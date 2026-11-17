@@ -20,6 +20,7 @@ import { PageHeader } from '../../../../shared/components/PageHeader';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useCommonConfirmDialog } from '../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
+import { DateEditor, normalizeDateInput } from '../../../../shared/components/f1-grid/editing/DateEditor';
 import {
   MaterialPickerDialog,
   CustomerPicker,
@@ -150,6 +151,8 @@ export function SalesOrderCreatePage({
   const [selectedQuotationCustomerId, setSelectedQuotationCustomerId] =
     useState<number | null>(null);
   const [deliveryDate, setDeliveryDate] = useState('');
+  const [orderDateError, setOrderDateError] = useState('');
+  const [deliveryDateError, setDeliveryDateError] = useState('');
   const [deliveryPlace, setDeliveryPlace] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('');
   const [remark, setRemark] = useState('');
@@ -226,6 +229,8 @@ export function SalesOrderCreatePage({
       setQuotationNumber(header.quotNo);
       setSelectedQuotationCustomerId(null);
       setDeliveryDate(header.deliveryDt);
+      setOrderDateError('');
+      setDeliveryDateError('');
       setDeliveryPlace(header.deliveryPlace);
       setDeliveryMethod(header.deliveryMethod);
       setRemark(header.remark);
@@ -353,21 +358,32 @@ export function SalesOrderCreatePage({
       return;
     }
 
+    const normalizedOrderDate = normalizeDateInput(orderDate);
+    const normalizedDeliveryDate = deliveryDate.trim() ? normalizeDateInput(deliveryDate) : '';
+    const nextOrderDateError = normalizedOrderDate ? ''
+      : orderDate.trim() ? '올바른 수주일자를 입력해 주세요.' : '수주일자를 입력해 주세요.';
+    const nextDeliveryDateError = deliveryDate.trim() && !normalizedDeliveryDate
+      ? '올바른 납기일자를 입력해 주세요.' : '';
+    setOrderDateError(nextOrderDateError);
+    setDeliveryDateError(nextDeliveryDateError);
+
     const input = {
-      orderDt: orderDate,
+      orderDt: normalizedOrderDate,
       customerId: customer?.id ?? null,
       quotNo: quotationNumber,
-      deliveryDt: deliveryDate,
+      deliveryDt: normalizedDeliveryDate,
       deliveryPlace,
       deliveryMethod,
       remark,
       details: gridRef.current?.getActiveRows() ?? [],
     };
     const errors = validateSalesOrderInput(input);
+    if (nextOrderDateError) errors.orderDt = nextOrderDateError;
     const isGridValid = gridRef.current?.validate() ?? true;
     gridValidationActiveRef.current = !isGridValid;
     const validationMessages = [
       errors.orderDt,
+      nextDeliveryDateError,
       errors.customerId,
       errors.details,
       ...errors.detailMessages,
@@ -667,20 +683,26 @@ export function SalesOrderCreatePage({
               slotProps={{ input: { readOnly: true } }}
               sx={{ '& .MuiInputBase-root': { backgroundColor: 'action.disabledBackground' } }}
             />
-            <TextField
+            <DateEditor
               label="수주일자"
-              type="date"
-              size="small"
+              variant="outlined"
+              autoFocus={false}
               required
               value={orderDate}
-              onChange={(event) => {
-                setOrderDate(event.target.value);
+              onChange={(value) => {
+                setOrderDate(value);
+                setOrderDateError('');
                 clearValidationErrors();
               }}
+              onBlur={() => {
+                const normalized = normalizeDateInput(orderDate);
+                if (normalized) setOrderDate(normalized);
+                setOrderDateError(normalized ? ''
+                  : orderDate.trim() ? '올바른 수주일자를 입력해 주세요.' : '수주일자를 입력해 주세요.');
+              }}
               disabled={!isEditable}
-              error={Boolean(validationErrors?.orderDt)}
-              helperText={validationErrors?.orderDt}
-              slotProps={{ inputLabel: { shrink: true } }}
+              error={Boolean(orderDateError || validationErrors?.orderDt)}
+              helperText={orderDateError || validationErrors?.orderDt}
             />
             <CustomerPicker
               value={customer}
@@ -734,17 +756,25 @@ export function SalesOrderCreatePage({
                 },
               }}
             />
-            <TextField
+            <DateEditor
               label="납기일자"
-              type="date"
-              size="small"
+              variant="outlined"
+              autoFocus={false}
               value={deliveryDate}
-              onChange={(event) => {
-                setDeliveryDate(event.target.value);
+              onChange={(value) => {
+                setDeliveryDate(value);
+                setDeliveryDateError('');
                 clearValidationErrors();
               }}
+              onBlur={() => {
+                const normalized = deliveryDate.trim() ? normalizeDateInput(deliveryDate) : '';
+                if (normalized) setDeliveryDate(normalized);
+                setDeliveryDateError(deliveryDate.trim() && !normalized
+                  ? '올바른 납기일자를 입력해 주세요.' : '');
+              }}
               disabled={!isEditable}
-              slotProps={{ inputLabel: { shrink: true } }}
+              error={Boolean(deliveryDateError)}
+              helperText={deliveryDateError}
             />
             <TextField
               label="납품장소"

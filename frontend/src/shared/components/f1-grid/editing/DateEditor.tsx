@@ -18,6 +18,7 @@ type DateEditorProps = {
   required?: boolean;
   error?: boolean;
   helperText?: string;
+  disabled?: boolean;
 };
 
 const DATE_FORMAT = 'YYYY-MM-DD';
@@ -86,6 +87,7 @@ export function DateEditor({
   required,
   error,
   helperText,
+  disabled = false,
 }: DateEditorProps) {
   const [draftValue, setDraftValue] = useState(value);
   const [calendarAnchor, setCalendarAnchor] =
@@ -93,7 +95,8 @@ export function DateEditor({
 
   useEffect(() => {
     setDraftValue(value);
-  }, [value]);
+    if (disabled) setCalendarAnchor(null);
+  }, [value, disabled]);
 
   const normalizedValue = normalizeDateInput(value);
   const parsedValue = normalizedValue
@@ -114,6 +117,7 @@ export function DateEditor({
         placeholder={variant === 'outlined' ? DATE_FORMAT : undefined}
         error={error}
         helperText={helperText}
+        disabled={disabled}
         value={draftValue}
         onChange={(event) => {
           const nextValue = event.target.value
@@ -150,6 +154,7 @@ export function DateEditor({
               <InputAdornment position="end">
                 <IconButton
                   size="small"
+                  disabled={disabled}
                   aria-label={label ? `${label} 달력 열기` : '달력 열기'}
                   onClick={(event) => setCalendarAnchor(event.currentTarget)}
                 >
@@ -198,12 +203,13 @@ export function DateEditor({
         }
       />
       <Popover
-        open={Boolean(calendarAnchor)}
+        open={!disabled && Boolean(calendarAnchor)}
         anchorEl={calendarAnchor}
         onClose={() => setCalendarAnchor(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
       >
         <DateCalendar
+          disabled={disabled}
           value={calendarValue}
           onChange={(nextValue) => {
             const nextDate = nextValue?.isValid()

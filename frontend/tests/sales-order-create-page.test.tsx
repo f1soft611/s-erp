@@ -60,6 +60,34 @@ describe('sales order entry page', () => {
     ]);
   });
 
+  it('normalizes form dates on blur and again when saving without blur', async () => {
+    updateSalesOrderMock.mockResolvedValue(loadedOrder());
+    renderSalesOrderPage(undefined, { mode: 'edit', salesOrderId: 300 });
+    await screen.findByDisplayValue('SO-20261027-0001');
+    expect(screen.getByRole('button', { name: '수주일자 달력 열기' })).toBeEnabled();
+    const orderDate = screen.getByLabelText(/수주일자/, { selector: 'input' });
+    const deliveryDate = screen.getByLabelText('납기일자');
+    fireEvent.change(orderDate, { target: { value: '20261117' } });
+    fireEvent.blur(orderDate);
+    expect(orderDate).toHaveValue('2026-11-17');
+    fireEvent.change(deliveryDate, { target: { value: '261118' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+    await waitFor(() => expect(updateSalesOrderMock).toHaveBeenCalledWith(
+      300, expect.objectContaining({ orderDt: '2026-11-17', deliveryDt: '2026-11-18' }),
+    ));
+  }, 15000);
+
+  it.each(['수주일자', '납기일자'])('blocks invalid %s without discarding its input', async (label) => {
+    renderSalesOrderPage(undefined, { mode: 'edit', salesOrderId: 300 });
+    await screen.findByDisplayValue('SO-20261027-0001');
+    const input = screen.getByLabelText(new RegExp(label), { selector: 'input' });
+    fireEvent.change(input, { target: { value: '20260230' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveValue('20260230');
+    expect(updateSalesOrderMock).not.toHaveBeenCalled();
+  });
+
   it('읽기전용 배경을 실제 편집 가능 여부에 따라 표시한다', () => {
     renderSalesOrderPage();
     const background = (label: string) => {
@@ -81,6 +109,8 @@ describe('sales order entry page', () => {
       expect(getComputedStyle(input.closest('.MuiInputBase-root')!).backgroundColor).toBe('rgba(0, 0, 0, 0.12)');
     }
     expect(screen.getByRole('button', { name: '거래처 선택' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '수주일자 달력 열기' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '납기일자 달력 열기' })).toBeDisabled();
   });
 
   it('renders the sales order form with its breadcrumb and API notice', () => {
@@ -277,7 +307,7 @@ describe('sales order entry page', () => {
   it('marks required header fields and detail grid columns', () => {
     renderSalesOrderPage();
 
-    expect(screen.getByLabelText(/수주일자/)).toBeRequired();
+    expect(screen.getByLabelText(/수주일자/, { selector: 'input' })).toBeRequired();
     expect(screen.getByLabelText(/거래처/, { selector: 'input' })).toBeRequired();
     expect(screen.getByLabelText(/견적번호/)).not.toBeRequired();
 
@@ -358,13 +388,13 @@ describe('sales order entry page', () => {
 
   it('shows required-field feedback without sending an invalid order', async () => {
     renderSalesOrderPage();
-    fireEvent.change(screen.getByLabelText(/수주일자/), {
+    fireEvent.change(screen.getByLabelText(/수주일자/, { selector: 'input' }), {
       target: { value: '' },
     });
 
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
 
-    expect(screen.getByLabelText(/수주일자/)).toHaveAttribute(
+    expect(screen.getByLabelText(/수주일자/, { selector: 'input' })).toHaveAttribute(
       'aria-invalid',
       'true',
     );
@@ -445,7 +475,7 @@ describe('sales order entry page', () => {
   it('shows save failure and retains all entered values', async () => {
     createSalesOrderMock.mockRejectedValue(new Error('저장을 완료하지 못했습니다.'));
     renderSalesOrderPage();
-    const initialOrderDate = (screen.getByLabelText(/수주일자/) as HTMLInputElement).value;
+    const initialOrderDate = (screen.getByLabelText(/수주일자/, { selector: 'input' }) as HTMLInputElement).value;
     await selectCustomer();
     await addAndCompleteDetail();
 
@@ -458,7 +488,7 @@ describe('sales order entry page', () => {
       'C-10 · 거래처 10',
     );
     expect(screen.getByLabelText('견적번호')).toHaveValue('');
-    expect(screen.getByLabelText(/수주일자/)).toHaveValue(initialOrderDate);
+    expect(screen.getByLabelText(/수주일자/, { selector: 'input' })).toHaveValue(initialOrderDate);
     const row = screen.getByRole('row', { name: /order-line-.*행 선택/ });
     expect(within(row).getByRole('gridcell', { name: 'M-20' })).toBeInTheDocument();
     expect(within(row).getByRole('gridcell', { name: '2.00' })).toBeInTheDocument();
@@ -622,9 +652,9 @@ describe('sales order entry page', () => {
 
   it('resets the header and detail grid with the new button after confirming unsaved changes', async () => {
     renderSalesOrderPage();
-    const today = (screen.getByLabelText(/수주일자/) as HTMLInputElement).value;
+    const today = (screen.getByLabelText(/수주일자/, { selector: 'input' }) as HTMLInputElement).value;
     await selectCustomer();
-    fireEvent.change(screen.getByLabelText(/수주일자/), { target: { value: '2026-01-02' } });
+    fireEvent.change(screen.getByLabelText(/수주일자/, { selector: 'input' }), { target: { value: '2026-01-02' } });
     fireEvent.change(screen.getByLabelText('견적번호'), { target: { value: 'QT-100' } });
     fireEvent.click(screen.getByRole('button', { name: '상세 행 추가' }));
 
@@ -641,7 +671,7 @@ describe('sales order entry page', () => {
 
     await waitFor(() => expect(screen.getByLabelText('견적번호')).toHaveValue(''));
     expect(screen.getByRole('textbox', { name: '거래처' })).toHaveValue('');
-    expect(screen.getByLabelText(/수주일자/)).toHaveValue(today);
+    expect(screen.getByLabelText(/수주일자/, { selector: 'input' })).toHaveValue(today);
     expect(screen.queryAllByRole('row', { name: /order-line-.*행 선택/ })).toHaveLength(0);
 
     fireEvent.click(screen.getByRole('button', { name: '신규' }));

@@ -3,7 +3,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { SalesStatementCreatePage } from '../src/pages/sales/shipment/statement/create/SalesStatementCreatePage';
 import { SalesStatementStatusPage } from '../src/pages/sales/shipment/statement/status/SalesStatementStatusPage';
-import { createStatement, getStatement, getStatementStatus, searchStatementSources } from '../src/pages/sales/shipment/statement/services/salesStatement.service';
+import { createStatement, getStatement, getStatementStatus, searchStatementSources, updateStatement } from '../src/pages/sales/shipment/statement/services/salesStatement.service';
 import { getDelivery } from '../src/pages/sales/shipment/delivery/create/services/salesDelivery.service';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
 
@@ -36,6 +36,38 @@ beforeEach(() => {
   vi.mocked(searchStatementSources).mockResolvedValue([source]);
   vi.mocked(getStatement).mockResolvedValue(item);
   vi.mocked(getStatementStatus).mockResolvedValue([]);
+});
+it('normalizes statement dates on blur and saves ISO without requiring blur', async () => {
+  vi.mocked(updateStatement).mockResolvedValue(item);
+  mount(<SalesStatementCreatePage {...props} statementId={3} />);
+  await screen.findByDisplayValue('TS-1');
+  expect(screen.getByRole('button', { name: '명세일 달력 열기' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: '출하일자 달력 열기' })).toBeDisabled();
+  const input = screen.getByLabelText(/명세일/, { selector: 'input' });
+  fireEvent.change(input, { target: { value: '20261117' } });
+  fireEvent.blur(input);
+  expect(input).toHaveValue('2026-11-17');
+  fireEvent.change(input, { target: { value: '261118' } });
+  fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+  await waitFor(() => expect(updateStatement).toHaveBeenCalledWith(
+    3, expect.objectContaining({ statementDt: '2026-11-18' }),
+  ));
+}, 15000);
+it.each(['20260230', ''])('blocks an invalid or missing statement date: %s', async (value) => {
+  mount(<SalesStatementCreatePage {...props} statementId={3} />);
+  await screen.findByDisplayValue('TS-1');
+  const input = screen.getByLabelText(/명세일/, { selector: 'input' });
+  fireEvent.change(input, { target: { value } });
+  fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+  expect(input).toHaveAttribute('aria-invalid', 'true');
+  expect(input).toHaveValue(value);
+  expect(updateStatement).not.toHaveBeenCalled();
+});
+it('disables the statement date and calendar in view mode', async () => {
+  mount(<SalesStatementCreatePage {...props} statementId={3} mode="view" />);
+  await screen.findByDisplayValue('TS-1');
+  expect(screen.getByLabelText(/명세일/, { selector: 'input' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '명세일 달력 열기' })).toBeDisabled();
 });
 it('selects one shipment and saves its server snapshot', async () => {
   vi.mocked(getDelivery).mockResolvedValue({

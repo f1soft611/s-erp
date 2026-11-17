@@ -6,6 +6,7 @@ import PrintIcon from '@mui/icons-material/Print';
 import { Alert, Box, IconButton, InputAdornment, Paper, TextField, Typography } from '@mui/material';
 import { PageHeader } from '../../../../../shared/components/PageHeader';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
+import { DateEditor } from '../../../../../shared/components/f1-grid/editing/DateEditor';
 import { StatementSourcePicker } from './components/StatementSourcePicker';
 import { StatementDetailGrid } from './components/StatementDetailGrid';
 import { StatementPrint } from '../components/StatementPrint';
@@ -15,7 +16,7 @@ import type { SalesStatementCreateProps } from './types/salesStatementCreate.typ
 export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
   const { currentMenuName, content, breadcrumbItems, selectedMenuPermissions: permissions, embedded = false } = props;
   const {
-    id, item, source, rows, date, setDate, remark, setRemark, picker, setPicker, printing, setPrinting,
+    id, item, source, rows, date, changeDate, commitDate, dateError, remark, setRemark, picker, setPicker, printing, setPrinting,
     pending, error, setError, notice, canRead, canSave, canDelete, editable, dirty, blocker, dialog,
     choose, save, remove, handleNew, print,
   } = useSalesStatementCreate(props);
@@ -44,15 +45,16 @@ export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' },
           columnGap: 2, rowGap: 1, '& > .MuiFormControl-root': { m: 0 } }}>
           <TextField size="small" label="명세번호" value={item?.statementNo ?? '저장 시 자동 채번'} slotProps={{ input: { readOnly: true } }} />
-          <TextField size="small" label="명세일" type="date" required value={date} disabled={!editable}
-            onChange={(event) => setDate(event.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+          <DateEditor label="명세일" variant="outlined" autoFocus={false} required value={date} disabled={!editable}
+            onChange={changeDate} onBlur={commitDate} error={Boolean(dateError)} helperText={dateError} />
           <TextField size="small" label="출하번호" value={source?.deliveryNo ?? ''}
             slotProps={{ input: { readOnly: true, endAdornment: <InputAdornment position="end">
               <IconButton size="small" aria-label="출하 선택" disabled={!editable || Boolean(id)} onClick={() => setPicker(true)}>
                 <SearchIcon fontSize="small" />
               </IconButton></InputAdornment> } }} />
           <TextField size="small" label="거래처" value={source?.customerName ?? ''} slotProps={{ input: { readOnly: true } }} />
-          <TextField size="small" label="출하일자" value={source?.deliveryDt ?? ''} slotProps={{ input: { readOnly: true } }} />
+          <DateEditor label="출하일자" variant="outlined" autoFocus={false} value={source?.deliveryDt ?? ''}
+            disabled onChange={() => {}} />
           <TextField size="small" label="비고" multiline minRows={2} sx={{ gridColumn: '1 / -1' }} value={remark}
             disabled={!editable} onChange={(event) => setRemark(event.target.value)} slotProps={{ htmlInput: { maxLength: 500 } }} />
         </Box>
