@@ -2,6 +2,7 @@ package egovframework.let.materials.order.create.domain.model;
 
 import java.io.Serializable;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -12,13 +13,16 @@ import lombok.Setter;
  * @since 2026.11.13
  * @version 1.0
  */
+@Schema(description = "입고대기 마감 저장 요청의 상세 행(발주 행 ID, 마감 값) 모델")
 @Getter
 @Setter
 public class PurchaseOrderReceiptCloseDetailVO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    @Schema(description = "발주 상세 ID", example = "120")
     private Long purchaseOrderDetailId;
-    /** Y 마감 / N 마감 취소 */
+
+    @Schema(description = "Y 마감 / N 마감 취소", example = "N")
     private String receiptCloseAt;
 }
