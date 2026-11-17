@@ -438,6 +438,8 @@ interface F1GridColumn<T> {
 
 ## 컬럼 확장 API (표시 커스터마이징)
 
+`F1GridColumn.options`는 `F1GridOption[]` 형태의 선택 목록이며 `select`/`autocomplete` 편집기, 값의 label 표시, 행 폼 및 상세검색에서 공유한다. `decimal`/`decimalPlaces`/`trailingZeros`/`rounding` 소수점 설정과 독립적으로 함께 제공한다. 소수점 옵션 확장 시에도 이 선택 목록 타입 계약을 유지해야 한다.
+
 `renderCell`, `getCellStyle`, `getCellProps`는 컬럼별로 표시 영역, 동적 스타일, 셀 속성, 접근성 메타데이터를 직접 확장할 수 있게 해준다.
 
 ```typescript

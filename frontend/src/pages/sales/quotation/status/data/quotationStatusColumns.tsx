@@ -15,6 +15,7 @@ const amountColumn = (
   field,
   headerName,
   type,
+  width,
   align: 'right',
   editable: false,
   search: { hidden: true },

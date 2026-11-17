@@ -179,6 +179,7 @@ export type F1GridColumn<T extends object> = {
   trailingZeros?: F1GridTrailingZeros;
   /** 반올림 방식: HALF_UP(반올림) / UP(올림) / DOWN(내림). 미지정 시 정책 관리 값. */
   rounding?: F1GridRoundingMode;
+  options?: F1GridOption[];
   userOptions?: F1GridUserOption[];
   selectOptionIcon?: (option: F1GridOption) => ReactNode;
   required?: boolean;

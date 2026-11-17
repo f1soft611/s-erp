@@ -46,6 +46,7 @@ import {
 type CommonCodeManagementPanelProps = {
   groups: CommonCodeGroupRow[];
   moduleOptions?: CommonCodeModuleOption[];
+  searchQuery?: string;
   canExportExcel?: boolean;
   onGroupsSaved?: (options?: { silent?: boolean }) => Promise<void> | void;
   onSaveSuccess?: (message: string) => void;
@@ -261,6 +262,7 @@ export const buildGroupColumns = (
   },
   {
     field: 'groupDc',
+    headerName: '그룹 설명',
     editable: true,
     search: { span: 2 },
     flex: 1,
