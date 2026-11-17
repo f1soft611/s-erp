@@ -12,7 +12,6 @@ import { sanitizeCustomerNumberInput } from '../utils/customerNumberInput';
 export type CustomerGridProps = {
   rows: CustomerRow[];
   columns: F1GridColumn<CustomerRow>[];
-  highlightKeyword?: string;
   canCreate: boolean;
   canUpdate: boolean;
   canExportExcel: boolean;
@@ -69,7 +68,6 @@ export function createCustomerColumns(
       align: 'center',
       editable: false,
       pinned: 'left',
-      highlightSearch: true,
       form: { hidden: true },
       search: { hidden: true },
     },
@@ -80,7 +78,6 @@ export function createCustomerColumns(
       editable: canEdit,
       required: true,
       pinned: 'left',
-      highlightSearch: true,
       validation: { unique: true },
       form: { group: '기본정보', order: 2 },
       search: { hidden: true },
@@ -90,7 +87,6 @@ export function createCustomerColumns(
       headerName: '약칭',
       width: 110,
       editable: canEdit,
-      highlightSearch: true,
       form: { group: '기본정보', order: 3 },
       search: { hidden: true },
     },
@@ -272,7 +268,6 @@ export function createCustomerColumns(
 export function CustomerGrid({
   rows,
   columns,
-  highlightKeyword,
   canCreate,
   canUpdate,
   canExportExcel,
@@ -300,7 +295,6 @@ export function CustomerGrid({
       storageKey="co-master-customer-grid"
       rows={rows}
       columns={columns}
-      highlightKeyword={highlightKeyword}
       rowKey="customerId"
       rowFormPlugin={rowFormPlugin}
       createRow={createCustomerRow}

@@ -1,5 +1,4 @@
 import { Link } from '@mui/material';
-import { F1GridHighlightText } from '../../../../../shared/components/f1-grid';
 import type { F1GridColumn, F1GridOption } from '../../../../../shared/components/f1-grid/types/grid.types';
 import { PURCHASE_REQUEST_STATUS_OPTIONS } from '../../create/services/purchaseRequest.service';
 import type { PurchaseRequestStatusRow } from '../types/purchaseRequestStatus.types';
@@ -47,9 +46,8 @@ export function createPurchaseRequestStatusColumns({
       mergeRows: true,
       align: 'center',
       search: { label: '구매요청번호', order: 2, span: 2, group: '구매요청정보' },
-      highlightSearch: true,
       renderCell: onOpenRequest
-        ? ({ row, highlightKeyword }) => (
+        ? ({ row }) => (
             <Link
               component="button"
               type="button"
@@ -72,7 +70,7 @@ export function createPurchaseRequestStatusColumns({
                 verticalAlign: 'baseline',
               }}
             >
-              {highlightKeyword ? <F1GridHighlightText text={row.requestNo} keyword={highlightKeyword} /> : row.requestNo}
+              {row.requestNo}
             </Link>
           )
         : undefined,
@@ -105,7 +103,6 @@ export function createPurchaseRequestStatusColumns({
       align: 'center',
       editable: false,
       mergeRows: true,
-      highlightSearch: true,
       search: { label: '요청자', order: 3, span: 2, group: '구매요청정보' },
     },
     {
@@ -145,10 +142,9 @@ export function createPurchaseRequestStatusColumns({
       width: 110,
       align: 'center',
       editable: false,
-      highlightSearch: true,
       search: { label: '품목', order: 5, span: 2, group: '품목정보' },
     },
-    { field: 'materialName', headerName: '품목명', type: 'text', width: 180, editable: false, highlightSearch: true, search: { hidden: true } },
+    { field: 'materialName', headerName: '품목명', type: 'text', width: 180, editable: false, search: { hidden: true } },
     { field: 'materialSpec', headerName: '규격', type: 'text', width: 110, editable: false, search: { hidden: true } },
     { field: 'unit', headerName: '단위', type: 'text', width: 60, align: 'center', editable: false, search: { hidden: true } },
     quantityColumn('requestQty', '요청수량'),

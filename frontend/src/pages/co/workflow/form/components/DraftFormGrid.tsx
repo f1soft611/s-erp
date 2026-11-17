@@ -24,7 +24,6 @@ export type DraftFormGridProps = {
   loading: boolean;
   gridKey: number;
   gridRef: RefObject<F1GridRef<DraftFormRow> | null>;
-  highlightKeyword?: string;
   onChangesChange: (changes: F1GridChanges<DraftFormRow>) => void;
 };
 
@@ -143,7 +142,6 @@ export function createDraftFormColumns(
     {
       field: 'cataTypeCode',
       headerName: '양식코드',
-      highlightSearch: true,
       width: 110,
       editable: false,
       align: 'center',
@@ -154,7 +152,6 @@ export function createDraftFormColumns(
     {
       field: 'codeName',
       headerName: '양식명',
-      highlightSearch: true,
       flex: 1,
       width: 300,
       editable: canEdit,
@@ -330,7 +327,6 @@ export function DraftFormGrid({
   loading,
   gridKey,
   gridRef,
-  highlightKeyword,
   onChangesChange,
 }: DraftFormGridProps) {
   const [layoutMigrated] = useState(migrateDraftFormGridActionPin);
@@ -351,7 +347,6 @@ export function DraftFormGrid({
       ariaLabel="기안양식 목록"
       storageKey={DRAFT_FORM_GRID_STORAGE_KEY}
       rows={rows}
-      highlightKeyword={highlightKeyword}
       columns={columns}
       rowKey="draftingWorkCategoryId"
       rowFormPlugin={rowFormPlugin}

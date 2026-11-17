@@ -90,7 +90,7 @@ export function useSalesStatementStatus(props: StatementPageProps) {
   };
 
   return {
-    defaults, values, setValues, applied, keyword, setKeyword, appliedKeyword, rows, loading, error, setError,
+    defaults, values, setValues, applied, keyword, setKeyword, rows, loading, error, setError,
     loaded, selectedId, detail, detailError, detailLoading, editor, setEditor, printing, setPrinting,
     canRead, detailPermissions, search, columns, resetSearch, closeDetail, saved, deleted,
   };

@@ -1,5 +1,4 @@
 export { F1Grid } from './core/F1Grid';
-export { F1GridHighlightText } from './core/GridHighlightText';
 export { F1Tree } from './tree/F1Tree';
 export * from './types/grid.types';
 export * from './state/GridState';

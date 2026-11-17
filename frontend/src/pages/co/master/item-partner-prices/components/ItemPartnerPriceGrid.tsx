@@ -24,7 +24,6 @@ type PickerState = {
 
 type Props = {
   rows: ItemPartnerPriceRow[];
-  highlightKeyword?: string;
   canCreate: boolean;
   canUpdate: boolean;
   canExportExcel: boolean;
@@ -36,7 +35,6 @@ type Props = {
 
 export function ItemPartnerPriceGrid({
   rows,
-  highlightKeyword,
   canCreate,
   canUpdate,
   canExportExcel,
@@ -88,7 +86,6 @@ export function ItemPartnerPriceGrid({
         storageKey="co-master-item-partner-price-grid-v1"
         rows={rows}
         columns={columns}
-        highlightKeyword={highlightKeyword}
         rowKey="priceId"
         rowFormPlugin={rowFormPlugin}
         createRow={createItemPartnerPriceRow}

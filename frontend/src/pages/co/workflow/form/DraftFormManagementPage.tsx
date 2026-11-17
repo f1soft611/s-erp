@@ -397,7 +397,6 @@ export function DraftFormManagementPage({
       >
         <DraftFormGrid
           rows={management.rows}
-          highlightKeyword={management.appliedFilters.keyword?.trim()}
           columns={columns}
           canCreate={
             pagePermissions.create &&

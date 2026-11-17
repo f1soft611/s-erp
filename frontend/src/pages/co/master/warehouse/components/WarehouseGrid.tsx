@@ -16,7 +16,6 @@ import { sanitizeWarehouseNumberInput } from '../utils/warehouseNumberInput';
 export type WarehouseGridProps = {
   rows: WarehouseRow[];
   columns: F1GridColumn<WarehouseRow>[];
-  highlightKeyword?: string;
   canCreate: boolean;
   canUpdate: boolean;
   canExportExcel: boolean;
@@ -100,7 +99,6 @@ export function createWarehouseColumns(
       align: 'center',
       editable: canEdit,
       pinned: 'left',
-      highlightSearch: true,
       form: { group: '기본정보', order: 1 },
       search: { hidden: true },
     },
@@ -112,7 +110,6 @@ export function createWarehouseColumns(
       required: true,
       pinned: 'left',
       validation: { unique: true },
-      highlightSearch: true,
       form: { group: '기본정보', order: 2 },
       search: { label: '창고명', order: 1 },
     },
@@ -268,7 +265,6 @@ export function createWarehouseColumns(
 export function WarehouseGrid({
   rows,
   columns,
-  highlightKeyword,
   canCreate,
   canUpdate,
   canExportExcel,
@@ -296,7 +292,6 @@ export function WarehouseGrid({
       storageKey="co-master-warehouse-grid"
       rows={rows}
       columns={columns}
-      highlightKeyword={highlightKeyword}
       rowKey="warehouseId"
       rowFormPlugin={rowFormPlugin}
       createRow={createWarehouseRow}

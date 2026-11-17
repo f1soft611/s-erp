@@ -212,7 +212,6 @@ export function SalesOrderStatusPage({
               orderStatusOptions={search.commonCodes.orderStatusOptions}
               progressStatusOptions={search.commonCodes.progressStatusOptions}
               deliveryMethodOptions={search.commonCodes.deliveryMethodOptions}
-              highlightKeyword={search.appliedFilters?.keyword}
             />
           </Box>
         </Box>

@@ -166,7 +166,6 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
     <PageMessageArea message={management.error} onClose={() => management.setError('')} />
     <Box sx={{ flex: 1, minHeight: 280, minWidth: 0, p: 1 }}>
       <MaterialGrid rows={management.rows} columns={columns}
-        highlightKeyword={management.appliedFilters.keyword}
         canCreate={canCreate && !management.loading && !management.saving}
         canUpdate={canUpdate && !management.loading && !management.saving}
         canExportExcel={Boolean(selectedMenuPermissions?.excel)}

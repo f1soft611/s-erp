@@ -1,5 +1,4 @@
 import { Link } from '@mui/material';
-import { F1GridHighlightText } from '../../../../../shared/components/f1-grid';
 import type { F1GridColumn } from '../../../../../shared/components/f1-grid/types/grid.types';
 import type { QuotationStatusRow } from '../types/quotationStatus.types';
 
@@ -45,9 +44,8 @@ export function createQuotationStatusColumns({
       mergeRows: true,
       align: 'center',
       search: { label: '견적번호', order: 2, span: 2, group: '견적정보' },
-      highlightSearch: true,
       renderCell: onOpenQuotation
-        ? ({ row, highlightKeyword }) => (
+        ? ({ row }) => (
             <Link
               component="button"
               type="button"
@@ -69,7 +67,7 @@ export function createQuotationStatusColumns({
                 verticalAlign: 'baseline',
               }}
             >
-              {highlightKeyword ? <F1GridHighlightText text={row.quotationNo} keyword={highlightKeyword} /> : row.quotationNo}
+              {row.quotationNo}
             </Link>
           )
         : undefined,
@@ -111,7 +109,6 @@ export function createQuotationStatusColumns({
       align: 'center',
       editable: false,
       mergeRows: true,
-      highlightSearch: true,
       search: { hidden: true },
     },
     {
@@ -120,7 +117,6 @@ export function createQuotationStatusColumns({
       width: 170,
       editable: false,
       mergeRows: true,
-      highlightSearch: true,
       search: { label: '거래처', order: 3, span: 2, group: '견적정보' },
     },
     {
@@ -138,7 +134,6 @@ export function createQuotationStatusColumns({
       width: 120,
       align: 'center',
       editable: false,
-      highlightSearch: true,
       search: { hidden: true },
     },
     {
@@ -146,7 +141,6 @@ export function createQuotationStatusColumns({
       headerName: '품목명',
       width: 180,
       editable: false,
-      highlightSearch: true,
       search: { label: '품목', order: 4, span: 2, group: '견적정보' },
     },
     {

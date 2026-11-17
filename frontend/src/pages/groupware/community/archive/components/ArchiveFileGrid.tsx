@@ -16,7 +16,6 @@ import {
 } from '@mui/material';
 import { getAttachmentIconMeta } from '../../../../../shared/components/feed/attachmentIconMeta';
 import {
-  F1GridHighlightText,
   F1Tree,
   type F1GridColumn,
 } from '../../../../../shared/components/f1-grid';
@@ -28,7 +27,6 @@ type ArchiveFileGridProps = {
   canUpdate: boolean;
   canDelete: boolean;
   canExportExcel: boolean;
-  highlightKeyword?: string;
   onFolderOpen: (folderCode: string) => void;
   onDownload: (row: ArchiveFileRow) => void;
   onEdit: (row: ArchiveFileRow) => void;
@@ -57,7 +55,6 @@ export function ArchiveFileGrid({
   canUpdate,
   canDelete,
   canExportExcel,
-  highlightKeyword,
   onFolderOpen,
   onDownload,
   onEdit,
@@ -74,8 +71,7 @@ export function ArchiveFileGrid({
         width: 240,
         editable: false,
         search: { hidden: true },
-        highlightSearch: true,
-        renderCell: ({ row, highlightKeyword: keyword }) => {
+        renderCell: ({ row }) => {
           if (row.rowType === 'section') {
             return (
               <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
@@ -105,11 +101,7 @@ export function ArchiveFileGrid({
                     fontWeight: 700,
                   }}
                 >
-                  {keyword ? (
-                    <F1GridHighlightText text={row.folderName} keyword={keyword} />
-                  ) : (
-                    row.folderName
-                  )}
+                  {row.folderName}
                 </Button>
                 {!row.active && (
                   <Chip label="사용 중지" size="small" variant="outlined" />
@@ -158,11 +150,7 @@ export function ArchiveFileGrid({
                     fontWeight: 400,
                   }}
                 >
-                  {keyword ? (
-                    <F1GridHighlightText text={row.file.fileName} keyword={keyword} />
-                  ) : (
-                    row.file.fileName
-                  )}
+                  {row.file.fileName}
                 </Button>
                 {isNarrow && (
                   <Typography variant="caption" color="text.secondary">
@@ -189,17 +177,8 @@ export function ArchiveFileGrid({
           width: 120,
           editable: false,
           search: { hidden: true },
-          highlightSearch: true,
-          renderCell: ({ row, highlightKeyword: keyword }) => {
-            if (row.rowType !== 'file') return '—';
-            const writerName = row.file.writerName;
-            if (!writerName) return '—';
-            return keyword ? (
-              <F1GridHighlightText text={writerName} keyword={keyword} />
-            ) : (
-              writerName
-            );
-          },
+          renderCell: ({ row }) =>
+            row.rowType === 'file' ? (row.file.writerName ?? '—') : '—',
         },
         {
           field: 'uploadedAt',
@@ -291,7 +270,6 @@ export function ArchiveFileGrid({
       <F1Tree
         ariaLabel="자료실"
         rows={rows}
-        highlightKeyword={highlightKeyword}
         columns={columns}
         rowKey="rowKey"
         parentKey="parentId"

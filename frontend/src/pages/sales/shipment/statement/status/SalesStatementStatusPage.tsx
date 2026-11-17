@@ -14,7 +14,7 @@ import { useSalesStatementStatus } from './hooks/useSalesStatementStatus';
 
 export function SalesStatementStatusPage(props: StatementPageProps) {
   const {
-    defaults, values, setValues, applied, keyword, setKeyword, appliedKeyword, rows, loading, error, setError,
+    defaults, values, setValues, applied, keyword, setKeyword, rows, loading, error, setError,
     loaded, selectedId, detail, detailError, detailLoading, editor, setEditor, printing, setPrinting,
     canRead, detailPermissions, search, columns, resetSearch, closeDetail, saved, deleted,
   } = useSalesStatementStatus(props);
@@ -45,7 +45,7 @@ export function SalesStatementStatusPage(props: StatementPageProps) {
     ) : null}
     <Box data-testid="sales-status-content" sx={{ px: { xs: 1, sm: 2 }, pt: 1, pb: 2, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 360, flex: 1 }}>
       <Box sx={{ flex: 1, minHeight: 320, minWidth: 0, overflow: 'hidden' }}>
-        <F1Grid ariaLabel="거래명세서현황 목록" rows={rows} columns={columns} rowKey="salesStatementDetailId" highlightKeyword={appliedKeyword}
+        <F1Grid ariaLabel="거래명세서현황 목록" rows={rows} columns={columns} rowKey="salesStatementDetailId"
           storageKey="sales-statement-status-grid-v1" loading={loading} showCheckbox={false} height="100%"
           minHeight={320} selectionMode="row" selectRowOnContextMenu={false} allowAddRowInContextMenu={false}
           allowDuplicateRowInContextMenu={false} allowDeleteRowInContextMenu={false}

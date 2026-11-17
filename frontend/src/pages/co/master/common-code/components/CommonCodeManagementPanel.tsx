@@ -47,7 +47,6 @@ type CommonCodeManagementPanelProps = {
   groups: CommonCodeGroupRow[];
   moduleOptions?: CommonCodeModuleOption[];
   searchQuery?: string;
-  highlightKeyword?: string;
   canExportExcel?: boolean;
   onGroupsSaved?: (options?: { silent?: boolean }) => Promise<void> | void;
   onSaveSuccess?: (message: string) => void;
@@ -242,7 +241,6 @@ export const buildGroupColumns = (
     editable: true,
     required: true,
     width: 120,
-    highlightSearch: true,
   },
   {
     field: 'groupNm',
@@ -250,7 +248,6 @@ export const buildGroupColumns = (
     editable: true,
     required: true,
     pinned: 'left',
-    highlightSearch: true,
     flex: 1,
   },
   {
@@ -268,7 +265,6 @@ export const buildGroupColumns = (
     headerName: '그룹 설명',
     editable: true,
     search: { span: 2 },
-    highlightSearch: true,
     flex: 1,
   },
 ];
@@ -357,7 +353,6 @@ export const CommonCodeManagementPanel = forwardRef<
     groups,
     moduleOptions = EMPTY_MODULE_OPTIONS,
     searchQuery = '',
-    highlightKeyword,
     canExportExcel = false,
     onGroupsSaved,
     onSaveSuccess,
@@ -1004,7 +999,6 @@ export const CommonCodeManagementPanel = forwardRef<
                 ref={treeRef}
                 rows={filteredGroups}
                 columns={groupGridColumns}
-                highlightKeyword={highlightKeyword}
                 rowKey="id"
                 parentKey="parentGroupId"
                 treeColumn="groupNm"

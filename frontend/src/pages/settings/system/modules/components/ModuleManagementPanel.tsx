@@ -54,7 +54,6 @@ type ModuleManagementPanelProps = {
   onError?: (message: string) => void;
   moduleGridKey?: number;
   moduleGridLoading?: boolean;
-  highlightKeyword?: string;
   saving?: boolean;
 };
 
@@ -135,7 +134,6 @@ export const ModuleManagementPanel = forwardRef<
     onError,
     moduleGridKey = 0,
     moduleGridLoading = false,
-    highlightKeyword,
     saving = false,
   },
   ref,
@@ -169,7 +167,6 @@ export const ModuleManagementPanel = forwardRef<
       {
         field: 'moduleCode',
         headerName: '모듈 코드',
-        highlightSearch: true,
         flex: 1,
         editable: (row) => !saving && canEditModuleCode(row),
         required: true,
@@ -179,7 +176,6 @@ export const ModuleManagementPanel = forwardRef<
       {
         field: 'moduleName',
         headerName: '모듈명',
-        highlightSearch: true,
         flex: 1.2,
         editable: !saving,
         required: true,
@@ -199,7 +195,6 @@ export const ModuleManagementPanel = forwardRef<
       {
         field: 'moduleUrl',
         headerName: '루트 경로',
-        highlightSearch: true,
         flex: 1.2,
         editable: !saving,
         required: true,
@@ -479,7 +474,6 @@ export const ModuleManagementPanel = forwardRef<
               key={moduleGridKey}
               ref={gridRef}
               rows={modules}
-              highlightKeyword={highlightKeyword}
               columns={columns}
               rowKey="id"
               storageKey="settings-system-module-grid"

@@ -268,7 +268,6 @@ export function ModuleManagementPage({
         onError={setError}
         moduleGridKey={moduleGridKey}
         moduleGridLoading={pageLoading}
-        highlightKeyword={searchQuery.trim()}
         saving={saving}
       />
       <UnsavedChangesConfirmDialog

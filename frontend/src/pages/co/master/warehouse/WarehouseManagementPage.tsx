@@ -295,7 +295,6 @@ export function WarehouseManagementPage({
         <WarehouseGrid
           rows={management.rows}
           columns={columns}
-          highlightKeyword={management.appliedFilters.keyword}
           canCreate={pagePermissions.create && !management.saving}
           canUpdate={pagePermissions.update && !management.saving}
           canExportExcel={pagePermissions.excel}

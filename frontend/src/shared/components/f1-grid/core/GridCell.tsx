@@ -21,7 +21,6 @@ import {
   isCellEditable,
   isGridCheckboxChecked,
 } from '../utils/grid.utils';
-import { F1GridHighlightText } from './GridHighlightText';
 
 type GridCellProps<T extends object> = {
   row: T;
@@ -31,7 +30,6 @@ type GridCellProps<T extends object> = {
   showCheckbox?: boolean;
   columnLine: boolean;
   stripeRows: boolean;
-  highlightKeyword?: string;
   focused: boolean;
   selectionMode?: 'cell' | 'row';
   editing: boolean;
@@ -98,7 +96,6 @@ const areGridCellPropsEqual = <T extends object>(
     prev.showCheckbox === next.showCheckbox &&
     prev.columnLine === next.columnLine &&
     prev.stripeRows === next.stripeRows &&
-    prev.highlightKeyword === next.highlightKeyword &&
     prev.focused === next.focused &&
     prev.selectionMode === next.selectionMode &&
     prev.editing === next.editing &&
@@ -132,7 +129,6 @@ const GridCellInner = <T extends object>({
   showCheckbox = true,
   columnLine,
   stripeRows,
-  highlightKeyword,
   focused,
   selectionMode = 'cell',
   editing,
@@ -178,9 +174,8 @@ const GridCellInner = <T extends object>({
       field: column.field,
       value,
       rowIndex,
-      highlightKeyword,
     }),
-    [column, highlightKeyword, row, rowId, rowIndex, value],
+    [column, row, rowId, rowIndex, value],
   );
   const imageContent = column.type === 'image' ? column.renderCell?.(cellRenderContext) : undefined;
   const displayValue = useMemo(
@@ -476,11 +471,7 @@ const GridCellInner = <T extends object>({
                   : 'normal',
             }}
           >
-            {highlightKeyword ? (
-              <F1GridHighlightText text={displayValue} keyword={highlightKeyword} />
-            ) : (
-              displayValue
-            )}
+            {displayValue}
           </Box>
         </>
       )}

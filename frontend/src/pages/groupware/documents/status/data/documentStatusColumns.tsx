@@ -1,5 +1,4 @@
 import { Chip, Link } from '@mui/material';
-import { F1GridHighlightText } from '../../../../../shared/components/f1-grid';
 import type { F1GridColumn } from '../../../../../shared/components/f1-grid/types/grid.types';
 import type { DocumentStatusRow } from '../types/documentStatus.types';
 import { getApprovalStatusPresentation } from '../../write/data/documentPresentation';
@@ -52,9 +51,8 @@ export function createDocumentStatusColumns({
         span: 1,
         group: '문서정보',
       },
-      highlightSearch: true,
       renderCell: onOpenDocument
-        ? ({ row, highlightKeyword }) => (
+        ? ({ row }) => (
             <Link
               component="button"
               type="button"
@@ -79,7 +77,7 @@ export function createDocumentStatusColumns({
                 verticalAlign: 'baseline',
               }}
             >
-              {highlightKeyword ? <F1GridHighlightText text={row.documentNo} keyword={highlightKeyword} /> : row.documentNo}
+              {row.documentNo}
             </Link>
           )
         : undefined,
@@ -89,7 +87,6 @@ export function createDocumentStatusColumns({
       headerName: '제목',
       width: 260,
       editable: false,
-      highlightSearch: true,
       search: { label: '제목', order: 5, span: 4, group: '제목' },
     },
     {
@@ -156,7 +153,6 @@ export function createDocumentStatusColumns({
       width: 100,
       align: 'center',
       editable: false,
-      highlightSearch: true,
       search: { label: '기안자', order: 6, group: '기안정보' },
     },
     {
