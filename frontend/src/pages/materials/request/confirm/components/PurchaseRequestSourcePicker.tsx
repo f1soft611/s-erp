@@ -127,6 +127,7 @@ export function PurchaseRequestSourcePicker({ open, onClose, onSelect }: {
           <F1Grid
             ref={gridRef}
             ariaLabel="확정 대상 구매요청 품목 목록"
+            storageKey="materials-purchase-request-source-picker-grid-v1"
             rows={rows}
             columns={columns}
             rowKey="purchaseRequestDetailId"
