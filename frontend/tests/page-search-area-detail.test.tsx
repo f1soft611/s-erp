@@ -1,7 +1,17 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import dayjs from 'dayjs';
 import { useState } from 'react';
+
+const { getSystemDateMock } = vi.hoisted(() => ({
+  getSystemDateMock: vi.fn(),
+}));
+vi.mock('../src/shared/services/systemDateService', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../src/shared/services/systemDateService')
+  >()),
+  getSystemDate: getSystemDateMock,
+}));
 import { PageSearchArea } from '../src/shared/components/PageSearchArea';
 import type { PageSearchField } from '../src/shared/components/page-search/searchFields';
 
@@ -391,6 +401,60 @@ describe('PageSearchArea 상세 검색', () => {
     expect(onSearch).toHaveBeenCalledWith({
       orderDt: { from: '2026-10-01', to: '2026-10-22' },
     });
+  });
+
+  it('필수 날짜 조건에만 서버 날짜 기준 빠른 날짜 버튼을 제공한다', async () => {
+    getSystemDateMock.mockResolvedValue('2026-11-17');
+    const onSearch = vi.fn();
+    render(
+      <PageSearchArea
+        detailFields={[
+          {
+            field: 'orderDt',
+            label: '수주일자',
+            type: 'date',
+            searchSpan: 3,
+            required: true,
+          },
+          {
+            field: 'dueDt',
+            label: '납기일',
+            type: 'date',
+            searchSpan: 3,
+          },
+        ]}
+        onDetailSearch={onSearch}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    const group = screen.getByRole('group', {
+      name: '수주일자 빠른 날짜 세팅',
+    });
+    expect(
+      screen.queryByRole('group', { name: '납기일 빠른 날짜 세팅' }),
+    ).toBeNull();
+
+    fireEvent.click(within(group).getByRole('button', { name: '전월' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('수주일자 시작일')).toHaveValue(
+        '2026-10-01',
+      ),
+    );
+    expect(screen.getByLabelText('수주일자 종료일')).toHaveValue('2026-10-31');
+
+    fireEvent.click(within(group).getByRole('button', { name: '오늘' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('수주일자 시작일')).toHaveValue(
+        '2026-11-17',
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    expect(onSearch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderDt: { from: '2026-11-17', to: '2026-11-17' },
+      }),
+    );
   });
 
   it('필수 날짜 상세조건은 칩에서 해제할 수 없다', () => {

@@ -1,4 +1,10 @@
-import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  Fragment,
+  useEffect,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import {
   Badge,
   Box,
@@ -20,6 +26,9 @@ import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownR
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import { DateEditor, normalizeDateInput } from './f1-grid/editing/DateEditor';
 import { useF1GridFormattedInput } from './f1-grid/editing/useF1GridFormattedInput';
+import { QUICK_DATE_PRESETS, resolveQuickDate } from './page-search/quickDates';
+import { getSystemDate } from '../services/systemDateService';
+import dayjs from 'dayjs';
 import type {
   PageSearchField,
   PageSearchFieldValue,
@@ -190,6 +199,7 @@ export function PageSearchArea({
     mergeSearchValues(defaultValues, detailValues),
   );
   const [dateErrors, setDateErrors] = useState<Record<string, boolean>>({});
+  const [quickDateError, setQuickDateError] = useState(false);
   const [requiredErrors, setRequiredErrors] = useState<Record<string, boolean>>(
     {},
   );
@@ -238,6 +248,26 @@ export function PageSearchArea({
       ),
     );
     onDetailValuesChange?.(next);
+  };
+
+  const applyQuickDate = async (
+    field: PageSearchField,
+    preset: (typeof QUICK_DATE_PRESETS)[number],
+  ) => {
+    try {
+      const today = await getSystemDate();
+      const range = resolveQuickDate(preset, dayjs(today));
+      setQuickDateError(false);
+      setDateErrors((current) => {
+        const next = { ...current };
+        delete next[`${field.field}.from`];
+        delete next[`${field.field}.to`];
+        return next;
+      });
+      updateValue(field.field, range);
+    } catch {
+      setQuickDateError(true);
+    }
   };
 
   const closeDetails = () => {
@@ -335,9 +365,12 @@ export function PageSearchArea({
       md: `span ${span}`,
     };
 
+    const showQuickDates = field.type === 'date' && field.required === true;
+    const quickSpan = Math.max(5 - span, 1);
+
     return (
+      <Fragment key={field.field}>
       <Box
-        key={field.field}
         data-search-field={field.field}
         data-search-span={span}
         sx={{ gridColumn, minWidth: 0 }}
@@ -428,6 +461,45 @@ export function PageSearchArea({
           />
         )}
       </Box>
+      {showQuickDates && (
+        <Box
+          role="group"
+          aria-label={`${field.label} 빠른 날짜 세팅`}
+          data-quick-dates={field.field}
+          sx={{
+            gridColumn: {
+              xs: 'span 1',
+              sm: 'span 2',
+              md: `span ${quickSpan}`,
+            },
+            minWidth: 0,
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            alignContent: 'flex-start',
+            gap: 0.75,
+            minHeight: 40,
+          }}
+        >
+          {QUICK_DATE_PRESETS.map((preset) => (
+            <Button
+              key={preset.key}
+              size="small"
+              variant="outlined"
+              onClick={() => void applyQuickDate(field, preset)}
+              sx={{ minWidth: 0, px: 1, whiteSpace: 'nowrap' }}
+            >
+              {preset.label}
+            </Button>
+          ))}
+          {quickDateError && (
+            <FormHelperText error sx={{ width: '100%', m: 0 }}>
+              서버 날짜를 불러오지 못했습니다.
+            </FormHelperText>
+          )}
+        </Box>
+      )}
+      </Fragment>
     );
   };
 
