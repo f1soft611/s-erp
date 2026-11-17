@@ -80,6 +80,10 @@ export function createMaterialColumns(
         definition.field === 'materialName' ||
         definition.field === 'materialTypeCode',
       type: codeGroup ? 'select' : 'text',
+      ...(['materialCode', 'materialName', 'materialEngName', 'materialModelName', 'searchItemName']
+        .includes(definition.field)
+        ? { highlightSearch: true }
+        : {}),
       ...(codeGroup ? { options: fieldOptions } : {}),
       form: definition.field === 'materialCode'
         ? { hidden: true }
@@ -191,6 +195,7 @@ export function createMaterialColumns(
 type Props = {
   rows: MaterialRow[];
   columns: F1GridColumn<MaterialRow>[];
+  highlightKeyword?: string;
   canCreate: boolean;
   canUpdate: boolean;
   canExportExcel: boolean;
@@ -203,6 +208,7 @@ type Props = {
 export function MaterialGrid({
   rows,
   columns,
+  highlightKeyword,
   canCreate,
   canUpdate,
   canExportExcel,
@@ -231,6 +237,7 @@ export function MaterialGrid({
       storageKey="co-master-material-grid-v2"
       rows={rows}
       columns={columns}
+      highlightKeyword={highlightKeyword}
       rowKey="materialId"
       rowFormPlugin={rowFormPlugin}
       createRow={createMaterialRow}

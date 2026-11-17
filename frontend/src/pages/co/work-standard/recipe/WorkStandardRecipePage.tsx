@@ -74,6 +74,7 @@ export function WorkStandardRecipePage({
   const canDelete = Boolean(selectedMenuPermissions?.delete);
 
   const [keyword, setKeyword] = useState('');
+  const [appliedKeyword, setAppliedKeyword] = useState('');
   const [detailValues, setDetailValues] = useState<WorkStandardSearchValues>(DEFAULT_SEARCH_VALUES);
   const [appliedDetailValues, setAppliedDetailValues] =
     useState<WorkStandardSearchValues>(DEFAULT_SEARCH_VALUES);
@@ -109,6 +110,7 @@ export function WorkStandardRecipePage({
       try {
         const result = await searchWorkStandards(toFilters(nextKeyword, values));
         setItems(result);
+        setAppliedKeyword(nextKeyword.trim());
         setHasLoaded(true);
         applyItem(result[0] ?? null);
       } catch (searchError) {
@@ -266,6 +268,7 @@ export function WorkStandardRecipePage({
         >
           <WorkStandardListPanel
             rows={listRows}
+            highlightKeyword={appliedKeyword}
             segment={segment}
             onSegmentChange={setSegment}
             selectedId={selectedId}

@@ -153,6 +153,7 @@ export function QuotationStatusPage({
                 loading={list.loading}
                 canExportExcel={selectedMenuPermissions?.excel ?? false}
                 onOpenQuotation={handleOpenQuotation}
+                highlightKeyword={search.appliedFilters?.keyword}
               />
             </Box>
           </Box>

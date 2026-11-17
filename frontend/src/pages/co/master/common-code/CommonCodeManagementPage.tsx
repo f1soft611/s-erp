@@ -449,6 +449,7 @@ export function CommonCodeManagementPage({
         groups={groups}
         moduleOptions={moduleOptions}
         searchQuery={searchQuery}
+        highlightKeyword={pageSession.appliedFilters.keyword}
         canExportExcel={pageActionPermissions.excel}
         onGroupsSaved={handleGroupsSaved}
         onSaveSuccess={showSuccess}

@@ -10,6 +10,7 @@ type DocumentStatusGridProps = {
   loading: boolean;
   canExportExcel: boolean;
   onOpenDocument: (row: DocumentStatusRow) => void;
+  highlightKeyword?: string;
 };
 
 export function DocumentStatusGrid({
@@ -17,6 +18,7 @@ export function DocumentStatusGrid({
   loading,
   canExportExcel,
   onOpenDocument,
+  highlightKeyword,
 }: DocumentStatusGridProps) {
   const columns = useMemo(
     () => createDocumentStatusColumns({ onOpenDocument }),
@@ -30,6 +32,7 @@ export function DocumentStatusGrid({
       storageKey="documentStatusGrid"
       rowKey="electronicApprovalId"
       rows={rows}
+      highlightKeyword={highlightKeyword}
       loading={loading}
       showCheckbox={false}
       selectionMode="row"
