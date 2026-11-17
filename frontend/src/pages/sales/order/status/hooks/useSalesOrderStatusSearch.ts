@@ -3,6 +3,7 @@ import { toPageSearchFields } from '../../../../../shared/components/page-search
 import { usePageSessionState } from '../../../../../shared/hooks/usePageSessionState';
 import { usePageSearchDefaults } from '../../../../../shared/hooks/usePageSearchDefaults';
 import { createSalesOrderStatusColumns } from '../data/salesOrderStatusColumns';
+import { useSalesOrderCommonCodes } from '../../hooks/useSalesOrderCommonCodes';
 import {
   cloneSalesOrderStatusSearchValues,
   isSalesOrderStatusSearchSession,
@@ -19,10 +20,23 @@ const SALES_ORDER_STATUS_SESSION_KEY = 's-erp:page:sales-order-status';
 const SALES_ORDER_STATUS_SESSION_VERSION = 1;
 
 export function useSalesOrderStatusSearch() {
+  const {
+    codes: commonCodes,
+    loading: commonCodesLoading,
+    error: commonCodesError,
+    retry: retryCommonCodes,
+  } = useSalesOrderCommonCodes();
   const [dashboardSearch] = useState(() => readDashboardSalesSearch(window.location.search));
   const detailFields = useMemo(
-    () => toPageSearchFields(createSalesOrderStatusColumns()),
-    [],
+    () =>
+      toPageSearchFields(
+        createSalesOrderStatusColumns({
+          orderStatusOptions: commonCodes.orderStatusOptions,
+          progressStatusOptions: commonCodes.progressStatusOptions,
+          deliveryMethodOptions: commonCodes.deliveryMethodOptions,
+        }),
+      ),
+    [commonCodes.deliveryMethodOptions, commonCodes.orderStatusOptions, commonCodes.progressStatusOptions],
   );
   const {
     values: defaultValues,
@@ -30,7 +44,7 @@ export function useSalesOrderStatusSearch() {
     error: defaultsError,
     retry: retryDefaults,
     initialLoad: defaultsInitialLoad,
-  } = usePageSearchDefaults(detailFields);
+  } = usePageSearchDefaults(detailFields, !commonCodesLoading && !commonCodesError);
   const { state: searchSession, setState: setSearchSession } =
     usePageSessionState<SalesOrderStatusSearchSession | null>(
       SALES_ORDER_STATUS_SESSION_KEY,
@@ -93,6 +107,16 @@ export function useSalesOrderStatusSearch() {
       toSalesOrderStatusFilters(resetSnapshot.keyword, resetSnapshot.detailValues),
     );
   }, [defaultValues, setSearchSession]);
+  const retryDefaultsWithCodes = useCallback(() => {
+    retryCommonCodes();
+    retryDefaults();
+  }, [retryCommonCodes, retryDefaults]);
+  const codeMissingError =
+    !commonCodesLoading &&
+    !commonCodesError &&
+    commonCodes.progressStatusOptions.length === 0
+      ? '수주 상태 공통코드가 등록되지 않았습니다. 공통코드 등록 후 다시 불러와 주세요.'
+      : null;
 
   return {
     keyword,
@@ -104,10 +128,13 @@ export function useSalesOrderStatusSearch() {
     searchAreaDefaultValues: searchSession === null ? (defaultValues ?? {}) : {},
     appliedFilters,
     defaultsInitialized: appliedFilters !== null,
-    defaultsLoading,
-    defaultsError,
+    defaultsLoading: defaultsLoading || commonCodesLoading,
+    defaultsError: commonCodesError ?? codeMissingError ?? defaultsError,
     defaultsInitialLoad,
-    retryDefaults,
+    retryDefaults: retryDefaultsWithCodes,
+    commonCodes,
+    commonCodesError,
+    codeMissingError,
     applySearch,
     resetSearch,
   };

@@ -11,6 +11,7 @@ import {
   type OpenMaterialPicker,
   type SalesOrderDetailRow,
 } from '../data/salesOrderDetail';
+import type { SalesOrderCodeOption } from '../../services/salesOrderCommonCode.service';
 
 type Props = {
   gridRef: RefObject<F1GridRef<SalesOrderDetailRow> | null>;
@@ -18,6 +19,9 @@ type Props = {
   onChangesChange: (changes: F1GridChanges<SalesOrderDetailRow>) => void;
   onSelectionChange: (rowIds: (string | number)[]) => void;
   onOpenMaterialPicker: OpenMaterialPicker;
+  deliveryDate: string;
+  progressStatusOptions: SalesOrderCodeOption[];
+  onCalculationError: (error: Error) => void;
   disabled?: boolean;
 };
 
@@ -27,11 +31,20 @@ export function SalesOrderDetailGrid({
   onChangesChange,
   onSelectionChange,
   onOpenMaterialPicker,
+  deliveryDate,
+  progressStatusOptions,
+  onCalculationError,
   disabled = false,
 }: Props) {
   const columns = useMemo(
-    () => createSalesOrderDetailColumns(onOpenMaterialPicker, disabled),
-    [disabled, onOpenMaterialPicker],
+    () =>
+      createSalesOrderDetailColumns(
+        onOpenMaterialPicker,
+        disabled,
+        progressStatusOptions,
+        onCalculationError,
+      ),
+    [disabled, onCalculationError, onOpenMaterialPicker, progressStatusOptions],
   );
 
   return (
@@ -43,7 +56,7 @@ export function SalesOrderDetailGrid({
       columns={columns}
       features={[{ ftype: 'summary', dock: 'bottom' }]}
       rowKey="rowId"
-      createRow={createSalesOrderDetailRow}
+      createRow={() => createSalesOrderDetailRow(deliveryDate)}
       createDuplicate={duplicateSalesOrderDetailRow}
       onChangesChange={onChangesChange}
       onSelectionChange={onSelectionChange}

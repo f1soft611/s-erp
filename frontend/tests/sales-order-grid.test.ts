@@ -62,6 +62,17 @@ describe('sales order active detail rows', () => {
 });
 
 describe('sales order detail grid', () => {
+  it('initializes a newly added row with the current header delivery date', () => {
+    expect(createSalesOrderDetailRow('2026-11-30').deliveryDt).toBe('2026-11-30');
+  });
+
+  it('uses the No and progress-state column labels', () => {
+    const columns = createSalesOrderDetailColumns(() => undefined);
+
+    expect(columns.find((column) => column.field === 'rowId')?.headerName).toBe('No');
+    expect(columns.find((column) => column.field === 'lineStatus')?.headerName).toBe('진행상태');
+  });
+
   it('recalculates VAT on quantity or price changes after a manual VAT edit', () => {
     const row = {
       ...createSalesOrderDetailRow(),
@@ -96,6 +107,50 @@ describe('sales order detail grid', () => {
       vatAmount: 4.1,
       totalAmount: 45.1,
     });
+  });
+
+  it('rejects amount overflow and reports it without throwing from the cell editor', () => {
+    const onCalculationError = vi.fn();
+    const columns = createSalesOrderDetailColumns(
+      () => undefined,
+      false,
+      [],
+      onCalculationError,
+    );
+    const quantityColumn = columns.find((column) => column.field === 'orderQty');
+    const row = { ...createSalesOrderDetailRow(), orderQty: 1, unitPrice: 1 };
+
+    const patch = quantityColumn?.onValueChange?.(row, Number.MAX_VALUE);
+
+    expect(patch).toEqual({});
+    expect(onCalculationError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: '계산된 공급가 계산 결과가 지원 범위를 초과했습니다.',
+      }),
+    );
+    expect(row.orderQty).toBe(1);
+  });
+
+  it('rejects VAT overflow and keeps the previous VAT value', () => {
+    const onCalculationError = vi.fn();
+    const columns = createSalesOrderDetailColumns(
+      () => undefined,
+      false,
+      [],
+      onCalculationError,
+    );
+    const vatColumn = columns.find((column) => column.field === 'vatAmount');
+    const row = { ...createSalesOrderDetailRow(), vatAmount: 12, totalAmount: 12 };
+
+    const patch = vatColumn?.onValueChange?.(row, Number.MAX_VALUE);
+
+    expect(patch).toEqual({});
+    expect(onCalculationError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: '부가세 계산 결과가 지원 범위를 초과했습니다.',
+      }),
+    );
+    expect(row.vatAmount).toBe(12);
   });
 
   it('marks material, quantity and price as required and validates them through F1-Grid rules', () => {

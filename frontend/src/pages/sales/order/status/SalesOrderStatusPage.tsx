@@ -1,6 +1,6 @@
-import { Box } from '@mui/material';
+import { Alert, Box, Button } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
@@ -64,12 +64,29 @@ export function SalesOrderStatusPage({
   const search = useSalesOrderStatusSearch();
   const list = useSalesOrderStatusList(search.appliedFilters);
   const detail = useSalesOrderStatusDetail();
+  const [searchResultMessageDismissed, setSearchResultMessageDismissed] = useState(false);
   const createPermissions = findMenuPermissions(
     selectedModule.tree,
     SALES_ORDER_CREATE_PAGE_KEY,
   );
   const { openDetail, closeDetail, closeEditor, refreshDetail } = detail;
-  const { refreshQuietly: refreshListQuietly } = list;
+  const { applySearch: submitSearch, appliedDetailValues } = search;
+  const { refreshQuietly: refreshList, retry: retryListRequest } = list;
+  const refreshListQuietly = useCallback(() => {
+    setSearchResultMessageDismissed(false);
+    refreshList();
+  }, [refreshList]);
+  const retryList = useCallback(() => {
+    setSearchResultMessageDismissed(false);
+    retryListRequest();
+  }, [retryListRequest]);
+  const applySearch = useCallback(
+    (values: Parameters<typeof submitSearch>[0]) => {
+      setSearchResultMessageDismissed(false);
+      submitSearch(values);
+    },
+    [submitSearch],
+  );
   const handleOpenOrder = useCallback(
     (row: SalesOrderStatusRow) => openDetail(row.salesOrderId),
     [openDetail],
@@ -92,7 +109,8 @@ export function SalesOrderStatusPage({
     !list.loading &&
     !list.initialLoad.loading &&
     !search.defaultsError &&
-    !list.error;
+    !list.error &&
+    !searchResultMessageDismissed;
   const pageActionGroups: PermissionActionGroupDefinition[] = [
     {
       key: 'read',
@@ -102,7 +120,7 @@ export function SalesOrderStatusPage({
           icon: SearchIcon,
           visible: selectedMenuPermissions?.read ?? false,
           disabled: !search.defaultsInitialized || list.loading,
-          onClick: () => search.applySearch(search.appliedDetailValues),
+          onClick: () => applySearch(appliedDetailValues),
         },
       ],
     },
@@ -130,7 +148,19 @@ export function SalesOrderStatusPage({
         label="검색 기본값"
         onRetry={search.retryDefaults}
       >
-        <PageLoadBoundary {...list.initialLoad} label="수주현황" onRetry={list.retry}>
+        <PageLoadBoundary {...list.initialLoad} label="수주현황" onRetry={retryList}>
+        {search.commonCodesError || search.codeMissingError ? (
+          <Alert
+            severity="error"
+            action={
+              <Button color="inherit" size="small" onClick={search.retryDefaults}>
+                공통코드 다시 불러오기
+              </Button>
+            }
+          >
+            {search.commonCodesError ?? search.codeMissingError}
+          </Alert>
+        ) : null}
         <SalesOrderStatusSearchArea
           keyword={search.keyword}
           onKeywordChange={search.setKeyword}
@@ -139,13 +169,17 @@ export function SalesOrderStatusPage({
           appliedDetailValues={search.appliedDetailValues}
           defaultValues={search.searchAreaDefaultValues}
           onDetailValuesChange={search.setDetailValues}
-          onSearch={search.applySearch}
+          onSearch={applySearch}
           onReset={search.resetSearch}
           initialized={search.defaultsInitialized}
           loading={search.defaultsLoading || list.loading}
         />
         <PageMessageArea
-          message={search.defaultsError ?? list.error}
+          message={
+            search.commonCodesError || search.codeMissingError
+              ? ''
+              : list.error || search.defaultsError || ''
+          }
           onClose={list.clearError}
           horizontalPadding="grid"
         />
@@ -153,6 +187,7 @@ export function SalesOrderStatusPage({
           <SearchResultMessage
             resultCount={list.rows.length}
             horizontalPadding="grid"
+            onDismiss={() => setSearchResultMessageDismissed(true)}
           />
         ) : null}
         <Box
@@ -174,6 +209,9 @@ export function SalesOrderStatusPage({
               loading={list.loading}
               canExportExcel={selectedMenuPermissions?.excel ?? false}
               onOpenOrder={handleOpenOrder}
+              orderStatusOptions={search.commonCodes.orderStatusOptions}
+              progressStatusOptions={search.commonCodes.progressStatusOptions}
+              deliveryMethodOptions={search.commonCodes.deliveryMethodOptions}
             />
           </Box>
         </Box>
@@ -185,6 +223,9 @@ export function SalesOrderStatusPage({
           loading={detail.loading}
           error={detail.error}
           canEdit={canEditOrder(detail.order, createPermissions)}
+          orderStatusOptions={search.commonCodes.orderStatusOptions}
+          progressStatusOptions={search.commonCodes.progressStatusOptions}
+          deliveryMethodOptions={search.commonCodes.deliveryMethodOptions}
           onClose={handleDetailClose}
           onView={() => detail.openEditor('view')}
           onEdit={() => detail.openEditor('edit')}

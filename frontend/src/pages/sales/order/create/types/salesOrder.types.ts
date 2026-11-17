@@ -30,6 +30,7 @@ export type SalesOrderCreateInput = Omit<
 
 export type SalesOrderValidationErrors = {
   orderDt?: string;
+  deliveryDt?: string;
   customerId?: string;
   details?: string;
   detailRows: Record<string, string>;

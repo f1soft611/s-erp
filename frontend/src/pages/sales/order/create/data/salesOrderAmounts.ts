@@ -32,11 +32,11 @@ function fromMinorUnits(value: bigint, label: string): number {
   return numericValue / 100;
 }
 
-export function roundSalesOrderAmount(value: number): number {
+export function roundSalesOrderAmount(value: number, label = '금액'): number {
   if (!Number.isFinite(value) || value < 0) {
     throw new Error('금액은 0 이상의 유한한 숫자여야 합니다.');
   }
-  return fromMinorUnits(toMinorUnits(value), '금액');
+  return fromMinorUnits(toMinorUnits(value), label);
 }
 
 export function calculateSalesOrderAmounts(

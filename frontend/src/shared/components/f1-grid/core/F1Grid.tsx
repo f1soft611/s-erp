@@ -157,6 +157,7 @@ function F1GridInner<T extends object>(
     ariaLabel = 'F1-GRID',
     columnLine = true,
     stripeRows = true,
+    highlightKeyword,
     storageKey,
     height,
     minHeight,
@@ -3112,6 +3113,7 @@ function F1GridInner<T extends object>(
             rowKey={rowKey}
             columnLine={columnLine}
             stripeRows={stripeRows}
+            highlightKeyword={highlightKeyword}
             columnTracks={columnTracks}
             defaultRowHeight={defaultRowHeight}
             minRowHeight={normalizedMinRowHeight}

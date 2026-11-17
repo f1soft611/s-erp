@@ -18,11 +18,15 @@ import type {
 } from '../src/pages/sales/order/create/types/salesOrder.types';
 import type { MenuPermission } from '../src/pages/dashboard/types/dashboard';
 import { getSystemDate } from '../src/shared/services/systemDateService';
+import { fetchSalesOrderCommonCodes } from '../src/pages/sales/order/services/salesOrderCommonCode.service';
 
 vi.mock('../src/shared/services/systemDateService', () => ({
   getSystemDate: vi.fn(),
 }));
-
+vi.mock('../src/pages/sales/order/services/salesOrderCommonCode.service', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/pages/sales/order/services/salesOrderCommonCode.service')>();
+  return { ...actual, fetchSalesOrderCommonCodes: vi.fn() };
+});
 vi.mock('../src/pages/sales/order/create/services/salesOrder.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/pages/sales/order/create/services/salesOrder.service')>();
   return {
@@ -51,13 +55,28 @@ const searchOrderCustomersMock = vi.mocked(searchOrderCustomers);
 const searchOrderQuotationsMock = vi.mocked(searchOrderQuotations);
 const getSalesOrderMock = vi.mocked(getSalesOrder);
 const updateSalesOrderMock = vi.mocked(updateSalesOrder);
-const getSystemDateMock = vi.mocked(getSystemDate);
 const deleteSalesOrderMock = vi.mocked(deleteSalesOrder);
+const getSystemDateMock = vi.mocked(getSystemDate);
+const fetchSalesOrderCommonCodesMock = vi.mocked(fetchSalesOrderCommonCodes);
 
 describe('sales order entry page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getSystemDateMock.mockResolvedValue('2000-02-03');
+    fetchSalesOrderCommonCodesMock.mockResolvedValue({
+      orderStatusOptions: [
+        { value: '수주등록', label: '신규 접수' },
+        { value: '생산대기', label: '생산 대기' },
+      ],
+      progressStatusOptions: [
+        { value: '대기', label: '대기 중' },
+        { value: '수주등록', label: '신규 접수' },
+      ],
+      deliveryMethodOptions: [
+        { value: 'PARCEL', label: '택배 배송' },
+        { value: 'CARGO', label: '화물 배송' },
+      ],
+    });
     getSalesOrderMock.mockResolvedValue(loadedOrder());
     searchOrderCustomersMock.mockResolvedValue([
       { id: 10, code: 'C-10', name: '거래처 10' },
@@ -66,6 +85,7 @@ describe('sales order entry page', () => {
       { id: 71, code: 'QT-20261116-0001', name: '거래처 10', customerId: 10 },
     ]);
   });
+
   it('uses the server date as the initial order date for a new order', async () => {
     renderSalesOrderPage();
 
@@ -81,6 +101,99 @@ describe('sales order entry page', () => {
     expect(screen.getByLabelText(/수주일자/, { selector: 'input' })).toHaveValue('');
   });
 
+  it('displays common-code names and lets delivery method retain its code value', async () => {
+    getSalesOrderMock.mockResolvedValue({
+      ...loadedOrder(),
+      deliveryDt: '2026-11-30',
+      deliveryMethod: 'PARCEL',
+    });
+    renderSalesOrderPage(undefined, { mode: 'edit', salesOrderId: 300 });
+
+    await screen.findByDisplayValue('SO-20261027-0001');
+    await waitFor(() => {
+      expect(screen.getByLabelText('수주상태')).toHaveValue('신규 접수');
+    });
+    const deliveryMethod = screen.getByRole('combobox', { name: '배송방법' });
+    expect(deliveryMethod).toHaveTextContent('택배 배송');
+    fireEvent.mouseDown(deliveryMethod);
+    fireEvent.click(await screen.findByRole('option', { name: '화물 배송' }));
+    expect(deliveryMethod).toHaveTextContent('화물 배송');
+  });
+
+  it('shows a common-code load error and retries the lookup', async () => {
+    fetchSalesOrderCommonCodesMock
+      .mockRejectedValueOnce(new Error('공통코드 조회 실패'))
+      .mockResolvedValueOnce({
+        orderStatusOptions: [{ value: '수주등록', label: '신규 접수' }],
+        progressStatusOptions: [{ value: '수주등록', label: '신규 접수' }],
+        deliveryMethodOptions: [{ value: 'PARCEL', label: '택배 배송' }],
+      });
+    renderSalesOrderPage();
+
+    expect(await screen.findByText('공통코드 조회 실패')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '공통코드 다시 불러오기' }));
+
+    expect(await screen.findByRole('combobox', { name: '배송방법' })).toBeEnabled();
+    expect(fetchSalesOrderCommonCodesMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not replace missing common codes with hard-coded delivery options', async () => {
+    fetchSalesOrderCommonCodesMock.mockResolvedValue({
+      orderStatusOptions: [],
+      progressStatusOptions: [],
+      deliveryMethodOptions: [],
+    });
+    renderSalesOrderPage();
+
+    expect(await screen.findByText(/수주 공통코드가 등록되지 않았습니다/)).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: '배송방법' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+  });
+
+  it('requires the header delivery date before saving', async () => {
+    renderSalesOrderPage();
+
+    await screen.findByDisplayValue('2000-02-03');
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    expect(await screen.findByText('납기일자를 입력해 주세요.')).toBeInTheDocument();
+    expect(createSalesOrderMock).not.toHaveBeenCalled();
+  });
+
+  it('copies the header delivery date into a newly added detail row', async () => {
+    renderSalesOrderPage();
+
+    await screen.findByDisplayValue('2000-02-03');
+    fireEvent.change(screen.getByLabelText('납기일자'), {
+      target: { value: '2026-11-30' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '상세 행 추가' }));
+
+    const row = screen.getByRole('row', { name: /order-line-.*행 선택/ });
+    expect(within(row).getAllByRole('gridcell')[8]).toHaveTextContent('2026-11-30');
+  });
+
+  it('shows amount overflow and keeps the previous quantity when editing a detail row', async () => {
+    renderSalesOrderPage();
+    await selectCustomer();
+    fireEvent.change(screen.getByLabelText('납기일자'), {
+      target: { value: '2026-11-30' },
+    });
+    await addAndCompleteDetail();
+
+    const row = screen.getByRole('row', { name: /order-line-.*행 선택/ });
+    fireEvent.doubleClick(within(row).getAllByRole('gridcell')[3]);
+    const editor = screen.getByRole('spinbutton');
+    fireEvent.change(editor, { target: { value: '999999999999999999999999999' } });
+    fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '계산된 공급가 계산 결과가 지원 범위를 초과했습니다.',
+    );
+    expect(within(row).getByRole('gridcell', { name: '2' })).toBeInTheDocument();
+  }, 10000);
 
   it('normalizes form dates on blur and again when saving without blur', async () => {
     updateSalesOrderMock.mockResolvedValue(loadedOrder());
@@ -88,7 +201,7 @@ describe('sales order entry page', () => {
     await screen.findByDisplayValue('SO-20261027-0001');
     expect(screen.getByRole('button', { name: '수주일자 달력 열기' })).toBeEnabled();
     const orderDate = screen.getByLabelText(/수주일자/, { selector: 'input' });
-    const deliveryDate = screen.getByLabelText('납기일자');
+    const deliveryDate = screen.getByLabelText('납기일자') as HTMLInputElement;
     fireEvent.change(orderDate, { target: { value: '20261117' } });
     fireEvent.blur(orderDate);
     expect(orderDate).toHaveValue('2026-11-17');
@@ -126,10 +239,14 @@ describe('sales order entry page', () => {
 
   it('권한이 없으면 모든 기본정보에 읽기전용 배경을 표시한다', () => {
     renderSalesOrderPage({ read: true, create: false, update: false, delete: false });
-    for (const label of ['수주번호', '수주일자', '거래처', '견적번호', '납기일자', '납품장소', '배송방법', '수주상태', '비고']) {
+    for (const label of ['수주번호', '수주일자', '거래처', '견적번호', '납기일자', '납품장소', '수주상태', '비고']) {
       const input = screen.getByLabelText(new RegExp(label), { selector: 'input, textarea' });
       expect(getComputedStyle(input.closest('.MuiInputBase-root')!).backgroundColor).toBe('rgba(0, 0, 0, 0.12)');
     }
+    expect(screen.getByRole('combobox', { name: '배송방법' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
     expect(screen.getByRole('button', { name: '거래처 선택' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '수주일자 달력 열기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '납기일자 달력 열기' })).toBeDisabled();
@@ -330,6 +447,7 @@ describe('sales order entry page', () => {
     renderSalesOrderPage();
 
     expect(screen.getByLabelText(/수주일자/, { selector: 'input' })).toBeRequired();
+    expect(screen.getByLabelText('납기일자')).toBeRequired();
     expect(screen.getByLabelText(/거래처/, { selector: 'input' })).toBeRequired();
     expect(screen.getByLabelText(/견적번호/)).not.toBeRequired();
 
@@ -603,6 +721,10 @@ describe('sales order entry page', () => {
 
   it('reloads the saved order into the header and grid and updates it with PUT', async () => {
     createSalesOrderMock.mockResolvedValue(createdOrder());
+    getSalesOrderMock.mockResolvedValue({
+      ...loadedOrder(),
+      deliveryDt: '2026-11-30',
+    });
     renderSalesOrderPage();
     await selectCustomer();
     await addAndCompleteDetail();
@@ -773,6 +895,10 @@ async function selectCustomer() {
 }
 
 async function addAndCompleteDetail() {
+  const deliveryDate = screen.getByLabelText('납기일자');
+  if (!deliveryDate.value) {
+    fireEvent.change(deliveryDate, { target: { value: '2026-11-30' } });
+  }
   fireEvent.click(screen.getByRole('button', { name: '상세 행 추가' }));
   const row = screen.getByRole('row', { name: /order-line-.*행 선택/ });
   fireEvent.doubleClick(within(row).getAllByRole('gridcell')[1]);

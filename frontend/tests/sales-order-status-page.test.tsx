@@ -4,6 +4,7 @@ import { apiGet, apiPut } from '../src/shared/services/apiClient';
 import { SalesOrderStatusPage } from '../src/pages/sales/order/status/SalesOrderStatusPage';
 import { SalesOrderStatusGrid } from '../src/pages/sales/order/status/components/SalesOrderStatusGrid';
 import { createSalesOrderStatusColumns } from '../src/pages/sales/order/status/data/salesOrderStatusColumns';
+import { fetchSalesOrderCommonCodes } from '../src/pages/sales/order/services/salesOrderCommonCode.service';
 import type { SalesOrderStatusRow } from '../src/pages/sales/order/status/types/salesOrderStatus.types';
 import type { SalesOrderItem } from '../src/pages/sales/order/create/types/salesOrder.types';
 import type { MenuPermission, ModuleItem } from '../src/pages/dashboard/types/dashboard';
@@ -14,9 +15,15 @@ vi.mock('../src/shared/services/apiClient', () => ({
   apiPut: vi.fn(),
   apiDelete: vi.fn(),
 }));
+vi.mock('../src/pages/sales/order/services/salesOrderCommonCode.service', () => ({
+  fetchSalesOrderCommonCodes: vi.fn(),
+  getSalesOrderCodeLabel: (options: Array<{ value: string; label: string }>, value?: string | null) =>
+    options.find((option) => option.value === value)?.label ?? value ?? '',
+}));
 
 const apiGetMock = vi.mocked(apiGet);
 const apiPutMock = vi.mocked(apiPut);
+const fetchSalesOrderCommonCodesMock = vi.mocked(fetchSalesOrderCommonCodes);
 const SYSTEM_TODAY = '2026-10-27';
 
 const statusRow: SalesOrderStatusRow = {
@@ -153,6 +160,18 @@ describe('sales order status page', () => {
     orderItem = createOrderItem();
     apiGetMock.mockReset();
     apiPutMock.mockReset();
+    fetchSalesOrderCommonCodesMock.mockReset();
+    fetchSalesOrderCommonCodesMock.mockResolvedValue({
+      orderStatusOptions: [
+        { value: '수주등록', label: '신규 접수' },
+        { value: '취소', label: '취소됨' },
+      ],
+      progressStatusOptions: [
+        { value: '대기', label: '대기 중' },
+        { value: '수주등록', label: '신규 접수' },
+      ],
+      deliveryMethodOptions: [{ value: '택배', label: '택배 배송' }],
+    });
     apiGetMock.mockImplementation((path: string) => {
       if (path.includes('/common/system-date')) {
         return Promise.resolve({ today: SYSTEM_TODAY });
@@ -221,6 +240,23 @@ describe('sales order status page', () => {
     expect(screen.queryByText(/조회 결과가 없습니다/)).not.toBeInTheDocument();
   });
 
+  it('shows and retries a common-code load error', async () => {
+    fetchSalesOrderCommonCodesMock
+      .mockRejectedValueOnce(new Error('공통코드 연결 오류'))
+      .mockResolvedValueOnce({
+        orderStatusOptions: [{ value: '수주등록', label: '신규 접수' }],
+        progressStatusOptions: [{ value: '대기', label: '대기 중' }],
+        deliveryMethodOptions: [],
+      });
+    renderStatusPage();
+
+    expect(await screen.findByText('공통코드 연결 오류')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '공통코드 다시 불러오기' }));
+
+    expect(await screen.findByRole('grid', { name: '수주현황 목록' })).toBeInTheDocument();
+    expect(fetchSalesOrderCommonCodesMock).toHaveBeenCalledTimes(2);
+  });
+
   it('announces positive result counts and shows the message again after a reload', async () => {
     renderStatusPage();
 
@@ -229,11 +265,17 @@ describe('sales order status page', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByTestId('sales-status-content')).toHaveStyle({
+      paddingTop: '8px',
+    });
 
     fireEvent.click(screen.getByRole('button', { name: '조회' }));
     expect(await screen.findByRole('status')).toHaveTextContent(
       '조회 결과 총 1건입니다.',
     );
+    expect(screen.getByTestId('sales-status-content')).toHaveStyle({
+      paddingTop: '0px',
+    });
   });
 
   it('keeps equal vertical spacing around the search result message', async () => {
@@ -317,7 +359,7 @@ describe('sales order status page', () => {
     expect(within(panel).getByText('거래처 10')).toBeInTheDocument();
     expect(within(panel).getByText('본사 창고')).toBeInTheDocument();
     expect(within(panel).getByText('품목 20')).toBeInTheDocument();
-    expect(within(panel).getByText('수주등록')).toBeInTheDocument();
+    expect(within(panel).getByText('신규 접수')).toBeInTheDocument();
 
     fireEvent.click(within(panel).getByRole('button', { name: '상세 닫기' }));
     await waitFor(() => {
@@ -475,13 +517,15 @@ describe('sales order status page', () => {
     expect(await within(grid).findByText('SO-20261027-0001')).toBeInTheDocument();
     expect(within(grid).getByText('수주번호')).toBeInTheDocument();
     expect(within(grid).getByText('거래처 10')).toBeInTheDocument();
+    expect(within(grid).getByText('Q-1')).toBeInTheDocument();
     expect(createSalesOrderStatusColumns().map((column) => column.headerName)).toEqual([
-      'No', '수주번호', '수주일자', '거래처코드', '거래처명', '견적번호', '업무상태', '수주상태', '납품장소', '배송방법',
+      'No', '수주번호', '수주일자', '거래처코드', '거래처명', '견적번호', '진행상태', '수주상태', '납품장소', '배송방법',
       '행', '품목코드', '품목명', '단위', '주문수량', '단가', '공급가', '부가세', '합계',
       '납기일자', '출하수량', '비고',
     ]);
     expect(within(grid).queryByText('수주상태')).not.toBeInTheDocument();
-    expect(within(grid).getByText('업무상태')).toBeInTheDocument();
+    expect(within(grid).getByText('진행상태')).toBeInTheDocument();
+    expect(within(grid).getByText('대기 중')).toBeInTheDocument();
 
     const request = listRequests().at(-1)!;
     expect(request.get('orderDtFrom')).toBe('2026-09-27');
@@ -518,12 +562,16 @@ describe('sales order status page', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
     const detail = screen.getByRole('dialog', { name: '상세 검색' });
+    expect(within(detail).getByRole('combobox', { name: '수주상태' })).toBeInTheDocument();
+    expect(within(detail).getByRole('combobox', { name: '진행상태' })).toBeInTheDocument();
     fireEvent.change(within(detail).getByRole('textbox', { name: '거래처' }), {
       target: { value: '거래처 10' },
     });
     fireEvent.change(within(detail).getByRole('textbox', { name: '품목' }), {
       target: { value: 'M-20' },
     });
+    fireEvent.mouseDown(within(detail).getByRole('combobox', { name: '진행상태' }));
+    fireEvent.click(await screen.findByRole('option', { name: '대기 중' }));
     fireEvent.click(within(detail).getByRole('button', { name: '조회' }));
 
     await waitFor(() => {
@@ -531,7 +579,17 @@ describe('sales order status page', () => {
       expect(request.get('customerKeyword')).toBe('거래처 10');
       expect(request.get('materialKeyword')).toBe('M-20');
       expect(request.get('orderDtFrom')).toBe('2026-09-27');
+      expect(request.get('lineStatus')).toBe('대기');
     });
+  });
+
+  it('displays common-code labels in the order detail panel', async () => {
+    renderStatusPage();
+    const detail = await openOrderDetailPanel();
+
+    expect(await within(detail).findByText('신규 접수')).toBeInTheDocument();
+    expect(within(detail).getByText('택배 배송')).toBeInTheDocument();
+    expect(within(detail).getByText('대기 중')).toBeInTheDocument();
   });
 
   it('keeps applied detail filters when a keyword search follows unsubmitted edits', async () => {
@@ -543,7 +601,7 @@ describe('sales order status page', () => {
     expect(screen.getByLabelText('수주일자 시작일')).toBeRequired();
     expect(screen.getByLabelText('수주일자 종료일')).toBeRequired();
     fireEvent.mouseDown(within(detail).getByRole('combobox', { name: '수주상태' }));
-    fireEvent.click(await screen.findByRole('option', { name: '수주등록' }));
+    fireEvent.click(await screen.findByRole('option', { name: '신규 접수' }));
     fireEvent.click(within(detail).getByRole('button', { name: '조회' }));
 
     await waitFor(() => {
@@ -555,7 +613,7 @@ describe('sales order status page', () => {
     fireEvent.mouseDown(
       within(reopenedDetail).getByRole('combobox', { name: '수주상태' }),
     );
-    fireEvent.click(await screen.findByRole('option', { name: '취소' }));
+    fireEvent.click(await screen.findByRole('option', { name: '취소됨' }));
     fireEvent.click(screen.getByRole('button', { name: '상세 검색 닫기' }));
 
     fireEvent.change(screen.getByRole('textbox', { name: '수주현황 빠른 검색' }), {

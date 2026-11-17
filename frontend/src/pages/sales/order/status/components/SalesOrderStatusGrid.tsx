@@ -2,12 +2,16 @@ import { useMemo } from 'react';
 import { F1Grid } from '../../../../../shared/components/f1-grid';
 import { createSalesOrderStatusColumns } from '../data/salesOrderStatusColumns';
 import type { SalesOrderStatusRow } from '../types/salesOrderStatus.types';
+import type { SalesOrderCodeOption } from '../../services/salesOrderCommonCode.service';
 
 type SalesOrderStatusGridProps = {
   rows: SalesOrderStatusRow[];
   loading: boolean;
   canExportExcel: boolean;
   onOpenOrder: (row: SalesOrderStatusRow) => void;
+  orderStatusOptions?: SalesOrderCodeOption[];
+  progressStatusOptions?: SalesOrderCodeOption[];
+  deliveryMethodOptions?: SalesOrderCodeOption[];
 };
 
 export function SalesOrderStatusGrid({
@@ -15,10 +19,19 @@ export function SalesOrderStatusGrid({
   loading,
   canExportExcel,
   onOpenOrder,
+  orderStatusOptions = [],
+  progressStatusOptions = [],
+  deliveryMethodOptions = [],
 }: SalesOrderStatusGridProps) {
   const columns = useMemo(
-    () => createSalesOrderStatusColumns({ onOpenOrder }),
-    [onOpenOrder],
+    () =>
+      createSalesOrderStatusColumns({
+        onOpenOrder,
+        orderStatusOptions,
+        progressStatusOptions,
+        deliveryMethodOptions,
+      }),
+    [deliveryMethodOptions, onOpenOrder, orderStatusOptions, progressStatusOptions],
   );
 
   return (
