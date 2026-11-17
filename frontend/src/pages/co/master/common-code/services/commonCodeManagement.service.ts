@@ -2,7 +2,9 @@ import { apiGet, apiPost, apiPut } from '../../../../../shared/services/apiClien
 import type {
   CommonCodeGroupRow,
   CommonCodeItemRow,
+  CommonCodeModuleOption,
 } from '../types/commonCodeManagement.types';
+import { normalizeModuleCd } from '../types/commonCodeManagement.types';
 
 export type CommonCodeBatchChangeSet<T> = {
   insertedRows: Partial<T>[];
@@ -25,6 +27,7 @@ export type CommonCodeGroupSearchFilters = {
   groupCode?: string;
   groupNm?: string;
   groupDc?: string;
+  moduleCd?: string;
 };
 
 interface CommonCodeGroupApiRow {
@@ -33,6 +36,7 @@ interface CommonCodeGroupApiRow {
   groupCode?: string | null;
   groupNm?: string | null;
   groupDc?: string | null;
+  moduleCd?: string | null;
   parentGroupId?: number | string | null;
   sortOrder?: number | string | null;
   useAt?: string | null;
@@ -61,6 +65,7 @@ export function toGroupRow(row: CommonCodeGroupApiRow): CommonCodeGroupRow {
     id: String(row.commonCodeGroupId ?? ''),
     groupCode: String(row.groupCode ?? ''),
     groupNm: String(row.groupNm ?? ''),
+    moduleCd: normalizeModuleCd(row.moduleCd),
     parentGroupId:
       row.parentGroupId == null || row.parentGroupId === ''
         ? null
@@ -104,6 +109,25 @@ export function normalizeBatchSaveResponse(response: unknown): {
     groups: savedGroups.map(toGroupRow),
     items: savedItems.map(toItemRow),
   };
+}
+
+export async function fetchCommonCodeModuleOptions(): Promise<
+  CommonCodeModuleOption[]
+> {
+  const result = await apiGet<{
+    resultList: Array<{
+      moduleCode?: string | null;
+      moduleNm?: string | null;
+      useAt?: string | null;
+    }>;
+  }>('/api/v1/system/modules');
+  return (result?.resultList ?? [])
+    .filter((module) => module.useAt === undefined || module.useAt !== 'N')
+    .filter((module) => String(module.moduleCode ?? '').trim())
+    .map((module) => ({
+      value: String(module.moduleCode).trim(),
+      label: String(module.moduleNm ?? module.moduleCode),
+    }));
 }
 
 export async function fetchCommonCodeGroups(

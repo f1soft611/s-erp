@@ -29,6 +29,9 @@ public class CommonCodeGroupVO implements Serializable {
     @Schema(description = "그룹 설명")
     private String groupDc;
 
+    @Schema(description = "업무 모듈 구분(COMMON/SALES/PRODUCTION/PURCHASE/QUALITY)")
+    private String moduleCd;
+
     @Schema(description = "상위 그룹 ID")
     private Long parentGroupId;
 

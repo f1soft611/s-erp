@@ -21,6 +21,17 @@ class CommonCodeMapperJdbcTypeTest {
     }
 
     @Test
+    void postgresGroupMapperReadsFiltersAndWritesModuleCd() throws Exception {
+        String xml = readResource("egovframework/mapper/let/co/master/commoncode/CommonCodeGroup_SQL_postgresql.xml");
+
+        assertThat(xml).contains("<result property=\"moduleCd\" column=\"module_cd\"/>");
+        assertThat(xml).contains("g.module_cd = #{moduleCd}");
+        assertThat(xml).contains("module_cd = #{moduleCd, jdbcType=VARCHAR}");
+        assertThat(xml).contains("FROM tb_module");
+        assertThat(xml).contains("#{moduleCd, jdbcType=VARCHAR},");
+    }
+
+    @Test
     void postgresItemMapperBindsNullableParentItemIdAsBigInt() throws Exception {
         String xml = readResource("egovframework/mapper/let/co/master/commoncode/CommonCodeItem_SQL_postgresql.xml");
 

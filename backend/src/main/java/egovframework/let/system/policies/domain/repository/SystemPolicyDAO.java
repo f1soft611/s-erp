@@ -26,6 +26,14 @@ public class SystemPolicyDAO extends EgovAbstractMapper {
         return selectList(NS + "selectPolicyList", tenantId);
     }
 
+    public String selectPolicyValueByCode(Map<String, Object> params) throws Exception {
+        return selectOne(NS + "selectPolicyValueByCode", params);
+    }
+
+    public List<SystemPolicyVO> selectGridDecimalPolicies(Long tenantId) throws Exception {
+        return selectList(NS + "selectGridDecimalPolicies", tenantId);
+    }
+
     public SystemPolicyVO selectPolicyById(Map<String, Object> params) throws Exception {
         return selectOne(NS + "selectPolicyById", params);
     }

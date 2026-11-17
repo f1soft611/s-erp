@@ -76,14 +76,14 @@ export function SystemPolicyPage({ isPlatformAdmin, selectedMenuPermissions, bre
   const filtered = policies.filter((policy) => (!category || category === policy.category)
     && `${policy.policyName} ${policy.policyCode} ${policy.description}`.toLowerCase().includes(query.trim().toLowerCase()));
   return (
-    <Box sx={{ minWidth: 0, width: '100%' }}>
+    <Box sx={{ display: 'flex', flex: 1, flexDirection: 'column', minHeight: 0, minWidth: 0, height: '100%', width: '100%' }}>
       <PageHeader breadcrumbItems={breadcrumbItems ?? ['환경설정', '시스템 관리', '시스템 정책']}
         description="현재 회사에 적용되는 업무 정책을 타입별로 설정합니다. 플랫폼 관리자 전용입니다."
         actionGroups={[{ key: 'policy', actions: [
           { label: '조회', icon: RefreshIcon, onClick: load, disabled: loading || Boolean(editor) || Boolean(deleting) },
           { label: '정책 추가', icon: AddIcon, visible: Boolean(selectedMenuPermissions?.create), disabled: loading || Boolean(editor) || Boolean(deleting), onClick: () => setEditor({ policy: null }) },
         ] }]} />
-      <Stack spacing={2.5} sx={{ p: { xs: 2, md: 3 } }}>
+      <Stack spacing={2.5} sx={{ flex: 1, minHeight: 0, minWidth: 0, overflowY: 'auto', p: 3 }}>
         <Paper variant="outlined" sx={{ p: 2, borderRadius: 1 }}>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { sm: 'center' } }}>
             <Chip label="플랫폼 관리자 전용" color="primary" variant="outlined" sx={{ alignSelf: 'start' }} />

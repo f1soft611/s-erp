@@ -10,6 +10,15 @@ public class CommonCodeGroupSearchCondition implements Serializable {
     private String groupCode;
     private String groupNm;
     private String groupDc;
+    private String moduleCd;
+
+    public String getModuleCd() {
+        return moduleCd;
+    }
+
+    public void setModuleCd(String moduleCd) {
+        this.moduleCd = moduleCd;
+    }
 
     public String getKeyword() {
         return keyword;

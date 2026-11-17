@@ -33,7 +33,7 @@ export function DeliveryPlanForm({ storageKey, planNo, orderNo, orderDt, custome
     { field: 'planDt', headerName: '계획일', type: 'date', mergeRows: true,
       editable: (row) => editable && !(Number(row.deliveredQty) > 0), width: 180, align: 'center',
       onValueChange: (_row, value) => ({ planDt: String(value || '') || null }) },
-    { field: 'plannedQty', headerName: '계획수량', type: 'decimal', decimalPlaces: 2,
+    { field: 'plannedQty', headerName: '계획수량', type: 'decimal',
       editable: (row) => editable && !(Number(row.deliveredQty) > 0),
       width: 150, align: 'right', onValueChange: (_row, value) => ({ plannedQty: Number(value) }) },
     { field: 'salesOrderDetailId', headerName: '합계', width: 110, align: 'right', mergeRows: true,

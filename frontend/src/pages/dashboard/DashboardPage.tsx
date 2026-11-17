@@ -52,6 +52,7 @@ import type { MenuFavoritesResponse } from './types/menuFavorite.types';
 import { fetchModuleRows } from '../settings/system/modules/services/moduleManagement.service';
 import { DashboardSidebar } from './components/DashboardSidebar';
 import { DashboardContent } from './components/DashboardContent';
+import { GridDecimalModuleProvider } from '../../shared/components/f1-grid/core/GridDecimalPolicy';
 import { useDashboardResponsive } from './hooks/useDashboardResponsive';
 import type {
   MenuTreeNode,
@@ -1084,6 +1085,7 @@ function DashboardPage() {
                   </Box>
                 </AppBar>
 
+              <GridDecimalModuleProvider moduleCode={selectedModule.id}>
                 {isSearchPage ? (
                   <UnifiedSearchPage />
                 ) : effectivePath === '/groupware/notifications' ? (
@@ -1132,6 +1134,7 @@ function DashboardPage() {
                     }}
                   />
                 )}
+              </GridDecimalModuleProvider>
               </>
             ) : (
               <Box

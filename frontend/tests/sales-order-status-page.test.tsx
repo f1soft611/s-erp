@@ -173,10 +173,10 @@ describe('sales order status page', () => {
       { ...statusRow, salesOrderDetailId: 451, orderQty: 3, supplyAmt: 300, vatAmt: 30, totalAmt: 330 },
     ]} loading={false} canExportExcel onOpenOrder={() => {}} />);
     const summary = screen.getByTestId('f1-grid-summary-bottom');
-    expect(within(summary).getByRole('gridcell', { name: '주문수량 집계' })).toHaveTextContent('5.00');
-    expect(within(summary).getByRole('gridcell', { name: '공급가 집계' })).toHaveTextContent('500.00');
-    expect(within(summary).getByRole('gridcell', { name: '부가세 집계' })).toHaveTextContent('50.00');
-    expect(within(summary).getByRole('gridcell', { name: '합계 집계' })).toHaveTextContent('550.00');
+    expect(within(summary).getByRole('gridcell', { name: '주문수량 집계' })).toHaveTextContent(/^5$/);
+    expect(within(summary).getByRole('gridcell', { name: '공급가 집계' })).toHaveTextContent('500');
+    expect(within(summary).getByRole('gridcell', { name: '부가세 집계' })).toHaveTextContent('50');
+    expect(within(summary).getByRole('gridcell', { name: '합계 집계' })).toHaveTextContent('550');
     expect(within(summary).getByRole('gridcell', { name: '단가 집계' })).toBeEmptyDOMElement();
     width.mockRestore();
   });
@@ -476,10 +476,12 @@ describe('sales order status page', () => {
     expect(within(grid).getByText('수주번호')).toBeInTheDocument();
     expect(within(grid).getByText('거래처 10')).toBeInTheDocument();
     expect(createSalesOrderStatusColumns().map((column) => column.headerName)).toEqual([
-      'No', '수주번호', '수주일자', '거래처코드', '거래처명', '견적번호', '수주상태', '납품장소', '배송방법',
+      'No', '수주번호', '수주일자', '거래처코드', '거래처명', '견적번호', '업무상태', '수주상태', '납품장소', '배송방법',
       '행', '품목코드', '품목명', '단위', '주문수량', '단가', '공급가', '부가세', '합계',
-      '납기일자', '출하수량', '행상태', '비고',
+      '납기일자', '출하수량', '비고',
     ]);
+    expect(within(grid).queryByText('수주상태')).not.toBeInTheDocument();
+    expect(within(grid).getByText('업무상태')).toBeInTheDocument();
 
     const request = listRequests().at(-1)!;
     expect(request.get('orderDtFrom')).toBe('2026-09-27');

@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +52,14 @@ public class SystemPolicyServiceImpl extends EgovAbstractServiceImpl implements 
     static final String DELIVERY_PLAN_MODE = "DELIVERY_PLAN_MODE";
     static final String OVER_DELIVERY_POLICY = "OVER_DELIVERY_POLICY";
 
+    static final String GRID_DECIMAL_PREFIX = "GRID_DECIMAL_";
+    static final String STATEMENT_ISSUE_MODE = "STATEMENT_ISSUE_MODE";
+    private static final int MAX_GRID_DECIMALS = 6;
+    private static final Set<String> GRID_ZERO_MODES =
+            Collections.unmodifiableSet(new HashSet<String>(Arrays.asList("FIXED", "AUTO")));
+    private static final Set<String> GRID_ROUNDING_MODES =
+            Collections.unmodifiableSet(new HashSet<String>(Arrays.asList("HALF_UP", "UP", "DOWN")));
+
     private static final Set<String> BUILT_IN_CODES =
             Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(DELIVERY_PLAN_MODE, OVER_DELIVERY_POLICY)));
     private static final Set<String> VALUE_TYPES = Collections.unmodifiableSet(new HashSet<String>(
@@ -91,6 +100,56 @@ public class SystemPolicyServiceImpl extends EgovAbstractServiceImpl implements 
     }
 
     @Override
+    public String getStatementIssueMode(Long tenantId) throws Exception {
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("tenantId", tenantId);
+        params.put("policyCode", STATEMENT_ISSUE_MODE);
+        String json = systemPolicyDAO.selectPolicyValueByCode(params);
+        if (json == null) {
+            return "MANUAL";
+        }
+        try {
+            return "AUTO".equals(MAPPER.readTree(json).asText()) ? "AUTO" : "MANUAL";
+        } catch (Exception ex) {
+            return "MANUAL";
+        }
+    }
+
+    @Override
+    public Map<String, Map<String, Object>> getGridDecimals(Long tenantId) throws Exception {
+        Map<String, Map<String, Object>> result = new LinkedHashMap<String, Map<String, Object>>();
+        List<SystemPolicyVO> policies = systemPolicyDAO.selectGridDecimalPolicies(tenantId);
+        if (policies == null) {
+            return result;
+        }
+        for (SystemPolicyVO policy : policies) {
+            String moduleCode = policy.getPolicyCode().substring(GRID_DECIMAL_PREFIX.length());
+            try {
+                JsonNode node = MAPPER.readTree(policy.getValueJson());
+                JsonNode placesNode = node.isObject() ? node.get("places") : node;
+                if (placesNode == null || !placesNode.isNumber()) {
+                    continue;
+                }
+                BigDecimal value = placesNode.decimalValue();
+                int places = value.intValue();
+                if (moduleCode.length() == 0 || value.compareTo(BigDecimal.ZERO) < 0 || places > MAX_GRID_DECIMALS) {
+                    continue;
+                }
+                String zeros = node.isObject() && node.has("trailingZeros") ? node.get("trailingZeros").asText() : "FIXED";
+                String rounding = node.isObject() && node.has("rounding") ? node.get("rounding").asText() : "HALF_UP";
+                Map<String, Object> entry = new LinkedHashMap<String, Object>();
+                entry.put("places", places);
+                entry.put("trailingZeros", GRID_ZERO_MODES.contains(zeros) ? zeros : "FIXED");
+                entry.put("rounding", GRID_ROUNDING_MODES.contains(rounding) ? rounding : "HALF_UP");
+                result.put(moduleCode, entry);
+            } catch (Exception ex) {
+                // 잘못된 정책 값은 무시하고 화면 기본값을 사용한다.
+            }
+        }
+        return result;
+    }
+
+    @Override
     @Transactional
     public SystemPolicyVO createPolicy(Long tenantId, Long actorId, SystemPolicySaveRequestVO request) throws Exception {
         requireRequest(request);
@@ -105,7 +164,7 @@ public class SystemPolicyServiceImpl extends EgovAbstractServiceImpl implements 
         if (!VALUE_TYPES.contains(type)) {
             throw badRequest("지원하지 않는 값 유형입니다.");
         }
-        Definition definition = normalizeDefinition(tenantId, type, request);
+        Definition definition = normalizeDefinition(tenantId, type, code, request);
 
         Map<String, Object> codeParams = new HashMap<String, Object>();
         codeParams.put("tenantId", tenantId);
@@ -176,7 +235,7 @@ public class SystemPolicyServiceImpl extends EgovAbstractServiceImpl implements 
                 throw conflict("테넌트 정책 값을 변경하지 못했습니다.");
             }
         } else {
-            definition = normalizeDefinition(tenantId, current.getValueType(), request);
+            definition = normalizeDefinition(tenantId, current.getValueType(), current.getPolicyCode(), request);
         }
 
         Map<String, Object> params = definition.toParams(tenantId, actorId);
@@ -320,7 +379,7 @@ public class SystemPolicyServiceImpl extends EgovAbstractServiceImpl implements 
         }
     }
 
-    private Definition normalizeDefinition(Long tenantId, String type, SystemPolicySaveRequestVO request) throws Exception {
+    private Definition normalizeDefinition(Long tenantId, String type, String code, SystemPolicySaveRequestVO request) throws Exception {
         Definition definition = normalizeCommon(request);
         JsonNode value = request.getValue();
         if (value == null || value.isNull() || value.isMissingNode()) {
@@ -333,7 +392,12 @@ public class SystemPolicyServiceImpl extends EgovAbstractServiceImpl implements 
                 throw badRequest("BOOLEAN 정책 값은 true 또는 false여야 합니다.");
             }
         } else if ("NUMBER".equals(type)) {
-            validateNumber(value, request.getMinValue(), request.getMaxValue());
+            if (code != null && code.startsWith(GRID_DECIMAL_PREFIX) && value.isObject()) {
+                validateGridDecimalValue(value, request.getMinValue(), request.getMaxValue());
+                value = normalizeGridDecimalValue(value);
+            } else {
+                validateNumber(value, request.getMinValue(), request.getMaxValue());
+            }
             definition.minValue = request.getMinValue();
             definition.maxValue = request.getMaxValue();
             definition.unit = trim(request.getUnit());
@@ -372,6 +436,33 @@ public class SystemPolicyServiceImpl extends EgovAbstractServiceImpl implements 
             throw badRequest("설명은 1000자 이하여야 합니다.");
         }
         return definition;
+    }
+
+    private void validateGridDecimalValue(JsonNode value, BigDecimal min, BigDecimal max) {
+        JsonNode places = value.get("places");
+        if (places == null || !places.isIntegralNumber()) {
+            throw badRequest("소수점 자릿수(places)는 정수여야 합니다.");
+        }
+        validateNumber(places, min, max);
+        if (places.intValue() < 0 || places.intValue() > MAX_GRID_DECIMALS) {
+            throw badRequest("소수점 자릿수는 0~" + MAX_GRID_DECIMALS + " 범위여야 합니다.");
+        }
+        JsonNode zeros = value.get("trailingZeros");
+        if (zeros != null && !(zeros.isTextual() && GRID_ZERO_MODES.contains(zeros.textValue()))) {
+            throw badRequest("0 표시 방식은 FIXED 또는 AUTO여야 합니다.");
+        }
+        JsonNode rounding = value.get("rounding");
+        if (rounding != null && !(rounding.isTextual() && GRID_ROUNDING_MODES.contains(rounding.textValue()))) {
+            throw badRequest("반올림 방식은 HALF_UP, UP, DOWN 중 하나여야 합니다.");
+        }
+    }
+
+    private JsonNode normalizeGridDecimalValue(JsonNode value) {
+        com.fasterxml.jackson.databind.node.ObjectNode node = MAPPER.createObjectNode();
+        node.put("places", value.get("places").intValue());
+        node.put("trailingZeros", value.has("trailingZeros") ? value.get("trailingZeros").textValue() : "FIXED");
+        node.put("rounding", value.has("rounding") ? value.get("rounding").textValue() : "HALF_UP");
+        return node;
     }
 
     private void validateNumber(JsonNode value, BigDecimal min, BigDecimal max) {

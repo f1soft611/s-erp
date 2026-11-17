@@ -137,7 +137,7 @@ export function SalesDeliveryStatusPage(props: DeliveryPageProps) {
     { field: 'unit', headerName: '단위', width: 80, align: 'center' },
     ...(['deliveryQty', 'unitPrice', 'supplyAmt', 'vatAmt', 'totalAmt'] as const).map((field, index) => ({
       field, headerName: ['출하수량', '단가', '공급가', 'VAT', '합계'][index],
-      type: 'decimal' as const, decimalPlaces: 2, width: 130, align: 'right' as const,
+      type: 'decimal' as const, width: 130, align: 'right' as const,
     })),
     { field: 'remark', headerName: '비고', width: 200, align: 'left', mergeRows: true },
   ], [canRead]);

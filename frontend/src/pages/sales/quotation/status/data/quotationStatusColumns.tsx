@@ -15,8 +15,6 @@ const amountColumn = (
   field,
   headerName,
   type,
-  decimalPlaces: 2,
-  width,
   align: 'right',
   editable: false,
   search: { hidden: true },

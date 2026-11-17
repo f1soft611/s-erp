@@ -628,6 +628,11 @@ const columns: F1GridColumn<Item>[] = [
 
 `format: 'currency'`의 기본 0자리 KRW 표시와 명시적 `decimalPlaces` 동작은 유지한다. Excel 숫자 서식은 기본 숫자의 정수 값에 `#,##0`, 소수 값에 `#,##0.#####`, 명시 자릿수에 고정 서식을 적용한다. 정수와 소수 값이 같은 컬럼에 있어도 셀 값별 서식을 적용한다.
 
+## 모듈별 소수점 정책 (자동 적용)
+
+정책 관리에 `GRID_DECIMAL_{모듈코드}`(예: `GRID_DECIMAL_SALES`) NUMBER 정책을 등록하면 F1Grid가 자동으로 적용한다. 화면 코드 수정은 필요 없다. 대시보드가 `GridDecimalModuleProvider`로 현재 모듈 코드를 제공하고, F1Grid가 `type`이 `number`/`decimal`/`currency`이면서 `decimalPlaces`가 없는 컬럼에 정책값을 채운다. 우선순위: 컬럼 `decimalPlaces` > 모듈 정책 > F1-Grid 기본값(최대 5자리, 끝자리 0 제거). 특정 컬럼만 고정하려면 `decimal: { places, trailingZeros, rounding }` 객체 하나로 지정한다(예: `decimal: { places: 0 }`, `decimal: { places: 3, trailingZeros: 'AUTO', rounding: 'DOWN' }`). 객체에서 지정한 항목만 정책보다 우선하고 생략한 항목은 정책을 따른다. 기존 개별 옵션(`decimalPlaces`, `trailingZeros`, `rounding`)도 호환되지만, 둘 다 있으면 `decimal` 객체가 우선한다. 조회 API는 `GET /api/v1/system/policies/grid-decimals`이며 세션당 1회 캐시한다(변경 반영은 재로그인/새로고침). 모듈 컨텍스트 밖의 F1Grid는 정책을 조회하지 않는다.
+
+정책 값은 `{ "places": 2, "trailingZeros": "FIXED|AUTO", "rounding": "HALF_UP|UP|DOWN" }` 객체이며(기존 숫자 값은 FIXED/HALF_UP으로 호환), 정책 관리의 소수점 편집기에서 한 번에 설정한다. 컬럼 옵션 `trailingZeros`(FIXED=항상 `.00` 표시, AUTO=있을 때만 표시)와 `rounding`(HALF_UP 반올림, UP 올림, DOWN 내림)도 `decimalPlaces`와 동일하게 컬럼 값이 정책보다 우선한다. 반올림은 표시와 Excel 내보내기 값에만 적용되며 저장 데이터와 입력 편집기는 바뀌지 않는다. Excel은 AUTO일 때 `#` 서식을 사용한다.
 ## PageSearchArea 상세 검색 연결
 
 문서현황과 수주현황의 통합검색 입력은 outlined 입력 루트에 현재 테마의 `background.paper`를 적용해 공통 표면색을 유지한다.

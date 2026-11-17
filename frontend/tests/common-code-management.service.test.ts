@@ -4,6 +4,7 @@ import {
   createCommonCodeItem,
   fetchCommonCodeGroups,
   fetchCommonCodeItems,
+  fetchCommonCodeModuleOptions,
   updateCommonCodeItem,
   type CommonCodeGroupSearchFilters,
 } from '../src/pages/co/master/common-code/services/commonCodeManagement.service';
@@ -18,6 +19,36 @@ vi.mock('../src/shared/services/apiClient', () => ({
 describe('commonCodeManagement.service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('maps moduleCd (blank = common) and sends the module filter', async () => {
+    vi.mocked(apiClient.apiGet).mockResolvedValue({
+      resultList: [
+        { commonCodeGroupId: 1, groupCode: 'A', groupNm: 'a', moduleCd: 'SALES' },
+        { commonCodeGroupId: 2, groupCode: 'B', groupNm: 'b' },
+      ],
+    });
+
+    const rows = await fetchCommonCodeGroups({ moduleCd: 'SALES' });
+
+    expect(rows.map((row) => row.moduleCd)).toEqual(['SALES', '']);
+    expect(apiClient.apiGet).toHaveBeenCalledWith(
+      '/api/v1/co/master/common-code/groups?moduleCd=SALES',
+    );
+  });
+
+  it('builds module options from the system module management data', async () => {
+    vi.mocked(apiClient.apiGet).mockResolvedValue({
+      resultList: [
+        { moduleCode: 'SALES', moduleNm: '영업관리', useAt: 'Y' },
+        { moduleCode: 'OLD', moduleNm: '폐기', useAt: 'N' },
+      ],
+    });
+
+    await expect(fetchCommonCodeModuleOptions()).resolves.toEqual([
+      { value: 'SALES', label: '영업관리' },
+    ]);
+    expect(apiClient.apiGet).toHaveBeenCalledWith('/api/v1/system/modules');
   });
 
   it('loads groups from the co/master/common-code API', async () => {

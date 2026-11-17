@@ -19,14 +19,18 @@ import type {
 } from '../../../dashboard/types/dashboard';
 import {
   CommonCodeManagementPanel,
-  groupColumns,
+  buildGroupColumns,
   type CommonCodeManagementPanelHandle,
 } from './components/CommonCodeManagementPanel';
 import {
   fetchCommonCodeGroups,
+  fetchCommonCodeModuleOptions,
   type CommonCodeGroupSearchFilters,
 } from './services/commonCodeManagement.service';
-import type { CommonCodeGroupRow } from './types/commonCodeManagement.types';
+import type {
+  CommonCodeGroupRow,
+  CommonCodeModuleOption,
+} from './types/commonCodeManagement.types';
 import {
   toPageSearchFields,
   type PageSearchFieldValue,
@@ -71,6 +75,20 @@ export function CommonCodeManagementPage({
   );
   const panelRef = useRef<CommonCodeManagementPanelHandle>(null);
   const [groups, setGroups] = useState<CommonCodeGroupRow[]>([]);
+  const [moduleOptions, setModuleOptions] = useState<
+    CommonCodeModuleOption[]
+  >([]);
+  useEffect(() => {
+    let active = true;
+    fetchCommonCodeModuleOptions()
+      .then((options) => {
+        if (active) setModuleOptions(options);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState(pageSession.searchQuery);
   const [panelDirty, setPanelDirty] = useState(false);
@@ -293,7 +311,7 @@ export function CommonCodeManagementPage({
     );
   }, [executeRefresh, pageSession.detailValues, searchQuery]);
 
-  const detailFields = toPageSearchFields(groupColumns);
+  const detailFields = toPageSearchFields(buildGroupColumns(moduleOptions));
   const handleDetailSearch = useCallback(
     (values: Record<string, PageSearchFieldValue>) => {
       const toText = (value: PageSearchFieldValue): string => {
@@ -305,6 +323,7 @@ export function CommonCodeManagementPage({
           groupCode: toText(values.groupCode),
           groupNm: toText(values.groupNm),
           groupDc: toText(values.groupDc),
+          moduleCd: toText(values.moduleCd),
         },
         'detail',
         searchQuery,
@@ -428,6 +447,7 @@ export function CommonCodeManagementPage({
       <CommonCodeManagementPanel
         ref={panelRef}
         groups={groups}
+        moduleOptions={moduleOptions}
         searchQuery={searchQuery}
         canExportExcel={pageActionPermissions.excel}
         onGroupsSaved={handleGroupsSaved}

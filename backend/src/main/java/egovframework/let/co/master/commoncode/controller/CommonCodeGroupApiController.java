@@ -87,14 +87,17 @@ public class CommonCodeGroupApiController {
             @RequestParam(required = false) String groupCode,
             @RequestParam(required = false) String groupNm,
             @RequestParam(required = false) String groupDc,
+            @RequestParam(required = false) String moduleCd,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         Map<String, Object> resultMap = new HashMap<>();
-        if (hasSearchValue(keyword) || hasSearchValue(groupCode) || hasSearchValue(groupNm) || hasSearchValue(groupDc)) {
+        if (hasSearchValue(keyword) || hasSearchValue(groupCode) || hasSearchValue(groupNm) || hasSearchValue(groupDc)
+                || hasSearchValue(moduleCd)) {
             CommonCodeGroupSearchCondition condition = new CommonCodeGroupSearchCondition();
             condition.setKeyword(keyword);
             condition.setGroupCode(groupCode);
             condition.setGroupNm(groupNm);
             condition.setGroupDc(groupDc);
+            condition.setModuleCd(moduleCd);
             resultMap.put("resultList", commonCodeGroupService.listGroups(user.getTenantId(), condition));
         } else {
             resultMap.put("resultList", commonCodeGroupService.listGroups(user.getTenantId()));

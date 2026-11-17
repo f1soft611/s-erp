@@ -9,6 +9,16 @@ export type F1GridSavedRow<T extends object> = {
 
 export type F1GridRowState = 'normal' | 'inserted' | 'updated' | 'deleted';
 
+export type F1GridTrailingZeros = 'FIXED' | 'AUTO';
+export type F1GridRoundingMode = 'HALF_UP' | 'UP' | 'DOWN';
+
+export interface F1GridDecimalOptions {
+  /** 소수점 자릿수 */
+  places?: number;
+  trailingZeros?: F1GridTrailingZeros;
+  rounding?: F1GridRoundingMode;
+}
+
 export type F1GridEditorType =
   | 'text'
   | 'number'
@@ -163,7 +173,12 @@ export type F1GridColumn<T extends object> = {
   type?: F1GridEditorType;
   format?: string;
   decimalPlaces?: number;
-  options?: F1GridOption[];
+  /** 소수점 설정을 한 번에 지정한다(예: `decimal: { places: 2, trailingZeros: 'AUTO', rounding: 'DOWN' }`). 지정한 항목만 정책보다 우선하며, 개별 옵션(decimalPlaces 등)보다 우선한다. */
+  decimal?: F1GridDecimalOptions;
+  /** 소수점 0 표시: FIXED(항상 자리수만큼, 기본) / AUTO(값이 있을 때만). 미지정 시 정책 관리 값. */
+  trailingZeros?: F1GridTrailingZeros;
+  /** 반올림 방식: HALF_UP(반올림) / UP(올림) / DOWN(내림). 미지정 시 정책 관리 값. */
+  rounding?: F1GridRoundingMode;
   userOptions?: F1GridUserOption[];
   selectOptionIcon?: (option: F1GridOption) => ReactNode;
   required?: boolean;

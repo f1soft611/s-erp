@@ -19,6 +19,7 @@ import { alpha } from '@mui/material/styles';
 import { AppLoadingSpinner } from '../../AppLoadingSpinner';
 import { useOptionalDisplayScale } from '../../../context/AppSettingsContext';
 import { GridHeader } from './GridHeader';
+import { usePolicyDecimalRule } from './GridDecimalPolicy';
 import { GridBody } from './GridBody';
 import { GridSummary } from './GridSummary';
 import { F1GridFormModal } from '../form/F1GridFormModal';
@@ -119,6 +120,7 @@ import {
 
 const GRID_ROW_FORM_ACTION_COLUMN_WIDTH = 48;
 const GRID_ROW_VIRTUALIZATION_THRESHOLD = 200;
+const GRID_CELL_VIRTUALIZATION_THRESHOLD = 1000;
 const GRID_COLUMN_VIRTUALIZATION_THRESHOLD = 12;
 const DEFAULT_MOBILE_ROW_FORM_PLUGIN = {};
 
@@ -149,7 +151,7 @@ function F1GridInner<T extends object>(
     features,
     dataSource,
     onDataSourceError,
-    columns,
+    columns: columnsProp,
     rowKey,
     rowFormPlugin,
     ariaLabel = 'F1-GRID',
@@ -205,6 +207,34 @@ function F1GridInner<T extends object>(
   }: F1GridProps<T>,
   ref: ForwardedRef<F1GridRef<T>>,
 ) {
+  // 소수점 우선순위(항목별): 컬럼 decimal 객체 > 컬럼 개별 옵션 > 정책 관리 모듈 규칙 > 그리드 기본(최대 5자리, 반올림)
+  const policyRule = usePolicyDecimalRule();
+  const columns = useMemo(
+    () =>
+      columnsProp.map((column) => {
+        if (
+          column.type !== 'number' &&
+          column.type !== 'decimal' &&
+          column.type !== 'currency'
+        ) {
+          return column;
+        }
+        const own = column.decimal;
+        const places = own?.places ?? column.decimalPlaces ?? policyRule?.places;
+        const trailingZeros =
+          own?.trailingZeros ?? column.trailingZeros ?? policyRule?.trailingZeros;
+        const rounding = own?.rounding ?? column.rounding ?? policyRule?.rounding;
+        if (
+          places === column.decimalPlaces &&
+          trailingZeros === column.trailingZeros &&
+          rounding === column.rounding
+        ) {
+          return column;
+        }
+        return { ...column, decimalPlaces: places, trailingZeros, rounding };
+      }),
+    [columnsProp, policyRule],
+  );
   const [serverRows, setServerRows] = useState<T[]>([]);
   const [serverTotalRowCount, setServerTotalRowCount] = useState(0);
   const [dataSourceLoading, setDataSourceLoading] = useState(false);
@@ -726,8 +756,9 @@ function F1GridInner<T extends object>(
     });
   const bodyScrollMetricsRef = useRef(bodyScrollMetrics);
   bodyScrollMetricsRef.current = bodyScrollMetrics;
+  const latestHorizontalScrollRef = useRef(0);
   const shouldUpdateHorizontalScrollRef = useRef<
-    (bodyScroll: HTMLDivElement, scrollLeft: number) => boolean
+    (scrollLeft: number) => boolean
   >(() => true);
   const viewportSchedulerRef = useRef<
     ReturnType<typeof createGridRafScheduler<GridViewportMetrics>> | undefined
@@ -754,16 +785,14 @@ function F1GridInner<T extends object>(
     bodyScroll: HTMLDivElement,
     measureHorizontalScroll = true,
   ) {
+    latestHorizontalScrollRef.current = bodyScroll.scrollLeft;
     const hasVerticalOverflow =
       bodyScroll.scrollHeight > bodyScroll.clientHeight;
     viewportSchedulerRef.current?.schedule({
       scrollTop: bodyScroll.scrollTop,
       scrollLeft:
         measureHorizontalScroll ||
-        shouldUpdateHorizontalScrollRef.current(
-          bodyScroll,
-          bodyScroll.scrollLeft,
-        )
+        shouldUpdateHorizontalScrollRef.current(bodyScroll.scrollLeft)
           ? bodyScroll.scrollLeft
           : bodyScrollMetricsRef.current.scrollLeft,
       viewportHeight: bodyScroll.clientHeight,
@@ -816,7 +845,9 @@ function F1GridInner<T extends object>(
     }
 
     const virtualizationActive =
-      virtualizeRows ?? visibleRows.length >= GRID_ROW_VIRTUALIZATION_THRESHOLD;
+      virtualizeRows ??
+      (visibleRows.length >= GRID_ROW_VIRTUALIZATION_THRESHOLD ||
+        visibleRows.length * visibleColumns.length >= GRID_CELL_VIRTUALIZATION_THRESHOLD);
     if (!virtualizationActive) {
       return {
         visibleRows,
@@ -908,6 +939,7 @@ function F1GridInner<T extends object>(
     rowKey,
     rowOverscan,
     virtualizeRows,
+    visibleColumns.length,
     visibleRows,
   ]);
 
@@ -988,22 +1020,17 @@ function F1GridInner<T extends object>(
     () => new Set(visibleColumns.map((_, index) => index)),
     [visibleColumns],
   );
-  const previousVirtualColumnIndexesRef = useRef(new Set<number>());
-  const renderedColumnIndexes = useMemo(() => {
+  const columnVirtualization = useMemo(() => {
     const viewportWidth =
       bodyScrollMetrics.viewportWidth || gridContainerWidth || 800;
     const totalWidth = resolvedColumnWidths.reduce(
       (sum, width) => sum + width,
       0,
     );
-    const virtualizationActive =
+    const active =
       virtualizeColumns ??
       (visibleColumns.length >= GRID_COLUMN_VIRTUALIZATION_THRESHOLD &&
         totalWidth > viewportWidth);
-    if (!virtualizationActive) {
-      return allColumnIndexes;
-    }
-
     const pinnedIndexes = visibleColumns
       .map((column, index) =>
         getGridColumnPinSide(pinnedFields, column) ? index : -1,
@@ -1018,32 +1045,20 @@ function F1GridInner<T extends object>(
       copiedCellRange?.focus.columnIndex,
     ].filter((index): index is number => index !== undefined);
 
-    const nextIndexes = getVirtualColumnIndexes({
-        widths: resolvedColumnWidths,
-        scrollLeft: Math.max(
-          0,
-          bodyScrollMetrics.scrollLeft - (showCheckbox ? 44 : 0),
-        ),
-        viewportWidth: Math.max(
-          0,
-          viewportWidth -
-            (showCheckbox ? 44 : 0) -
-            (rowFormActive ? GRID_ROW_FORM_ACTION_COLUMN_WIDTH : 0),
-        ),
-        overscan: columnOverscan,
-        pinnedIndexes,
-        protectedIndexes,
-      });
-    const previous = previousVirtualColumnIndexesRef.current;
-    if (hasSameColumnIndexes(previous, nextIndexes)) {
-      return previous;
-    }
-    const next = new Set(nextIndexes);
-    previousVirtualColumnIndexesRef.current = next;
-    return next;
+    return {
+      active,
+      widths: resolvedColumnWidths,
+      viewportWidth: Math.max(
+        0,
+        viewportWidth -
+          (showCheckbox ? 44 : 0) -
+          (rowFormActive ? GRID_ROW_FORM_ACTION_COLUMN_WIDTH : 0),
+      ),
+      overscan: columnOverscan,
+      pinnedIndexes,
+      protectedIndexes,
+    };
   }, [
-    allColumnIndexes,
-    bodyScrollMetrics.scrollLeft,
     bodyScrollMetrics.viewportWidth,
     cellSelection,
     columnOverscan,
@@ -1058,52 +1073,39 @@ function F1GridInner<T extends object>(
     virtualizeColumns,
     visibleColumns,
   ]);
-  shouldUpdateHorizontalScrollRef.current = (bodyScroll, scrollLeft) => {
-    const viewportWidth =
-      bodyScrollMetrics.viewportWidth ||
-      bodyScroll.clientWidth ||
-      gridContainerWidth ||
-      800;
-    const totalWidth = resolvedColumnWidths.reduce(
-      (sum, width) => sum + width,
-      0,
-    );
-    const virtualizationActive =
-      virtualizeColumns ??
-      (visibleColumns.length >= GRID_COLUMN_VIRTUALIZATION_THRESHOLD &&
-        totalWidth > viewportWidth);
-    if (!virtualizationActive) return false;
-
-    const pinnedIndexes = visibleColumns
-      .map((column, index) =>
-        getGridColumnPinSide(pinnedFields, column) ? index : -1,
-      )
-      .filter((index) => index >= 0);
-    const protectedIndexes = [
-      focusedCell?.columnIndex,
-      editingCell?.columnIndex,
-      cellSelection?.anchor.columnIndex,
-      cellSelection?.focus.columnIndex,
-      copiedCellRange?.anchor.columnIndex,
-      copiedCellRange?.focus.columnIndex,
-    ].filter((index): index is number => index !== undefined);
-    const nextIndexes = getVirtualColumnIndexes({
-      widths: resolvedColumnWidths,
+  const previousVirtualColumnIndexesRef = useRef<{
+    options: typeof columnVirtualization;
+    indexes: Set<number>;
+  } | undefined>(undefined);
+  const getColumnIndexesForScroll = useCallback((scrollLeft: number) => {
+    const previous = previousVirtualColumnIndexesRef.current;
+    return getVirtualColumnIndexes({
+      ...columnVirtualization,
       scrollLeft: Math.max(0, scrollLeft - (showCheckbox ? 44 : 0)),
-      viewportWidth: Math.max(
-        0,
-        viewportWidth -
-          (showCheckbox ? 44 : 0) -
-          (rowFormActive ? GRID_ROW_FORM_ACTION_COLUMN_WIDTH : 0),
-      ),
-      overscan: columnOverscan,
-      pinnedIndexes,
-      protectedIndexes,
+      previousIndexes: previous?.options === columnVirtualization
+        ? previous.indexes : undefined,
     });
+  }, [columnVirtualization, showCheckbox]);
 
+  const renderedColumnIndexes = useMemo(() => {
+    if (!columnVirtualization.active) return allColumnIndexes;
+    const nextIndexes = getColumnIndexesForScroll(latestHorizontalScrollRef.current);
+    const previous = previousVirtualColumnIndexesRef.current;
+    const indexes = previous && hasSameColumnIndexes(previous.indexes, nextIndexes)
+      ? previous.indexes : new Set(nextIndexes);
+    previousVirtualColumnIndexesRef.current = { options: columnVirtualization, indexes };
+    return indexes;
+  }, [
+    allColumnIndexes,
+    bodyScrollMetrics.scrollLeft,
+    columnVirtualization,
+    getColumnIndexesForScroll,
+  ]);
+  shouldUpdateHorizontalScrollRef.current = (scrollLeft) => {
+    if (!columnVirtualization.active) return false;
     return !hasSameColumnIndexes(
-      previousVirtualColumnIndexesRef.current,
-      nextIndexes,
+      renderedColumnIndexes,
+      getColumnIndexesForScroll(scrollLeft),
     );
   };
 
@@ -2923,27 +2925,32 @@ function F1GridInner<T extends object>(
     const summaryScroll = summaryScrollRef.current;
     if (!headerScroll || !bodyScroll) return;
 
+    const synchronizedPositions = new Map<HTMLElement, number>();
     const syncHeaderScroll = () => {
-      if (headerScroll.scrollLeft !== bodyScroll.scrollLeft) {
-        headerScroll.scrollLeft = bodyScroll.scrollLeft;
-      }
-      if (summaryScroll && summaryScroll.scrollLeft !== bodyScroll.scrollLeft) {
-        summaryScroll.scrollLeft = bodyScroll.scrollLeft;
+      const scrollLeft = bodyScroll.scrollLeft;
+      for (const follower of [headerScroll, summaryScroll]) {
+        if (!follower) continue;
+        if (follower.scrollLeft !== scrollLeft) {
+          follower.scrollLeft = scrollLeft;
+        }
+        synchronizedPositions.set(follower, follower.scrollLeft);
       }
     };
 
-    const syncBodyScroll = () => {
-      if (bodyScroll.scrollLeft !== headerScroll.scrollLeft) {
-        bodyScroll.scrollLeft = headerScroll.scrollLeft;
+    const syncFromFollower = (follower: HTMLElement) => {
+      // Programmatic scroll events arrive later and must not rewind newer body input.
+      if (synchronizedPositions.get(follower) === follower.scrollLeft) return;
+      if (bodyScroll.scrollLeft !== follower.scrollLeft) {
+        bodyScroll.scrollLeft = follower.scrollLeft;
       }
+      syncHeaderScroll();
     };
+    const syncBodyScroll = () => syncFromFollower(headerScroll);
 
     bodyScroll.addEventListener('scroll', syncHeaderScroll, { passive: true });
     headerScroll.addEventListener('scroll', syncBodyScroll, { passive: true });
     const syncSummaryScroll = () => {
-      if (summaryScroll && bodyScroll.scrollLeft !== summaryScroll.scrollLeft) {
-        bodyScroll.scrollLeft = summaryScroll.scrollLeft;
-      }
+      if (summaryScroll) syncFromFollower(summaryScroll);
     };
     summaryScroll?.addEventListener('scroll', syncSummaryScroll, { passive: true });
     syncHeaderScroll();

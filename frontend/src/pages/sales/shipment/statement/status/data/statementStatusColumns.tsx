@@ -21,7 +21,7 @@ export function createStatementStatusColumns(
     { field: 'unit', headerName: '단위', width: 80, align: 'center' },
     ...(['deliveryQty', 'unitPrice', 'supplyAmt', 'vatAmt', 'lineTotalAmt'] as const).map((field, index) => ({
       field, headerName: ['수량', '단가', '공급가', 'VAT', '합계'][index],
-      type: 'decimal' as const, decimalPlaces: 2, width: 130, align: 'right' as const,
+      type: 'decimal' as const, width: 130, align: 'right' as const,
     })),
   ];
 }

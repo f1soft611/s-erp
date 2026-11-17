@@ -8,6 +8,7 @@
         <result property="groupCode" column="group_code"/>
         <result property="groupNm" column="group_nm"/>
         <result property="groupDc" column="group_dc"/>
+        <result property="moduleCd" column="module_cd"/>
         <result property="parentGroupId" column="parent_group_id"/>
         <result property="sortOrder" column="sort_order"/>
         <result property="useAt" column="use_at"/>
@@ -22,6 +23,7 @@
             g.group_code,
             g.group_nm,
             g.group_dc,
+            g.module_cd,
             g.parent_group_id,
             g.sort_order,
             g.use_at,
@@ -29,6 +31,9 @@
             g.updated_at
         FROM tb_common_code_group g
                 WHERE g.tenant_id = #{tenantId}
+                <if test='moduleCd != null and moduleCd != ""'>
+                    AND g.module_cd = #{moduleCd}
+                </if>
                 <if test='keyword != null and keyword != ""'>
                     AND (
                         LOWER(COALESCE(g.group_code, '')) LIKE LOWER(CONCAT('%', #{keyword}, '%'))
@@ -55,6 +60,7 @@
             g.group_code,
             g.group_nm,
             g.group_dc,
+            g.module_cd,
             g.parent_group_id,
             g.sort_order,
             g.use_at,
@@ -63,6 +69,13 @@
         FROM tb_common_code_group g
         WHERE g.common_code_group_id = #{groupId}
           AND g.tenant_id = #{tenantId}
+    </select>
+
+    <select id="countModuleByCode" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM tb_module
+        WHERE tenant_id = #{tenantId}
+          AND module_code = #{moduleCd}
     </select>
 
     <select id="selectGroupIdByCode" parameterType="map" resultType="long">
@@ -79,6 +92,7 @@
             group_code,
             group_nm,
             group_dc,
+            module_cd,
             parent_group_id,
             sort_order,
             use_at,
@@ -89,6 +103,7 @@
             #{groupCode},
             #{groupNm},
             #{groupDc},
+            #{moduleCd, jdbcType=VARCHAR},
             #{parentGroupId, jdbcType=BIGINT},
             #{sortOrder},
             #{useAt},
@@ -103,6 +118,7 @@
         SET group_code = #{groupCode},
             group_nm = #{groupNm},
             group_dc = #{groupDc},
+            module_cd = #{moduleCd, jdbcType=VARCHAR},
             parent_group_id = #{parentGroupId, jdbcType=BIGINT},
             sort_order = #{sortOrder},
             use_at = #{useAt},

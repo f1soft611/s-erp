@@ -886,17 +886,16 @@ describe('CommonCode management page', () => {
     );
 
     await screen.findByRole('grid', { name: '공통코드 그룹 트리' });
+    const commonCodeCalls = () =>
+      apiMocks.apiGet.mock.calls
+        .map((call: unknown[]) => call[0])
+        .filter((path: unknown) => path !== '/api/v1/system/modules');
     await waitFor(() => {
-      expect(apiMocks.apiGet).toHaveBeenCalledTimes(2);
+      expect(commonCodeCalls()).toEqual([
+        '/api/v1/co/master/common-code/groups',
+        '/api/v1/co/master/common-code/groups/1/items',
+      ]);
     });
-    expect(apiMocks.apiGet).toHaveBeenNthCalledWith(
-      1,
-      '/api/v1/co/master/common-code/groups',
-    );
-    expect(apiMocks.apiGet).toHaveBeenNthCalledWith(
-      2,
-      '/api/v1/co/master/common-code/groups/1/items',
-    );
   });
 
   it('renders the use flag as a checkbox and the sort order as a numeric field for detail rows', async () => {

@@ -1,5 +1,5 @@
 import type { F1GridColumn } from '../types/grid.types';
-import { getCellDisplayValue, getGridDateValue } from '../utils/grid.utils';
+import { getCellDisplayValue, getGridDateValue, roundGridNumber } from '../utils/grid.utils';
 import { calculateGridSummary } from '../utils/gridSummary';
 
 type ExportCellValue = string | number | boolean | Date | null;
@@ -66,7 +66,7 @@ function getBooleanOrText(value: unknown): boolean | string {
 }
 
 function getNumericFormat<T extends object>(
-  column: Pick<F1GridColumn<T>, 'format' | 'decimalPlaces'>,
+  column: Pick<F1GridColumn<T>, 'format' | 'decimalPlaces' | 'trailingZeros'>,
   value: number | string,
 ): string {
   const decimalPlaces =
@@ -81,7 +81,7 @@ function getNumericFormat<T extends object>(
     Number.isInteger(value);
   const digits =
     decimalPlaces !== undefined
-      ? '0'.repeat(decimalPlaces)
+      ? (column.trailingZeros === 'AUTO' ? '#' : '0').repeat(decimalPlaces)
       : column.format === 'currency' || isDefaultInteger
         ? ''
         : '#####';
@@ -118,7 +118,11 @@ function getTypedExcelCell<T extends object>(
     case 'number':
     case 'decimal':
     case 'currency': {
-      const value = getNumberOrText(rawValue);
+      const numeric = getNumberOrText(rawValue);
+      const value =
+        column.rounding && typeof numeric === 'number'
+          ? roundGridNumber(numeric, column.decimalPlaces ?? 5, column.rounding)
+          : numeric;
       cell = {
         value,
         numFmt: getNumericFormat(column, value),
