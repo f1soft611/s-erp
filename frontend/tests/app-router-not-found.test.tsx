@@ -87,6 +87,46 @@ describe('AppRouter not found fallback', () => {
     expect(screen.queryByText('요청하신 페이지를 찾을 수 없습니다')).not.toBeInTheDocument();
   }, 30000);
 
+  it('opens the authorized quality module route (자재수입검사현황) instead of the NotFound page', async () => {
+    window.localStorage.setItem('s-erp-auth', JSON.stringify({
+      tenantCode: 'TEST', userId: 'test', accessToken: 'token', refreshToken: '',
+      expiresAt: new Date(Date.now() + 300000).toISOString(),
+    }));
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/v1/menus/my')) {
+        return new Response(JSON.stringify({ resultCode: '200', result: {
+          user: { userId: 'test', roles: [] },
+          menus: [{
+            menuId: 1, name: '품질관리', path: '/quality', icon: 'ClipboardCheck',
+            children: [{ menuId: 2, name: '수입검사', path: '/quality/inspect', children: [{
+              menuId: 3, name: '자재수입검사현황', path: '/quality/inspect/inspect-status', children: [],
+              permissions: { read: true, create: false, update: false, delete: false, excel: true },
+            }] }],
+          }],
+        } }), { status: 200 });
+      }
+      return new Response(JSON.stringify({
+        resultCode: '200', result: { resultList: [] },
+      }), { status: 200 });
+    }));
+    render(
+      <AppSettingsProvider>
+        <MemoryRouter initialEntries={['/quality/inspect/inspect-status']}>
+          <AppRouter />
+        </MemoryRouter>
+      </AppSettingsProvider>,
+    );
+    // 화면이 다시 그려지며 그리드가 교체될 수 있어 찾은 요소를 쥐지 않고 매번 다시 찾는다.
+    await waitFor(
+      () => expect(screen.getByRole('grid', { name: '자재수입검사현황 목록' })).toBeInTheDocument(),
+      { timeout: 25000 },
+    );
+    // 메뉴를 불러오는 동안 잠깐 보일 수 있으므로 메뉴가 도착한 뒤 NotFound가 없는지 확인한다.
+    await waitFor(() => expect(screen.getAllByText('자재수입검사현황').length).toBeGreaterThan(0), { timeout: 5000 });
+    await waitFor(() => expect(screen.queryByText('요청하신 페이지를 찾을 수 없습니다')).not.toBeInTheDocument(), { timeout: 5000 });
+  }, 40000);
+
   it('redirects an unauthenticated process route to login', async () => {
     render(
       <AppSettingsProvider>

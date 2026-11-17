@@ -145,6 +145,14 @@ function AppRouter() {
             }
           />
           <Route
+            path="/quality/*"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/co/*"
             element={
               <ProtectedRoute>

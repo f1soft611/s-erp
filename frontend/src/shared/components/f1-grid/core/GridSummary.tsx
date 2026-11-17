@@ -25,6 +25,8 @@ export function GridSummary<T extends object>({
     () => columns.map((column) => column.summaryType ? calculateGridSummary(rows, column) : undefined),
     [columns, rows],
   );
+  // 체크박스 열이 없는 Grid는 값이 없는 첫 열의 칸에 "합계" 라벨을 보여 준다.
+  const labelIndex = showCheckbox ? -1 : values.findIndex((value) => value === undefined);
   return (
     <Box
       role="row"
@@ -35,7 +37,7 @@ export function GridSummary<T extends object>({
       {showCheckbox && (
         <Box sx={{ position: 'sticky', left: 0, zIndex: 2, bgcolor: 'background.default',
           borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', fontWeight: 'bold' }}>집계</Box>
+          justifyContent: 'center', fontWeight: 'bold' }}>합계</Box>
       )}
       {columns.map((column, index) => {
         const pin = getPinOffset(column);
@@ -59,7 +61,8 @@ export function GridSummary<T extends object>({
             }}
           >
             {(!renderedColumnIndexes || renderedColumnIndexes.has(index)) && value !== undefined
-              ? getCellDisplayValue(column, value) : ''}
+              ? getCellDisplayValue(column, value)
+              : (index === labelIndex ? '합계' : '')}
           </Box>
         );
       })}
