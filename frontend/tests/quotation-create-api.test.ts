@@ -134,7 +134,7 @@ describe('quotation create API', () => {
     expect(payload.submitDt).toBeNull();
   });
 
-  it('requires master selection for item codes and allows only manual item-name entry', () => {
+  it('requires master selection for item codes and allows manual item-name entry', () => {
     const openMaterialPicker = vi.fn();
     const columns = createQuotationDetailColumns(openMaterialPicker);
     const code = columns.find((column) => column.field === 'materialCode')!;
@@ -149,6 +149,7 @@ describe('quotation create API', () => {
     code.onOpenCodePicker?.(row, applyPatch);
     expect(openMaterialPicker).toHaveBeenCalledWith(applyPatch);
     expect(spec.editable).toBe(false);
+    expect(unit.type).toBe('select');
     expect(unit.editable).toBe(false);
     expect(name.editable).toBe(true);
     expect(name.onValueChange?.(row, '직접 입력 품목')).toEqual({
@@ -174,6 +175,19 @@ describe('quotation create API', () => {
       materialSpec: 'R-1',
       unit: 'EA',
     });
+  });
+
+  it('uses common-code unit options without unlinking the selected material', () => {
+    const options = [{ value: 'KG', label: '킬로그램' }];
+    const row = detailRow({ materialId: 20, materialCode: 'M-20', unit: 'G' });
+    const unit = createQuotationDetailColumns(vi.fn(), false, options)
+      .find((column) => column.field === 'unit')!;
+    expect(unit.type).toBe('select');
+    expect(unit.editable).toBe(true);
+    expect(unit.options).toEqual([{ value: '', label: '선택 안 함' }, ...options]);
+    expect(unit.onValueChange?.(row, 'KG')).toEqual({ unit: 'KG' });
+    expect(createQuotationDetailColumns(vi.fn(), true, options)
+      .find((column) => column.field === 'unit')?.editable).toBe(false);
   });
 
   it('searches existing active masters and returns picker snapshot details without writing masters', async () => {

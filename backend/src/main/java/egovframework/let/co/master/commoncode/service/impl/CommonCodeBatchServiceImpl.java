@@ -153,6 +153,7 @@ public class CommonCodeBatchServiceImpl extends EgovAbstractServiceImpl implemen
         payload.setGroupCode(row.getGroupCode());
         payload.setGroupNm(row.getGroupNm());
         payload.setGroupDc(row.getGroupDc());
+        payload.setModuleCd(row.getModuleCd());
         payload.setParentGroupId(resolveParentGroupId(tenantId, row.getParentGroupId(), tempGroupIdToPersistedGroupId));
         payload.setSortOrder(row.getSortOrder());
         payload.setUseAt(row.getUseAt());

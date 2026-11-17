@@ -438,6 +438,8 @@ interface F1GridColumn<T> {
 
 ## 컬럼 확장 API (표시 커스터마이징)
 
+`F1GridColumn.options`는 `F1GridOption[]` 형태의 선택 목록이며 `select`/`autocomplete` 편집기, 값의 label 표시, 행 폼 및 상세검색에서 공유한다. `decimal`/`decimalPlaces`/`trailingZeros`/`rounding` 소수점 설정과 독립적으로 함께 제공한다. 소수점 옵션 확장 시에도 이 선택 목록 타입 계약을 유지해야 한다.
+
 `renderCell`, `getCellStyle`, `getCellProps`는 컬럼별로 표시 영역, 동적 스타일, 셀 속성, 접근성 메타데이터를 직접 확장할 수 있게 해준다.
 
 ```typescript
@@ -628,6 +630,11 @@ const columns: F1GridColumn<Item>[] = [
 
 `format: 'currency'`의 기본 0자리 KRW 표시와 명시적 `decimalPlaces` 동작은 유지한다. Excel 숫자 서식은 기본 숫자의 정수 값에 `#,##0`, 소수 값에 `#,##0.#####`, 명시 자릿수에 고정 서식을 적용한다. 정수와 소수 값이 같은 컬럼에 있어도 셀 값별 서식을 적용한다.
 
+## 모듈별 소수점 정책 (자동 적용)
+
+정책 관리에 `GRID_DECIMAL_{모듈코드}`(예: `GRID_DECIMAL_SALES`) NUMBER 정책을 등록하면 F1Grid가 자동으로 적용한다. 화면 코드 수정은 필요 없다. 대시보드가 `GridDecimalModuleProvider`로 현재 모듈 코드를 제공하고, F1Grid가 `type`이 `number`/`decimal`/`currency`이면서 `decimalPlaces`가 없는 컬럼에 정책값을 채운다. 우선순위: 컬럼 `decimalPlaces` > 모듈 정책 > F1-Grid 기본값(최대 5자리, 끝자리 0 제거). 특정 컬럼만 고정하려면 `decimal: { places, trailingZeros, rounding }` 객체 하나로 지정한다(예: `decimal: { places: 0 }`, `decimal: { places: 3, trailingZeros: 'AUTO', rounding: 'DOWN' }`). 객체에서 지정한 항목만 정책보다 우선하고 생략한 항목은 정책을 따른다. 기존 개별 옵션(`decimalPlaces`, `trailingZeros`, `rounding`)도 호환되지만, 둘 다 있으면 `decimal` 객체가 우선한다. 조회 API는 `GET /api/v1/system/policies/grid-decimals`이며 세션당 1회 캐시한다(변경 반영은 재로그인/새로고침). 모듈 컨텍스트 밖의 F1Grid는 정책을 조회하지 않는다.
+
+정책 값은 `{ "places": 2, "trailingZeros": "FIXED|AUTO", "rounding": "HALF_UP|UP|DOWN" }` 객체이며(기존 숫자 값은 FIXED/HALF_UP으로 호환), 정책 관리의 소수점 편집기에서 한 번에 설정한다. 컬럼 옵션 `trailingZeros`(FIXED=항상 `.00` 표시, AUTO=있을 때만 표시)와 `rounding`(HALF_UP 반올림, UP 올림, DOWN 내림)도 `decimalPlaces`와 동일하게 컬럼 값이 정책보다 우선한다. 반올림은 표시와 Excel 내보내기 값에만 적용되며 저장 데이터와 입력 편집기는 바뀌지 않는다. Excel은 AUTO일 때 `#` 서식을 사용한다.
 ## PageSearchArea 상세 검색 연결
 
 문서현황과 수주현황의 통합검색 입력은 outlined 입력 루트에 현재 테마의 `background.paper`를 적용해 공통 표면색을 유지한다.
@@ -2237,7 +2244,7 @@ const createLargeDataset = (count: number) =>
 
 ### Virtualized rendering contract
 
-F1-Grid는 전체 데이터/선택/편집 상태와 실제 DOM 렌더 범위를 분리한다. 행 수가 200개 이상이면 row virtualization이 자동 활성화되고, 컬럼 수가 12개 이상이면서 가로 overflow가 있으면 column virtualization이 자동 활성화된다.
+F1-Grid는 전체 데이터/선택/편집 상태와 실제 DOM 렌더 범위를 분리한다. 행 수가 200개 이상이거나, 병합 컬럼이 없는 표에서 필터 적용 후 행 수 × 숨김 제외 컬럼 수가 1,000 이상이면 row virtualization이 자동 활성화된다. 컬럼이 많은 표는 200행 미만이어도 화면 밖 행의 셀을 생성하지 않아 가로 이동 중의 렌더 부담을 줄인다. `mergeRows` 컬럼이 있는 표는 병합 레이아웃을 보존하기 위해 추가 셀 수 조건을 적용하지 않고 기존 행 수 기준을 유지한다. 컬럼 수가 12개 이상이면서 가로 overflow가 있으면 column virtualization이 자동 활성화된다.
 
 ```tsx
 <F1Grid
@@ -2253,12 +2260,13 @@ F1-Grid는 전체 데이터/선택/편집 상태와 실제 DOM 렌더 범위를 
 />
 ```
 
-- `virtualizeRows`, `virtualizeColumns`: 자동 활성화 판단을 호출부에서 재정의한다.
+- `virtualizeRows`, `virtualizeColumns`: 자동 활성화 판단을 호출부에서 재정의한다. 특히 `virtualizeRows={false}`는 셀 수와 무관하게 전체 행 렌더를 유지한다.
 - `rowOverscan`: viewport 위/아래에 추가 렌더링할 행 수이며 기본값은 8이다.
 - `columnOverscan`: viewport 좌/우에 추가 렌더링할 일반 컬럼 수이며 기본값은 2이다.
 - `fixedRowHeightThreshold`: 기본값 10,000이며, 이상에서는 행 높이를 고정하고 행 리사이즈 핸들을 비활성화한다.
 - pinned 컬럼, 편집 중 컬럼, 선택 범위의 anchor/focus 컬럼은 viewport 밖이어도 DOM에 유지한다.
-- 세로 스크롤 위치와 viewport 크기/스크롤바 gutter는 기존처럼 `requestAnimationFrame`으로 측정한다. 가로 스크롤은 네이티브 본문 스크롤과 헤더 동기화를 유지하며, 컬럼 가상화가 꺼져 있거나 현재 표시할 열 집합이 바뀌지 않으면 수평 위치만으로 React viewport 상태를 다시 렌더하지 않는다. 표시 열 집합이 바뀌면 pinned/protected 컬럼을 포함해 새 범위를 반영한다.
+- 세로 스크롤 위치와 viewport 크기/스크롤바 gutter는 기존처럼 `requestAnimationFrame`으로 측정한다. 가로 스크롤은 별도 애니메이션 없이 네이티브 본문 이동을 사용한다. 컬럼 가상화가 꺼져 있거나 미리 렌더한 열 집합이 실제 viewport와 pinned/protected 열을 모두 포함하면 수평 위치만으로 React viewport 상태를 다시 렌더하지 않는다. 버퍼를 벗어나면 최신 위치에서 `columnOverscan`을 포함한 새 범위를 반영한다. 리사이즈·컬럼 구성·고정/보호 열 변경 시 버퍼를 초기화하며, 상태 갱신 없이 이동한 경우에도 최신 실제 가로 위치에서 재계산한다.
+- 본문·헤더·합계의 가로 위치는 즉시 동기화한다. 프로그램으로 헤더/합계 위치를 맞춘 뒤 늦게 도착하는 후속 scroll 이벤트는 새 본문 위치를 되돌리지 않는다. 헤더/합계에서 직접 시작한 이동은 계속 본문과 다른 영역에 반영한다.
 - 세로 스크롤바가 생기는 대용량 그리드에서는 본문 스크롤 영역의 scrollbar gutter 폭을 헤더 스크롤 영역 끝에도 반영해, 가로 스크롤을 마지막으로 이동해도 헤더와 데이터 셀의 최대 `scrollLeft` 기준이 일치해야 한다.
 - 선택 범위는 셀마다 state를 만들지 않고 `{ anchor, focus }`로 저장한 뒤 숫자 bounds를 한 번 계산해 렌더 셀에서 비교한다.
 - export, validate, 전체 선택, 정렬/필터, dirty/edit 데이터는 virtual window가 아니라 전체 visible rows를 기준으로 동작한다.

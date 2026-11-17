@@ -29,6 +29,11 @@ public class CommonCodeGroupDAO extends EgovAbstractMapper {
         return selectOne("CommonCodeGroupDAO.selectGroupIdByCode", params);
     }
 
+    public int countModuleByCode(Map<String, Object> params) throws Exception {
+        Integer count = selectOne("CommonCodeGroupDAO.countModuleByCode", params);
+        return count == null ? 0 : count;
+    }
+
     public Long insertGroup(Map<String, Object> params) throws Exception {
         return selectOne("CommonCodeGroupDAO.insertGroup", params);
     }

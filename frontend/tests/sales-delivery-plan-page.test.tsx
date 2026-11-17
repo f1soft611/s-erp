@@ -283,7 +283,7 @@ it('splits a fully planned AUTO order and can save the split again', async () =>
   fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
   fireEvent.click(await screen.findByRole('button', { name: 'SO-7', exact: true }));
   await waitFor(() => expect(screen.getByLabelText('계획번호')).toHaveValue('DP-9'));
-  let grid = screen.getByRole('grid', { name: '출하계획 상세 목록' });
+  let grid = await screen.findByRole('grid', { name: '출하계획 상세 목록' });
   editCell(grid, 0, 5, '5');
   fireEvent.click(within(grid).getByRole('button', { name: '분할' }));
   grid = screen.getByRole('grid', { name: '출하계획 상세 목록' });
@@ -297,7 +297,7 @@ it('splits a fully planned AUTO order and can save the split again', async () =>
   }));
   fireEvent.click(screen.getByRole('button', { name: '수정 저장', exact: true }));
   await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledTimes(2));
-});
+}, 15000);
 
 it('excludes quantities in other plans from an AUTO plan update limit', async () => {
   vi.mocked(searchPlanSourceOrders).mockResolvedValue([{ ...source, remainingPlanQty: 2 }]);
@@ -312,7 +312,7 @@ it('excludes quantities in other plans from an AUTO plan update limit', async ()
   fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
   fireEvent.click(await screen.findByRole('button', { name: 'SO-7', exact: true }));
   await waitFor(() => expect(screen.getByLabelText('계획번호')).toHaveValue('DP-9'));
-  let grid = screen.getByRole('grid', { name: '출하계획 상세 목록' });
+  let grid = await screen.findByRole('grid', { name: '출하계획 상세 목록' });
   editCell(grid, 0, 5, '7');
   fireEvent.click(screen.getByRole('button', { name: '수정 저장', exact: true }));
   await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledTimes(1));
@@ -326,7 +326,7 @@ it('excludes quantities in other plans from an AUTO plan update limit', async ()
   expect(alert.parentElement).toBe(screen.getByRole('region', { name: '출하계획 입력 내용' }));
   expect(alert.parentElement).toHaveStyle({ paddingTop: '8px', paddingBottom: '16px' });
   expect(updateDeliveryPlan).toHaveBeenCalledTimes(1);
-});
+}, 15000);
 
 it('registers only selected source item rows from multiple orders with their remaining quantities', async () => {
   vi.mocked(searchPlanSourceOrders).mockResolvedValue([

@@ -29,6 +29,26 @@ beforeEach(() => {
   vi.mocked(deletePolicy).mockResolvedValue(undefined);
 });
 
+it('edits places, zero display and rounding together for a grid decimal policy', async () => {
+  vi.mocked(getPolicies).mockResolvedValue([{
+    ...row, policyId: 9, policyCode: 'GRID_DECIMAL_SALES', policyName: '영업관리 그리드 소수점', valueType: 'NUMBER',
+    value: 2, options: [], minValue: 0, maxValue: 6, unit: '자리', systemPolicy: false,
+  }] as never);
+  render(<SystemPolicyPage {...props} />);
+  await screen.findByText('영업관리 그리드 소수점');
+  fireEvent.click(screen.getByRole('button', { name: '영업관리 그리드 소수점 수정' }));
+  const dialog = screen.getByRole('dialog', { name: '정책 수정' });
+  expect(within(dialog).getByLabelText('소수점 자릿수')).toHaveValue(2);
+  fireEvent.mouseDown(within(dialog).getByLabelText('소수점 0 표시'));
+  fireEvent.click(await screen.findByRole('option', { name: /있을 때만 표시/ }));
+  fireEvent.mouseDown(within(dialog).getByLabelText('반올림 방식'));
+  fireEvent.click(await screen.findByRole('option', { name: '내림' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장', exact: true }));
+  await waitFor(() => expect(updatePolicy).toHaveBeenCalledWith(9, expect.objectContaining({
+    value: { places: 2, trailingZeros: 'AUTO', rounding: 'DOWN' },
+  })));
+});
+
 it('denies tenant administrators even with all menu permissions', () => {
   render(<SystemPolicyPage {...props} isPlatformAdmin={false} />);
   expect(screen.getByText('플랫폼 관리자만 사용할 수 있습니다.')).toBeInTheDocument();

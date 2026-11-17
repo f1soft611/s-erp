@@ -34,6 +34,8 @@ import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryStatu
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryVO;
 import egovframework.let.sales.shipment.delivery.domain.repository.SalesDeliveryDAO;
 import egovframework.let.sales.shipment.deliveryplan.service.SalesDeliveryPlanService;
+import egovframework.let.sales.shipment.statement.service.impl.SalesStatementServiceImpl;
+import egovframework.let.system.policies.service.SystemPolicyService;
 
 class SalesDeliveryServiceImplTest {
     @Mock
@@ -42,12 +44,17 @@ class SalesDeliveryServiceImplTest {
     private IdSequenceService sequenceService;
     @Mock
     private SalesDeliveryPlanService planService;
+    @Mock
+    private SystemPolicyService systemPolicyService;
+    @Mock
+    private SalesStatementServiceImpl statementService;
     private SalesDeliveryServiceImpl service;
 
     @BeforeEach
     void setUp() throws Exception {
         MockitoAnnotations.openMocks(this);
-        service = new SalesDeliveryServiceImpl(dao, sequenceService, planService);
+        service = new SalesDeliveryServiceImpl(dao, sequenceService, planService, systemPolicyService,
+                statementService);
         when(planService.getOverDeliveryPolicy(71L)).thenReturn("BLOCK");
         when(dao.existsActiveCustomer(anyMap())).thenReturn(true);
         when(dao.existsActiveMaterial(anyMap())).thenReturn(true);
@@ -57,6 +64,34 @@ class SalesDeliveryServiceImplTest {
         when(dao.adjustPlanDeliveredQty(anyMap())).thenReturn(1);
         when(sequenceService.nextValue("SALES_DELIVERY_NO", "71", "20261104"))
                 .thenReturn(1L);
+    }
+
+    @Test
+    void issuesStatementInSameFlowOnlyWhenPolicyIsAuto() throws Exception {
+        SalesDeliveryVO reloaded = new SalesDeliveryVO();
+        reloaded.setCreatedBy("user01");
+        when(dao.selectDelivery(anyMap())).thenReturn(reloaded);
+        when(dao.selectDeliveryDetails(anyMap())).thenReturn(Collections.emptyList());
+
+        when(systemPolicyService.getStatementIssueMode(71L)).thenReturn("AUTO");
+        service.createDelivery(71L, "user01", directPayload());
+
+        verify(statementService).create(org.mockito.ArgumentMatchers.eq(71L),
+                org.mockito.ArgumentMatchers.eq("user01"), org.mockito.ArgumentMatchers.eq(501L),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void doesNotIssueStatementWhenPolicyIsManual() throws Exception {
+        SalesDeliveryVO reloaded = new SalesDeliveryVO();
+        reloaded.setCreatedBy("user01");
+        when(dao.selectDelivery(anyMap())).thenReturn(reloaded);
+        when(dao.selectDeliveryDetails(anyMap())).thenReturn(Collections.emptyList());
+        when(systemPolicyService.getStatementIssueMode(71L)).thenReturn("MANUAL");
+
+        service.createDelivery(71L, "user01", directPayload());
+
+        verifyNoInteractions(statementService);
     }
 
     @Test

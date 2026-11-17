@@ -29,6 +29,24 @@
         ORDER BY p.system_policy_at DESC, p.category_nm, p.policy_nm, p.policy_id
     </select>
 
+    <select id="selectPolicyValueByCode" parameterType="map" resultType="string">
+        SELECT p.value_json::text
+        FROM tb_system_policy p
+        WHERE p.tenant_id = #{tenantId}
+          AND p.policy_code = #{policyCode}
+    </select>
+
+    <select id="selectGridDecimalPolicies" parameterType="long" resultType="egovframework.let.system.policies.domain.model.SystemPolicyVO">
+        SELECT
+            p.policy_code AS policyCode,
+            p.value_json::text AS valueJson
+        FROM tb_system_policy p
+        WHERE p.tenant_id = #{tenantId}
+          AND p.value_type = 'NUMBER'
+          AND p.policy_code LIKE 'GRID\_DECIMAL\_%'
+        ORDER BY p.policy_code
+    </select>
+
     <select id="selectPolicyById" parameterType="map" resultType="egovframework.let.system.policies.domain.model.SystemPolicyVO">
         SELECT
             p.policy_id AS policyId,

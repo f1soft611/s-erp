@@ -52,6 +52,58 @@ class SystemPolicyServiceImplTest {
     }
 
     @Test
+    void gridDecimalsMapsModuleCodesAndIgnoresInvalidValues() throws Exception {
+        SystemPolicyVO sales = new SystemPolicyVO();
+        sales.setPolicyCode("GRID_DECIMAL_SALES");
+        sales.setValueJson("2");
+        SystemPolicyVO purchase = new SystemPolicyVO();
+        purchase.setPolicyCode("GRID_DECIMAL_PURCHASE");
+        purchase.setValueJson("4");
+        SystemPolicyVO bad = new SystemPolicyVO();
+        bad.setPolicyCode("GRID_DECIMAL_BAD");
+        bad.setValueJson("-1");
+        SystemPolicyVO big = new SystemPolicyVO();
+        big.setPolicyCode("GRID_DECIMAL_BIG");
+        big.setValueJson("9");
+        SystemPolicyVO obj = new SystemPolicyVO();
+        obj.setPolicyCode("GRID_DECIMAL_MATERIALS");
+        obj.setValueJson("{\"places\":4,\"trailingZeros\":\"AUTO\",\"rounding\":\"DOWN\"}");
+        SystemPolicyVO badObj = new SystemPolicyVO();
+        badObj.setPolicyCode("GRID_DECIMAL_BADOBJ");
+        badObj.setValueJson("{\"places\":2,\"trailingZeros\":\"AUTO\",\"rounding\":\"CEIL\"}");
+        when(dao.selectGridDecimalPolicies(TENANT)).thenReturn(listOf(sales, purchase, bad, big, obj, badObj));
+
+        Map<String, Map<String, Object>> result = service.getGridDecimals(TENANT);
+
+        assertThat(result).containsOnlyKeys("SALES", "PURCHASE", "MATERIALS", "BADOBJ");
+        assertThat(result.get("SALES")).containsEntry("places", 2).containsEntry("trailingZeros", "FIXED")
+                .containsEntry("rounding", "HALF_UP");
+        assertThat(result.get("PURCHASE")).containsEntry("places", 4);
+        assertThat(result.get("MATERIALS")).containsEntry("places", 4).containsEntry("trailingZeros", "AUTO")
+                .containsEntry("rounding", "DOWN");
+        assertThat(result.get("BADOBJ")).containsEntry("rounding", "HALF_UP");
+    }
+
+    @Test
+    void gridDecimalObjectValueIsAcceptedOnlyForGridDecimalPolicies() throws Exception {
+        when(dao.insertPolicy(anyMap())).thenReturn(20L);
+        String objectValue = "{\"places\":2,\"trailingZeros\":\"AUTO\",\"rounding\":\"UP\"}";
+        assertBadRequest(() -> service.createPolicy(TENANT, ACTOR, request("{\"policyCode\":\"OTHER_NUMBER\","
+                + "\"policyName\":\"x\",\"category\":\"c\",\"valueType\":\"NUMBER\",\"value\":" + objectValue + "}")));
+        assertBadRequest(() -> service.createPolicy(TENANT, ACTOR, request("{\"policyCode\":\"GRID_DECIMAL_X\","
+                + "\"policyName\":\"x\",\"category\":\"c\",\"valueType\":\"NUMBER\",\"minValue\":0,\"maxValue\":6,"
+                + "\"value\":{\"places\":2,\"rounding\":\"CEIL\"}}")));
+        assertBadRequest(() -> service.createPolicy(TENANT, ACTOR, request("{\"policyCode\":\"GRID_DECIMAL_X\","
+                + "\"policyName\":\"x\",\"category\":\"c\",\"valueType\":\"NUMBER\",\"minValue\":0,\"maxValue\":6,"
+                + "\"value\":{\"places\":9}}")));
+        service.createPolicy(TENANT, ACTOR, request("{\"policyCode\":\"GRID_DECIMAL_X\","
+                + "\"policyName\":\"x\",\"category\":\"c\",\"valueType\":\"NUMBER\",\"minValue\":0,\"maxValue\":6,"
+                + "\"value\":" + objectValue + "}"));
+        verify(dao).insertPolicy(argThat(params -> "{\"places\":2,\"trailingZeros\":\"AUTO\",\"rounding\":\"UP\"}"
+                .equals(String.valueOf(params.get("valueJson")))));
+    }
+
+    @Test
     void listConvertsStoredJsonIntoRawValuesAndOptions() throws Exception {
         SystemPolicyVO stored = stored(4L, "DELIVERY_PLAN_MODE", "SELECT", "\"MANUAL\"", MODE_OPTIONS, true, 2);
         SystemPolicyVO flag = stored(5L, "FLAG", "BOOLEAN", "false", "[]", false, 1);

@@ -40,8 +40,23 @@ public class CommonCodeGroupServiceImpl extends EgovAbstractServiceImpl implemen
             putSearchValue(params, "groupCode", condition.getGroupCode());
             putSearchValue(params, "groupNm", condition.getGroupNm());
             putSearchValue(params, "groupDc", condition.getGroupDc());
+            putSearchValue(params, "moduleCd", condition.getModuleCd());
         }
         return commonCodeGroupDAO.selectGroupList(params);
+    }
+
+    private String resolveModuleCd(Long tenantId, String moduleCd) throws Exception {
+        if (!StringUtils.hasText(moduleCd)) {
+            return null;
+        }
+        String normalized = moduleCd.trim();
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("moduleCd", normalized);
+        if (commonCodeGroupDAO.countModuleByCode(params) == 0) {
+            throw new IllegalArgumentException("등록되지 않은 모듈입니다: " + moduleCd);
+        }
+        return normalized;
     }
 
     private void putSearchValue(Map<String, Object> params, String key, String value) {
@@ -68,6 +83,7 @@ public class CommonCodeGroupServiceImpl extends EgovAbstractServiceImpl implemen
         params.put("groupCode", payload.getGroupCode().trim());
         params.put("groupNm", payload.getGroupNm().trim());
         params.put("groupDc", payload.getGroupDc());
+        params.put("moduleCd", resolveModuleCd(tenantId, payload.getModuleCd()));
         params.put("parentGroupId", payload.getParentGroupId());
         params.put("sortOrder", payload.getSortOrder() == null ? 0 : payload.getSortOrder());
         params.put("useAt", "N".equalsIgnoreCase(payload.getUseAt()) ? "N" : "Y");
@@ -99,6 +115,7 @@ public class CommonCodeGroupServiceImpl extends EgovAbstractServiceImpl implemen
         params.put("groupCode", payload.getGroupCode() == null ? existing.getGroupCode() : payload.getGroupCode().trim());
         params.put("groupNm", payload.getGroupNm().trim());
         params.put("groupDc", payload.getGroupDc());
+        params.put("moduleCd", resolveModuleCd(tenantId, payload.getModuleCd()));
         params.put("parentGroupId", payload.getParentGroupId());
         params.put("sortOrder", payload.getSortOrder() == null ? 0 : payload.getSortOrder());
         params.put("useAt", "N".equalsIgnoreCase(payload.getUseAt()) ? "N" : "Y");

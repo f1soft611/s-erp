@@ -41,6 +41,8 @@ export function useQuotationStatusSearch() {
         persistWhen: (value) => value !== null,
       },
     );
+  const [keyword, setKeyword] = useState(searchSession?.keyword ?? '');
+  const [appliedKeyword, setAppliedKeyword] = useState(searchSession?.keyword ?? '');
   const [detailValues, setDetailValues] = useState<QuotationStatusSearchValues>(
     () => cloneQuotationStatusSearchValues(searchSession?.detailValues ?? {}),
   );
@@ -49,8 +51,8 @@ export function useQuotationStatusSearch() {
   );
   const [searchError, setSearchError] = useState('');
   const appliedFilters = useMemo<QuotationStatusFilters | null>(
-    () => appliedValues ? toQuotationStatusFilters(appliedValues) : null,
-    [appliedValues],
+    () => appliedValues ? toQuotationStatusFilters(appliedValues, appliedKeyword) : null,
+    [appliedValues, appliedKeyword],
   );
 
   useEffect(() => {
@@ -60,8 +62,11 @@ export function useQuotationStatusSearch() {
       && validateQuotationStatusRange(searchSession.detailValues) === ''
     ) return;
     const snapshot: QuotationStatusSearchSession = {
+      keyword: '',
       detailValues: cloneQuotationStatusSearchValues(defaultValues),
     };
+    setKeyword('');
+    setAppliedKeyword('');
     setDetailValues(snapshot.detailValues);
     setAppliedValues(snapshot.detailValues);
     setSearchSession(snapshot);
@@ -72,19 +77,24 @@ export function useQuotationStatusSearch() {
     setSearchError(error);
     if (error) return false;
     const snapshot: QuotationStatusSearchSession = {
+      keyword,
       detailValues: cloneQuotationStatusSearchValues(values),
     };
+    setAppliedKeyword(keyword);
     setDetailValues(snapshot.detailValues);
     setAppliedValues(snapshot.detailValues);
     setSearchSession(snapshot);
     return true;
-  }, [detailValues, setSearchSession]);
+  }, [detailValues, keyword, setSearchSession]);
 
   const resetSearch = useCallback(() => {
     if (!defaultValues) return;
     const snapshot: QuotationStatusSearchSession = {
+      keyword: '',
       detailValues: cloneQuotationStatusSearchValues(defaultValues),
     };
+    setKeyword('');
+    setAppliedKeyword('');
     setDetailValues(snapshot.detailValues);
     setAppliedValues(snapshot.detailValues);
     setSearchError('');
@@ -92,6 +102,8 @@ export function useQuotationStatusSearch() {
   }, [defaultValues, setSearchSession]);
 
   return {
+    keyword,
+    setKeyword,
     detailFields,
     detailValues,
     appliedDetailValues: searchSession?.detailValues ?? {},

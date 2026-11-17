@@ -58,6 +58,50 @@ describe('F1Grid virtualization engine', () => {
     expect(indexes).toEqual([0, 3, 4, 5]);
   });
 
+  it('reuses buffered columns until the actual viewport leaves the rendered window', () => {
+    const options = {
+      widths: Array.from({ length: 30 }, () => 100),
+      viewportWidth: 300,
+      overscan: 2,
+      pinnedIndexes: [0, 29],
+      protectedIndexes: [20],
+    };
+    const initial = getVirtualColumnIndexes({ ...options, scrollLeft: 0 });
+    const previousIndexes = new Set(initial);
+
+    expect(getVirtualColumnIndexes({
+      ...options, scrollLeft: 120, previousIndexes,
+    })).toEqual(initial);
+    expect(getVirtualColumnIndexes({
+      ...options, scrollLeft: 220, previousIndexes,
+    })).toEqual(initial);
+
+    const advanced = getVirtualColumnIndexes({
+      ...options, scrollLeft: 450, previousIndexes,
+    });
+    expect(advanced).not.toEqual(initial);
+    expect(advanced).toEqual(expect.arrayContaining([0, 4, 5, 6, 7, 20, 29]));
+    const reversed = getVirtualColumnIndexes({
+      ...options, scrollLeft: 0, previousIndexes: new Set(advanced),
+    });
+    expect(reversed).toEqual(initial);
+  });
+
+  it('does not reuse a buffered window that lacks a newly protected column', () => {
+    const options = {
+      widths: Array.from({ length: 30 }, () => 100),
+      viewportWidth: 300,
+      overscan: 2,
+    };
+    const initial = getVirtualColumnIndexes({ ...options, scrollLeft: 0 });
+    const next = getVirtualColumnIndexes({
+      ...options, scrollLeft: 120, previousIndexes: new Set(initial),
+      protectedIndexes: [25],
+    });
+    expect(next).toContain(25);
+    expect(next).toEqual(expect.arrayContaining([1, 2, 3, 4]));
+  });
+
   it('coalesces repeated viewport updates into one animation frame using the latest value', () => {
     let frameCallback: FrameRequestCallback | undefined;
     const requestFrame = vi.fn((callback: FrameRequestCallback) => {

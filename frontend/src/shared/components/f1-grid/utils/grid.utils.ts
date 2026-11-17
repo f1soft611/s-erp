@@ -2,7 +2,9 @@ import dayjs from 'dayjs';
 import type {
   F1GridColumn,
   F1GridPinSide,
+  F1GridRoundingMode,
   F1GridRowId,
+  F1GridTrailingZeros,
 } from '../types/grid.types';
 
 export function getStateKey(rowId: F1GridRowId): string {
@@ -170,15 +172,36 @@ export function getGridColumnTracks<T extends object>(
   return `${checkboxWidth > 0 ? `${checkboxWidth}px ` : ''}${tracks.join(' ')}`;
 }
 
+export function roundGridNumber(
+  value: number,
+  places: number,
+  mode: F1GridRoundingMode = 'HALF_UP',
+): number {
+  // 부동소수점 오차(예: 3.3000000000000003)가 올림/내림에 영향을 주지 않도록 먼저 정리한다.
+  const clean = Number(value.toPrecision(12));
+  const factor = 10 ** places;
+  const shifted = Number((Math.abs(clean) * factor).toPrecision(12));
+  const rounded =
+    mode === 'UP'
+      ? Math.ceil(shifted)
+      : mode === 'DOWN'
+        ? Math.floor(shifted)
+        : Math.round(shifted);
+  const result = (clean < 0 ? -rounded : rounded) / factor;
+  return result === 0 ? 0 : result;
+}
+
 function formatNumericValue(
   value: unknown,
   options?: {
     type?: F1GridColumn<object>['type'];
     format?: F1GridColumn<object>['format'];
     decimalPlaces?: number;
+    trailingZeros?: F1GridTrailingZeros;
+    rounding?: F1GridRoundingMode;
   },
 ): string {
-  const numericValue = Number(value);
+  let numericValue = Number(value);
   if (!Number.isFinite(numericValue)) {
     return String(value ?? '');
   }
@@ -188,6 +211,15 @@ function formatNumericValue(
     Number.isInteger(options.decimalPlaces)
       ? Math.max(0, options.decimalPlaces)
       : undefined;
+  const minDigits = options?.trailingZeros === 'AUTO' ? 0 : decimalPlaces;
+
+  if (options?.rounding) {
+    numericValue = roundGridNumber(
+      numericValue,
+      decimalPlaces ?? 5,
+      options.rounding,
+    );
+  }
 
   const resolvedFormat = options?.format ?? options?.type;
 
@@ -196,19 +228,12 @@ function formatNumericValue(
       style: 'currency',
       currency: 'KRW',
       maximumFractionDigits: decimalPlaces ?? 0,
-      minimumFractionDigits: decimalPlaces ?? 0,
-    }).format(numericValue);
-  }
-
-  if (resolvedFormat === 'number' || resolvedFormat === 'decimal') {
-    return new Intl.NumberFormat('ko-KR', {
-      minimumFractionDigits: decimalPlaces ?? 0,
-      maximumFractionDigits: decimalPlaces ?? 5,
+      minimumFractionDigits: minDigits ?? 0,
     }).format(numericValue);
   }
 
   return new Intl.NumberFormat('ko-KR', {
-    minimumFractionDigits: decimalPlaces ?? 0,
+    minimumFractionDigits: minDigits ?? 0,
     maximumFractionDigits: decimalPlaces ?? 5,
   }).format(numericValue);
 }
@@ -293,6 +318,8 @@ export function getCellDisplayValue<T extends object>(
       type: column.type,
       format: column.format,
       decimalPlaces: column.decimalPlaces,
+      trailingZeros: column.trailingZeros,
+      rounding: column.rounding,
     });
   }
 

@@ -20,7 +20,8 @@ const amountColumn = (
   field,
   headerName,
   type,
-  decimalPlaces: 2,
+  // 수량(decimal)은 소수점을 지정하지 않아 정책 관리의 모듈 소수점을 따른다.
+  // decimalPlaces: type === 'currency' ? 2 : undefined,
   width,
   align: 'right',
   editable: false,
@@ -126,6 +127,14 @@ export function createSalesOrderStatusColumns({
       search: { label: '견적번호', order: 4, span: 2, group: '수주정보' },
     },
     {
+      field: 'lineStatus',
+      headerName: '업무상태',
+      width: 80,
+      align: 'center',
+      editable: false,
+      search: { label: '업무상태', order: 8, span: 2, group: '품목정보' },
+    },
+    {
       field: 'status',
       headerName: '수주상태',
       type: 'select',
@@ -133,6 +142,7 @@ export function createSalesOrderStatusColumns({
       width: 80,
       align: 'center',
       editable: false,
+      hidden: true,
       mergeRows: true,
       search: { label: '수주상태', order: 5, span: 2, group: '수주정보' },
     },
@@ -155,7 +165,7 @@ export function createSalesOrderStatusColumns({
     {
       field: 'lineNo',
       headerName: '행',
-      type: 'number',
+      // type: 'number',
       width: 60,
       align: 'center',
       editable: false,
@@ -200,14 +210,6 @@ export function createSalesOrderStatusColumns({
       search: { label: '납기일자', order: 7, span: 4, group: '품목정보' },
     },
     amountColumn('shippedQty', '출하수량', 'decimal'),
-    {
-      field: 'lineStatus',
-      headerName: '행상태',
-      width: 80,
-      align: 'center',
-      editable: false,
-      search: { label: '행상태', order: 8, span: 2, group: '품목정보' },
-    },
     {
       field: 'remark',
       headerName: '비고',

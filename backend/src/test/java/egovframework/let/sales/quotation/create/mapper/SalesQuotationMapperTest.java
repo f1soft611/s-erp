@@ -52,4 +52,21 @@ class SalesQuotationMapperTest {
         }
         return config;
     }
+
+    @Test
+    void integratedKeywordBindsFiveOrColumnsWithinTenantAndDateFilters() throws Exception {
+        Configuration config = parse("status/EgovSalesQuotationStatus_SQL_postgresql.xml");
+        Map<String, Object> params = new HashMap<>();
+        params.put("keyword", "bolt");
+        BoundSql bound = config.getMappedStatement("SalesQuotationStatusDAO.selectList").getBoundSql(params);
+        String sql = bound.getSql().replaceAll("\\s+", " ");
+        assertThat(sql).contains("AND (h.quotation_no ILIKE", "OR c.customer_code ILIKE",
+                "OR c.customer_name ILIKE", "OR d.material_code ILIKE", "OR d.material_name ILIKE",
+                "h.tenant_id = ?", "h.use_at = 'Y'");
+        assertThat(bound.getParameterMappings()).filteredOn(p -> p.getProperty().equals("keyword")).hasSize(5);
+        params.put("keyword", null);
+        assertThat(config.getMappedStatement("SalesQuotationStatusDAO.selectList")
+                .getBoundSql(params).getParameterMappings())
+                .noneMatch(p -> p.getProperty().equals("keyword"));
+    }
 }

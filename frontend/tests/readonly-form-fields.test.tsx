@@ -1,6 +1,6 @@
 import { InputAdornment, IconButton, TextField } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { GridFormField } from '../src/shared/components/f1-grid/form/GridFormField';
 import { MasterPicker } from '../src/shared/components/master-picker/MasterPicker';
@@ -42,6 +42,25 @@ describe.each([
     rerender(picker(true));
     expect(background('거래처')).toBe(readOnlyColor);
     expect(screen.getByRole('button', { name: '거래처 선택' })).toBeDisabled();
+  });
+
+  it('높이 측정용 숨김 textarea 때문에 편집 가능한 비고에 읽기전용 색상을 적용하지 않는다', () => {
+    render(<ThemeProvider theme={createAppTheme(mode)}>
+      <TextField label="편집 비고" multiline minRows={2} defaultValue="" />
+      <TextField label="읽기전용 비고" multiline minRows={2}
+        slotProps={{ htmlInput: { readOnly: true } }} />
+      <TextField label="비활성 비고" multiline minRows={2} disabled />
+    </ThemeProvider>);
+    const editable = screen.getByRole('textbox', { name: '편집 비고' });
+    expect(editable).toBeEnabled();
+    expect(getComputedStyle(editable.closest('.MuiInputBase-root')!).backgroundColor)
+      .not.toBe(readOnlyColor);
+    fireEvent.change(editable, { target: { value: '견적 비고 입력' } });
+    expect(editable).toHaveValue('견적 비고 입력');
+    for (const label of ['읽기전용 비고', '비활성 비고']) {
+      expect(getComputedStyle(screen.getByRole('textbox', { name: label })
+        .closest('.MuiInputBase-root')!).backgroundColor).toBe(readOnlyColor);
+    }
   });
 
   it('F1-Grid 행 폼의 읽기전용과 코드 선택 가능 상태를 구분한다', () => {

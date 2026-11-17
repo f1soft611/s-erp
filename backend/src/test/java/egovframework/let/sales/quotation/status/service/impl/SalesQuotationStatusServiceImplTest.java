@@ -24,9 +24,14 @@ class SalesQuotationStatusServiceImplTest {
         verifyNoInteractions(dao);
         search.setSubmitDtFrom(null); search.setSubmitDtTo(null);
         search.setMaterialKeyword(" item ");
+        search.setKeyword(" integrated ");
         service.search(71L, search);
         verify(dao).selectList(argThat((java.util.Map<String, Object> p) -> Long.valueOf(71).equals(p.get("tenantId"))
                 && LocalDate.of(2026, 11, 1).equals(p.get("quotationDtFrom"))
-                && "item".equals(p.get("materialKeyword"))));
+                && "item".equals(p.get("materialKeyword"))
+                && "integrated".equals(p.get("keyword"))));
+        search.setKeyword(" ");
+        service.search(71L, search);
+        verify(dao).selectList(argThat((java.util.Map<String, Object> p) -> p.get("keyword") == null));
     }
 }

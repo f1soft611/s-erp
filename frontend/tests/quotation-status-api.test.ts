@@ -41,6 +41,18 @@ describe('quotation status service', () => {
     })).toBe('');
   });
 
+  it('includes a trimmed integrated keyword without changing detailed filters', () => {
+    expect(toQuotationStatusFilters({
+      quotationDt: { from: '2026-11-01', to: '2026-11-17' }, quotationNo: 'QT',
+    }, ' bolt ')).toEqual({
+      quotationDtFrom: '2026-11-01', quotationDtTo: '2026-11-17',
+      quotationNo: 'QT', keyword: 'bolt',
+    });
+    expect(isQuotationStatusSearchSession({
+      keyword: 123, detailValues: { quotationDt: { from: '2026-11-01', to: '2026-11-17' } },
+    })).toBe(false);
+  });
+
   it('rejects restored search sessions with a missing or invalid required date range', () => {
     expect(isQuotationStatusSearchSession({
       detailValues: { quotationDt: { from: '', to: '' } },

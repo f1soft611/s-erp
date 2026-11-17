@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert, Autocomplete, Box, Chip, FormControlLabel, MenuItem, Stack, Switch, TextField, Typography } from '@mui/material';
-import type { PolicyPayload, PolicyUser, PolicyValue } from '../types/systemPolicy.types';
+import { isGridDecimalPolicy, ROUNDING_LABELS, toGridDecimalValue, ZERO_MODE_LABELS, type GridDecimalPolicyValue, type PolicyPayload, type PolicyUser, type PolicyValue } from '../types/systemPolicy.types';
 import { searchPolicyUsers } from '../services/systemPolicy.service';
 
 function PolicyUserInput({ value, onChange, disabled }: { value: number[]; onChange: (value: PolicyValue) => void; disabled: boolean }) {
@@ -41,7 +41,27 @@ function PolicyUserInput({ value, onChange, disabled }: { value: number[]; onCha
   );
 }
 
+function GridDecimalInput({ draft, onChange, disabled }: { draft: PolicyPayload; onChange: (value: PolicyValue) => void; disabled: boolean }) {
+  const rule = toGridDecimalValue(draft.value);
+  const update = (patch: Partial<GridDecimalPolicyValue>) => onChange({ ...rule, ...patch });
+  return (
+    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2 }}>
+      <TextField label="소수점 자릿수" type="number" value={Number.isNaN(rule.places) ? '' : rule.places} disabled={disabled}
+        slotProps={{ htmlInput: { min: draft.minValue ?? undefined, max: draft.maxValue ?? undefined, step: 1 } }}
+        helperText={`허용 범위: ${draft.minValue ?? '제한 없음'} ~ ${draft.maxValue ?? '제한 없음'} ${draft.unit}`}
+        onChange={(event) => update({ places: event.target.value === '' ? Number.NaN : Number(event.target.value) })} />
+      <TextField select label="소수점 0 표시" value={rule.trailingZeros} disabled={disabled} onChange={(event) => update({ trailingZeros: event.target.value as GridDecimalPolicyValue['trailingZeros'] })}>
+        {Object.entries(ZERO_MODE_LABELS).map(([key, label]) => <MenuItem key={key} value={key}>{label}</MenuItem>)}
+      </TextField>
+      <TextField select label="반올림 방식" value={rule.rounding} disabled={disabled} onChange={(event) => update({ rounding: event.target.value as GridDecimalPolicyValue['rounding'] })}>
+        {Object.entries(ROUNDING_LABELS).map(([key, label]) => <MenuItem key={key} value={key}>{label}</MenuItem>)}
+      </TextField>
+    </Box>
+  );
+}
+
 export function PolicyValueInput({ draft, onChange, disabled = false }: { draft: PolicyPayload; onChange: (value: PolicyValue) => void; disabled?: boolean }) {
+  if (isGridDecimalPolicy(draft)) return <GridDecimalInput draft={draft} onChange={onChange} disabled={disabled} />;
   if (draft.valueType === 'BOOLEAN') {
     return <Box><FormControlLabel control={<Switch checked={draft.value === true} onChange={(_event, checked) => onChange(checked)} disabled={disabled} />} label="정책 사용" /><Chip size="small" label={draft.value === true ? '사용' : '미사용'} /></Box>;
   }

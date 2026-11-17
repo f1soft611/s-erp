@@ -447,6 +447,34 @@ describe('F1-GRID loading overlay', () => {
     expect(screen.getAllByRole('row').length).toBeLessThan(250);
   });
 
+  it.each([
+    { virtualizeRows: undefined, mergeRows: false },
+    { virtualizeRows: false, mergeRows: false },
+    { virtualizeRows: undefined, mergeRows: true },
+  ])(
+    'limits mounted rows in a wide grid without changing explicit or merged layouts: %j',
+    ({ virtualizeRows, mergeRows }) => {
+      type WideRow = { id: string } & Record<string, string>;
+      const wideRows: WideRow[] = Array.from({ length: 120 }, (_, index) => ({
+        id: `row-${index}`,
+      }));
+      const wideColumns: F1GridColumn<WideRow>[] = Array.from({ length: 12 }, (_, index) => ({
+        field: `field${index}`, headerName: `Column ${index}`, width: 100,
+        mergeRows: index === 0 && mergeRows,
+      }));
+      const { container } = render(<F1Grid rows={wideRows} columns={wideColumns}
+        rowKey="id" height={240} virtualizeRows={virtualizeRows} />);
+      const mountedRows = container.querySelectorAll('[data-f1-grid-row-id]').length;
+      if (virtualizeRows === false || mergeRows) {
+        expect(mountedRows).toBe(120);
+      } else {
+        expect(mountedRows).toBeGreaterThan(0);
+        expect(mountedRows).toBeLessThan(30);
+      }
+      expect(screen.getByRole('grid')).toHaveAttribute('aria-rowcount', '120');
+    },
+  );
+
   it('moves the virtual row window after vertical scrolling', async () => {
     const largeRows = Array.from({ length: 1500 }, (_, index) => ({
       id: `row-${index}`,
@@ -1064,6 +1092,18 @@ describe('F1-GRID loading overlay', () => {
       screen.getByRole('columnheader', { name: 'Column 19' }),
     ).toBeInTheDocument();
 
+    bodyScroll.scrollLeft = 140;
+    fireEvent.scroll(bodyScroll);
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => resolve()),
+          );
+        }),
+    );
+    expect(commits).not.toHaveBeenCalled();
+
     bodyScroll.scrollLeft = 1500;
     fireEvent.scroll(bodyScroll);
 
@@ -1080,6 +1120,70 @@ describe('F1-GRID loading overlay', () => {
     });
     expect(commits).toHaveBeenCalled();
   });
+
+  it('recalculates a resized column window at the latest buffered scroll position', async () => {
+    type WideRow = { id: string } & Record<string, string>;
+    const wideRows: WideRow[] = [{ id: 'row-1' }];
+    const wideColumns: F1GridColumn<WideRow>[] = Array.from({ length: 20 }, (_, index) => ({
+      field: `field${index}`, headerName: `Column ${index}`, width: 120,
+    }));
+    const { rerender } = render(<F1Grid rows={wideRows} columns={wideColumns}
+      rowKey="id" showCheckbox={false} virtualizeColumns columnOverscan={2} />);
+    const body = screen.getByTestId('f1-grid-body-scroll');
+    Object.defineProperty(body, 'clientWidth', { configurable: true, value: 360 });
+    fireEvent.resize(window);
+    await act(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }));
+    body.scrollLeft = 220;
+    fireEvent.scroll(body);
+    await act(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }));
+
+    rerender(<F1Grid rows={wideRows}
+      columns={wideColumns.map((column) => ({ ...column, width: 60 }))}
+      rowKey="id" showCheckbox={false} virtualizeColumns columnOverscan={2} />);
+    expect(screen.getByRole('columnheader', { name: 'Column 9' })).toBeInTheDocument();
+  });
+
+  it.each(['header', 'summary'] as const)(
+    'does not let a queued %s synchronization event rewind the body',
+    (source) => {
+      render(<F1Grid rows={rows} columns={columns} rowKey="id"
+        features={[{ ftype: 'summary', dock: 'bottom' }]} />);
+      const body = screen.getByTestId('f1-grid-body-scroll');
+      const header = screen.getByRole('grid').firstElementChild as HTMLElement;
+      const summary = screen.getByTestId('f1-grid-summary-bottom').parentElement!;
+      body.scrollLeft = 1200;
+      fireEvent.scroll(body);
+      expect(header.scrollLeft).toBe(1200);
+      expect(summary.scrollLeft).toBe(1200);
+
+      body.scrollLeft = 1240;
+      fireEvent.scroll(source === 'header' ? header : summary);
+      expect(body.scrollLeft).toBe(1240);
+      fireEvent.scroll(body);
+      expect(header.scrollLeft).toBe(1240);
+      expect(summary.scrollLeft).toBe(1240);
+    },
+  );
+
+  it.each(['header', 'summary'] as const)(
+    'propagates direct %s scrolling immediately to the other regions',
+    (source) => {
+      render(<F1Grid rows={rows} columns={columns} rowKey="id"
+        features={[{ ftype: 'summary', dock: 'bottom' }]} />);
+      const body = screen.getByTestId('f1-grid-body-scroll');
+      const header = screen.getByRole('grid').firstElementChild as HTMLElement;
+      const summary = screen.getByTestId('f1-grid-summary-bottom').parentElement!;
+      const origin = source === 'header' ? header : summary;
+      origin.scrollLeft = 320;
+      fireEvent.scroll(origin);
+      expect([body.scrollLeft, header.scrollLeft, summary.scrollLeft])
+        .toEqual([320, 320, 320]);
+    },
+  );
 
   it('reserves a stable scrollbar gutter when both vertical and horizontal scrolling are active', () => {
     const rows = Array.from({ length: 20 }, (_, index) => ({

@@ -42,6 +42,13 @@ import {
   validateQuotationInput,
 } from './services/quotation.service';
 import { QuotationDetailGrid } from './components/QuotationDetailGrid';
+import { QuotationCodeSelect } from './components/QuotationCodeSelect';
+import {
+  fetchQuotationCommonCodes,
+  QUOTATION_CODE_GROUPS,
+  type QuotationCodeGroup,
+  type QuotationCommonCodes,
+} from './services/quotationCommonCode.service';
 import type {
   QuotationItem,
   QuotationValidationErrors,
@@ -155,6 +162,12 @@ export function QuotationCreatePage({
   const [businessDate, setBusinessDate] = useState(initialDate);
   const [dateError, setDateError] = useState('');
   const [dateRetry, setDateRetry] = useState(0);
+  const [commonCodes, setCommonCodes] = useState<QuotationCommonCodes>({
+    INCOTERMS: [], PAYMENT_TERM: [], CURRENCY: [], ITEM_UNIT: [],
+  });
+  const [codesLoading, setCodesLoading] = useState(true);
+  const [codesError, setCodesError] = useState('');
+  const [codesRetry, setCodesRetry] = useState(0);
   const [baseline, setBaseline] = useState<HeaderSnapshot>(() => emptyHeader());
   const [customer, setCustomer] = useState<MasterPickerOption | null>(null);
   const [quotationDt, setQuotationDt] = useState('');
@@ -205,6 +218,23 @@ export function QuotationCreatePage({
   useEffect(() => {
     onDirtyChange?.(hasUnsavedChanges);
   }, [hasUnsavedChanges, onDirtyChange]);
+
+  useEffect(() => {
+    let active = true;
+    void fetchQuotationCommonCodes()
+      .then((codes) => { if (active) setCommonCodes(codes); })
+      .catch((loadError: unknown) => {
+        if (active) setCodesError(
+          loadError instanceof Error ? loadError.message : '견적 공통코드를 불러오지 못했습니다.',
+        );
+      })
+      .finally(() => { if (active) setCodesLoading(false); });
+    return () => { active = false; };
+  }, [codesRetry]);
+  const codesDisabled = !isEditable || codesLoading || Boolean(codesError);
+  const missingCodes = (Object.keys(QUOTATION_CODE_GROUPS) as QuotationCodeGroup[])
+    .filter((code) => commonCodes[code].length === 0)
+    .map((code) => QUOTATION_CODE_GROUPS[code]);
 
   useEffect(() => {
     let active = true;
@@ -530,6 +560,17 @@ export function QuotationCreatePage({
             {dateError}
           </Alert>
         ) : null}
+        {codesError || (!codesLoading && missingCodes.length > 0) ? (
+          <Alert severity={codesError ? 'error' : 'warning'}
+            action={<Button color="inherit" size="small" aria-label="공통코드 재시도"
+              onClick={() => {
+                setCodesLoading(true);
+                setCodesError('');
+                setCodesRetry((retry) => retry + 1);
+              }}>재시도</Button>}>
+            {codesError || `선택 가능한 공통코드가 없습니다: ${missingCodes.join(', ')}. 공통코드 등록 및 사용 여부를 확인해 주세요.`}
+          </Alert>
+        ) : null}
         {validationMessages.length ? (
           <Alert severity="error">
             <Box component="ul" sx={{ my: 0, pl: 2 }}>{validationMessages.map((message) => <li key={message}>{message}</li>)}</Box>
@@ -556,6 +597,7 @@ export function QuotationCreatePage({
               sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
               <DateEditor
                 label="견적작성일" variant="outlined" autoFocus={false} required
+                disabled={!isEditable}
                 value={quotationDt} error={Boolean(quotationDateError)}
                 helperText={quotationDateError}
                 onChange={(value) => {
@@ -584,6 +626,7 @@ export function QuotationCreatePage({
               sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
               <DateEditor
                 label="견적제출일" variant="outlined" autoFocus={false}
+                disabled={!isEditable}
                 value={submitDt} error={Boolean(submitDateError)}
                 helperText={submitDateError}
                 onChange={(value) => {
@@ -601,14 +644,14 @@ export function QuotationCreatePage({
             </Box>
             <TextField label="참조" size="small" value={customerReference}
               onChange={(event) => setCustomerReference(event.target.value)} disabled={!isEditable} />
-            <TextField label="Incoterms" size="small" value={incoterms}
-              onChange={(event) => setIncoterms(event.target.value)} disabled={!isEditable} />
-            <TextField label="결제조건" size="small" value={paymentTerm}
-              onChange={(event) => setPaymentTerm(event.target.value)} disabled={!isEditable} />
+            <QuotationCodeSelect label="Incoterms" value={incoterms}
+              options={commonCodes.INCOTERMS} onChange={setIncoterms} disabled={codesDisabled} />
+            <QuotationCodeSelect label="결제조건" value={paymentTerm}
+              options={commonCodes.PAYMENT_TERM} onChange={setPaymentTerm} disabled={codesDisabled} />
             <TextField label="견적유효기간" size="small" value={validTerm}
               onChange={(event) => setValidTerm(event.target.value)} disabled={!isEditable} />
-            <TextField label="화폐단위" size="small" value={currencyCode}
-              onChange={(event) => setCurrencyCode(event.target.value)} disabled={!isEditable} />
+            <QuotationCodeSelect label="화폐단위" value={currencyCode}
+              options={commonCodes.CURRENCY} onChange={setCurrencyCode} disabled={codesDisabled} />
             <TextField label="비고" size="small" multiline minRows={2} value={remark}
               onChange={(event) => setRemark(event.target.value)} disabled={!isEditable}
               sx={{ gridColumn: { xs: 'auto', sm: '1 / -1' } }} />
@@ -643,6 +686,7 @@ export function QuotationCreatePage({
               key={gridKey} gridRef={gridRef} rows={gridRows}
               onChangesChange={handleChangesChange} onSelectionChange={setSelectedRowIds}
               onOpenMaterialPicker={openMaterialPicker}
+              unitOptions={codesLoading || codesError ? [] : commonCodes.ITEM_UNIT}
               disabled={!isEditable}
             />
           </Box>

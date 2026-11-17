@@ -322,6 +322,7 @@
 | group_code           | varchar   | 그룹 코드              |
 | group_nm             | varchar   | 그룹명                 |
 | group_dc             | varchar   | 그룹 설명              |
+| module_cd            | varchar   | 업무 모듈 구분(tb_module.module_code, NULL=공통) |
 | parent_group_id      | bigint    | 상위 그룹 FK(자기참조) |
 | sort_order           | int       | 정렬 순서              |
 | use_at               | char      | 사용 여부              |

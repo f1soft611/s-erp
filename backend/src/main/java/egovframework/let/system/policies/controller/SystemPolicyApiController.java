@@ -52,6 +52,15 @@ public class SystemPolicyApiController {
         return result("resultList", systemPolicyService.listPolicies(user.getTenantId()), null);
     }
 
+    @Operation(summary = "모듈별 그리드 소수점 정책 조회", security = { @SecurityRequirement(name = "Authorization") })
+    @GetMapping("/grid-decimals")
+    public ResultVO gridDecimals(@Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
+        if (user == null || user.getTenantId() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "로그인이 필요합니다.");
+        }
+        return result("item", systemPolicyService.getGridDecimals(user.getTenantId()), null);
+    }
+
     @Operation(summary = "시스템 정책 등록", security = { @SecurityRequirement(name = "Authorization") })
     @PostMapping
     public ResultVO createPolicy(@RequestBody SystemPolicySaveRequestVO payload,

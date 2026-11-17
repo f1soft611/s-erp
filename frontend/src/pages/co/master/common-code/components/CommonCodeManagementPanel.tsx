@@ -38,9 +38,14 @@ import type {
   CommonCodeGroupRow,
   CommonCodeItemRow,
 } from '../types/commonCodeManagement.types';
+import {
+  COMMON_CODE_MODULE_COMMON_OPTION,
+  type CommonCodeModuleOption,
+} from '../types/commonCodeManagement.types';
 
 type CommonCodeManagementPanelProps = {
   groups: CommonCodeGroupRow[];
+  moduleOptions?: CommonCodeModuleOption[];
   searchQuery?: string;
   canExportExcel?: boolean;
   onGroupsSaved?: (options?: { silent?: boolean }) => Promise<void> | void;
@@ -206,6 +211,7 @@ const createGroupRow = (): CommonCodeGroupRow => ({
   id: `new-common-group-${Date.now()}-${Math.random().toString(16).slice(2)}`,
   groupCode: '',
   groupNm: '',
+  moduleCd: '',
   parentGroupId: null,
   groupDc: '',
   sortOrder: 0,
@@ -224,7 +230,11 @@ const createItemRow = (groupId: string): CommonCodeItemRow => ({
   itemDc: '',
 });
 
-export const groupColumns: F1GridColumn<CommonCodeGroupRow>[] = [
+const EMPTY_MODULE_OPTIONS: CommonCodeModuleOption[] = [];
+
+export const buildGroupColumns = (
+  moduleOptions: CommonCodeModuleOption[] = [],
+): F1GridColumn<CommonCodeGroupRow>[] => [
   {
     field: 'groupCode',
     headerName: '그룹코드',
@@ -239,6 +249,16 @@ export const groupColumns: F1GridColumn<CommonCodeGroupRow>[] = [
     required: true,
     pinned: 'left',
     flex: 1,
+  },
+  {
+    field: 'moduleCd',
+    headerName: '모듈',
+    type: 'select',
+    options: [COMMON_CODE_MODULE_COMMON_OPTION, ...moduleOptions],
+    editable: true,
+    align: 'center',
+    width: 90,
+    search: { label: '모듈', order: 0 },
   },
   {
     field: 'groupDc',
@@ -331,6 +351,7 @@ export const CommonCodeManagementPanel = forwardRef<
 >(function CommonCodeManagementPanel(
   {
     groups,
+    moduleOptions = EMPTY_MODULE_OPTIONS,
     searchQuery = '',
     canExportExcel = false,
     onGroupsSaved,
@@ -602,10 +623,10 @@ export const CommonCodeManagementPanel = forwardRef<
   ).map((column) => (saving ? { ...column, editable: false } : column));
   const groupGridColumns = useMemo(
     () =>
-      groupColumns.map((column) =>
+      buildGroupColumns(moduleOptions).map((column) =>
         saving ? { ...column, editable: false } : column,
       ),
-    [saving],
+    [moduleOptions, saving],
   );
 
   const checkGroupDeleteBlockedMessage = useCallback(

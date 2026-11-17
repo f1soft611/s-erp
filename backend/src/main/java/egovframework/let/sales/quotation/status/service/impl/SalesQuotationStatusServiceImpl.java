@@ -25,6 +25,7 @@ public class SalesQuotationStatusServiceImpl implements SalesQuotationStatusServ
         if (search == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "견적일 범위가 필요합니다.");
         Map<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
+        params.put("keyword", text(search.getKeyword()));
         range(params, "quotationDt", search.getQuotationDtFrom(), search.getQuotationDtTo(), true);
         range(params, "submitDt", search.getSubmitDtFrom(), search.getSubmitDtTo(), false);
         params.put("quotationNo", text(search.getQuotationNo()));

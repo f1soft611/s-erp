@@ -114,6 +114,8 @@ export function QuotationStatusPage({
       >
         <PageLoadBoundary {...list.initialLoad} label="견적현황" onRetry={list.retry}>
           <QuotationStatusSearchArea
+            keyword={search.keyword}
+            onKeywordChange={search.setKeyword}
             detailFields={search.detailFields}
             detailValues={search.detailValues}
             appliedDetailValues={search.appliedDetailValues}

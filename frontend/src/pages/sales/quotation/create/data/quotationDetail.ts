@@ -3,6 +3,7 @@ import type {
   F1GridColumn,
 } from '../../../../../shared/components/f1-grid';
 import type { MasterPickerOption } from '../../../../../shared/components/master-picker/masterPicker.types';
+import type { F1GridOption } from '../../../../../shared/components/f1-grid/types/grid.types';
 
 export type QuotationDetailRow = {
   rowId: string;
@@ -85,6 +86,7 @@ function snapshotEdit<T extends 'materialCode' | 'materialName' | 'materialSpec'
 export function createQuotationDetailColumns(
   onOpenMaterialPicker: OpenMaterialPicker,
   disabled = false,
+  unitOptions: F1GridOption[] = [],
 ): F1GridColumn<QuotationDetailRow>[] {
   return [
     {
@@ -142,17 +144,17 @@ export function createQuotationDetailColumns(
     {
       field: 'unit',
       headerName: '단위',
-      type: 'text',
+      type: 'select',
       width: 90,
-      editable: false,
-      onValueChange: (_row, value) => snapshotEdit('unit', value),
+      editable: !disabled && unitOptions.length > 0,
+      options: [{ value: '', label: '선택 안 함' }, ...unitOptions],
+      onValueChange: (_row, value) => ({ unit: String(value ?? '') }),
     },
     {
       field: 'quotationQty',
       headerName: '견적수량',
       summaryType: 'sum',
       type: 'decimal',
-      decimalPlaces: 2,
       width: 120,
       align: 'right',
       editable: !disabled,
@@ -168,7 +170,6 @@ export function createQuotationDetailColumns(
       field: 'unitPrice',
       headerName: '견적단가',
       type: 'currency',
-      decimalPlaces: 2,
       width: 130,
       align: 'right',
       editable: !disabled,
@@ -185,7 +186,6 @@ export function createQuotationDetailColumns(
       headerName: '견적금액',
       summaryType: 'sum',
       type: 'currency',
-      decimalPlaces: 2,
       width: 140,
       align: 'right',
       editable: false,

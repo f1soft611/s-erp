@@ -33,6 +33,8 @@ import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryVO;
 import egovframework.let.sales.shipment.delivery.domain.repository.SalesDeliveryDAO;
 import egovframework.let.sales.shipment.delivery.service.SalesDeliveryService;
 import egovframework.let.sales.shipment.deliveryplan.service.SalesDeliveryPlanService;
+import egovframework.let.sales.shipment.statement.service.impl.SalesStatementServiceImpl;
+import egovframework.let.system.policies.service.SystemPolicyService;
 
 @Service("salesDeliveryService")
 public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements SalesDeliveryService {
@@ -47,12 +49,17 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
     private final SalesDeliveryDAO salesDeliveryDAO;
     private final IdSequenceService idSequenceService;
     private final SalesDeliveryPlanService planService;
+    private final SystemPolicyService systemPolicyService;
+    private final SalesStatementServiceImpl statementService;
 
     public SalesDeliveryServiceImpl(SalesDeliveryDAO salesDeliveryDAO, IdSequenceService idSequenceService,
-            SalesDeliveryPlanService planService) {
+            SalesDeliveryPlanService planService, SystemPolicyService systemPolicyService,
+            SalesStatementServiceImpl statementService) {
         this.salesDeliveryDAO = salesDeliveryDAO;
         this.idSequenceService = idSequenceService;
         this.planService = planService;
+        this.systemPolicyService = systemPolicyService;
+        this.statementService = statementService;
     }
 
     @Override
@@ -89,6 +96,10 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         persistDetails(deliveryId, tenantId, payload.getDeliveryType(), details);
         adjustDeliveryShippedQty(tenantId, userId, details, Collections.<SalesDeliveryDetailVO>emptyList());
         adjustPlanDeliveredQty(tenantId, userId, details, Collections.<SalesDeliveryDetailVO>emptyList());
+        if ("AUTO".equals(systemPolicyService.getStatementIssueMode(tenantId))) {
+            // 같은 트랜잭션에서 발행하므로 명세서 실패 시 출하 저장도 함께 롤백된다.
+            statementService.create(tenantId, userId, deliveryId, payload.getDeliveryDt().toString(), "출하등록 자동 발행");
+        }
         return getDelivery(tenantId, userId, deliveryId);
     }
 

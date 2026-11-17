@@ -287,18 +287,18 @@ describe('sales order entry page', () => {
     editCell(4, '100');
 
     const grid = screen.getByRole('grid', { name: '수주 상세 목록' });
-    expect(within(grid).getByRole('gridcell', { name: '200.00' })).toBeInTheDocument();
+    expect(within(grid).getByRole('gridcell', { name: '200' })).toBeInTheDocument();
     const summary = within(grid).getByTestId('f1-grid-summary-bottom');
-    expect(within(summary).getByRole('gridcell', { name: '주문수량 집계' })).toHaveTextContent('2.00');
-    expect(within(summary).getByRole('gridcell', { name: '공급가 집계' })).toHaveTextContent('200.00');
-    expect(within(summary).getByRole('gridcell', { name: '라인합계 집계' })).toHaveTextContent('220.00');
+    expect(within(summary).getByRole('gridcell', { name: '주문수량 집계' })).toHaveTextContent('2');
+    expect(within(summary).getByRole('gridcell', { name: '공급가 집계' })).toHaveTextContent('200');
+    expect(within(summary).getByRole('gridcell', { name: '라인합계 집계' })).toHaveTextContent('220');
     expect(screen.getByLabelText('수주 금액 합계')).toHaveTextContent(
       /공급가 합계\s*200\.00\s*부가세 합계\s*20\.00\s*총 합계\s*220\.00/,
     );
 
     editCell(6, '30');
-    expect(within(summary).getByRole('gridcell', { name: '부가세 집계' })).toHaveTextContent('30.00');
-    expect(within(summary).getByRole('gridcell', { name: '라인합계 집계' })).toHaveTextContent('230.00');
+    expect(within(summary).getByRole('gridcell', { name: '부가세 집계' })).toHaveTextContent('30');
+    expect(within(summary).getByRole('gridcell', { name: '라인합계 집계' })).toHaveTextContent('230');
     expect(screen.getByLabelText('수주 금액 합계')).toHaveTextContent(
       /공급가 합계\s*200\.00\s*부가세 합계\s*30\.00\s*총 합계\s*230\.00/,
     );
@@ -491,8 +491,8 @@ describe('sales order entry page', () => {
     expect(screen.getByLabelText(/수주일자/, { selector: 'input' })).toHaveValue(initialOrderDate);
     const row = screen.getByRole('row', { name: /order-line-.*행 선택/ });
     expect(within(row).getByRole('gridcell', { name: 'M-20' })).toBeInTheDocument();
-    expect(within(row).getByRole('gridcell', { name: '2.00' })).toBeInTheDocument();
-    expect(within(row).getByRole('gridcell', { name: '100.00' })).toBeInTheDocument();
+    expect(within(row).getByRole('gridcell', { name: '2' })).toBeInTheDocument();
+    expect(within(row).getByRole('gridcell', { name: '100' })).toBeInTheDocument();
     expect(createSalesOrderMock).toHaveBeenCalledTimes(1);
   }, 10000);
 
@@ -592,7 +592,7 @@ describe('sales order entry page', () => {
     expect(screen.getByRole('textbox', { name: '거래처' })).toHaveValue('C-10 · 거래처 10');
     const row = screen.getByRole('row', { name: /order-line-450.*행 선택/ });
     expect(within(row).getByRole('gridcell', { name: 'M-20' })).toBeInTheDocument();
-    expect(within(row).getByRole('gridcell', { name: '220.00' })).toBeInTheDocument();
+    expect(within(row).getByRole('gridcell', { name: '220' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '상세 행 추가' })).toBeEnabled();
 

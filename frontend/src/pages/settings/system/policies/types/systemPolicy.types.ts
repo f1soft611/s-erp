@@ -1,5 +1,10 @@
 export type PolicyValueType = 'BOOLEAN' | 'NUMBER' | 'SELECT' | 'TEXT' | 'DATE' | 'USER_LIST';
-export type PolicyValue = boolean | number | string | number[];
+export type GridDecimalPolicyValue = {
+  places: number;
+  trailingZeros: 'FIXED' | 'AUTO';
+  rounding: 'HALF_UP' | 'UP' | 'DOWN';
+};
+export type PolicyValue = boolean | number | string | number[] | GridDecimalPolicyValue;
 export type PolicyOption = { value: string; label: string };
 export type PolicyPayload = {
   policyCode: string;
@@ -43,7 +48,28 @@ export function initialPolicyValue(type: PolicyValueType): PolicyValue {
   if (type === 'USER_LIST') return [];
   return '';
 }
+export const ZERO_MODE_LABELS = { FIXED: '항상 표시 (예: 1.50)', AUTO: '있을 때만 표시 (예: 1.5)' } as const;
+export const ROUNDING_LABELS = { HALF_UP: '반올림', UP: '올림', DOWN: '내림' } as const;
+
+/** 그리드 소수점 정책(GRID_DECIMAL_*)은 자릿수 외에 0 표시·반올림 방식을 한 값(객체)으로 관리한다. */
+export function isGridDecimalPolicy(policy: Pick<PolicyPayload, 'policyCode' | 'valueType'>): boolean {
+  return policy.valueType === 'NUMBER' && policy.policyCode.startsWith('GRID_DECIMAL_');
+}
+export function toGridDecimalValue(value: PolicyValue): GridDecimalPolicyValue {
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    return {
+      places: Number(value.places),
+      trailingZeros: value.trailingZeros === 'AUTO' ? 'AUTO' : 'FIXED',
+      rounding: value.rounding === 'UP' || value.rounding === 'DOWN' ? value.rounding : 'HALF_UP',
+    };
+  }
+  return { places: value === '' ? Number.NaN : Number(value), trailingZeros: 'FIXED', rounding: 'HALF_UP' };
+}
 export function policyValueLabel(policy: SystemPolicy): string {
+  if (isGridDecimalPolicy(policy)) {
+    const rule = toGridDecimalValue(policy.value);
+    return `${rule.places}${policy.unit || '자리'} · ${rule.trailingZeros === 'AUTO' ? '0 있을 때만' : '0 항상'} · ${ROUNDING_LABELS[rule.rounding]}`;
+  }
   if (policy.valueType === 'BOOLEAN') return policy.value ? '사용' : '미사용';
   if (policy.valueType === 'USER_LIST') return `${Array.isArray(policy.value) ? policy.value.length : 0}명 선택`;
   if (policy.valueType === 'SELECT') return policy.options.find((item) => item.value === policy.value)?.label ?? String(policy.value);
@@ -55,10 +81,12 @@ export function validatePolicy(draft: PolicyPayload): string {
   if (!draft.category.trim() || draft.category.length > 80) return '분류는 1~80자로 입력하세요.';
   if (draft.description.length > 1000) return '설명은 1000자 이내로 입력하세요.';
   if (draft.valueType === 'NUMBER') {
-    if (draft.value === '' || !Number.isFinite(Number(draft.value))) return '정책값에 유효한 숫자를 입력하세요.';
+    const places = isGridDecimalPolicy(draft) ? toGridDecimalValue(draft.value).places : draft.value;
+    if (places === '' || !Number.isFinite(Number(places))) return '정책값에 유효한 숫자를 입력하세요.';
+    if (isGridDecimalPolicy(draft) && !Number.isInteger(Number(places))) return '소수점 자릿수는 정수로 입력하세요.';
     if (draft.minValue !== null && draft.maxValue !== null && draft.minValue > draft.maxValue) return '최솟값은 최댓값 이하여야 합니다.';
-    if ((draft.minValue !== null && Number(draft.value) < draft.minValue)
-      || (draft.maxValue !== null && Number(draft.value) > draft.maxValue)) return '정책값이 허용 범위를 벗어났습니다.';
+    if ((draft.minValue !== null && Number(places) < draft.minValue)
+      || (draft.maxValue !== null && Number(places) > draft.maxValue)) return '정책값이 허용 범위를 벗어났습니다.';
   }
   if (draft.valueType === 'SELECT') {
     if (!draft.options.length || draft.options.length > 50

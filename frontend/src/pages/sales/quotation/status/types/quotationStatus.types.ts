@@ -32,6 +32,7 @@ export type QuotationStatusRow = {
 };
 
 export type QuotationStatusFilters = {
+  keyword?: string;
   quotationDtFrom: string;
   quotationDtTo: string;
   submitDtFrom?: string;
@@ -44,6 +45,7 @@ export type QuotationStatusFilters = {
 export type QuotationStatusSearchValues = Record<string, PageSearchFieldValue>;
 
 export type QuotationStatusSearchSession = {
+  keyword?: string;
   detailValues: QuotationStatusSearchValues;
 };
 
