@@ -53,7 +53,8 @@ const props = {
 };
 
 function planCell(grid: HTMLElement, rowIndex: number, columnIndex: number) {
-  const rows = within(grid).getAllByRole('row').filter((row) => within(row).queryByText('M20'));
+  const rows = within(grid).getAllByRole('row').filter((row) =>
+    within(row).queryByRole('button', { name: '분할', exact: true }));
   return within(rows[rowIndex]).getAllByRole('gridcell')[columnIndex];
 }
 
@@ -267,6 +268,66 @@ it('loads and updates an existing AUTO plan instead of creating another plan', a
   expect(createDeliveryPlan).not.toHaveBeenCalled();
 });
 
+it('splits a fully planned AUTO order and can save the split again', async () => {
+  vi.mocked(searchPlanSourceOrders).mockResolvedValue([{ ...source, remainingPlanQty: 0 }]);
+  const splitPlan: DeliveryPlanItem = {
+    ...plan,
+    details: [
+      { ...plan.details[0], plannedQty: 5 },
+      { ...plan.details[0], salesDeliveryPlanDetailId: 91, planDt: null, plannedQty: 5 },
+    ],
+  };
+  vi.mocked(updateDeliveryPlan).mockResolvedValue(splitPlan);
+  render(<SalesDeliveryPlanCreatePage {...props} deliveryPlanMode="AUTO" />);
+  fireEvent.click(screen.getByRole('button', { name: '수주 선택' }));
+  fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
+  fireEvent.click(await screen.findByRole('button', { name: 'SO-7', exact: true }));
+  await waitFor(() => expect(screen.getByLabelText('계획번호')).toHaveValue('DP-9'));
+  let grid = screen.getByRole('grid', { name: '출하계획 상세 목록' });
+  editCell(grid, 0, 5, '5');
+  fireEvent.click(within(grid).getByRole('button', { name: '분할' }));
+  grid = screen.getByRole('grid', { name: '출하계획 상세 목록' });
+  editCell(grid, 1, 5, '5');
+  fireEvent.click(screen.getByRole('button', { name: '수정 저장', exact: true }));
+  await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledWith(9, {
+    details: [
+      { salesDeliveryPlanDetailId: 90, salesOrderId: 7, salesOrderDetailId: 70, planDt: '2026-11-08', plannedQty: 5 },
+      { salesDeliveryPlanDetailId: null, salesOrderId: 7, salesOrderDetailId: 70, planDt: null, plannedQty: 5 },
+    ],
+  }));
+  fireEvent.click(screen.getByRole('button', { name: '수정 저장', exact: true }));
+  await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledTimes(2));
+});
+
+it('excludes quantities in other plans from an AUTO plan update limit', async () => {
+  vi.mocked(searchPlanSourceOrders).mockResolvedValue([{ ...source, remainingPlanQty: 2 }]);
+  vi.mocked(getDeliveryPlanByOrder).mockResolvedValue({
+    ...plan, details: [{ ...plan.details[0], plannedQty: 5 }],
+  });
+  vi.mocked(updateDeliveryPlan).mockResolvedValue({
+    ...plan, details: [{ ...plan.details[0], plannedQty: 7 }],
+  });
+  render(<SalesDeliveryPlanCreatePage {...props} deliveryPlanMode="AUTO" />);
+  fireEvent.click(screen.getByRole('button', { name: '수주 선택' }));
+  fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
+  fireEvent.click(await screen.findByRole('button', { name: 'SO-7', exact: true }));
+  await waitFor(() => expect(screen.getByLabelText('계획번호')).toHaveValue('DP-9'));
+  let grid = screen.getByRole('grid', { name: '출하계획 상세 목록' });
+  editCell(grid, 0, 5, '7');
+  fireEvent.click(screen.getByRole('button', { name: '수정 저장', exact: true }));
+  await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledTimes(1));
+  await screen.findByText(/출하계획이 수정되었습니다/);
+  grid = screen.getByRole('grid', { name: '출하계획 상세 목록' });
+  editCell(grid, 0, 5, '8');
+  fireEvent.click(screen.getByRole('button', { name: '수정 저장', exact: true }));
+  const alert = screen.getByText('계획수량 합계가 수주수량을 초과했습니다.').closest('[role="alert"]') as HTMLElement;
+  expect(alert).toHaveTextContent('계획수량 합계가 수주수량을 초과했습니다.');
+  expect(screen.queryByText(/출하계획이 수정되었습니다/)).not.toBeInTheDocument();
+  expect(alert.parentElement).toBe(screen.getByRole('region', { name: '출하계획 입력 내용' }));
+  expect(alert.parentElement).toHaveStyle({ paddingTop: '8px', paddingBottom: '16px' });
+  expect(updateDeliveryPlan).toHaveBeenCalledTimes(1);
+});
+
 it('registers only selected source item rows from multiple orders with their remaining quantities', async () => {
   vi.mocked(searchPlanSourceOrders).mockResolvedValue([
     { ...source, remainingPlanQty: 6 },
@@ -412,6 +473,34 @@ it('uses the registration form in status editing and saves split rows', async ()
   }));
 });
 
+it('prevents editing or splitting shipped rows while allowing unshipped siblings', async () => {
+  vi.mocked(getDeliveryPlan).mockResolvedValue({
+    ...plan,
+    details: [
+      { ...plan.details[0], plannedQty: 6, deliveredQty: 2 },
+      { ...plan.details[0], salesDeliveryPlanDetailId: 91, plannedQty: 4, deliveredQty: 0 },
+    ],
+  });
+  render(<SalesDeliveryPlanStatusPage {...props} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
+  await screen.findByRole('group', { name: '출하계획 정보' });
+  fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+  const grid = within(screen.getByRole('dialog', { name: '출하계획 수정' })).getByRole('grid');
+  const shipped = planCell(grid, 0, 5);
+  const shippedRow = shipped.closest('[role="row"]') as HTMLElement;
+  expect(within(shippedRow).getByRole('button', { name: '분할' })).toBeDisabled();
+  expect(within(shippedRow).getByRole('button', { name: '분할행 삭제' })).toBeDisabled();
+  fireEvent.doubleClick(shipped);
+  expect(shipped.querySelector('input')).toBeNull();
+  const shippedDate = planCell(grid, 0, 4);
+  fireEvent.doubleClick(shippedDate);
+  expect(shippedDate.querySelector('input')).toBeNull();
+  const unshippedRow = planCell(grid, 1, 5).closest('[role="row"]') as HTMLElement;
+  expect(within(unshippedRow).getByRole('button', { name: '분할' })).toBeEnabled();
+  expect(within(unshippedRow).getByRole('button', { name: '분할행 삭제' })).toBeEnabled();
+});
+
 it('inserts a split after its source and immediately edits the new quantity', async () => {
   vi.mocked(getDeliveryPlan).mockResolvedValue({
     ...plan, details: [
@@ -430,9 +519,9 @@ it('inserts a split after its source and immediately edits the new quantity', as
   fireEvent.click(within(grid).getAllByRole('button', { name: '분할', exact: true })[0]);
   grid = within(dialog).getByRole('grid', { name: '출하계획 상세 목록' });
   const itemRows = within(grid).getAllByRole('row').filter((row) =>
-    within(row).queryByText('M20') || within(row).queryByText('M21'));
+    within(row).queryByRole('button', { name: '분할', exact: true }));
   expect(itemRows.map((row) => within(row).getAllByRole('gridcell')[1].textContent))
-    .toEqual(['M20', 'M20', 'M21']);
+    .toEqual(['M20', '', 'M21']);
   const editor = planCell(grid, 1, 5).querySelector('input');
   expect(editor).not.toBeNull();
   await waitFor(() => expect(editor).toHaveFocus());
@@ -464,9 +553,9 @@ it('keeps split rows grouped with their order line after reopening a saved plan'
   fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
   const grid = within(screen.getByRole('dialog')).getByRole('grid', { name: '출하계획 상세 목록' });
   const rows = within(grid).getAllByRole('row').filter((row) =>
-    within(row).queryByText('M20') || within(row).queryByText('M21'));
+    within(row).queryByRole('button', { name: '분할', exact: true }));
   expect(rows.map((row) => within(row).getAllByRole('gridcell')[1].textContent))
-    .toEqual(['M20', 'M20', 'M21']);
+    .toEqual(['M20', '', 'M21']);
 });
 
 it('retains edited values after deleting a split row and warns before closing', async () => {

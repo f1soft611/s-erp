@@ -56,8 +56,10 @@ describe('quotation create API', () => {
       details: [
         detailRow({
           materialId: null,
-          materialCode: 'CUSTOM',
+          materialCode: '',
           materialName: '직접 입력 품목',
+          materialSpec: '',
+          unit: '',
           quotationQty: 2,
           unitPrice: 0,
         }),
@@ -69,7 +71,15 @@ describe('quotation create API', () => {
       quotationDt: '2026-11-16',
       customerId: 10,
       details: [
-        detailRow({ materialId: null, materialName: '', quotationQty: 0, unitPrice: -1 }),
+        detailRow({
+          materialId: null,
+          materialCode: '',
+          materialName: '',
+          materialSpec: '',
+          unit: '',
+          quotationQty: 0,
+          unitPrice: -1,
+        }),
       ],
     });
     expect(invalid.detailRows['line-1']).toContain('품목명을 입력');
@@ -89,7 +99,7 @@ describe('quotation create API', () => {
       currencyCode: 'KRW',
       remark: '',
       details: [
-        detailRow({ materialId: null, materialCode: 'CUSTOM', materialName: '직접 품목' }),
+        detailRow({ materialId: null, materialCode: '', materialName: '직접 품목' }),
         detailRow({
           rowId: 'line-2',
           materialId: 20,
@@ -104,7 +114,9 @@ describe('quotation create API', () => {
     expect(payload.details).toEqual([
       expect.objectContaining({
         materialId: null,
-        materialCode: 'CUSTOM',
+        materialCode: null,
+        materialSpec: null,
+        unit: null,
         materialName: '직접 품목',
       }),
       expect.objectContaining({
@@ -122,16 +134,29 @@ describe('quotation create API', () => {
     expect(payload.submitDt).toBeNull();
   });
 
-  it('lets manual code entry clear the material reference while keeping the master picker snapshot path', () => {
-    const columns = createQuotationDetailColumns();
+  it('requires master selection for item codes and allows only manual item-name entry', () => {
+    const openMaterialPicker = vi.fn();
+    const columns = createQuotationDetailColumns(openMaterialPicker);
     const code = columns.find((column) => column.field === 'materialCode')!;
+    const name = columns.find((column) => column.field === 'materialName')!;
+    const spec = columns.find((column) => column.field === 'materialSpec')!;
+    const unit = columns.find((column) => column.field === 'unit')!;
     const row = detailRow();
 
-    expect(code.type).toBe('text');
+    expect(code.type).toBe('code');
     expect(code.editable).toBe(true);
-    expect(code.onValueChange?.(row, 'CUSTOM')).toEqual({
+    const applyPatch = vi.fn();
+    code.onOpenCodePicker?.(row, applyPatch);
+    expect(openMaterialPicker).toHaveBeenCalledWith(applyPatch);
+    expect(spec.editable).toBe(false);
+    expect(unit.editable).toBe(false);
+    expect(name.editable).toBe(true);
+    expect(name.onValueChange?.(row, '직접 입력 품목')).toEqual({
       materialId: null,
-      materialCode: 'CUSTOM',
+      materialCode: '',
+      materialName: '직접 입력 품목',
+      materialSpec: '',
+      unit: '',
     });
 
     expect(code.onValueChange?.(row, {

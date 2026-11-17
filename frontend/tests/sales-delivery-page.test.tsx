@@ -46,6 +46,31 @@ beforeEach(() => {
   vi.mocked(getDelivery).mockResolvedValue(item as Awaited<ReturnType<typeof getDelivery>>);
   vi.mocked(getDeliveryStatus).mockResolvedValue([]);
 });
+it('normalizes the shipment form date on blur and before saving', async () => {
+  vi.mocked(updateDelivery).mockResolvedValue(item as Awaited<ReturnType<typeof updateDelivery>>);
+  mount(<SalesDeliveryCreatePage {...props} salesDeliveryId={1} />);
+  await screen.findByDisplayValue('SD-1');
+  expect(screen.getByRole('button', { name: '출하일자 달력 열기' })).toBeEnabled();
+  const input = screen.getByLabelText(/출하일자/, { selector: 'input' });
+  fireEvent.change(input, { target: { value: '20261117' } });
+  fireEvent.blur(input);
+  expect(input).toHaveValue('2026-11-17');
+  fireEvent.change(input, { target: { value: '261118' } });
+  fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+  await waitFor(() => expect(updateDelivery).toHaveBeenCalledWith(
+    1, expect.objectContaining({ deliveryDt: '2026-11-18' }),
+  ));
+}, 15000);
+it.each(['20260230', ''])('blocks an invalid or missing shipment form date: %s', async (value) => {
+  mount(<SalesDeliveryCreatePage {...props} salesDeliveryId={1} />);
+  await screen.findByDisplayValue('SD-1');
+  const input = screen.getByLabelText(/출하일자/, { selector: 'input' });
+  fireEvent.change(input, { target: { value } });
+  fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+  expect(input).toHaveAttribute('aria-invalid', 'true');
+  expect(input).toHaveValue(value);
+  expect(updateDelivery).not.toHaveBeenCalled();
+});
 it('shows the delivery creator name, profile image, and registration time in status detail', async () => {
   vi.mocked(getDeliveryStatus).mockResolvedValue([{ ...item, ...item.details[0] }] as Awaited<ReturnType<typeof getDeliveryStatus>>);
   vi.mocked(getDelivery).mockResolvedValue({
@@ -132,6 +157,7 @@ it('does not expose mutations without permissions', async () => {
   expect(screen.queryByRole('button', { name: '저장', exact: true })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '삭제', exact: true })).not.toBeInTheDocument();
   expect(screen.getByLabelText('출하장소')).toBeDisabled();
+  expect(screen.getByRole('button', { name: '출하일자 달력 열기' })).toBeDisabled();
 });
 it('loads status with mandatory current-month period and renders required chip', async () => {
   mount(<SalesDeliveryStatusPage {...props} />);

@@ -1,21 +1,39 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
-import App from '../src/App';
+import { MemoryRouter } from 'react-router-dom';
+import { describe, expect, it, vi } from 'vitest';
+import DashboardPage from '../src/pages/dashboard/DashboardPage';
+import { AppSettingsProvider } from '../src/shared/context/AppSettingsContext';
+import { NotificationProvider } from '../src/shared/context/NotificationContext';
+import { login } from '../src/shared/services/authService';
+
+vi.mock('../src/pages/dashboard/components/DashboardContent', () => ({
+  DashboardContent: () => null,
+}));
 
 describe('Theme settings', () => {
   it('lets the user switch theme and display size from icon-only dashboard header controls', async () => {
-    render(<App />);
+    const defaultFetch = window.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await defaultFetch(input, init);
+      if (!String(input).includes('/api/v1/menus/my')) return response;
 
-    fireEvent.change(screen.getByLabelText(/업체코드/i), {
-      target: { value: 'A001' },
-    });
-    fireEvent.change(screen.getByLabelText(/사용자 ID/i), {
-      target: { value: 'admin' },
-    });
-    fireEvent.change(screen.getByLabelText(/비밀번호/i), {
-      target: { value: '1234' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /로그인/i }));
+      const body = await response.json();
+      for (const root of body.result.menus) {
+        root.children = [{ ...root, menuId: 'dashboard-home', children: [] }];
+      }
+      return new Response(JSON.stringify(body), { status: 200 });
+    }));
+    await login({ tenantCode: 'A001', userId: 'admin', password: '1234' });
+
+    render(
+      <MemoryRouter>
+        <AppSettingsProvider>
+          <NotificationProvider>
+            <DashboardPage />
+          </NotificationProvider>
+        </AppSettingsProvider>
+      </MemoryRouter>,
+    );
 
     const themeButton = await screen.findByRole('button', {
       name: /테마 설정/i,

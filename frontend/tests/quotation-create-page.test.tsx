@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { apiGet } from '../src/shared/services/apiClient';
+import { apiGet, apiPost } from '../src/shared/services/apiClient';
 import { QuotationCreatePage } from '../src/pages/sales/quotation/create/QuotationCreatePage';
 import {
   calculateQuotationLineAmount,
@@ -16,6 +16,7 @@ vi.mock('../src/shared/services/apiClient', () => ({
 }));
 
 const apiGetMock = vi.mocked(apiGet);
+const apiPostMock = vi.mocked(apiPost);
 const moduleItem: ModuleItem = {
   id: 'sales',
   name: '영업관리',
@@ -27,6 +28,7 @@ const moduleItem: ModuleItem = {
 describe('quotation create page', () => {
   beforeEach(() => {
     apiGetMock.mockReset();
+    apiPostMock.mockReset();
     apiGetMock.mockResolvedValue({ today: '2026-11-16' });
   });
 
@@ -48,9 +50,36 @@ describe('quotation create page', () => {
     expect(await screen.findByRole('region', { name: '견적 입력 내용' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByDisplayValue('2026-11-16')).toBeInTheDocument());
     expect(screen.getByLabelText('견적번호')).toHaveValue('저장 시 자동 채번');
-    expect(screen.getByText(/품목코드·품목명·규격·단위를 직접 입력/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '견적작성일 달력 열기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '견적제출일 달력 열기' })).toBeInTheDocument();
+    expect(screen.getByText(/품목명을 직접 입력/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '상세 행 추가' })).toBeEnabled();
     expect(apiGetMock).toHaveBeenCalledWith('/api/v1/common/system-date');
+  });
+
+  it('marks an invalid optional submit date and blocks saving', async () => {
+    const router = createMemoryRouter([{
+      path: '/',
+      element: (
+        <QuotationCreatePage
+          selectedModule={moduleItem}
+          currentMenuName="견적서작성"
+          content={{ title: '견적서작성', description: '', cards: [], items: [] }}
+          breadcrumbItems={[]}
+          selectedMenuPermissions={{ read: true, create: true }}
+        />
+      ),
+    }]);
+    render(<RouterProvider router={router} />);
+
+    const submitDate = await screen.findByLabelText('견적제출일');
+    fireEvent.change(submitDate, { target: { value: '2026-02-31' } });
+    fireEvent.blur(submitDate);
+
+    expect(await screen.findByText('올바른 견적제출일을 입력해 주세요.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(screen.getByText('올바른 견적제출일을 입력해 주세요.')).toBeInTheDocument();
+    expect(apiPostMock).not.toHaveBeenCalled();
   });
 
   it('allows the writer to edit a loaded quotation when the system date lookup fails', async () => {

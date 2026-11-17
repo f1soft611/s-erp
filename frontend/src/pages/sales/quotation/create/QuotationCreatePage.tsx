@@ -14,10 +14,10 @@ import {
   Typography,
 } from '@mui/material';
 import { PageHeader } from '../../../../shared/components/PageHeader';
-import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useCommonConfirmDialog } from '../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
+import { DateEditor, normalizeDateInput } from '../../../../shared/components/f1-grid/editing/DateEditor';
 import {
   CustomerPicker,
   MaterialPickerDialog,
@@ -48,6 +48,7 @@ import type {
 } from './types/quotation.types';
 import {
   resolveActiveQuotationRows,
+  type OpenMaterialPicker,
   type QuotationDetailRow,
 } from './data/quotationDetail';
 
@@ -93,6 +94,8 @@ type HeaderSnapshot = {
 const EMPTY_AMOUNTS = { supplyAmt: 0, vatAmt: 0, totalAmt: 0 };
 const EMPTY_CONTENT: PageContent = { title: '견적서작성', description: '', cards: [], items: [] };
 
+type MaterialPickerApply = (option: MasterPickerOption) => void;
+
 function emptyHeader(quotationDt = ''): HeaderSnapshot {
   return {
     quotationDt,
@@ -112,6 +115,16 @@ function headerFromForm(
   values: Omit<HeaderSnapshot, 'customerId'>,
 ): HeaderSnapshot {
   return { ...values, customerId: customer?.id ?? null };
+}
+
+function quotationMaterialSnapshot(option: MasterPickerOption): Partial<QuotationDetailRow> {
+  return {
+    materialId: option.id,
+    materialCode: option.code,
+    materialName: option.name,
+    materialSpec: option.details?.find((detail) => detail.label === '품목규격')?.value ?? '',
+    unit: option.details?.find((detail) => detail.label === '단위')?.value ?? '',
+  };
 }
 
 function calculateTotals(rows: QuotationDetailRow[]) {
@@ -146,6 +159,8 @@ export function QuotationCreatePage({
   const [customer, setCustomer] = useState<MasterPickerOption | null>(null);
   const [quotationDt, setQuotationDt] = useState('');
   const [submitDt, setSubmitDt] = useState('');
+  const [quotationDateError, setQuotationDateError] = useState('');
+  const [submitDateError, setSubmitDateError] = useState('');
   const [customerReference, setCustomerReference] = useState('');
   const [incoterms, setIncoterms] = useState('');
   const [paymentTerm, setPaymentTerm] = useState('');
@@ -154,9 +169,7 @@ export function QuotationCreatePage({
   const [remark, setRemark] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedRowIds, setSelectedRowIds] = useState<(string | number)[]>([]);
-  const [materialApplyPatch, setMaterialApplyPatch] = useState<
-    ((changes: Partial<QuotationDetailRow>) => void) | null
-  >(null);
+  const [materialPickerApply, setMaterialPickerApply] = useState<MaterialPickerApply | null>(null);
   const [loadedQuotation, setLoadedQuotation] = useState<QuotationItem | null>(null);
   const [gridRows, setGridRows] = useState<QuotationDetailRow[]>([]);
   const [gridKey, setGridKey] = useState(0);
@@ -220,6 +233,8 @@ export function QuotationCreatePage({
     setCustomer(form.customer);
     setQuotationDt(form.header.quotationDt);
     setSubmitDt(form.header.submitDt ?? '');
+    setQuotationDateError('');
+    setSubmitDateError('');
     setCustomerReference(form.header.customerReference ?? '');
     setIncoterms(form.header.incoterms ?? '');
     setPaymentTerm(form.header.paymentTerm ?? '');
@@ -252,6 +267,8 @@ export function QuotationCreatePage({
     setCustomer(null);
     setQuotationDt(date);
     setSubmitDt('');
+    setQuotationDateError('');
+    setSubmitDateError('');
     setCustomerReference('');
     setIncoterms('');
     setPaymentTerm('');
@@ -302,42 +319,49 @@ export function QuotationCreatePage({
     [clearValidationErrors, gridRows],
   );
 
+  const openMaterialPicker: OpenMaterialPicker = useCallback((applyPatch) => {
+    setMaterialPickerApply(
+      () => (option: MasterPickerOption) => applyPatch(quotationMaterialSnapshot(option)),
+    );
+    setPickerOpen(true);
+  }, []);
+
   const selectMaterial = useCallback((option: MasterPickerOption) => {
-    materialApplyPatch?.({
-      materialId: option.id,
-      materialCode: option.code,
-      materialName: option.name,
-      materialSpec: option.details?.find((detail) => detail.label === '품목규격')?.value ?? '',
-      unit: option.details?.find((detail) => detail.label === '단위')?.value ?? '',
-    });
+    materialPickerApply?.(option);
     setPickerOpen(false);
-    setMaterialApplyPatch(null);
+    setMaterialPickerApply(null);
     clearValidationErrors();
-  }, [clearValidationErrors, materialApplyPatch]);
+  }, [clearValidationErrors, materialPickerApply]);
 
   const openSelectedMaterialPicker = useCallback(() => {
     const [selectedRow] = gridRef.current?.getSelectedRows() ?? [];
     if (!selectedRow) return;
     const rowId = selectedRow.rowId;
-    setMaterialApplyPatch(() => (changes: Partial<QuotationDetailRow>) => {
-      gridRef.current?.setCellValue(rowId, 'materialCode', {
-        id: changes.materialId,
-        code: changes.materialCode,
-        name: changes.materialName,
-        details: [
-          { label: '품목규격', value: changes.materialSpec ?? '' },
-          { label: '단위', value: changes.unit ?? '' },
-        ],
-      });
+    setMaterialPickerApply(() => (option: MasterPickerOption) => {
+      gridRef.current?.setCellValue(rowId, 'materialCode', option);
     });
     setPickerOpen(true);
   }, []);
 
   const handleSave = useCallback(async () => {
     if (savingRef.current || !isEditable || (loadedQuotation && !hasUnsavedChanges)) return;
+    const normalizedQuotationDt = normalizeDateInput(quotationDt);
+    const normalizedSubmitDt = submitDt.trim() ? normalizeDateInput(submitDt) : '';
+    const nextQuotationDateError = normalizedQuotationDt
+      ? ''
+      : quotationDt.trim()
+        ? '올바른 견적작성일을 입력해 주세요.'
+        : '견적작성일을 입력해 주세요.';
+    const nextSubmitDateError = submitDt.trim() && !normalizedSubmitDt
+      ? '올바른 견적제출일을 입력해 주세요.'
+      : '';
+    setQuotationDateError(nextQuotationDateError);
+    setSubmitDateError(nextSubmitDateError);
+    if (nextQuotationDateError || nextSubmitDateError) return;
+
     const input = {
-      quotationDt,
-      submitDt,
+      quotationDt: normalizedQuotationDt,
+      submitDt: normalizedSubmitDt,
       customerId: customer?.id ?? null,
       customerReference,
       incoterms,
@@ -512,13 +536,15 @@ export function QuotationCreatePage({
           </Alert>
         ) : null}
         {notice ? <Alert severity="success">{notice}</Alert> : null}
-        <PageMessageArea message={error} onClose={() => setError('')} severity="error" compact />
+        {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
         <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, minWidth: 0, borderRadius: 1 }}>
           <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 700 }}>견적 기본정보</Typography>
           <Box sx={{
             display: 'grid',
             gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' },
-            columnGap: 2, rowGap: 1, '& > .MuiFormControl-root': { m: 0 },
+            columnGap: 2, rowGap: 1,
+            '& > .MuiFormControl-root': { m: 0 },
+            '& > .MuiStack-root': { mt: 0, minWidth: 0, alignItems: 'flex-start' },
           }}>
             <TextField
               label="견적번호" size="small"
@@ -526,24 +552,53 @@ export function QuotationCreatePage({
               slotProps={{ input: { readOnly: true } }}
               sx={{ '& .MuiInputBase-root': { backgroundColor: 'action.disabledBackground' } }}
             />
-            <TextField
-              label="견적작성일" type="date" size="small" required value={quotationDt}
-              onChange={(event) => { setQuotationDt(event.target.value); clearValidationErrors(); }}
-              disabled={!isEditable} error={Boolean(validationErrors?.quotationDt)}
-              helperText={validationErrors?.quotationDt}
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
+            <Box component="fieldset" disabled={!isEditable}
+              sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
+              <DateEditor
+                label="견적작성일" variant="outlined" autoFocus={false} required
+                value={quotationDt} error={Boolean(quotationDateError)}
+                helperText={quotationDateError}
+                onChange={(value) => {
+                  setQuotationDt(value);
+                  setQuotationDateError('');
+                  clearValidationErrors();
+                }}
+                onBlur={() => {
+                  const normalized = normalizeDateInput(quotationDt);
+                  if (normalized) setQuotationDt(normalized);
+                  setQuotationDateError(normalized
+                    ? ''
+                    : quotationDt.trim()
+                      ? '올바른 견적작성일을 입력해 주세요.'
+                      : '견적작성일을 입력해 주세요.');
+                }}
+              />
+            </Box>
             <CustomerPicker
               value={customer} search={searchQuotationCustomers} triggerMode="icon"
               onChange={(value) => { setCustomer(value); clearValidationErrors(); }}
               disabled={!isEditable} required error={Boolean(validationErrors?.customerId)}
               helperText={validationErrors?.customerId}
             />
-            <TextField
-              label="견적제출일" type="date" size="small" value={submitDt}
-              onChange={(event) => setSubmitDt(event.target.value)} disabled={!isEditable}
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
+            <Box component="fieldset" disabled={!isEditable}
+              sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
+              <DateEditor
+                label="견적제출일" variant="outlined" autoFocus={false}
+                value={submitDt} error={Boolean(submitDateError)}
+                helperText={submitDateError}
+                onChange={(value) => {
+                  setSubmitDt(value);
+                  setSubmitDateError('');
+                }}
+                onBlur={() => {
+                  const normalized = submitDt.trim() ? normalizeDateInput(submitDt) : '';
+                  if (normalized) setSubmitDt(normalized);
+                  setSubmitDateError(submitDt.trim() && !normalized
+                    ? '올바른 견적제출일을 입력해 주세요.'
+                    : '');
+                }}
+              />
+            </Box>
             <TextField label="참조" size="small" value={customerReference}
               onChange={(event) => setCustomerReference(event.target.value)} disabled={!isEditable} />
             <TextField label="Incoterms" size="small" value={incoterms}
@@ -570,7 +625,7 @@ export function QuotationCreatePage({
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>견적 상세</Typography>
               <Typography variant="caption" color="text.secondary">
-                품목을 선택하거나 품목코드·품목명·규격·단위를 직접 입력할 수 있습니다.
+                품목을 선택하거나 품목명을 직접 입력할 수 있습니다.
               </Typography>
             </Box>
             {!isReadOnly ? (
@@ -587,6 +642,7 @@ export function QuotationCreatePage({
             <QuotationDetailGrid
               key={gridKey} gridRef={gridRef} rows={gridRows}
               onChangesChange={handleChangesChange} onSelectionChange={setSelectedRowIds}
+              onOpenMaterialPicker={openMaterialPicker}
               disabled={!isEditable}
             />
           </Box>
@@ -603,7 +659,7 @@ export function QuotationCreatePage({
       <MaterialPickerDialog
         open={pickerOpen && isEditable}
         search={searchQuotationMaterials}
-        onClose={() => { setPickerOpen(false); setMaterialApplyPatch(null); }}
+        onClose={() => { setPickerOpen(false); setMaterialPickerApply(null); }}
         onChange={selectMaterial}
       />
       {embedded ? null : <QuotationRouteLeaveGuard when={hasUnsavedChanges} />}

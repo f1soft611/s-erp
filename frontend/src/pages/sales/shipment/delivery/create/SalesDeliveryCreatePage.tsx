@@ -9,10 +9,10 @@ import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined
 import type { PermissionActionGroupDefinition } from '../../../../../shared/components/PermissionGroup';
 import { PageHeader } from '../../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../../shared/components/PageLoadBoundary';
-import { PageMessageArea } from '../../../../../shared/components/PageMessageArea';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useCommonConfirmDialog } from '../../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../../shared/hooks/useUnsavedChangesBeforeUnload';
+import { DateEditor, normalizeDateInput } from '../../../../../shared/components/f1-grid/editing/DateEditor';
 import { CustomerPicker, MaterialPickerDialog } from '../../../../../shared/components/master-picker/MasterPickers';
 import type { F1GridChanges, F1GridRef } from '../../../../../shared/components/f1-grid';
 import { searchOrderCustomers, searchOrderMaterials } from '../../../order/create/services/salesOrderMaster.service';
@@ -53,6 +53,7 @@ export function SalesDeliveryCreatePage({
   const [pending, setPending] = useState(false);
   const [locked, setLocked] = useState(false);
   const [error, setError] = useState('');
+  const [dateError, setDateError] = useState('');
   const [notice, setNotice] = useState('');
   const [sourceOpen, setSourceOpen] = useState(false);
   const [materialOpen, setMaterialOpen] = useState(false);
@@ -74,7 +75,7 @@ export function SalesDeliveryCreatePage({
   useEffect(() => onPendingChange?.(pending), [pending, onPendingChange]);
   const applyForm = useCallback((next: DeliveryForm) => {
     setForm(next); setRows(next.details); setGridKey((value) => value + 1);
-    setBaseline(JSON.stringify(next)); setSelectedIds([]);
+    setBaseline(JSON.stringify(next)); setSelectedIds([]); setDateError('');
   }, []);
   const applyItem = useCallback((next: DeliveryItem) => {
     setItem(next); setSavedId(next.salesDeliveryId); setLocked(false); applyForm(deliveryForm(next));
@@ -130,7 +131,11 @@ export function SalesDeliveryCreatePage({
   }, [canSave, savedId, applyItem, onSaved]);
   const save = useCallback(async () => {
     if (!editable || busy.current) return;
-    const current = { ...form, details: grid.current?.getActiveRows() ?? form.details };
+    const deliveryDt = normalizeDateInput(form.deliveryDt);
+    setDateError(deliveryDt ? '' : form.deliveryDt.trim()
+      ? '올바른 출하일자를 입력해 주세요.' : '출하일자를 입력해 주세요.');
+    if (!deliveryDt) return;
+    const current = { ...form, deliveryDt, details: grid.current?.getActiveRows() ?? form.details };
     const message = validateDelivery(current);
     grid.current?.validate();
     if (message) { setError(message); return; }
@@ -177,8 +182,8 @@ export function SalesDeliveryCreatePage({
     <Box role="region" aria-label="출하 입력 내용" aria-busy={pending || loading}
       sx={{ px: embedded ? 0 : { xs: 1, sm: 2 }, pt: embedded ? 0 : 1, pb: embedded ? 0 : 2,
         display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
-      <PageMessageArea message={error} onClose={() => setError('')} />
       {notice ? <Alert severity="success">{notice}</Alert> : null}
+      {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
       {locked && savedId ? <Button startIcon={<SearchIcon />} disabled={pending || loading} onClick={() => void load(savedId)}>재조회</Button> : null}
       {loading ? <Typography role="status">출하를 불러오는 중입니다.</Typography> : null}
       <PageLoadBoundary loading={loading} error={loadError ? 'server' : null} label="출하등록"
@@ -189,8 +194,15 @@ export function SalesDeliveryCreatePage({
             '& > .MuiFormControl-root': { m: 0 }, '& > .MuiStack-root': { mt: 0 } }}>
             <TextField size="small" label="출하번호" value={item?.deliveryNo ?? '저장 시 자동 채번'} slotProps={{ input: { readOnly: true } }}
               sx={{ '& .MuiInputBase-input': { fontSize: { xs: '0.75rem', sm: '1rem' } } }} />
-            <TextField size="small" label="출하일자" type="date" required value={form.deliveryDt} disabled={!editable}
-              onChange={(event) => change('deliveryDt', event.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+            <DateEditor label="출하일자" variant="outlined" autoFocus={false} required
+              value={form.deliveryDt} disabled={!editable} error={Boolean(dateError)} helperText={dateError}
+              onChange={(value) => { change('deliveryDt', value); setDateError(''); }}
+              onBlur={() => {
+                const normalized = normalizeDateInput(form.deliveryDt);
+                if (normalized) change('deliveryDt', normalized);
+                setDateError(normalized ? '' : form.deliveryDt.trim()
+                  ? '올바른 출하일자를 입력해 주세요.' : '출하일자를 입력해 주세요.');
+              }} />
             <CustomerPicker required disabled={!editable || Boolean(savedId) || form.deliveryType === 'ORDER'} triggerMode="icon"
               value={form.customerId ? { id: form.customerId, code: form.customerCode, name: form.customerName } : null}
               search={searchOrderCustomers} onChange={(customer) => {

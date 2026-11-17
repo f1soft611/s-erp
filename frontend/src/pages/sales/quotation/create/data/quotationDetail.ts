@@ -17,6 +17,10 @@ export type QuotationDetailRow = {
   remark: string;
 };
 
+export type OpenMaterialPicker = (
+  applyPatch: (changes: Partial<QuotationDetailRow>) => void,
+) => void;
+
 export function roundQuotationAmount(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
@@ -79,6 +83,7 @@ function snapshotEdit<T extends 'materialCode' | 'materialName' | 'materialSpec'
 }
 
 export function createQuotationDetailColumns(
+  onOpenMaterialPicker: OpenMaterialPicker,
   disabled = false,
 ): F1GridColumn<QuotationDetailRow>[] {
   return [
@@ -95,11 +100,19 @@ export function createQuotationDetailColumns(
     {
       field: 'materialCode',
       headerName: '품목코드',
-      type: 'text',
+      type: 'code',
       width: 140,
       pinned: 'left',
       editable: !disabled,
-      onValueChange: (_row, value) => snapshotEdit('materialCode', value),
+      onValueChange: (_row, value) => {
+        if (!isMasterPickerOption(value)) {
+          throw new Error('품목 선택 항목을 확인해 주세요.');
+        }
+        return snapshotEdit('materialCode', value);
+      },
+      onOpenCodePicker: (_row, applyPatch) => {
+        if (!disabled) onOpenMaterialPicker(applyPatch);
+      },
     },
     {
       field: 'materialName',
@@ -110,14 +123,20 @@ export function createQuotationDetailColumns(
       required: true,
       validate: (_value, row) =>
         row.materialName.trim() ? true : '품목명을 입력해 주세요.',
-      onValueChange: (_row, value) => snapshotEdit('materialName', value),
+      onValueChange: (_row, value) => ({
+        materialId: null,
+        materialCode: '',
+        materialName: String(value ?? ''),
+        materialSpec: '',
+        unit: '',
+      }),
     },
     {
       field: 'materialSpec',
       headerName: '규격',
       type: 'text',
       width: 140,
-      editable: !disabled,
+      editable: false,
       onValueChange: (_row, value) => snapshotEdit('materialSpec', value),
     },
     {
@@ -125,7 +144,7 @@ export function createQuotationDetailColumns(
       headerName: '단위',
       type: 'text',
       width: 90,
-      editable: !disabled,
+      editable: false,
       onValueChange: (_row, value) => snapshotEdit('unit', value),
     },
     {

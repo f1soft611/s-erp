@@ -26,15 +26,17 @@ export function DeliveryPlanForm({ storageKey, planNo, orderNo, orderDt, custome
     setGridVersion((version) => version + 1);
   }, [setRows]);
   const columns = useMemo<F1GridColumn<PlanRow>[]>(() => [
-    { field: 'rowId', headerName: '행', type: 'rownumber', width: 56, align: 'center' },
-    { field: 'materialCode', headerName: '품목코드', width: 130, align: 'center' },
-    { field: 'materialName', headerName: '품목명', width: 180, align: 'left' },
-    { field: 'orderQty', headerName: '수주수량', type: 'decimal', width: 110, align: 'right' },
-    { field: 'planDt', headerName: '계획일', type: 'date', editable, width: 180, align: 'center',
+    { field: 'rowId', headerName: 'No', type: 'rownumber', width: 56, align: 'center' },
+    { field: 'materialCode', headerName: '품목코드', width: 130, align: 'center', mergeRows: true },
+    { field: 'materialName', headerName: '품목명', width: 180, align: 'left', mergeRows: true },
+    { field: 'orderQty', headerName: '수주수량', type: 'decimal', width: 110, align: 'right', mergeRows: true },
+    { field: 'planDt', headerName: '계획일', type: 'date', mergeRows: true,
+      editable: (row) => editable && !(Number(row.deliveredQty) > 0), width: 180, align: 'center',
       onValueChange: (_row, value) => ({ planDt: String(value || '') || null }) },
-    { field: 'plannedQty', headerName: '계획수량', type: 'decimal', decimalPlaces: 2, editable,
+    { field: 'plannedQty', headerName: '계획수량', type: 'decimal', decimalPlaces: 2,
+      editable: (row) => editable && !(Number(row.deliveredQty) > 0),
       width: 150, align: 'right', onValueChange: (_row, value) => ({ plannedQty: Number(value) }) },
-    { field: 'salesOrderDetailId', headerName: '합계', width: 110, align: 'right',
+    { field: 'salesOrderDetailId', headerName: '합계', width: 110, align: 'right', mergeRows: true,
       renderCell: ({ row }) => {
         const total = rows.filter((item) => item.salesOrderId === row.salesOrderId
           && item.salesOrderDetailId === row.salesOrderDetailId)
@@ -46,7 +48,7 @@ export function DeliveryPlanForm({ storageKey, planNo, orderNo, orderDt, custome
       } },
     { field: 'salesDeliveryPlanDetailId', headerName: '분할', width: 160, align: 'center',
       renderCell: ({ row }) => <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', gap: 0.5 }}>
-        <Button size="small" startIcon={<AddIcon />} disabled={!editable}
+        <Button size="small" startIcon={<AddIcon />} disabled={!editable || Number(row.deliveredQty) > 0}
           onClick={() => {
             const active = gridRef.current?.getActiveRows() ?? rows;
             const index = active.findIndex((item) => item.rowId === row.rowId);
@@ -58,7 +60,7 @@ export function DeliveryPlanForm({ storageKey, planNo, orderNo, orderDt, custome
           }}>분할</Button>
         {rows.filter((item) => item.salesOrderId === row.salesOrderId
           && item.salesOrderDetailId === row.salesOrderDetailId).length > 1
-          ? <Button size="small" color="error" aria-label="분할행 삭제" disabled={!editable} sx={{ minWidth: 0, px: 1 }}
+          ? <Button size="small" color="error" aria-label="분할행 삭제" disabled={!editable || Number(row.deliveredQty) > 0} sx={{ minWidth: 0, px: 1 }}
             onClick={() => replaceRows((gridRef.current?.getActiveRows() ?? rows)
               .filter((item) => item.rowId !== row.rowId))}>
             <DeleteOutlinedIcon fontSize="small" />

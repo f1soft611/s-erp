@@ -88,6 +88,16 @@ export function SalesDeliveryPlanCreatePage({
     setLoading(true);
     try {
       const saved = await getDeliveryPlanByOrder(selected[0].salesOrderId);
+      const currentTotals = new Map<string, number>();
+      for (const detail of saved.details) {
+        const key = sourceKey(detail);
+        currentTotals.set(key, (currentTotals.get(key) ?? 0) + Number(detail.plannedQty));
+      }
+      setSelectedSources(selected.map((row) => ({
+        ...row,
+        remainingPlanQty: row.remainingPlanQty == null ? Number(row.orderQty)
+          : Math.min(Number(row.orderQty), Number(row.remainingPlanQty) + (currentTotals.get(sourceKey(row)) ?? 0)),
+      })));
       setPlanId(saved.salesDeliveryPlanId);
       setPlanNo(saved.planNo);
       setRows(planRowsFromDetails(saved.details));
@@ -99,12 +109,12 @@ export function SalesDeliveryPlanCreatePage({
 
   const save = async () => {
     if (!canWrite) return;
+    setNotice('');
     const currentRequest = createRequest(gridRef.current?.getActiveRows() ?? rows);
     const message = validateDeliveryPlan(currentRequest, selectedSources);
     if (message) { setError(message); return; }
     setSaving(true);
     setError('');
-    setNotice('');
     try {
       const saved = planId === null
         ? await createDeliveryPlan(currentRequest)
@@ -173,9 +183,10 @@ export function SalesDeliveryPlanCreatePage({
     <PageHeader breadcrumbItems={breadcrumbItems.length ? breadcrumbItems : [currentMenuName]}
       description={content.description} actionGroups={actions} />
     <Box role="region" aria-label="출하계획 입력 내용"
-      sx={{ px: { xs: 1, sm: 2 }, pt: 1, pb: 2, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
-      <PageMessageArea message={error} onClose={() => setError('')} />
+      sx={{ px: { xs: 1, sm: 2 }, pt: 1, pb: 2,
+        display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
       {notice ? <Alert severity="success">{notice}</Alert> : null}
+      {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
       <DeliveryPlanForm key={formVersion} gridRef={gridRef} storageKey="sales-delivery-plan-create-details-v1" planNo={planNo} orderNo={selectedOrderNo} orderDt={selectedOrderDates}
         customerName={selectedCustomers} rows={rows} setRows={setRows} editable={canWrite}
         canSelectOrder={canSelectOrder && planId === null} onSelectOrder={openSourcePicker} />
