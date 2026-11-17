@@ -24,6 +24,13 @@ import type {
   PurchaseConfirmItem,
   PurchaseRequestConfirmDetail,
 } from '../src/pages/materials/request/confirm/types/purchaseRequestConfirm.types';
+import { getSystemDate } from '../src/shared/services/systemDateService';
+
+// 작성 기준일은 서버 날짜(GET /api/v1/common/system-date)로 채운다. 기본은 2026-11-17이고 테스트가 값을 바꾼다.
+vi.mock('../src/shared/services/systemDateService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/shared/services/systemDateService')>()),
+  getSystemDate: vi.fn(async () => '2026-11-17'),
+}));
 
 vi.mock('../src/shared/services/apiClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/shared/services/apiClient')>();
@@ -295,3 +302,18 @@ function renderPage(permissions: { read: boolean; update?: boolean } = { read: t
   }], { initialEntries: ['/'] });
   return render(<RouterProvider router={router} />);
 }
+
+describe('구매요청확정 server date default', () => {
+  it('fills the 확정일 from the server date, not the browser clock', async () => {
+    vi.mocked(getSystemDate).mockResolvedValueOnce('2031-05-06');
+    renderPage();
+    await waitFor(() => expect(screen.getByRole('textbox', { name: /^확정일/ })).toHaveValue('2031-05-06'));
+  });
+
+  it('leaves the 확정일 empty and shows the error when the server date cannot be loaded', async () => {
+    vi.mocked(getSystemDate).mockRejectedValueOnce(new Error('연결 실패'));
+    renderPage();
+    expect(await screen.findByText(/서버 기준일을 불러오지 못했습니다\. 연결 실패/)).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /^확정일/ })).toHaveValue('');
+  });
+});

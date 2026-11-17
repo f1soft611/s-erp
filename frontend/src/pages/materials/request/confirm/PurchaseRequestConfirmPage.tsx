@@ -50,6 +50,8 @@ import type {
   PurchaseConfirmListItem,
   PurchaseRequestConfirmCandidate,
 } from './types/purchaseRequestConfirm.types';
+import { useServerDateDefault } from '../../../../shared/hooks/useServerDateDefault';
+import { FormDateField, normalizeFormDate } from '../../../../shared/components/FormDateField';
 
 type Props = {
   selectedModule: ModuleItem;
@@ -63,11 +65,6 @@ type SupplierTarget = {
   row: PurchaseRequestConfirmRow;
   applyPatch: (changes: Partial<PurchaseRequestConfirmRow>) => void;
 };
-
-function today(): string {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
 
 function formatAmount(value: number): string {
   return value.toLocaleString('ko-KR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -91,7 +88,7 @@ export function PurchaseRequestConfirmPage({
   const [activeRows, setActiveRows] = useState<PurchaseRequestConfirmRow[]>([]);
   const [selectedRowIds, setSelectedRowIds] = useState<(string | number)[]>([]);
   const [gridKey, setGridKey] = useState(0);
-  const [confirmDt, setConfirmDt] = useState(today());
+  const [confirmDt, setConfirmDt] = useState('');
   const [remark, setRemark] = useState('');
   const [warehouseOptions, setWarehouseOptions] = useState<ConfirmSelectOption[]>([]);
   const [orderTypeOptions, setOrderTypeOptions] = useState<ConfirmSelectOption[]>([]);
@@ -148,12 +145,20 @@ export function PurchaseRequestConfirmPage({
     resetGrid(toConfirmRows(item.details, false));
   }, [resetGrid]);
 
+  const { markTouched: markDateTouched, reload: reloadServerDate } = useServerDateDefault({
+    enabled: true,
+    // 저장된 확정을 연 뒤에 늦게 도착한 서버 날짜가 확정일을 덮어쓰지 않게 비어 있을 때만 채운다.
+    onDate: (date) => setConfirmDt((current) => current || date),
+    onError: setError,
+  });
+
   const resetToNew = useCallback(() => {
     setLoaded(null);
-    setConfirmDt(today());
+    setConfirmDt('');
+    void reloadServerDate();
     setRemark('');
     resetGrid([]);
-  }, [resetGrid]);
+  }, [resetGrid, reloadServerDate]);
 
   const runBusy = useCallback(async (work: () => Promise<void>) => {
     if (busyRef.current) return;
@@ -187,11 +192,12 @@ export function PurchaseRequestConfirmPage({
     void runBusy(async () => {
       const details = await fetchRequestDetails(candidates.map((candidate) => candidate.purchaseRequestDetailId));
       setLoaded(null);
-      setConfirmDt(today());
+      setConfirmDt('');
       setRemark('');
       resetGrid(toConfirmRows(details, true));
+      await reloadServerDate();
     });
-  }, [resetGrid, runBusy]);
+  }, [reloadServerDate, resetGrid, runBusy]);
 
   /** 체크한 품목 행만 뺀다. 입력한 값은 남은 행에 그대로 유지한다. */
   const removeSelectedRows = useCallback(() => {
@@ -259,7 +265,11 @@ export function PurchaseRequestConfirmPage({
   const handleConfirm = useCallback(async () => {
     if (!confirmEditable) return;
     const rows = gridRef.current?.getRows() ?? activeRows;
-    const messages = validateConfirmInput(confirmDt, rows);
+    const dateCheck = normalizeFormDate(confirmDt);
+    if (dateCheck.date && dateCheck.date !== confirmDt) setConfirmDt(dateCheck.date);
+    const messages = dateCheck.invalid
+      ? ['올바른 확정일을 입력해 주세요.']
+      : validateConfirmInput(dateCheck.date, rows);
     const isGridValid = gridRef.current?.validate() ?? true;
     gridValidationActiveRef.current = !isGridValid;
     setValidationMessages(messages);
@@ -271,7 +281,7 @@ export function PurchaseRequestConfirmPage({
       return;
     }
     void runBusy(async () => {
-      const saved = await createPurchaseConfirm(buildConfirmPayload(confirmDt, remark, rows));
+      const saved = await createPurchaseConfirm(buildConfirmPayload(dateCheck.date, remark, rows));
       applyLoaded(saved);
       setNotice(`구매요청을 확정했습니다. 확정번호: ${saved.confirmNo}`);
     });
@@ -423,18 +433,11 @@ export function PurchaseRequestConfirmPage({
               value={loaded?.confirmNo ?? (hasRows ? '확정 시 자동 채번' : '')}
               slotProps={readOnlyField}
             />
-            <TextField
+            <FormDateField
               label="확정일"
-              type="date"
-              size="small"
-              required
               value={confirmDt}
-              onChange={(event) => {
-                setConfirmDt(event.target.value);
-                setValidationMessages([]);
-              }}
               disabled={!confirmEditable}
-              slotProps={{ inputLabel: { shrink: true } }}
+              onChange={(value) => { markDateTouched(); setConfirmDt(value); setValidationMessages([]); }}
             />
             <TextField label="확정자" size="small" value={loaded?.confirmerName ?? ''} slotProps={readOnlyField} />
             <TextField label="상태" size="small" value={statusLabel} slotProps={readOnlyField} />

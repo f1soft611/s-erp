@@ -1,10 +1,8 @@
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { IconButton, InputAdornment, Popover, TextField } from '@mui/material';
-import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import dayjs from 'dayjs';
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { DatePanel } from '../../calendar/DatePanel';
 
 type DateEditorProps = {
   value: string;
@@ -19,6 +17,11 @@ type DateEditorProps = {
   error?: boolean;
   helperText?: string;
   disabled?: boolean;
+  /**
+   * 달력 팝업 내용을 직접 그린다(예: 기간 검색의 범위 달력). 없으면 날짜 하나를 고르는 기본 달력을 쓴다.
+   * `value`는 현재 입력 값이고 `close`는 팝업을 닫는다.
+   */
+  renderCalendar?: (api: { value: string; close: () => void }) => ReactNode;
 };
 
 const DATE_FORMAT = 'YYYY-MM-DD';
@@ -88,6 +91,7 @@ export function DateEditor({
   error,
   helperText,
   disabled = false,
+  renderCalendar,
 }: DateEditorProps) {
   const [draftValue, setDraftValue] = useState(value);
   const [calendarAnchor, setCalendarAnchor] =
@@ -98,14 +102,11 @@ export function DateEditor({
     if (disabled) setCalendarAnchor(null);
   }, [value, disabled]);
 
+  const closeCalendar = () => setCalendarAnchor(null);
   const normalizedValue = normalizeDateInput(value);
-  const parsedValue = normalizedValue
-    ? dayjs(normalizedValue, DATE_FORMAT)
-    : null;
-  const calendarValue = parsedValue?.isValid() ? parsedValue : null;
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs}>
+    <>
       <TextField
         autoFocus={autoFocus}
         fullWidth
@@ -208,19 +209,24 @@ export function DateEditor({
         onClose={() => setCalendarAnchor(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
       >
-        <DateCalendar
-          disabled={disabled}
-          value={calendarValue}
-          onChange={(nextValue) => {
-            const nextDate = nextValue?.isValid()
-              ? nextValue.format(DATE_FORMAT)
-              : '';
-            setDraftValue(nextDate);
-            onChange(nextDate);
-            setCalendarAnchor(null);
-          }}
-        />
+        {renderCalendar ? (
+          renderCalendar({ value, close: closeCalendar })
+        ) : (
+          <DatePanel
+            value={normalizedValue}
+            onChange={(nextDate) => {
+              setDraftValue(nextDate);
+              onChange(nextDate);
+              closeCalendar();
+            }}
+            onClear={() => {
+              setDraftValue('');
+              onChange('');
+              closeCalendar();
+            }}
+          />
+        )}
       </Popover>
-    </LocalizationProvider>
+    </>
   );
 }

@@ -13,7 +13,8 @@ export type PageSearchFieldType =
   | 'currency'
   | 'date'
   | 'select'
-  | 'checkbox';
+  | 'checkbox'
+  | 'month';
 
 export type PageSearchFieldValue =
   | string
@@ -30,6 +31,8 @@ export type PageSearchField = {
   group?: string;
   options?: F1GridOption[];
   required?: boolean;
+  /** false이면 select 필드의 빈 값 "전체" 선택지를 숨긴다. */
+  allowEmpty?: boolean;
   defaultValue?: F1GridDateRangeDefault;
   inputFormat?: F1GridInputFormat;
   sanitizeInput?: (value: string) => string;
@@ -94,11 +97,12 @@ export function toPageSearchFields<T extends object>(
     .map((column) => ({
       field: String(column.field),
       label: column.search?.label ?? column.headerName,
-      type: resolveSearchType(column.type),
+      type: column.search?.inputType === 'month' ? 'month' : resolveSearchType(column.type),
       searchSpan: column.search?.span ?? 1,
       ...(column.search?.group ? { group: column.search.group } : {}),
       ...(column.options ? { options: column.options } : {}),
       ...(column.search?.required ? { required: true } : {}),
+      ...(column.search?.allowEmpty === false ? { allowEmpty: false } : {}),
       ...(column.inputFormat ? { inputFormat: column.inputFormat } : {}),
       ...(column.sanitizeInput ? { sanitizeInput: column.sanitizeInput } : {}),
       ...(column.search?.defaultValue

@@ -59,6 +59,8 @@ import type {
   PurchaseOrderSourceType,
   PurchaseOrderTaxType,
 } from './types/purchaseOrder.types';
+import { useServerDateDefault } from '../../../../shared/hooks/useServerDateDefault';
+import { FormDateField, normalizeFormDate } from '../../../../shared/components/FormDateField';
 
 export type PurchaseOrderPageMode = 'create' | 'edit' | 'view' | 'close';
 
@@ -98,11 +100,6 @@ const DEFAULT_TAX_OPTIONS: PurchaseOrderSelectOption[] = [
   { value: 'EXEMPT', label: '면세' },
 ];
 
-function today(): string {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
 function formatAmount(value: number): string {
   return value.toLocaleString('ko-KR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
@@ -130,7 +127,7 @@ export function PurchaseOrderCreatePage({
   const [activeRows, setActiveRows] = useState<PurchaseOrderRow[]>([]);
   const [selectedRowIds, setSelectedRowIds] = useState<(string | number)[]>([]);
   const [gridKey, setGridKey] = useState(0);
-  const [orderDt, setOrderDt] = useState(today());
+  const [orderDt, setOrderDt] = useState('');
   const [supplier, setSupplier] = useState<Supplier | null>(null);
   const [currencyCode, setCurrencyCode] = useState(DEFAULT_CURRENCY);
   const [warehouseId, setWarehouseId] = useState('');
@@ -239,10 +236,17 @@ export function PurchaseOrderCreatePage({
     return () => { active = false; };
   }, [applyLoaded, purchaseOrderId]);
 
+  const { markTouched: markDateTouched, reload: reloadServerDate } = useServerDateDefault({
+    enabled: purchaseOrderId == null,
+    onDate: setOrderDt,
+    onError: setError,
+  });
+
   const resetToNew = useCallback(() => {
     setLoaded(null);
     setDirty(false);
-    setOrderDt(today());
+    setOrderDt('');
+    void reloadServerDate();
     setSupplier(null);
     setCurrencyCode(DEFAULT_CURRENCY);
     setWarehouseId('');
@@ -253,7 +257,7 @@ export function PurchaseOrderCreatePage({
     setUseType('');
     setWarning('');
     resetGrid([]);
-  }, [resetGrid]);
+  }, [resetGrid, reloadServerDate]);
 
   const runBusy = useCallback(async (work: () => Promise<void>) => {
     if (busyRef.current) return;
@@ -448,18 +452,22 @@ export function PurchaseOrderCreatePage({
     }
     if (!editable || !sourceType) return;
     const rows = currentRows();
-    const messages = loaded && rows.length === 0
-      ? ['모든 행을 뺄 수 없습니다. 발주 취소를 사용해 주세요.']
-      : validateOrderInput(
-        { orderDt, supplierId: supplier?.id ?? null, taxType, sourceType, orderType: orderType || 'edit', useType: useType || 'edit' },
-        rows,
-      );
+    const dateCheck = normalizeFormDate(orderDt);
+    if (dateCheck.date && dateCheck.date !== orderDt) setOrderDt(dateCheck.date);
+    const messages = dateCheck.invalid
+      ? ['올바른 발주일을 입력해 주세요.']
+      : loaded && rows.length === 0
+        ? ['모든 행을 뺄 수 없습니다. 발주 취소를 사용해 주세요.']
+        : validateOrderInput(
+          { orderDt: dateCheck.date, supplierId: supplier?.id ?? null, taxType, sourceType, orderType: orderType || 'edit', useType: useType || 'edit' },
+          rows,
+        );
     const isGridValid = gridRef.current?.validate() ?? true;
     gridValidationActiveRef.current = !isGridValid;
     setValidationMessages(messages);
     if (messages.length > 0 || !isGridValid || !supplier) return;
     const payload = buildOrderPayload({
-      sourceType, orderDt, supplierId: supplier.id, currencyCode, warehouseId, taxType, vatIncluded,
+      sourceType, orderDt: dateCheck.date, supplierId: supplier.id, currencyCode, warehouseId, taxType, vatIncluded,
       remark, orderType, useType,
     }, rows);
     void runBusy(async () => {
@@ -634,15 +642,11 @@ export function PurchaseOrderCreatePage({
               value={loaded?.orderNo ?? (hasRows ? '저장 시 자동 채번' : '')}
               slotProps={readOnlyField}
             />
-            <TextField
+            <FormDateField
               label="발주일"
-              type="date"
-              size="small"
-              required
               value={orderDt}
-              onChange={(event) => { setOrderDt(event.target.value); setDirty(true); setValidationMessages([]); }}
               disabled={!editable}
-              slotProps={{ inputLabel: { shrink: true } }}
+              onChange={(value) => { markDateTouched(); setOrderDt(value); setDirty(true); setValidationMessages([]); }}
             />
             <TextField
               label="구매처"

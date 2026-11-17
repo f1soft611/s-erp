@@ -96,6 +96,13 @@ export type F1GridColumnSearchOptions = {
   order?: number;
   span?: 1 | 2 | 3 | 4 | 5;
   required?: boolean;
+  /**
+   * select 검색 필드에서 빈 값 선택지("전체")를 숨긴다. 기본값이 항상 채워지는 필드(예: 상태 정상/취소/전체)에 쓴다.
+   * false가 아니면 기존처럼 빈 값 "전체" 선택지를 보여 준다.
+   */
+  allowEmpty?: boolean;
+  /** 검색 입력 방식. 'month'이면 달력(연·월)으로 월(YYYYMM)을 고른다. 값은 열 type과 무관하게 문자열이다. */
+  inputType?: 'month';
   defaultValue?: F1GridDateRangeDefault;
 };
 
