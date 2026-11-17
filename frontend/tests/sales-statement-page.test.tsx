@@ -6,7 +6,11 @@ import { SalesStatementStatusPage } from '../src/pages/sales/shipment/statement/
 import { createStatement, getStatement, getStatementStatus, searchStatementSources, updateStatement } from '../src/pages/sales/shipment/statement/services/salesStatement.service';
 import { getDelivery } from '../src/pages/sales/shipment/delivery/create/services/salesDelivery.service';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
+import { getSystemDate } from '../src/shared/services/systemDateService';
 
+vi.mock('../src/shared/services/systemDateService', () => ({
+  getSystemDate: vi.fn(),
+}));
 vi.mock('../src/pages/sales/shipment/statement/services/salesStatement.service', () => ({
   createStatement: vi.fn(), updateStatement: vi.fn(), deleteStatement: vi.fn(),
   getStatement: vi.fn(), getStatementStatus: vi.fn(), searchStatementSources: vi.fn(),
@@ -33,9 +37,31 @@ function mount(node: React.ReactNode) {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(getSystemDate).mockResolvedValue('2000-02-03');
   vi.mocked(searchStatementSources).mockResolvedValue([source]);
   vi.mocked(getStatement).mockResolvedValue(item);
   vi.mocked(getStatementStatus).mockResolvedValue([]);
+});
+it('uses the server date as the initial statement date for a new statement', async () => {
+  mount(<SalesStatementCreatePage {...props} />);
+
+  expect(await screen.findByDisplayValue('2000-02-03')).toBeInTheDocument();
+  expect(getSystemDate).toHaveBeenCalledOnce();
+});
+it('does not use the browser date when the server statement date cannot be loaded', async () => {
+  vi.mocked(getSystemDate).mockRejectedValueOnce(new Error('offline'));
+  mount(<SalesStatementCreatePage {...props} />);
+
+  expect(await screen.findByText(/서버 기준일을 불러오지 못했습니다\./)).toBeInTheDocument();
+  expect(screen.getByLabelText(/명세일/, { selector: 'input' })).toHaveValue('');
+});
+it('reloads the server date when starting a new statement', async () => {
+  mount(<SalesStatementCreatePage {...props} />);
+  const date = await screen.findByDisplayValue('2000-02-03');
+  fireEvent.click(screen.getByRole('button', { name: '신규' }));
+
+  await waitFor(() => expect(date).toHaveValue('2000-02-03'));
+  expect(getSystemDate).toHaveBeenCalledTimes(2);
 });
 it('normalizes statement dates on blur and saves ISO without requiring blur', async () => {
   vi.mocked(updateStatement).mockResolvedValue(item);

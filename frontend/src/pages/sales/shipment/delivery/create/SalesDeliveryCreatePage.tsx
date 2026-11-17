@@ -13,6 +13,7 @@ import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/Un
 import { useCommonConfirmDialog } from '../../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import { DateEditor, normalizeDateInput } from '../../../../../shared/components/f1-grid/editing/DateEditor';
+import { getSystemDate } from '../../../../../shared/services/systemDateService';
 import { CustomerPicker, MaterialPickerDialog } from '../../../../../shared/components/master-picker/MasterPickers';
 import type { F1GridChanges, F1GridRef } from '../../../../../shared/components/f1-grid';
 import { searchOrderCustomers, searchOrderMaterials } from '../../../order/create/services/salesOrderMaster.service';
@@ -64,6 +65,7 @@ export function SalesDeliveryCreatePage({
   const grid = useRef<F1GridRef<DeliveryRow>>(null);
   const busy = useRef(false);
   const materialPatch = useRef<((changes: Partial<DeliveryRow>) => void) | null>(null);
+  const deliveryDateTouchedRef = useRef(false);
   const canRead = Boolean(permissions?.read);
   const canSave = canRead && mode !== 'view' && Boolean(savedId ? permissions?.update : permissions?.create);
   const canDelete = canRead && mode !== 'view' && Boolean(savedId && permissions?.delete);
@@ -74,6 +76,7 @@ export function SalesDeliveryCreatePage({
   useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
   useEffect(() => onPendingChange?.(pending), [pending, onPendingChange]);
   const applyForm = useCallback((next: DeliveryForm) => {
+    if (next.deliveryDt) deliveryDateTouchedRef.current = true;
     setForm(next); setRows(next.details); setGridKey((value) => value + 1);
     setBaseline(JSON.stringify(next)); setSelectedIds([]); setDateError('');
   }, []);
@@ -88,9 +91,30 @@ export function SalesDeliveryCreatePage({
     } finally { setLoading(false); }
   }, [applyItem]);
   useEffect(() => {
+    if (salesDeliveryId != null) return;
+    let active = true;
+    void getSystemDate()
+      .then((date) => {
+        if (!active || deliveryDateTouchedRef.current) return;
+        deliveryDateTouchedRef.current = true;
+        setForm((current) => ({ ...current, deliveryDt: date }));
+        setBaseline((current) => JSON.stringify({
+          ...(JSON.parse(current) as DeliveryForm),
+          deliveryDt: date,
+        }));
+      })
+      .catch((cause: unknown) => {
+        if (active) setError(cause instanceof Error
+          ? `서버 기준일을 불러오지 못했습니다. ${cause.message}`
+          : '서버 기준일을 불러오지 못했습니다.');
+      });
+    return () => { active = false; };
+  }, [salesDeliveryId]);
+  useEffect(() => {
     if (salesDeliveryId != null && canRead) void load(salesDeliveryId);
   }, [salesDeliveryId, canRead, load]);
   const change = <K extends keyof DeliveryForm>(key: K, value: DeliveryForm[K]) => {
+    if (key === 'deliveryDt') deliveryDateTouchedRef.current = true;
     setForm((current) => ({ ...current, [key]: value })); setError(''); setNotice('');
   };
   const handleChanges = useCallback((changes: F1GridChanges<DeliveryRow>) => {
@@ -100,9 +124,21 @@ export function SalesDeliveryCreatePage({
   const openMaterial = useCallback((patch: (changes: Partial<DeliveryRow>) => void) => {
     materialPatch.current = patch; setMaterialOpen(true);
   }, []);
-  const reset = () => {
+  const reset = async () => {
     setItem(null); setSavedId(undefined); setLocked(false); setLoadError(false);
-    setError(''); setNotice(''); applyForm(emptyDelivery()); setConfirm(null); setOverDelivery(null);
+    setError(''); setNotice(''); setConfirm(null); setOverDelivery(null);
+    setPending(true);
+    deliveryDateTouchedRef.current = false;
+    try {
+      applyForm(emptyDelivery(await getSystemDate()));
+    } catch (cause) {
+      applyForm(emptyDelivery());
+      setError(cause instanceof Error
+        ? `서버 기준일을 불러오지 못했습니다. ${cause.message}`
+        : '서버 기준일을 불러오지 못했습니다.');
+    } finally {
+      setPending(false);
+    }
   };
   const savePayload = useCallback(async (payload: DeliveryPayload) => {
     if (busy.current || !canSave) return;
@@ -154,7 +190,7 @@ export function SalesDeliveryCreatePage({
     setConfirm(null);
     if (!canDelete || !savedId || busy.current) return;
     busy.current = true; setPending(true); setError('');
-    try { await deleteDelivery(savedId); reset(); setNotice('출하가 삭제되었습니다.'); onDeleted?.(); }
+    try { await deleteDelivery(savedId); await reset(); setNotice('출하가 삭제되었습니다.'); onDeleted?.(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : '출하 삭제에 실패했습니다.'); }
     finally { busy.current = false; setPending(false); }
   };
@@ -219,7 +255,7 @@ export function SalesDeliveryCreatePage({
                 ) {
                   return;
                 }
-                const next = { ...emptyDelivery(), deliveryDt: form.deliveryDt, deliveryType };
+                const next = { ...emptyDelivery(form.deliveryDt), deliveryType };
                 setForm(next); setRows([]); setGridKey((value) => value + 1);
               }}>
               <MenuItem value="DIRECT">직출하</MenuItem><MenuItem value="ORDER">수주출하</MenuItem>

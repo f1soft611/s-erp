@@ -3,7 +3,8 @@ import { useBlocker } from 'react-router-dom';
 import { useCommonConfirmDialog } from '../../../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import { normalizeDateInput } from '../../../../../../shared/components/f1-grid/editing/DateEditor';
-import { getDelivery, localDate } from '../../../delivery/create/services/salesDelivery.service';
+import { getSystemDate } from '../../../../../../shared/services/systemDateService';
+import { getDelivery } from '../../../delivery/create/services/salesDelivery.service';
 import { createStatement, deleteStatement, getStatement, updateStatement } from '../../services/salesStatement.service';
 import type { StatementDetail, StatementItem, StatementSource } from '../../types/salesStatement.types';
 import type { SalesStatementCreateProps } from '../types/salesStatementCreate.types';
@@ -17,16 +18,17 @@ export function useSalesStatementCreate({
   const [item, setItem] = useState<StatementItem | null>(null);
   const [source, setSource] = useState<StatementSource | null>(null);
   const [rows, setRows] = useState<StatementDetail[]>([]);
-  const [date, setDate] = useState(localDate);
+  const [date, setDate] = useState('');
   const [dateError, setDateError] = useState('');
   const [remark, setRemark] = useState('');
-  const [baseline, setBaseline] = useState(() => JSON.stringify([null, localDate(), '']));
+  const [baseline, setBaseline] = useState(() => JSON.stringify([null, '', '']));
   const [picker, setPicker] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const busy = useRef(false);
+  const dateTouchedRef = useRef(false);
   const canRead = Boolean(permissions?.read);
   const canSave = canRead && mode !== 'view' && Boolean(id ? permissions?.update : permissions?.create);
   const canDelete = canRead && mode !== 'view' && Boolean(id && permissions?.delete);
@@ -37,11 +39,33 @@ export function useSalesStatementCreate({
   const blocker = useBlocker(!embedded && (dirty || pending));
   useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
   useEffect(() => onPendingChange?.(pending), [pending, onPendingChange]);
+  useEffect(() => {
+    if (statementId != null) return;
+    let active = true;
+    void getSystemDate()
+      .then((today) => {
+        if (!active || dateTouchedRef.current) return;
+        dateTouchedRef.current = true;
+        setDate(today);
+        setBaseline((current) => {
+          const values = JSON.parse(current) as [number | null, string, string];
+          values[1] = today;
+          return JSON.stringify(values);
+        });
+      })
+      .catch((cause: unknown) => {
+        if (active) setError(cause instanceof Error
+          ? `서버 기준일을 불러오지 못했습니다. ${cause.message}`
+          : '서버 기준일을 불러오지 못했습니다.');
+      });
+    return () => { active = false; };
+  }, [statementId]);
   const apply = useCallback((value: StatementItem) => {
     setItem(value); setId(value.salesStatementId);
     setSource({ salesDeliveryId: value.salesDeliveryId, deliveryNo: value.deliveryNo, deliveryDt: value.deliveryDt,
       deliveryType: value.deliveryType, customerName: value.customerName ?? '', totalAmt: value.totalAmt });
     setDate(value.statementDt); setRemark(value.remark ?? ''); setRows(value.details);
+    dateTouchedRef.current = true;
     setDateError('');
     setBaseline(JSON.stringify([value.salesDeliveryId, value.statementDt, value.remark ?? '']));
   }, []);
@@ -63,14 +87,28 @@ export function useSalesStatementCreate({
     } catch (cause) { setError(cause instanceof Error ? cause.message : '출하 조회에 실패했습니다.'); }
     finally { setPending(false); }
   }, []);
-  const reset = useCallback(() => {
-    const today = localDate();
-    setId(undefined); setItem(null); setSource(null); setRows([]); setDate(today); setRemark('');
+  const reset = useCallback(async () => {
+    setPending(true); setError(''); setNotice('');
+    dateTouchedRef.current = false;
+    setId(undefined); setItem(null); setSource(null); setRows([]); setDate(''); setRemark('');
     setDateError('');
-    setBaseline(JSON.stringify([null, today, ''])); setError(''); setNotice('');
+    setBaseline(JSON.stringify([null, '', '']));
+    try {
+      const today = await getSystemDate();
+      dateTouchedRef.current = true;
+      setDate(today);
+      setBaseline(JSON.stringify([null, today, '']));
+    } catch (cause) {
+      setError(cause instanceof Error
+        ? `서버 기준일을 불러오지 못했습니다. ${cause.message}`
+        : '서버 기준일을 불러오지 못했습니다.');
+    } finally {
+      setPending(false);
+    }
   }, []);
   const changeDate = useCallback((value: string) => {
-    setDate(value); setDateError('');
+    dateTouchedRef.current = true;
+    setDate(value); setDateError(''); setError('');
   }, []);
   const commitDate = useCallback(() => {
     const normalized = normalizeDateInput(date);
@@ -96,13 +134,13 @@ export function useSalesStatementCreate({
     if (!canDelete || !id || busy.current) return;
     if (!(await confirm({ title: '거래명세서 삭제', description: '거래명세서를 삭제하시겠습니까?' }))) return;
     busy.current = true; setPending(true); setError('');
-    try { await deleteStatement(id); reset(); onDeleted?.(); }
+    try { await deleteStatement(id); await reset(); onDeleted?.(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : '거래명세서 삭제에 실패했습니다.'); }
     finally { busy.current = false; setPending(false); }
   }, [canDelete, id, reset, onDeleted, confirm]);
   const handleNew = useCallback(async () => {
     if (dirty && !(await confirm({ description: '입력 내용을 초기화하시겠습니까?' }))) return;
-    reset();
+    await reset();
   }, [confirm, dirty, reset]);
   const print = useCallback(() => setPrinting(true), []);
   useEffect(() => {

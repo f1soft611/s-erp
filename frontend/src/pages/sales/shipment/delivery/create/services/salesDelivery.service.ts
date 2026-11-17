@@ -6,8 +6,8 @@ const PATH = '/api/v1/sales/deliveries';
 export function localDate(date = new Date()): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
-export function emptyDelivery(): DeliveryForm {
-  return { deliveryDt: localDate(), deliveryType: 'DIRECT', customerId: null, customerCode: '', customerName: '',
+export function emptyDelivery(deliveryDt = ''): DeliveryForm {
+  return { deliveryDt, deliveryType: 'DIRECT', customerId: null, customerCode: '', customerName: '',
     salesOrderId: null, orderNo: '', deliveryPlace: '', deliveryMethod: '', remark: '', details: [] };
 }
 export function deliveryAmounts(qty: number, price: number, vat?: number) {
@@ -25,7 +25,7 @@ export function sourceOrderForm(rows: SourceOrderRow[], deliveryDt: string): Del
   if (!rows.length) throw new Error('수주를 선택해 주세요.');
   const source = rows[0];
   const orderNos = [...new Set(rows.map((row) => row.orderNo))];
-  return { ...emptyDelivery(), deliveryDt, deliveryType: 'ORDER', customerId: source.customerId,
+  return { ...emptyDelivery(deliveryDt), deliveryType: 'ORDER', customerId: source.customerId,
     customerCode: source.customerCode, customerName: source.customerName, salesOrderId: source.salesOrderId,
     orderNo: orderNos.join(', '), deliveryPlace: source.deliveryPlace ?? '', deliveryMethod: source.deliveryMethod ?? '',
     details: rows.map((row) => ({

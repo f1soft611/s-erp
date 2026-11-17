@@ -34,6 +34,7 @@ import type {
   ModuleItem,
   PageContent,
 } from '../../../dashboard/types/dashboard';
+import { getSystemDate } from '../../../../shared/services/systemDateService';
 import { sumSalesOrderAmounts } from './data/salesOrderAmounts';
 import {
   SalesOrderDetailGrid,
@@ -99,16 +100,9 @@ type HeaderSnapshot = SalesOrderHeaderValues & { customerId: number | null };
 const EDITABLE_ORDER_STATUS = '수주등록';
 const EMPTY_AMOUNTS = { supplyAmount: 0, vatAmount: 0, totalAmount: 0 };
 
-function getLocalDateInputValue(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function createEmptyHeader(): SalesOrderHeaderValues {
+function createEmptyHeader(orderDt = ''): SalesOrderHeaderValues {
   return {
-    orderDt: getLocalDateInputValue(new Date()),
+    orderDt,
     quotNo: '',
     deliveryDt: '',
     deliveryPlace: '',
@@ -170,6 +164,7 @@ export function SalesOrderCreatePage({
   const [validationErrors, setValidationErrors] =
     useState<SalesOrderValidationErrors | null>(null);
   const [error, setError] = useState('');
+  const orderDateTouchedRef = useRef(false);
   const [isLoadingOrder, setIsLoadingOrder] = useState(salesOrderId != null);
   const gridValidationActiveRef = useRef(false);
 
@@ -225,6 +220,7 @@ export function SalesOrderCreatePage({
       rows: SalesOrderDetailRow[],
     ) => {
       setCustomer(nextCustomer);
+      orderDateTouchedRef.current = true;
       setOrderDate(header.orderDt);
       setQuotationNumber(header.quotNo);
       setSelectedQuotationCustomerId(null);
@@ -260,12 +256,42 @@ export function SalesOrderCreatePage({
     [applyForm],
   );
 
-  const resetToNewOrder = useCallback(() => {
+  const resetToNewOrder = useCallback(async () => {
     setLoadedOrder(null);
     setIsLocked(false);
     setError('');
-    applyForm(null, createEmptyHeader(), []);
+    setIsLoadingOrder(true);
+    orderDateTouchedRef.current = false;
+    try {
+      applyForm(null, createEmptyHeader(await getSystemDate()), []);
+    } catch (cause) {
+      applyForm(null, createEmptyHeader(), []);
+      setError(cause instanceof Error
+        ? `서버 기준일을 불러오지 못했습니다. ${cause.message}`
+        : '서버 기준일을 불러오지 못했습니다.');
+    } finally {
+      setIsLoadingOrder(false);
+    }
   }, [applyForm]);
+  useEffect(() => {
+    if (salesOrderId != null || mode !== 'create') return;
+    let active = true;
+    void getSystemDate()
+      .then((date) => {
+        if (!active || orderDateTouchedRef.current) return;
+        setOrderDate(date);
+        orderDateTouchedRef.current = true;
+        setBaseline((current) => ({ ...current, orderDt: date }));
+      })
+      .catch((cause: unknown) => {
+        if (!active) return;
+        setError(cause instanceof Error
+          ? `서버 기준일을 불러오지 못했습니다. ${cause.message}`
+          : '서버 기준일을 불러오지 못했습니다.');
+      });
+    return () => { active = false; };
+  }, [mode, salesOrderId]);
+
 
   useEffect(() => {
     if (salesOrderId == null) return;
@@ -469,7 +495,7 @@ export function SalesOrderCreatePage({
     setError('');
     try {
       await deleteSalesOrder(loadedOrder.salesOrderId);
-      resetToNewOrder();
+      await resetToNewOrder();
       setNotice(`수주가 삭제되었습니다. 수주번호: ${loadedOrder.orderNo}`);
       onDeleted?.();
     } catch (deleteError) {
@@ -497,7 +523,7 @@ export function SalesOrderCreatePage({
     ) {
       return;
     }
-    resetToNewOrder();
+    await resetToNewOrder();
     setNotice('');
   }, [confirm, hasUnsavedChanges, resetToNewOrder]);
 
@@ -690,7 +716,9 @@ export function SalesOrderCreatePage({
               required
               value={orderDate}
               onChange={(value) => {
+                orderDateTouchedRef.current = true;
                 setOrderDate(value);
+                setError('');
                 setOrderDateError('');
                 clearValidationErrors();
               }}

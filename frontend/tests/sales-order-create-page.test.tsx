@@ -17,6 +17,11 @@ import type {
   SalesOrderItem,
 } from '../src/pages/sales/order/create/types/salesOrder.types';
 import type { MenuPermission } from '../src/pages/dashboard/types/dashboard';
+import { getSystemDate } from '../src/shared/services/systemDateService';
+
+vi.mock('../src/shared/services/systemDateService', () => ({
+  getSystemDate: vi.fn(),
+}));
 
 vi.mock('../src/pages/sales/order/create/services/salesOrder.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/pages/sales/order/create/services/salesOrder.service')>();
@@ -46,11 +51,13 @@ const searchOrderCustomersMock = vi.mocked(searchOrderCustomers);
 const searchOrderQuotationsMock = vi.mocked(searchOrderQuotations);
 const getSalesOrderMock = vi.mocked(getSalesOrder);
 const updateSalesOrderMock = vi.mocked(updateSalesOrder);
+const getSystemDateMock = vi.mocked(getSystemDate);
 const deleteSalesOrderMock = vi.mocked(deleteSalesOrder);
 
 describe('sales order entry page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getSystemDateMock.mockResolvedValue('2000-02-03');
     getSalesOrderMock.mockResolvedValue(loadedOrder());
     searchOrderCustomersMock.mockResolvedValue([
       { id: 10, code: 'C-10', name: '거래처 10' },
@@ -59,6 +66,21 @@ describe('sales order entry page', () => {
       { id: 71, code: 'QT-20261116-0001', name: '거래처 10', customerId: 10 },
     ]);
   });
+  it('uses the server date as the initial order date for a new order', async () => {
+    renderSalesOrderPage();
+
+    expect(await screen.findByDisplayValue('2000-02-03')).toBeInTheDocument();
+    expect(getSystemDateMock).toHaveBeenCalledOnce();
+  });
+
+  it('does not use the browser date when the server date cannot be loaded', async () => {
+    getSystemDateMock.mockRejectedValueOnce(new Error('offline'));
+    renderSalesOrderPage();
+
+    expect(await screen.findByText(/서버 기준일을 불러오지 못했습니다\./)).toBeInTheDocument();
+    expect(screen.getByLabelText(/수주일자/, { selector: 'input' })).toHaveValue('');
+  });
+
 
   it('normalizes form dates on blur and again when saving without blur', async () => {
     updateSalesOrderMock.mockResolvedValue(loadedOrder());
@@ -475,6 +497,7 @@ describe('sales order entry page', () => {
   it('shows save failure and retains all entered values', async () => {
     createSalesOrderMock.mockRejectedValue(new Error('저장을 완료하지 못했습니다.'));
     renderSalesOrderPage();
+    await waitFor(() => expect(screen.getByLabelText(/수주일자/, { selector: 'input' })).toHaveValue('2000-02-03'));
     const initialOrderDate = (screen.getByLabelText(/수주일자/, { selector: 'input' }) as HTMLInputElement).value;
     await selectCustomer();
     await addAndCompleteDetail();
@@ -652,7 +675,7 @@ describe('sales order entry page', () => {
 
   it('resets the header and detail grid with the new button after confirming unsaved changes', async () => {
     renderSalesOrderPage();
-    const today = (screen.getByLabelText(/수주일자/, { selector: 'input' }) as HTMLInputElement).value;
+    await waitFor(() => expect(screen.getByLabelText(/수주일자/, { selector: 'input' })).toHaveValue('2000-02-03'));
     await selectCustomer();
     fireEvent.change(screen.getByLabelText(/수주일자/, { selector: 'input' }), { target: { value: '2026-01-02' } });
     fireEvent.change(screen.getByLabelText('견적번호'), { target: { value: 'QT-100' } });
@@ -671,7 +694,8 @@ describe('sales order entry page', () => {
 
     await waitFor(() => expect(screen.getByLabelText('견적번호')).toHaveValue(''));
     expect(screen.getByRole('textbox', { name: '거래처' })).toHaveValue('');
-    expect(screen.getByLabelText(/수주일자/, { selector: 'input' })).toHaveValue(today);
+    await waitFor(() => expect(screen.getByLabelText(/수주일자/, { selector: 'input' })).toHaveValue('2000-02-03'));
+    expect(getSystemDateMock).toHaveBeenCalledTimes(2);
     expect(screen.queryAllByRole('row', { name: /order-line-.*행 선택/ })).toHaveLength(0);
 
     fireEvent.click(screen.getByRole('button', { name: '신규' }));

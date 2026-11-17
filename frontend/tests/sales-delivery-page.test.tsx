@@ -6,7 +6,11 @@ import { SalesDeliveryStatusPage } from '../src/pages/sales/shipment/delivery/st
 import { SourceOrderPicker } from '../src/pages/sales/shipment/delivery/create/components/SourceOrderPicker';
 import { createDelivery, getDelivery, updateDelivery, getDeliveryStatus, searchSourceOrders, deleteDelivery, OverDeliveryConfirmationRequired } from '../src/pages/sales/shipment/delivery/create/services/salesDelivery.service';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
+import { getSystemDate } from '../src/shared/services/systemDateService';
 
+vi.mock('../src/shared/services/systemDateService', () => ({
+  getSystemDate: vi.fn(),
+}));
 vi.mock('../src/pages/sales/shipment/delivery/create/services/salesDelivery.service', async (original) => ({
   ...await original<object>(), createDelivery: vi.fn(), getDelivery: vi.fn(), updateDelivery: vi.fn(),
   getDeliveryStatus: vi.fn(), searchSourceOrders: vi.fn(), deleteDelivery: vi.fn(),
@@ -43,8 +47,30 @@ async function openStatusDocument(mode: 'view' | 'edit') {
 }
 beforeEach(() => {
   vi.clearAllMocks(); sessionStorage.clear();
+  vi.mocked(getSystemDate).mockResolvedValue('2000-02-03');
   vi.mocked(getDelivery).mockResolvedValue(item as Awaited<ReturnType<typeof getDelivery>>);
   vi.mocked(getDeliveryStatus).mockResolvedValue([]);
+});
+it('uses the server date as the initial delivery date for a new delivery', async () => {
+  mount(<SalesDeliveryCreatePage {...props} />);
+
+  expect(await screen.findByDisplayValue('2000-02-03')).toBeInTheDocument();
+  expect(getSystemDate).toHaveBeenCalledOnce();
+});
+it('does not use the browser date when the server delivery date cannot be loaded', async () => {
+  vi.mocked(getSystemDate).mockRejectedValueOnce(new Error('offline'));
+  mount(<SalesDeliveryCreatePage {...props} />);
+
+  expect(await screen.findByText(/서버 기준일을 불러오지 못했습니다\./)).toBeInTheDocument();
+  expect(screen.getByLabelText(/출하일자/, { selector: 'input' })).toHaveValue('');
+});
+it('reloads the server date when starting a new delivery', async () => {
+  mount(<SalesDeliveryCreatePage {...props} />);
+  const date = await screen.findByDisplayValue('2000-02-03');
+  fireEvent.click(screen.getByRole('button', { name: '신규' }));
+
+  await waitFor(() => expect(date).toHaveValue('2000-02-03'));
+  expect(getSystemDate).toHaveBeenCalledTimes(2);
 });
 it('normalizes the shipment form date on blur and before saving', async () => {
   vi.mocked(updateDelivery).mockResolvedValue(item as Awaited<ReturnType<typeof updateDelivery>>);
