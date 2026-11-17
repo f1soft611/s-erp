@@ -2242,7 +2242,7 @@ const createLargeDataset = (count: number) =>
 
 ### Virtualized rendering contract
 
-F1-Grid는 전체 데이터/선택/편집 상태와 실제 DOM 렌더 범위를 분리한다. 행 수가 200개 이상이면 row virtualization이 자동 활성화되고, 컬럼 수가 12개 이상이면서 가로 overflow가 있으면 column virtualization이 자동 활성화된다.
+F1-Grid는 전체 데이터/선택/편집 상태와 실제 DOM 렌더 범위를 분리한다. 행 수가 200개 이상이거나, 병합 컬럼이 없는 표에서 필터 적용 후 행 수 × 숨김 제외 컬럼 수가 1,000 이상이면 row virtualization이 자동 활성화된다. 컬럼이 많은 표는 200행 미만이어도 화면 밖 행의 셀을 생성하지 않아 가로 이동 중의 렌더 부담을 줄인다. `mergeRows` 컬럼이 있는 표는 병합 레이아웃을 보존하기 위해 추가 셀 수 조건을 적용하지 않고 기존 행 수 기준을 유지한다. 컬럼 수가 12개 이상이면서 가로 overflow가 있으면 column virtualization이 자동 활성화된다.
 
 ```tsx
 <F1Grid
@@ -2258,12 +2258,13 @@ F1-Grid는 전체 데이터/선택/편집 상태와 실제 DOM 렌더 범위를 
 />
 ```
 
-- `virtualizeRows`, `virtualizeColumns`: 자동 활성화 판단을 호출부에서 재정의한다.
+- `virtualizeRows`, `virtualizeColumns`: 자동 활성화 판단을 호출부에서 재정의한다. 특히 `virtualizeRows={false}`는 셀 수와 무관하게 전체 행 렌더를 유지한다.
 - `rowOverscan`: viewport 위/아래에 추가 렌더링할 행 수이며 기본값은 8이다.
 - `columnOverscan`: viewport 좌/우에 추가 렌더링할 일반 컬럼 수이며 기본값은 2이다.
 - `fixedRowHeightThreshold`: 기본값 10,000이며, 이상에서는 행 높이를 고정하고 행 리사이즈 핸들을 비활성화한다.
 - pinned 컬럼, 편집 중 컬럼, 선택 범위의 anchor/focus 컬럼은 viewport 밖이어도 DOM에 유지한다.
-- 세로 스크롤 위치와 viewport 크기/스크롤바 gutter는 기존처럼 `requestAnimationFrame`으로 측정한다. 가로 스크롤은 네이티브 본문 스크롤과 헤더 동기화를 유지하며, 컬럼 가상화가 꺼져 있거나 현재 표시할 열 집합이 바뀌지 않으면 수평 위치만으로 React viewport 상태를 다시 렌더하지 않는다. 표시 열 집합이 바뀌면 pinned/protected 컬럼을 포함해 새 범위를 반영한다.
+- 세로 스크롤 위치와 viewport 크기/스크롤바 gutter는 기존처럼 `requestAnimationFrame`으로 측정한다. 가로 스크롤은 별도 애니메이션 없이 네이티브 본문 이동을 사용한다. 컬럼 가상화가 꺼져 있거나 미리 렌더한 열 집합이 실제 viewport와 pinned/protected 열을 모두 포함하면 수평 위치만으로 React viewport 상태를 다시 렌더하지 않는다. 버퍼를 벗어나면 최신 위치에서 `columnOverscan`을 포함한 새 범위를 반영한다. 리사이즈·컬럼 구성·고정/보호 열 변경 시 버퍼를 초기화하며, 상태 갱신 없이 이동한 경우에도 최신 실제 가로 위치에서 재계산한다.
+- 본문·헤더·합계의 가로 위치는 즉시 동기화한다. 프로그램으로 헤더/합계 위치를 맞춘 뒤 늦게 도착하는 후속 scroll 이벤트는 새 본문 위치를 되돌리지 않는다. 헤더/합계에서 직접 시작한 이동은 계속 본문과 다른 영역에 반영한다.
 - 세로 스크롤바가 생기는 대용량 그리드에서는 본문 스크롤 영역의 scrollbar gutter 폭을 헤더 스크롤 영역 끝에도 반영해, 가로 스크롤을 마지막으로 이동해도 헤더와 데이터 셀의 최대 `scrollLeft` 기준이 일치해야 한다.
 - 선택 범위는 셀마다 state를 만들지 않고 `{ anchor, focus }`로 저장한 뒤 숫자 bounds를 한 번 계산해 렌더 셀에서 비교한다.
 - export, validate, 전체 선택, 정렬/필터, dirty/edit 데이터는 virtual window가 아니라 전체 visible rows를 기준으로 동작한다.

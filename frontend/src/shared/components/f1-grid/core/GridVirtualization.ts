@@ -64,6 +64,7 @@ export function getVirtualColumnIndexes({
   overscan,
   pinnedIndexes = [],
   protectedIndexes = [],
+  previousIndexes,
 }: {
   widths: number[];
   scrollLeft: number;
@@ -71,6 +72,7 @@ export function getVirtualColumnIndexes({
   overscan: number;
   pinnedIndexes?: number[];
   protectedIndexes?: number[];
+  previousIndexes?: ReadonlySet<number>;
 }): number[] {
   if (widths.length === 0) return [];
 
@@ -99,19 +101,31 @@ export function getVirtualColumnIndexes({
     lastVisible = lastIndex;
   }
 
-  const startIndex = Math.max(0, firstVisible - normalizedOverscan);
-  const endIndex = Math.min(
-    widths.length - 1,
-    lastVisible + normalizedOverscan,
-  );
   const indexes = new Set<number>();
 
-  for (let index = startIndex; index <= endIndex; index += 1) {
+  for (let index = firstVisible; index <= lastVisible; index += 1) {
     indexes.add(index);
   }
   [...pinnedIndexes, ...protectedIndexes].forEach((index) => {
     if (index >= 0 && index < widths.length) indexes.add(index);
   });
+
+  // Keep the overscan buffer until the viewport actually needs an unmounted column.
+  if (
+    previousIndexes &&
+    Array.from(indexes).every((index) => previousIndexes.has(index))
+  ) {
+    return Array.from(previousIndexes).sort((left, right) => left - right);
+  }
+
+  const startIndex = Math.max(0, firstVisible - normalizedOverscan);
+  const endIndex = Math.min(
+    widths.length - 1,
+    lastVisible + normalizedOverscan,
+  );
+  for (let index = startIndex; index <= endIndex; index += 1) {
+    indexes.add(index);
+  }
 
   return Array.from(indexes).sort((left, right) => left - right);
 }

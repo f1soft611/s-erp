@@ -756,7 +756,7 @@ function F1GridInner<T extends object>(
     });
   const bodyScrollMetricsRef = useRef(bodyScrollMetrics);
   bodyScrollMetricsRef.current = bodyScrollMetrics;
-  const latestHorizontalScrollRef = useRef(0);
+  const latestHorizontalScrollRef = useRef<number | undefined>(undefined);
   const shouldUpdateHorizontalScrollRef = useRef<
     (scrollLeft: number) => boolean
   >(() => true);
@@ -847,7 +847,9 @@ function F1GridInner<T extends object>(
     const virtualizationActive =
       virtualizeRows ??
       (visibleRows.length >= GRID_ROW_VIRTUALIZATION_THRESHOLD ||
-        visibleRows.length * visibleColumns.length >= GRID_CELL_VIRTUALIZATION_THRESHOLD);
+        (!visibleColumns.some((column) => column.mergeRows) &&
+          visibleRows.length * visibleColumns.length >=
+            GRID_CELL_VIRTUALIZATION_THRESHOLD));
     if (!virtualizationActive) {
       return {
         visibleRows,
@@ -939,7 +941,7 @@ function F1GridInner<T extends object>(
     rowKey,
     rowOverscan,
     virtualizeRows,
-    visibleColumns.length,
+    visibleColumns,
     visibleRows,
   ]);
 
@@ -1077,23 +1079,35 @@ function F1GridInner<T extends object>(
     options: typeof columnVirtualization;
     indexes: Set<number>;
   } | undefined>(undefined);
-  const getColumnIndexesForScroll = useCallback((scrollLeft: number) => {
-    const previous = previousVirtualColumnIndexesRef.current;
-    return getVirtualColumnIndexes({
-      ...columnVirtualization,
-      scrollLeft: Math.max(0, scrollLeft - (showCheckbox ? 44 : 0)),
-      previousIndexes: previous?.options === columnVirtualization
-        ? previous.indexes : undefined,
-    });
-  }, [columnVirtualization, showCheckbox]);
+  const getColumnIndexesForScroll = useCallback(
+    (scrollLeft: number) => {
+      const previous = previousVirtualColumnIndexesRef.current;
+      return getVirtualColumnIndexes({
+        ...columnVirtualization,
+        scrollLeft: Math.max(0, scrollLeft - (showCheckbox ? 44 : 0)),
+        previousIndexes:
+          previous?.options === columnVirtualization
+            ? previous.indexes
+            : undefined,
+      });
+    },
+    [columnVirtualization, showCheckbox],
+  );
 
   const renderedColumnIndexes = useMemo(() => {
     if (!columnVirtualization.active) return allColumnIndexes;
-    const nextIndexes = getColumnIndexesForScroll(latestHorizontalScrollRef.current);
+    const nextIndexes = getColumnIndexesForScroll(
+      latestHorizontalScrollRef.current ?? bodyScrollMetrics.scrollLeft,
+    );
     const previous = previousVirtualColumnIndexesRef.current;
-    const indexes = previous && hasSameColumnIndexes(previous.indexes, nextIndexes)
-      ? previous.indexes : new Set(nextIndexes);
-    previousVirtualColumnIndexesRef.current = { options: columnVirtualization, indexes };
+    const indexes =
+      previous && hasSameColumnIndexes(previous.indexes, nextIndexes)
+        ? previous.indexes
+        : new Set(nextIndexes);
+    previousVirtualColumnIndexesRef.current = {
+      options: columnVirtualization,
+      indexes,
+    };
     return indexes;
   }, [
     allColumnIndexes,
