@@ -513,4 +513,20 @@
           AND od.tenant_id = #{tenantId, jdbcType=BIGINT}
         ORDER BY od.line_no
     </select>
+
+    <!-- 발주 행별 유효한 가입고 수량 합. 가입고가 있는 행의 삭제·수정·취소를 막는 데 쓴다. -->
+    <select id="selectArrivedQtyByOrderDetail" parameterType="map"
+            resultType="egovframework.let.materials.order.create.domain.model.PurchaseOrderArrivalQtyVO">
+        SELECT ad.purchase_order_detail_id AS purchaseOrderDetailId,
+               sum(ad.arrival_qty) AS arrivedQty
+        FROM tb_material_arrival_dt ad
+        JOIN tb_material_arrival_hd ah
+          ON ah.material_arrival_id = ad.material_arrival_id
+         AND ah.tenant_id = ad.tenant_id
+        WHERE ah.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND ah.use_at = 'Y'
+          AND ad.purchase_order_detail_id IN
+          <foreach collection="detailIds" item="id" open="(" separator="," close=")">#{id, jdbcType=BIGINT}</foreach>
+        GROUP BY ad.purchase_order_detail_id
+    </select>
 </mapper>

@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,6 +25,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import egovframework.let.common.idsequence.service.IdSequenceService;
+import egovframework.let.materials.order.create.domain.model.PurchaseOrderArrivalQtyVO;
 import egovframework.let.materials.order.create.domain.model.PurchaseOrderCandidateVO;
 import egovframework.let.materials.order.create.domain.model.PurchaseOrderConfirmRowVO;
 import egovframework.let.materials.order.create.domain.model.PurchaseOrderDetailSaveRequestVO;
@@ -246,6 +248,14 @@ public class PurchaseOrderServiceImpl extends EgovAbstractServiceImpl implements
                 throw badRequest("발주 상세 정보가 올바르지 않습니다. 화면을 다시 조회해 주세요.");
             }
         }
+        // 가입고가 있는 행은 삭제할 수 없다. 수량 축소·검사대상 변경은 값 검증 뒤에 확인한다.
+        Map<Long, BigDecimal> arrivedById = selectArrivedQtys(tenantId, existingById.keySet());
+        for (PurchaseOrderDetailVO existing : existingById.values()) {
+            if (arrivedById.containsKey(existing.getPurchaseOrderDetailId())
+                    && !requestedById.containsKey(existing.getPurchaseOrderDetailId())) {
+                throw arrivalConflict("가입고가 있는 행은 삭제할 수 없습니다.");
+            }
+        }
 
         boolean direct = SOURCE_DIRECT.equals(locked.getSourceType());
         List<Long> requestDetailIds = new ArrayList<Long>();
@@ -281,10 +291,20 @@ public class PurchaseOrderServiceImpl extends EgovAbstractServiceImpl implements
                 continue;
             }
             String inspectAt = normalize(detail.getInspectAt());
-            prepared.add(prepareRow(tenantId, header, detail, existing.getPurchaseRequestDetailId(),
+            PreparedRow preparedRow = prepareRow(tenantId, header, detail, existing.getPurchaseRequestDetailId(),
                     existing.getMaterialId(), existing.getOrderType(), existing.getUseType(),
                     inspectAt == null ? existing.getInspectAt() : inspectAt,
-                    existing.getWarehouseId(), existing.getDeliveryDt()));
+                    existing.getWarehouseId(), existing.getDeliveryDt());
+            BigDecimal arrived = arrivedById.get(existing.getPurchaseOrderDetailId());
+            if (arrived != null) {
+                if (preparedRow.orderQty.compareTo(arrived) < 0) {
+                    throw arrivalConflict("가입고 수량보다 작게 수정할 수 없습니다.");
+                }
+                if (!preparedRow.inspectAt.equals(existing.getInspectAt())) {
+                    throw arrivalConflict("가입고가 있는 행은 검사대상을 바꿀 수 없습니다.");
+                }
+            }
+            prepared.add(preparedRow);
             keptExisting.add(existing);
         }
         BigDecimal supplyTotal = BigDecimal.ZERO.setScale(SCALE);
@@ -460,6 +480,13 @@ public class PurchaseOrderServiceImpl extends EgovAbstractServiceImpl implements
         Map<String, Object> orderParams = tenantParams(tenantId);
         orderParams.put("purchaseOrderId", purchaseOrderId);
         List<PurchaseOrderDetailVO> details = orderDAO.selectOrderDetails(orderParams);
+        List<Long> detailIds = new ArrayList<Long>();
+        for (PurchaseOrderDetailVO detail : details) {
+            detailIds.add(detail.getPurchaseOrderDetailId());
+        }
+        if (!selectArrivedQtys(tenantId, detailIds).isEmpty()) {
+            throw arrivalConflict("가입고가 있는 발주는 취소할 수 없습니다.");
+        }
 
         Map<String, Object> cancelParams = tenantParams(tenantId);
         cancelParams.put("purchaseOrderId", purchaseOrderId);
@@ -534,6 +561,27 @@ public class PurchaseOrderServiceImpl extends EgovAbstractServiceImpl implements
             throw new ResponseStatusException(HttpStatus.CONFLICT, canceledMessage);
         }
         return locked;
+    }
+
+    /** 발주 행별 유효한 가입고 수량 합(가입고가 있는 행만, 합 > 0). */
+    private Map<Long, BigDecimal> selectArrivedQtys(Long tenantId, Collection<Long> orderDetailIds)
+            throws Exception {
+        Map<Long, BigDecimal> arrived = new HashMap<Long, BigDecimal>();
+        if (orderDetailIds.isEmpty()) {
+            return arrived;
+        }
+        Map<String, Object> params = tenantParams(tenantId);
+        params.put("detailIds", new ArrayList<Long>(new TreeSet<Long>(orderDetailIds)));
+        for (PurchaseOrderArrivalQtyVO row : orderDAO.selectArrivedQtyByOrderDetail(params)) {
+            if (row.getArrivedQty() != null && row.getArrivedQty().signum() > 0) {
+                arrived.put(row.getPurchaseOrderDetailId(), row.getArrivedQty());
+            }
+        }
+        return arrived;
+    }
+
+    private ResponseStatusException arrivalConflict(String message) {
+        return new ResponseStatusException(HttpStatus.CONFLICT, message);
     }
 
     private ResponseStatusException concurrentChange() {

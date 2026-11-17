@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="MaterialArrivalDAO">
+
+    <!-- 유효한 가입고 행의 발주 행별 기가입고 수량. 수입검사 불합격량은 발주 잔량에 되돌려 주므로 정상 검사의 불합격 합을 뺀다. -->
+    <sql id="arrivedQtySubquery">
+        (SELECT ad.purchase_order_detail_id AS purchase_order_detail_id,
+                sum(ad.arrival_qty) - COALESCE((SELECT sum(fd.fail_qty)
+                                                  FROM tb_material_inspection_dt fd
+                                                  JOIN tb_material_inspection_hd ih
+                                                    ON ih.material_inspection_id = fd.material_inspection_id
+                                                   AND ih.tenant_id = fd.tenant_id
+                                                 WHERE fd.purchase_order_detail_id = ad.purchase_order_detail_id
+                                                   AND ih.tenant_id = #{tenantId, jdbcType=BIGINT}
+                                                   AND ih.use_at = 'Y'), 0) AS arrived_qty
+         FROM tb_material_arrival_dt ad
+         JOIN tb_material_arrival_hd ah
+           ON ah.material_arrival_id = ad.material_arrival_id
+          AND ah.tenant_id = ad.tenant_id
+         WHERE ah.tenant_id = #{tenantId, jdbcType=BIGINT}
+           AND ah.use_at = 'Y'
+         GROUP BY ad.purchase_order_detail_id)
+    </sql>
+
+    <!-- 발주가 유효하고 입고대기 마감이 아니며 잔량이 남은 발주 품목 행 -->
+    <select id="selectCandidates" parameterType="map"
+            resultType="egovframework.let.materials.arrival.create.domain.model.MaterialArrivalCandidateVO">
+        SELECT od.purchase_order_detail_id AS purchaseOrderDetailId,
+               oh.order_no AS orderNo,
+               oh.order_dt AS orderDt,
+               oh.tax_type AS taxType,
+               oh.vat_included_at AS vatIncludedAt,
+               oh.supplier_id AS supplierId,
+               c.customer_code AS supplierCode,
+               c.customer_name AS supplierName,
+               od.material_id AS materialId,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.material_spec AS materialSpec,
+               m.unit AS unit,
+               m.material_type_code AS materialTypeCode,
+               od.inspect_at AS inspectAt,
+               od.order_qty AS orderQty,
+               COALESCE(a.arrived_qty, 0) AS arrivedQty,
+               od.order_qty - COALESCE(a.arrived_qty, 0) AS remainQty,
+               od.delivery_dt AS deliveryDt,
+               od.warehouse_id AS warehouseId,
+               w.warehouse_name AS warehouseName,
+               od.unit_price AS unitPrice,
+               oh.currency_code AS currencyCode,
+               oci.item_nm AS orderTypeName,
+               uci.item_nm AS useTypeName,
+               od.remark AS remark
+        FROM tb_purchase_order_dt od
+        JOIN tb_purchase_order_hd oh
+          ON oh.purchase_order_id = od.purchase_order_id
+         AND oh.tenant_id = od.tenant_id
+        LEFT JOIN <include refid="arrivedQtySubquery"/> a
+          ON a.purchase_order_detail_id = od.purchase_order_detail_id
+        LEFT JOIN tb_material_info m
+          ON m.material_id = od.material_id
+         AND m.tenant_id = od.tenant_id
+        LEFT JOIN tb_customer_info c
+          ON c.customer_id = oh.supplier_id
+         AND c.tenant_id = oh.tenant_id
+        LEFT JOIN tb_warehouse w
+          ON w.warehouse_id = od.warehouse_id
+        LEFT JOIN tb_common_code_group ocg
+          ON ocg.tenant_id = od.tenant_id
+         AND ocg.group_code = 'PURCHASE_ORDER_TYPE'
+        LEFT JOIN tb_common_code_item oci
+          ON oci.group_id = ocg.common_code_group_id
+         AND oci.item_code = od.order_type
+        LEFT JOIN tb_common_code_group ucg
+          ON ucg.tenant_id = od.tenant_id
+         AND ucg.group_code = 'PURCHASE_USE_TYPE'
+        LEFT JOIN tb_common_code_item uci
+          ON uci.group_id = ucg.common_code_group_id
+         AND uci.item_code = od.use_type
+        WHERE od.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND oh.use_at = 'Y'
+          AND od.receipt_close_at = 'N'
+          AND od.order_qty - COALESCE(a.arrived_qty, 0) > 0
+        <if test="fromDt != null">
+          AND oh.order_dt &gt;= CAST(#{fromDt} AS date)
+        </if>
+        <if test="toDt != null">
+          AND oh.order_dt &lt;= CAST(#{toDt} AS date)
+        </if>
+        <if test="keyword != null and keyword != ''">
+          AND (oh.order_no ILIKE '%' || #{keyword} || '%'
+               OR c.customer_name ILIKE '%' || #{keyword} || '%'
+               OR m.material_code ILIKE '%' || #{keyword} || '%'
+               OR m.material_name ILIKE '%' || #{keyword} || '%')
+        </if>
+        ORDER BY c.customer_name, oh.order_dt DESC, oh.order_no, od.line_no
+        LIMIT 500
+    </select>
+
+    <!-- 가입고 대상 발주 행 상태. forUpdate가 true이면 행을 ID 순서로 잠근다. -->
+    <select id="selectOrderRows" parameterType="map"
+            resultType="egovframework.let.materials.arrival.create.domain.model.MaterialArrivalOrderRowVO">
+        SELECT od.purchase_order_detail_id AS purchaseOrderDetailId,
+               od.purchase_order_id AS purchaseOrderId,
+               oh.use_at AS orderUseAt,
+               oh.supplier_id AS supplierId,
+               oh.currency_code AS currencyCode,
+               od.material_id AS materialId,
+               od.order_qty AS orderQty,
+               COALESCE((SELECT sum(ad.arrival_qty)
+                           FROM tb_material_arrival_dt ad
+                           JOIN tb_material_arrival_hd ah
+                             ON ah.material_arrival_id = ad.material_arrival_id
+                            AND ah.tenant_id = ad.tenant_id
+                          WHERE ad.purchase_order_detail_id = od.purchase_order_detail_id
+                            AND ah.tenant_id = #{tenantId, jdbcType=BIGINT}
+                            AND ah.use_at = 'Y'), 0)
+               - COALESCE((SELECT sum(fd.fail_qty)
+                             FROM tb_material_inspection_dt fd
+                             JOIN tb_material_inspection_hd ih
+                               ON ih.material_inspection_id = fd.material_inspection_id
+                              AND ih.tenant_id = fd.tenant_id
+                            WHERE fd.purchase_order_detail_id = od.purchase_order_detail_id
+                              AND ih.tenant_id = #{tenantId, jdbcType=BIGINT}
+                              AND ih.use_at = 'Y'), 0) AS arrivedQty,
+               od.unit_price AS unitPrice,
+               od.warehouse_id AS warehouseId,
+               od.inspect_at AS inspectAt,
+               od.receipt_close_at AS receiptCloseAt
+        FROM tb_purchase_order_dt od
+        JOIN tb_purchase_order_hd oh
+          ON oh.purchase_order_id = od.purchase_order_id
+         AND oh.tenant_id = od.tenant_id
+        WHERE od.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND od.purchase_order_detail_id IN
+          <foreach collection="detailIds" item="id" open="(" separator="," close=")">#{id, jdbcType=BIGINT}</foreach>
+        ORDER BY od.purchase_order_detail_id
+        <if test="forUpdate">
+        FOR UPDATE OF od
+        </if>
+    </select>
+
+    <select id="insertArrivalHeader" parameterType="map" resultType="long">
+        INSERT INTO tb_material_arrival_hd (
+            tenant_id, arrival_no, arrival_dt, supplier_id, receiver_id, receiver_dept_id, currency_code,
+            tax_type, vat_included_at, supply_amt, vat_amt, total_amt, remark, created_by
+        )
+        SELECT t.tenant_id, #{arrivalNo}, CAST(#{arrivalDt} AS date), #{supplierId, jdbcType=BIGINT},
+               #{receiverId, jdbcType=BIGINT}, #{receiverDeptId, jdbcType=BIGINT}, #{currencyCode},
+               #{taxType}, #{vatIncludedAt}, #{supplyAmt, jdbcType=NUMERIC},
+               #{vatAmt, jdbcType=NUMERIC}, #{totalAmt, jdbcType=NUMERIC}, #{remark}, #{createdBy}
+        FROM tb_tenant t
+        WHERE t.tenant_id = #{tenantId, jdbcType=BIGINT}
+        RETURNING material_arrival_id
+    </select>
+
+    <select id="insertArrivalDetail" parameterType="map" resultType="long">
+        INSERT INTO tb_material_arrival_dt (
+            material_arrival_id, tenant_id, line_no, purchase_order_detail_id, material_id, arrival_qty,
+            unit_price, supply_amt, vat_amt, total_amt, warehouse_id, manufacture_dt, expire_dt, lot_no,
+            inspect_at, remark, created_by
+        ) VALUES (
+            #{materialArrivalId, jdbcType=BIGINT}, #{tenantId, jdbcType=BIGINT}, #{lineNo},
+            #{purchaseOrderDetailId, jdbcType=BIGINT}, #{materialId, jdbcType=BIGINT},
+            #{arrivalQty, jdbcType=NUMERIC}, #{unitPrice, jdbcType=NUMERIC},
+            #{supplyAmt, jdbcType=NUMERIC}, #{vatAmt, jdbcType=NUMERIC}, #{totalAmt, jdbcType=NUMERIC},
+            #{warehouseId, jdbcType=BIGINT}, CAST(#{manufactureDt, jdbcType=VARCHAR} AS date),
+            CAST(#{expireDt, jdbcType=VARCHAR} AS date), #{lotNo, jdbcType=VARCHAR},
+            #{inspectAt}, #{remark}, #{createdBy}
+        )
+        RETURNING material_arrival_detail_id
+    </select>
+
+    <!-- 수정·취소 전에 가입고 헤더를 잠근다. 없으면 null. -->
+    <select id="selectArrivalForUpdate" parameterType="map"
+            resultType="egovframework.let.materials.arrival.create.domain.model.MaterialArrivalVO">
+        SELECT ah.material_arrival_id AS materialArrivalId,
+               ah.arrival_no AS arrivalNo,
+               ah.arrival_dt AS arrivalDt,
+               ah.supplier_id AS supplierId,
+               ah.currency_code AS currencyCode,
+               ah.tax_type AS taxType,
+               ah.vat_included_at AS vatIncludedAt,
+               ah.use_at AS useAt
+        FROM tb_material_arrival_hd ah
+        WHERE ah.material_arrival_id = #{materialArrivalId, jdbcType=BIGINT}
+          AND ah.tenant_id = #{tenantId, jdbcType=BIGINT}
+        FOR UPDATE OF ah
+    </select>
+
+    <update id="updateArrivalHeader" parameterType="map">
+        UPDATE tb_material_arrival_hd
+        SET arrival_dt = CAST(#{arrivalDt} AS date),
+            tax_type = #{taxType},
+            vat_included_at = #{vatIncludedAt},
+            supply_amt = #{supplyAmt, jdbcType=NUMERIC},
+            vat_amt = #{vatAmt, jdbcType=NUMERIC},
+            total_amt = #{totalAmt, jdbcType=NUMERIC},
+            remark = #{remark},
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE material_arrival_id = #{materialArrivalId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND use_at = 'Y'
+    </update>
+
+    <update id="updateArrivalDetail" parameterType="map">
+        UPDATE tb_material_arrival_dt
+        SET line_no = #{lineNo},
+            arrival_qty = #{arrivalQty, jdbcType=NUMERIC},
+            unit_price = #{unitPrice, jdbcType=NUMERIC},
+            supply_amt = #{supplyAmt, jdbcType=NUMERIC},
+            vat_amt = #{vatAmt, jdbcType=NUMERIC},
+            total_amt = #{totalAmt, jdbcType=NUMERIC},
+            warehouse_id = #{warehouseId, jdbcType=BIGINT},
+            manufacture_dt = CAST(#{manufactureDt, jdbcType=VARCHAR} AS date),
+            expire_dt = CAST(#{expireDt, jdbcType=VARCHAR} AS date),
+            remark = #{remark},
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE material_arrival_detail_id = #{materialArrivalDetailId, jdbcType=BIGINT}
+          AND material_arrival_id = #{materialArrivalId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+    </update>
+
+    <update id="updateArrivalDetailLineNo" parameterType="map">
+        UPDATE tb_material_arrival_dt
+        SET line_no = #{lineNo},
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE material_arrival_detail_id = #{materialArrivalDetailId, jdbcType=BIGINT}
+          AND material_arrival_id = #{materialArrivalId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+    </update>
+
+    <delete id="deleteArrivalDetail" parameterType="map">
+        DELETE FROM tb_material_arrival_dt
+        WHERE material_arrival_detail_id = #{materialArrivalDetailId, jdbcType=BIGINT}
+          AND material_arrival_id = #{materialArrivalId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+    </delete>
+
+    <update id="cancelArrivalHeader" parameterType="map">
+        UPDATE tb_material_arrival_hd
+        SET use_at = 'N',
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE material_arrival_id = #{materialArrivalId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND use_at = 'Y'
+    </update>
+
+    <select id="selectArrival" parameterType="map"
+            resultType="egovframework.let.materials.arrival.create.domain.model.MaterialArrivalVO">
+        SELECT ah.material_arrival_id AS materialArrivalId,
+               ah.arrival_no AS arrivalNo,
+               ah.arrival_dt AS arrivalDt,
+               ah.supplier_id AS supplierId,
+               c.customer_code AS supplierCode,
+               c.customer_name AS supplierName,
+               u.user_nm AS receiverName,
+               ah.currency_code AS currencyCode,
+               ah.tax_type AS taxType,
+               ah.vat_included_at AS vatIncludedAt,
+               ah.supply_amt AS supplyAmt,
+               ah.vat_amt AS vatAmt,
+               ah.total_amt AS totalAmt,
+               ah.remark AS remark,
+               ah.use_at AS useAt,
+               ah.created_by AS createdBy,
+               ah.created_at AS createdAt,
+               ah.updated_by AS updatedBy,
+               ah.updated_at AS updatedAt
+        FROM tb_material_arrival_hd ah
+        LEFT JOIN tb_customer_info c
+          ON c.customer_id = ah.supplier_id
+         AND c.tenant_id = ah.tenant_id
+        LEFT JOIN tb_user u
+          ON u.user_id = ah.receiver_id
+        WHERE ah.material_arrival_id = #{materialArrivalId, jdbcType=BIGINT}
+          AND ah.tenant_id = #{tenantId, jdbcType=BIGINT}
+    </select>
+
+    <select id="selectArrivalDetails" parameterType="map"
+            resultType="egovframework.let.materials.arrival.create.domain.model.MaterialArrivalDetailVO">
+        SELECT ad.material_arrival_detail_id AS materialArrivalDetailId,
+               ad.line_no AS lineNo,
+               ad.purchase_order_detail_id AS purchaseOrderDetailId,
+               oh.order_no AS orderNo,
+               ad.material_id AS materialId,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.material_spec AS materialSpec,
+               m.unit AS unit,
+               od.order_qty AS orderQty,
+               od.order_qty - COALESCE((SELECT sum(a2.arrival_qty)
+                                          FROM tb_material_arrival_dt a2
+                                          JOIN tb_material_arrival_hd ah2
+                                            ON ah2.material_arrival_id = a2.material_arrival_id
+                                           AND ah2.tenant_id = a2.tenant_id
+                                         WHERE a2.purchase_order_detail_id = ad.purchase_order_detail_id
+                                           AND ah2.tenant_id = #{tenantId, jdbcType=BIGINT}
+                                           AND ah2.use_at = 'Y'
+                                           AND a2.material_arrival_detail_id &lt;&gt; ad.material_arrival_detail_id), 0)
+               + COALESCE((SELECT sum(fd.fail_qty)
+                             FROM tb_material_inspection_dt fd
+                             JOIN tb_material_inspection_hd ih
+                               ON ih.material_inspection_id = fd.material_inspection_id
+                              AND ih.tenant_id = fd.tenant_id
+                            WHERE fd.purchase_order_detail_id = ad.purchase_order_detail_id
+                              AND ih.tenant_id = #{tenantId, jdbcType=BIGINT}
+                              AND ih.use_at = 'Y'
+                              AND fd.material_arrival_detail_id IS NOT NULL
+                              AND fd.material_arrival_detail_id &lt;&gt; ad.material_arrival_detail_id), 0) AS remainQty,
+               od.unit_price AS orderUnitPrice,
+               od.warehouse_id AS orderWarehouseId,
+               ad.arrival_qty AS arrivalQty,
+               ad.unit_price AS unitPrice,
+               ad.supply_amt AS supplyAmt,
+               ad.vat_amt AS vatAmt,
+               ad.total_amt AS totalAmt,
+               ad.warehouse_id AS warehouseId,
+               w.warehouse_name AS warehouseName,
+               ad.manufacture_dt AS manufactureDt,
+               ad.expire_dt AS expireDt,
+               ad.lot_no AS lotNo,
+               ad.inspect_at AS inspectAt,
+               ad.remark AS remark,
+               (SELECT min(rh.material_receipt_id)
+                  FROM tb_material_receipt_dt rd
+                  JOIN tb_material_receipt_hd rh
+                    ON rh.material_receipt_id = rd.material_receipt_id
+                   AND rh.tenant_id = rd.tenant_id
+                 WHERE rd.material_arrival_detail_id = ad.material_arrival_detail_id
+                   AND rh.tenant_id = #{tenantId, jdbcType=BIGINT}
+                   AND rh.use_at = 'Y') AS receiptId,
+               (SELECT min(rh.receipt_no)
+                  FROM tb_material_receipt_dt rd
+                  JOIN tb_material_receipt_hd rh
+                    ON rh.material_receipt_id = rd.material_receipt_id
+                   AND rh.tenant_id = rd.tenant_id
+                 WHERE rd.material_arrival_detail_id = ad.material_arrival_detail_id
+                   AND rh.tenant_id = #{tenantId, jdbcType=BIGINT}
+                   AND rh.use_at = 'Y') AS receiptNo,
+               (SELECT max(ih.material_inspection_id)
+                  FROM tb_material_inspection_dt fd
+                  JOIN tb_material_inspection_hd ih
+                    ON ih.material_inspection_id = fd.material_inspection_id
+                   AND ih.tenant_id = fd.tenant_id
+                 WHERE fd.material_arrival_detail_id = ad.material_arrival_detail_id
+                   AND ih.tenant_id = #{tenantId, jdbcType=BIGINT}
+                   AND ih.use_at = 'Y') AS inspectionId,
+               (SELECT ih.inspection_no
+                  FROM tb_material_inspection_dt fd
+                  JOIN tb_material_inspection_hd ih
+                    ON ih.material_inspection_id = fd.material_inspection_id
+                   AND ih.tenant_id = fd.tenant_id
+                 WHERE fd.material_arrival_detail_id = ad.material_arrival_detail_id
+                   AND ih.tenant_id = #{tenantId, jdbcType=BIGINT}
+                   AND ih.use_at = 'Y'
+                 ORDER BY ih.material_inspection_id DESC
+                 LIMIT 1) AS inspectionNo
+        FROM tb_material_arrival_dt ad
+        JOIN tb_purchase_order_dt od
+          ON od.purchase_order_detail_id = ad.purchase_order_detail_id
+        JOIN tb_purchase_order_hd oh
+          ON oh.purchase_order_id = od.purchase_order_id
+         AND oh.tenant_id = od.tenant_id
+        LEFT JOIN tb_material_info m
+          ON m.material_id = ad.material_id
+         AND m.tenant_id = ad.tenant_id
+        LEFT JOIN tb_warehouse w
+          ON w.warehouse_id = ad.warehouse_id
+        WHERE ad.material_arrival_id = #{materialArrivalId, jdbcType=BIGINT}
+          AND ad.tenant_id = #{tenantId, jdbcType=BIGINT}
+        ORDER BY ad.line_no
+    </select>
+</mapper>
