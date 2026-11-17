@@ -2,6 +2,7 @@ import { Link } from '@mui/material';
 import type { F1GridColumn, F1GridOption } from '../../../../../shared/components/f1-grid/types/grid.types';
 import { PURCHASE_REQUEST_STATUS_OPTIONS } from '../../create/services/purchaseRequest.service';
 import type { PurchaseRequestStatusRow } from '../types/purchaseRequestStatus.types';
+import { F1GridHighlightText } from '../../../../../shared/components/f1-grid';
 
 export type PurchaseRequestStatusColumnOptions = {
   onOpenRequest?: (row: PurchaseRequestStatusRow) => void;
@@ -40,14 +41,15 @@ export function createPurchaseRequestStatusColumns({
     {
       type: 'text',
       field: 'requestNo',
+      highlightSearch: true,
       headerName: '구매요청번호',
       width: 150,
       editable: false,
       mergeRows: true,
       align: 'center',
-      search: { label: '구매요청번호', order: 2, span: 2, group: '구매요청정보' },
+      search: { label: '구매요청번호', order: 2, span: 1, group: '텍스트' },
       renderCell: onOpenRequest
-        ? ({ row }) => (
+        ? ({ row, highlightKeyword }) => (
             <Link
               component="button"
               type="button"
@@ -70,7 +72,7 @@ export function createPurchaseRequestStatusColumns({
                 verticalAlign: 'baseline',
               }}
             >
-              {row.requestNo}
+              {highlightKeyword ? <F1GridHighlightText text={row.requestNo} keyword={highlightKeyword} /> : row.requestNo}
             </Link>
           )
         : undefined,
@@ -87,7 +89,7 @@ export function createPurchaseRequestStatusColumns({
         required: true,
         label: '요청일',
         order: 1,
-        span: 4,
+        span: 2,
         group: '요청일',
         defaultValue: {
           from: { type: 'systemDate', offset: { months: -1 } },
@@ -97,13 +99,14 @@ export function createPurchaseRequestStatusColumns({
     },
     {
       field: 'requesterName',
+      highlightSearch: true,
       headerName: '요청자',
       type: 'text',
       width: 90,
       align: 'center',
       editable: false,
       mergeRows: true,
-      search: { label: '요청자', order: 3, span: 2, group: '구매요청정보' },
+      search: { label: '요청자', order: 3, span: 1, group: '텍스트' },
     },
     {
       field: 'requestDeptName',
@@ -124,7 +127,7 @@ export function createPurchaseRequestStatusColumns({
       align: 'center',
       editable: false,
       mergeRows: true,
-      search: { label: '상태', order: 4, span: 2, group: '구매요청정보' },
+      search: { label: '상태', order: 5, span: 1, group: '선택' },
     },
     {
       field: 'lineNo',
@@ -137,14 +140,15 @@ export function createPurchaseRequestStatusColumns({
     },
     {
       field: 'materialCode',
+      highlightSearch: true,
       headerName: '품목코드',
       type: 'text',
       width: 110,
       align: 'center',
       editable: false,
-      search: { label: '품목', order: 5, span: 2, group: '품목정보' },
+      search: { label: '품목', order: 4, span: 1, group: '텍스트' },
     },
-    { field: 'materialName', headerName: '품목명', type: 'text', width: 180, editable: false, search: { hidden: true } },
+    { field: 'materialName', highlightSearch: true, headerName: '품목명', type: 'text', width: 180, editable: false, search: { hidden: true } },
     { field: 'materialSpec', headerName: '규격', type: 'text', width: 110, editable: false, search: { hidden: true } },
     { field: 'unit', headerName: '단위', type: 'text', width: 60, align: 'center', editable: false, search: { hidden: true } },
     quantityColumn('requestQty', '요청수량'),
@@ -155,7 +159,7 @@ export function createPurchaseRequestStatusColumns({
       width: 100,
       align: 'center',
       editable: false,
-      search: { label: '요청납기일', order: 6, span: 4, group: '품목정보' },
+      search: { label: '요청납기일', order: 7, span: 2, group: '부가날짜' },
     },
     {
       field: 'useTypeName',
@@ -167,7 +171,7 @@ export function createPurchaseRequestStatusColumns({
       editable: false,
       getValue: (row) => row.useTypeName ?? row.useType ?? '',
       renderCell: ({ row }) => row.useTypeName ?? row.useType ?? '',
-      search: { label: '사용용도', order: 7, span: 2, group: '품목정보' },
+      search: { label: '사용용도', order: 6, span: 1, group: '선택' },
     },
     quantityColumn('confirmQty', '확정수량'),
     { field: 'requestRemark', headerName: '비고', type: 'text', width: 180, editable: false, search: { hidden: true } },

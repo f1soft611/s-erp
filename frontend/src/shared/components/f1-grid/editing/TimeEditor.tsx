@@ -8,6 +8,8 @@ import { DigitalClock } from '@mui/x-date-pickers/DigitalClock';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
+import 'dayjs/locale/ko';
+import { koKR } from '@mui/x-date-pickers/locales';
 import { useState, type KeyboardEvent } from 'react';
 import { CommonDialog } from '../../CommonDialog';
 
@@ -30,7 +32,11 @@ export function TimeEditor({
   const parsedValue = value ? dayjs(value, TIME_FORMAT) : null;
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs}>
+    <LocalizationProvider
+      dateAdapter={AdapterDayjs}
+      adapterLocale="ko"
+      localeText={koKR.components.MuiLocalizationProvider.defaultProps.localeText}
+    >
       <TextField
         autoFocus
         fullWidth

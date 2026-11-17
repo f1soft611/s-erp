@@ -10,6 +10,7 @@ import { createPurchaseOrderStatusColumns } from '../data/purchaseOrderStatusCol
 import {
   clonePurchaseOrderStatusSearchValues,
   isPurchaseOrderStatusSearchSession,
+  PURCHASE_ORDER_STATUS_DEFAULT,
   searchPurchaseOrderStatus,
   toPurchaseOrderStatusFilters,
 } from '../services/purchaseOrderStatus.service';
@@ -26,15 +27,21 @@ const SESSION_KEY = 's-erp:page:materials-purchase-order-status';
 export function usePurchaseOrderStatusSearch() {
   const detailFields = useMemo(() => toPageSearchFields(createPurchaseOrderStatusColumns()), []);
   const {
-    values: defaultValues,
+    values: loadedDefaultValues,
     loading: defaultsLoading,
     error: defaultsError,
     retry: retryDefaults,
     initialLoad: defaultsInitialLoad,
   } = usePageSearchDefaults(detailFields);
+  // 날짜 범위 기본값은 공통 훅이 주고, 상태 기본값(정상)은 여기서 주입한다.
+  const defaultValues = useMemo<PurchaseOrderStatusSearchValues | null>(
+    () => (loadedDefaultValues ? { ...loadedDefaultValues, status: PURCHASE_ORDER_STATUS_DEFAULT } : null),
+    [loadedDefaultValues],
+  );
   const { state: searchSession, setState: setSearchSession } =
     usePageSessionState<PurchaseOrderStatusSearchSession | null>(SESSION_KEY, null, {
-      version: 1,
+      // 2: 상태 기본값(정상)이 없던 예전 세션을 버린다.
+      version: 2,
       validate: (value): value is PurchaseOrderStatusSearchSession | null =>
         value === null || isPurchaseOrderStatusSearchSession(value),
       persistWhen: (value) => value !== null,

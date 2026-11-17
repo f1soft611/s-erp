@@ -13,7 +13,7 @@ vi.mock('../src/shared/services/systemDateService', async (importOriginal) => ({
   getSystemDate: getSystemDateMock,
 }));
 import { PageSearchArea } from '../src/shared/components/PageSearchArea';
-import type { PageSearchField } from '../src/shared/components/page-search/searchFields';
+import { toPageSearchFields, type PageSearchField } from '../src/shared/components/page-search/searchFields';
 
 describe('PageSearchArea 상세 검색', () => {
   const fields: PageSearchField[] = [
@@ -27,6 +27,45 @@ describe('PageSearchArea 상세 검색', () => {
       options: [{ value: 'Y', label: '사용' }],
     },
   ];
+
+  it('shows the blank 전체 option on a select field unless allowEmpty is false', () => {
+    const statusOptions = [{ value: 'ACTIVE', label: '정상' }, { value: 'CANCELED', label: '취소' }, { value: 'ALL', label: '전체' }];
+    const { rerender } = render(
+      <PageSearchArea
+        detailFields={[{ field: 'status', label: '상태', type: 'select', searchSpan: 1, options: statusOptions }]}
+        defaultValues={{ status: 'ACTIVE' }}
+        onDetailSearch={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '상태' }));
+    // 빈 값 "전체" + 옵션의 "전체"(ALL)가 둘 다 나온다.
+    expect(screen.getAllByRole('option', { name: '전체' })).toHaveLength(2);
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
+
+    rerender(
+      <PageSearchArea
+        detailFields={[{ field: 'status', label: '상태', type: 'select', searchSpan: 1, options: statusOptions, allowEmpty: false }]}
+        defaultValues={{ status: 'ACTIVE' }}
+        onDetailSearch={vi.fn()}
+      />,
+    );
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '상태' }));
+    const options = screen.getAllByRole('option').map((option) => option.textContent);
+    expect(options).toEqual(['정상', '취소', '전체']);
+  });
+
+  it('maps the column search allowEmpty:false option onto the search field', () => {
+    const [field] = toPageSearchFields([
+      {
+        field: 'status', headerName: '상태', type: 'select', options: [{ value: 'ACTIVE', label: '정상' }],
+        search: { required: true, allowEmpty: false },
+      },
+    ] as never);
+    expect(field).toMatchObject({ field: 'status', required: true, allowEmpty: false });
+    const [plain] = toPageSearchFields([{ field: 'status', headerName: '상태', type: 'select', options: [] }] as never);
+    expect(plain).not.toHaveProperty('allowEmpty');
+  });
 
   it('sanitizes configured string search fields but leaves ordinary text unchanged', () => {
     const onSearch = vi.fn();
@@ -233,8 +272,39 @@ describe('PageSearchArea 상세 검색', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
     fireEvent.click(screen.getByRole('button', { name: '생성일 시작일 달력 열기' }));
-    fireEvent.click(screen.getByRole('gridcell', { name: '22', exact: true }));
+    fireEvent.click(screen.getByRole('gridcell', { name: '2026-10-22' }));
     expect(screen.getByLabelText('생성일 시작일')).toHaveValue('2026-10-22');
+    expect(screen.getByLabelText('생성일 종료일')).toHaveValue('');
+    expect(screen.queryByRole('grid')).not.toBeInTheDocument();
+  });
+
+  it('종료일 달력은 종료일 값을 선택으로 보여 주고 종료일만 바꾼다', () => {
+    render(
+      <PageSearchArea
+        detailFields={fields}
+        detailValues={{ createdAt: { from: '2026-10-10', to: '2026-10-20' } }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    fireEvent.click(screen.getByRole('button', { name: '생성일 종료일 달력 열기' }));
+    expect(screen.getByRole('gridcell', { name: '2026-10-20' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('gridcell', { name: '2026-10-10' })).toHaveAttribute('aria-selected', 'false');
+    fireEvent.click(screen.getByRole('gridcell', { name: '2026-10-25' }));
+    expect(screen.getByLabelText('생성일 시작일')).toHaveValue('2026-10-10');
+    expect(screen.getByLabelText('생성일 종료일')).toHaveValue('2026-10-25');
+  });
+
+  it('달력의 삭제는 그 날짜 하나만 비운다', () => {
+    render(
+      <PageSearchArea
+        detailFields={fields}
+        detailValues={{ createdAt: { from: '2026-10-10', to: '2026-10-20' } }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    fireEvent.click(screen.getByRole('button', { name: '생성일 종료일 달력 열기' }));
+    fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+    expect(screen.getByLabelText('생성일 시작일')).toHaveValue('2026-10-10');
     expect(screen.getByLabelText('생성일 종료일')).toHaveValue('');
   });
 

@@ -216,6 +216,7 @@ export function PurchaseRequestStatusPage({
           >
             <Box sx={{ flex: 1, minHeight: 320, minWidth: 0, overflow: 'hidden' }}>
               <F1Grid
+                highlightKeyword={search.appliedFilters?.keyword}
                 ariaLabel="구매요청현황 목록"
                 columns={columns}
                 storageKey="materialsPurchaseRequestStatusGrid"

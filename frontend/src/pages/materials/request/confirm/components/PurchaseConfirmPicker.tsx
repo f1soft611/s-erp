@@ -141,6 +141,7 @@ export function PurchaseConfirmPicker({ open, onClose, onSelect }: {
         <Box sx={{ flex: 1, minWidth: 0, minHeight: 240, overflow: 'hidden' }}>
           <F1Grid
             ariaLabel="구매요청확정 목록"
+            storageKey="materials-purchase-confirm-picker-grid-v1"
             rows={rows}
             columns={columns}
             rowKey="purchaseConfirmId"

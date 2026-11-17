@@ -52,6 +52,22 @@ describe('F1Grid summary', () => {
     expect(screen.getByTestId('f1-grid-body-scroll').compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('labels the summary row 합계 in the first cell when the grid has no checkbox column', () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" showCheckbox={false}
+      features={[{ ftype: 'summary', dock: 'bottom' }]} />);
+    const summary = screen.getByTestId('f1-grid-summary-bottom');
+    expect(within(summary).getByRole('gridcell', { name: 'ID 집계' })).toHaveTextContent('합계');
+    expect(summary).not.toHaveTextContent('집계');
+  });
+
+  it('labels the summary row 합계 in the checkbox cell when the grid shows checkboxes', () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" showCheckbox multiSelect
+      features={[{ ftype: 'summary', dock: 'bottom' }]} />);
+    const summary = screen.getByTestId('f1-grid-summary-bottom');
+    expect(within(summary).getByText('합계')).toBeInTheDocument();
+    expect(within(summary).getByRole('gridcell', { name: 'ID 집계' })).toBeEmptyDOMElement();
+  });
+
   it('updates the aggregate when a column filter changes', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id"
       features={[{ ftype: 'summary', dock: 'top' }]} />);

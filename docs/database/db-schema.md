@@ -1213,7 +1213,142 @@ PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 
 - [생성 SQL](20261113/20261113_002_create_purchase_order_schema.sql), [롤백 SQL](20261113/20261113_002_rollback_purchase_order_schema.sql), [변경 이력](20261113/20261113_002_change_purchase_order_schema.md) 및 [backend 사본](../../backend/DATABASE/20261113) 참고.
 - 메뉴: [20261113_003](20261113/20261113_003_change_purchase_order_menu.md). 부가세구분 공통코드: [20261113_001](20261113/20261113_001_change_purchase_tax_type_codes.md).
 
+---
+
+### tb_material_arrival_hd / tb_material_arrival_dt (2026-11-16, 미적용)
+
+구매자재 모듈의 가입고(MP). MES TMA203(가입고 메인)·TMA204(가입고 상세)를 핵심 항목만 남겨 재설계했다(LOCATION·실가입고량·SCM 확정·수주 연계 제외). 가입고 1건은 구매처 1곳·통화 1종이며 발주 상세 행을 불러와 등록한다. 발주 행 가입고 잔량은 `발주수량 − 유효 가입고 행 수량 합`이며 조회 시 계산한다. 부가세는 발주와 같은 규칙으로 공급가·세액·합계를 저장한다.
+
+| 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
+|---|---|---|---|---|
+| `tb_material_arrival_hd` | `material_arrival_id` | `bigserial` | NOT NULL, PK | 가입고 ID |
+| | `tenant_id` | `bigint` | NOT NULL | tenant FK |
+| | `arrival_no` | `varchar(30)` | NOT NULL | tenant별 유일 번호 `MP-yyyyMMdd-NNNN` |
+| | `arrival_dt` | `date` | NOT NULL | 가입고일 |
+| | `supplier_id` | `bigint` | NOT NULL | 구매처 거래처 복합 FK |
+| | `receiver_id` | `bigint` | NOT NULL | 가입고 담당자 `tb_user` FK |
+| | `receiver_dept_id` | `bigint` | NULL | 담당 부서 `tb_department` FK |
+| | `currency_code` | `varchar(10)` | NOT NULL, `KRW` | 통화 |
+| | `tax_type` | `varchar(20)` | NOT NULL, `TAXABLE` | 부가세구분, 공통코드 `PURCHASE_TAX_TYPE` |
+| | `vat_included_at` | `char(1)` | NOT NULL, `N` | 부가세 포함 여부, 과세만 `Y` 가능(CHECK) |
+| | `supply_amt`, `vat_amt`, `total_amt` | `numeric(15,2)` | NOT NULL, `0` | 행 합계 |
+| | `remark` | `varchar(500)` | NULL | 비고 |
+| | `use_at` | `char(1)` | NOT NULL, `Y` | `N` = 가입고 취소(이력 보존) |
+| | `created_by`, `created_at`, `updated_by`, `updated_at` | 감사 컬럼 | | |
+| `tb_material_arrival_dt` | `material_arrival_detail_id` | `bigserial` | NOT NULL, PK | 상세 ID |
+| | `material_arrival_id`, `tenant_id` | `bigint` | NOT NULL | 헤더 복합 FK (cascade) |
+| | `line_no` | `integer` | NOT NULL | 행 순번 (> 0) |
+| | `purchase_order_detail_id` | `bigint` | NOT NULL | 발주 상세 행 FK, 분할 입고 시 중복 가능 |
+| | `material_id` | `bigint` | NOT NULL | 품목 복합 FK |
+| | `arrival_qty` | `numeric(15,2)` | NOT NULL | 가입고수량 (> 0) |
+| | `unit_price` | `numeric(15,2)` | NOT NULL | 가입고단가(필수, 0 허용) |
+| | `supply_amt`, `vat_amt`, `total_amt` | `numeric(15,2)` | NOT NULL, `0` | 공급가·세액·합계 |
+| | `warehouse_id` | `bigint` | NOT NULL | 입고창고 FK(기본값은 발주 행 창고) |
+| | `manufacture_dt`, `expire_dt` | `date` | NULL | 제조일, 소비기한(소비기한 ≥ 제조일 CHECK) |
+| | `lot_no` | `varchar(50)` | NULL | LOT번호(재고 연결 후 채움, 현재 빈값) |
+| | `inspect_at` | `char(1)` | NOT NULL, `N` | 검사대상(발주 행 `inspect_at` 복사본, 후속 분기 기준) |
+| | `remark` | `varchar(500)` | NULL | 비고 |
+| | `created_by`, `created_at`, `updated_by`, `updated_at` | 헤더와 동일 | | 감사 컬럼 |
+
+- [생성 SQL](20261116/20261116_002_create_material_arrival_schema.sql), [롤백 SQL](20261116/20261116_002_rollback_material_arrival_schema.sql), [변경 이력](20261116/20261116_002_change_material_arrival_schema.md) 및 [backend 사본](../../backend/DATABASE/20261116) 참고.
+- 메뉴: 입고관리 그룹·가입고등록 [20261116_003](20261116/20261116_003_change_material_arrival_menu.md), 가입고현황 [20261116_004](20261116/20261116_004_change_material_arrival_status_menu.md).
+
+---
+
+### tb_material_receipt_hd / tb_material_receipt_dt (2026-11-17, 미적용)
+
+구매자재 모듈의 입고(MI). MES TMA205(입고 메인)·TMA206(입고 상세)를 핵심 항목만 남겨 재설계했다(LOCATION·실입고량·사용용도·수주/생산 연계·도면·매입마감·재고/LOT 값 제외). 무검사 품목은 가입고 저장 시 입고가 자동 생성된다. 입고 상세는 가입고 상세 행을 참조하며 가입고 행이 삭제돼도 이력이 남도록 FK는 `ON DELETE SET NULL`이고 가입고번호를 복사해 둔다. 검사 여부는 연결된 가입고 행의 `inspect_at`으로 판단한다. 부가세는 발주·가입고와 같은 규칙이다.
+
+| 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
+|---|---|---|---|---|
+| `tb_material_receipt_hd` | `material_receipt_id` | `bigserial` | NOT NULL, PK | 입고 ID |
+| | `tenant_id` | `bigint` | NOT NULL | tenant FK |
+| | `receipt_no` | `varchar(30)` | NOT NULL | tenant별 유일 번호 `MI-yyyyMMdd-NNNN` |
+| | `receipt_dt` | `date` | NOT NULL | 입고일 |
+| | `supplier_id` | `bigint` | NOT NULL | 구매처 거래처 복합 FK |
+| | `receiver_id` | `bigint` | NOT NULL | 입고 담당자 `tb_user` FK(자동 입고는 가입고 담당자) |
+| | `receiver_dept_id` | `bigint` | NULL | 담당 부서 `tb_department` FK |
+| | `currency_code` | `varchar(10)` | NOT NULL, `KRW` | 통화 |
+| | `tax_type` | `varchar(20)` | NOT NULL, `TAXABLE` | 부가세구분, 공통코드 `PURCHASE_TAX_TYPE` |
+| | `vat_included_at` | `char(1)` | NOT NULL, `N` | 부가세 포함 여부, 과세만 `Y` 가능(CHECK) |
+| | `supply_amt`, `vat_amt`, `total_amt` | `numeric(15,2)` | NOT NULL, `0` | 행 합계 |
+| | `remark` | `varchar(500)` | NULL | 비고 |
+| | `use_at` | `char(1)` | NOT NULL, `Y` | `N` = 입고 취소(이력 보존) |
+| | `created_by`, `created_at`, `updated_by`, `updated_at` | 감사 컬럼 | | |
+| `tb_material_receipt_dt` | `material_receipt_detail_id` | `bigserial` | NOT NULL, PK | 상세 ID |
+| | `material_receipt_id`, `tenant_id` | `bigint` | NOT NULL | 헤더 복합 FK (cascade) |
+| | `line_no` | `integer` | NOT NULL | 행 순번 (> 0) |
+| | `material_arrival_detail_id` | `bigint` | NULL | 가입고 상세 행 FK(`ON DELETE SET NULL`), 분할 입고 시 중복 가능 |
+| | `arrival_no` | `varchar(30)` | NOT NULL | 가입고번호 복사본(이력·화면 표시용) |
+| | `material_inspection_detail_id` | `bigint` | NULL | 입고한 수입검사 상세 행 FK(`ON DELETE SET NULL`, 분할 입고 시 중복 가능, 무검사 입고 행은 NULL) — `20261117_006` |
+| | `inspection_no` | `varchar(30)` | NULL | 검사번호 복사본(이력·화면 표시용, 무검사 입고 행은 NULL) — `20261117_006` |
+| | `closing_month` | `varchar(6)` | NULL | 매입마감월 `YYYYMM`(NULL이면 미마감) — `20261117_007` |
+| | `closed_at` | `timestamp` | NULL | 매입마감 일시 |
+| | `closed_by` | `varchar(100)` | NULL | 매입마감자(로그인 ID) |
+| | `closing_unit_price` | `numeric(15,2)` | NULL | 마감 단가(마감 시 조정 가능, 입고 단가 `unit_price`는 유지) |
+| | `closing_tax_type` | `varchar(20)` | NULL | 마감 세금 구분(`TAXABLE`/`ZERO_RATED`/`EXEMPT`) |
+| | `closing_vat_included_at` | `char(1)` | NULL | 마감 부가세 포함 여부(`Y`/`N`, `Y`는 과세만) |
+| | `closing_supply_amt` | `numeric(15,2)` | NULL | 마감 공급가액(서버 계산) |
+| | `closing_vat_amt` | `numeric(15,2)` | NULL | 마감 부가세액(서버 계산) |
+| | `closing_total_amt` | `numeric(15,2)` | NULL | 마감 합계금액(서버 계산). 마감월이 있으면 마감 컬럼 전부 필수(CHECK) |
+| | `purchase_order_detail_id` | `bigint` | NOT NULL | 발주 상세 행 FK |
+| | `material_id` | `bigint` | NOT NULL | 품목 복합 FK |
+| | `receipt_qty` | `numeric(15,2)` | NOT NULL | 입고수량 (> 0) |
+| | `unit_price` | `numeric(15,2)` | NOT NULL | 입고단가(0 허용) |
+| | `supply_amt`, `vat_amt`, `total_amt` | `numeric(15,2)` | NOT NULL, `0` | 공급가·세액·합계 |
+| | `warehouse_id` | `bigint` | NOT NULL | 입고창고 FK(기본값은 가입고 행 창고) |
+| | `manufacture_dt`, `expire_dt` | `date` | NULL | 제조일, 소비기한(소비기한 ≥ 제조일 CHECK) |
+| | `lot_no` | `varchar(50)` | NULL | LOT번호(재고 연결 후 채움, 현재 빈값) |
+| | `remark` | `varchar(500)` | NULL | 비고 |
+| | `created_by`, `created_at`, `updated_by`, `updated_at` | 헤더와 동일 | | 감사 컬럼 |
+
+- [생성 SQL](20261117/20261117_001_create_material_receipt_schema.sql), [롤백 SQL](20261117/20261117_001_rollback_material_receipt_schema.sql), [변경 이력](20261117/20261117_001_change_material_receipt_schema.md) 및 [backend 사본](../../backend/DATABASE/20261117) 참고.
+- 메뉴: 입고등록 [20261117_002](20261117/20261117_002_change_material_receipt_menu.md), 입고현황 [20261117_003](20261117/20261117_003_change_material_receipt_status_menu.md).
+- 수입검사 합격분 입고 연결 컬럼 추가 [20261117_006](20261117/20261117_006_change_receipt_inspection_link.md)([적용 SQL](20261117/20261117_006_add_receipt_inspection_link.sql), [롤백 SQL](20261117/20261117_006_rollback_receipt_inspection_link.sql)). 입고 가능량(검사 행) = 합격량 − 유효 입고 합이며 조회 시 계산한다.
+
+---
+
+### tb_material_inspection_hd / tb_material_inspection_dt (2026-11-17, 적용·MCP 확인 완료)
+
+품질관리 모듈의 자재 수입검사(QI). MES TQC205(검사 메인)·TQC206(검사 상세)을 핵심 항목만 남겨 재설계했다(검사방법·시료·샘플·특채조건·부적합 처리·검사항목별 결과·사진·입고요청량 제외). 검사 1건(검사번호)에 가입고 행 여러 개를 불러와 묶고, 같은 가입고 행을 여러 번 나눠 검사할 수 있다(부분 검사). 검사량은 저장하지 않고 `pass_qty + fail_qty`로 계산한다. 불합격량은 가입고 수량을 바꾸지 않고 발주 잔량에 더해 계산한다. 검사 상세는 가입고 행을 참조하며 가입고 행이 삭제돼도 이력이 남도록 FK는 `ON DELETE SET NULL`이고 가입고번호를 복사해 둔다. 입고 연결 컬럼은 입고 수동 등록 단계에서 추가한다.
+
+| 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
+|---|---|---|---|---|
+| `tb_material_inspection_hd` | `material_inspection_id` | `bigserial` | NOT NULL, PK | 수입검사 ID |
+| | `tenant_id` | `bigint` | NOT NULL | tenant FK |
+| | `inspection_no` | `varchar(30)` | NOT NULL | tenant별 유일 번호 `QI-yyyyMMdd-NNNN` |
+| | `inspection_dt` | `date` | NOT NULL | 검사일 |
+| | `inspector_id` | `bigint` | NOT NULL | 검사자 `tb_user` FK |
+| | `inspector_dept_id` | `bigint` | NULL | 검사자 부서 `tb_department` FK |
+| | `remark` | `varchar(500)` | NULL | 비고 |
+| | `use_at` | `char(1)` | NOT NULL, `Y` | `N` = 검사 취소(이력 보존) |
+| | `created_by`, `created_at`, `updated_by`, `updated_at` | 감사 컬럼 | | |
+| `tb_material_inspection_dt` | `material_inspection_detail_id` | `bigserial` | NOT NULL, PK | 상세 ID |
+| | `material_inspection_id`, `tenant_id` | `bigint` | NOT NULL | 헤더 복합 FK (cascade) |
+| | `line_no` | `integer` | NOT NULL | 행 순번 (> 0) |
+| | `material_arrival_detail_id` | `bigint` | NULL | 가입고 상세 행 FK(`ON DELETE SET NULL`), 부분 검사 시 중복 가능 |
+| | `arrival_no` | `varchar(30)` | NOT NULL | 가입고번호 복사본(이력·화면 표시용) |
+| | `purchase_order_detail_id` | `bigint` | NOT NULL | 발주 상세 행 FK(발주 잔량에 불합격량을 더할 때 사용) |
+| | `material_id` | `bigint` | NOT NULL | 품목 복합 FK |
+| | `pass_qty` | `numeric(15,2)` | NOT NULL, `0` | 합격량 (≥ 0) |
+| | `fail_qty` | `numeric(15,2)` | NOT NULL, `0` | 불합격량 (≥ 0, 합격량 + 불합격량 > 0 CHECK) |
+| | `remark` | `varchar(500)` | NULL | 비고 |
+| | `created_by`, `created_at`, `updated_by`, `updated_at` | 헤더와 동일 | | 감사 컬럼 |
+
+- [생성 SQL](20261117/20261117_004_create_material_inspection_schema.sql), [롤백 SQL](20261117/20261117_004_rollback_material_inspection_schema.sql), [변경 이력](20261117/20261117_004_change_material_inspection_schema.md) 및 [backend 사본](../../backend/DATABASE/20261117) 참고.
+- 모듈·메뉴: 품질관리 모듈 `QUALITY`(`/quality`, 정렬 5), 수입검사 그룹 `QUALITY_INSPECT`, 자재수입검사등록·현황 [20261117_005](20261117/20261117_005_change_quality_inspect_menu.md).
+
 ## 변경 이력
+
+- 2026-11-17: 입고 상세 `tb_material_receipt_dt`에 매입마감 컬럼 9개(`closing_month`, `closed_at`, `closed_by`, `closing_unit_price`, `closing_tax_type`, `closing_vat_included_at`, `closing_supply_amt`, `closing_vat_amt`, `closing_total_amt`)와 CHECK 4개, 인덱스 `ix_material_receipt_dt_closing_month`를 추가하는 `20261117_007`, 매입마감처리 메뉴 `20261117_008`을 정의했다. 읽기 전용 MCP로 컬럼이 아직 없음을 확인했고 실제 DB에는 적용하지 않았다. [docs/database/20261117](20261117) 및 [backend 사본](../../backend/DATABASE/20261117) 참고.
+- 2026-11-17: 입고 상세 `tb_material_receipt_dt`에 수입검사 연결 컬럼 `material_inspection_detail_id`(FK `ON DELETE SET NULL`)·`inspection_no`와 인덱스를 추가하는 `20261117_006`을 정의했다. 읽기 전용 MCP로 두 컬럼이 아직 없음을 확인했고 실제 DB에는 적용하지 않았다. [docs/database/20261117](20261117) 및 [backend 사본](../../backend/DATABASE/20261117) 참고.
+
+- 2026-11-17: 자재 수입검사 테이블 `tb_material_inspection_hd`/`tb_material_inspection_dt` 생성 `20261117_004`, 품질관리 모듈·수입검사 그룹·자재수입검사등록/현황 메뉴 `20261117_005`를 정의했다. 읽기 전용 MCP로 수입검사 테이블과 `QUALITY` 모듈이 아직 없음, `tb_module`(`module_id` identity, `(tenant_id, module_code)` 유일)과 `tb_menu` 유일 제약, 입고등록·입고현황 역할 권한(각 4건)을 확인했고 실제 DB에는 적용하지 않았다. [docs/database/20261117](20261117) 및 [backend 사본](../../backend/DATABASE/20261117) 참고.
+
+- 2026-11-17: 입고 테이블 `tb_material_receipt_hd`/`tb_material_receipt_dt` 생성 `20261117_001`, 입고등록 메뉴 `20261117_002`, 입고현황 메뉴 `20261117_003`을 정의했다. 읽기 전용 MCP `list_tables`로 입고·수입검사·재고 테이블이 아직 없음을 확인했고 실제 DB에는 적용하지 않았다. [docs/database/20261117](20261117) 및 [backend 사본](../../backend/DATABASE/20261117) 참고.
+
+
+- 2026-11-16: 가입고 테이블 `tb_material_arrival_hd`/`tb_material_arrival_dt` 생성 `20261116_002`, 입고관리 그룹·가입고등록 메뉴 `20261116_003`, 가입고현황 메뉴 `20261116_004`를 정의했다. 읽기 전용 MCP로 발주·거래처·창고 구조와 기존 `MATERIALS_*` 메뉴를 확인했고 실제 DB에는 적용하지 않았다. [docs/database/20261116](20261116) 및 [backend 사본](../../backend/DATABASE/20261116) 참고.
 
 - 2026-11-16: 전자결재 워크플로 알림을 공통 알림 저장소에 연결하기 위해 `tb_notification.chk_notification_event_source`에 `APPROVAL_WORKFLOW` / `APPROVAL_STATUS_EVENT` 쌍을 추가하는 `20261116_001`을 정의했다. 기본 PostgreSQL MCP의 테이블/컬럼 metadata 조회는 성공했으나 CHECK 제약 조회는 실패했다. 저장소 DDL을 대체 근거로 사용했으며 실제 DB에는 적용하지 않았다. [docs/database/20261116](20261116) 및 [backend 사본](../../backend/DATABASE/20261116) 참고.
 - 2026-11-16: 견적관리의 `quotation-create`/`quotation-status` 메뉴 seed와 기존 수주 메뉴 권한을 복사하는 `20261116_002`를 정의했다. `tb_menu`, `tb_module`, 메뉴/역할 권한 테이블 메타데이터를 MCP로 확인했고 tenant 행은 조회하지 않았다. 승인된 테넌트 ID를 지정해야 하며 이 작업에서는 스키마와 메뉴 seed를 DB에 적용하지 않았다. [docs/database/20261116](20261116) 및 [backend 사본](../../backend/DATABASE/20261116) 참고.

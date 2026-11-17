@@ -44,6 +44,24 @@ class PurchaseOrderStatusTest {
     }
 
     @Test
+    void defaultsTheStatusToActiveAndPassesCanceledAndAllThrough() throws Exception {
+        service.selectOrderStatusList(1L, new PurchaseOrderStatusSearchVO());
+        service.selectOrderStatusList(1L, null);
+        PurchaseOrderStatusSearchVO canceled = new PurchaseOrderStatusSearchVO();
+        canceled.setStatus("CANCELED");
+        service.selectOrderStatusList(1L, canceled);
+        PurchaseOrderStatusSearchVO all = new PurchaseOrderStatusSearchVO();
+        all.setStatus(" ALL ");
+        service.selectOrderStatusList(1L, all);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass((Class<Map<String, Object>>) (Class<?>) Map.class);
+        verify(dao, org.mockito.Mockito.times(4)).selectOrderStatusList(captor.capture());
+        assertThat(captor.getAllValues()).extracting(params -> params.get("status"))
+                .containsExactly("ACTIVE", "ACTIVE", "CANCELED", "ALL");
+    }
+
+    @Test
     void normalizesSearchConditionsAndScopesToTenant() throws Exception {
         PurchaseOrderStatusSearchVO search = new PurchaseOrderStatusSearchVO();
         search.setKeyword("  PO-2026 ");
@@ -92,6 +110,27 @@ class PurchaseOrderStatusTest {
                 .getBoundSql(params).getSql().replaceAll("\\s+", " ");
         assertThat(sql).contains("oh.tenant_id = ?", "oh.use_at = 'Y'", "'ACTIVE'", "'CANCELED'",
                 "ORDER BY oh.order_dt DESC, oh.order_no DESC, od.line_no", "oh.order_dt >= CAST(? AS date)");
+    }
+
+    @Test
+    void mapperFiltersByUseAtOnlyForActiveAndCanceledAndNotForAll() throws Exception {
+        Configuration configuration = new Configuration();
+        try (InputStream input = Resources.getResourceAsStream(RESOURCE)) {
+            new XMLMapperBuilder(input, configuration, RESOURCE, configuration.getSqlFragments()).parse();
+        }
+        String id = "PurchaseOrderStatusDAO.selectOrderStatusList";
+        assertThat(sql(configuration, id, "ACTIVE")).contains("AND oh.use_at = 'Y'");
+        assertThat(sql(configuration, id, "CANCELED")).contains("AND oh.use_at = 'N'");
+        String all = sql(configuration, id, "ALL");
+        assertThat(all).doesNotContain("AND oh.use_at");
+        assertThat(all).contains("CASE WHEN oh.use_at = 'Y' THEN 'ACTIVE' ELSE 'CANCELED' END AS status");
+    }
+
+    private static String sql(Configuration configuration, String id, String status) {
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("tenantId", 1L);
+        params.put("status", status);
+        return configuration.getMappedStatement(id).getBoundSql(params).getSql().replaceAll("\\s+", " ");
     }
 
     private void assertBadRequest(java.util.function.Consumer<PurchaseOrderStatusSearchVO> mutation) {

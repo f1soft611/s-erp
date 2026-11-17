@@ -36,6 +36,8 @@ import {
   validatePurchaseRequestInput,
 } from './services/purchaseRequest.service';
 import type { PurchaseRequestItem, PurchaseRequestUseTypeOption } from './types/purchaseRequest.types';
+import { useServerDateDefault } from '../../../../shared/hooks/useServerDateDefault';
+import { FormDateField, normalizeFormDate } from '../../../../shared/components/FormDateField';
 
 export type PurchaseRequestPageMode = 'create' | 'edit' | 'view';
 
@@ -69,11 +71,6 @@ type Props = {
 
 const EDITABLE_STATUS = 'REQUESTED';
 
-function today(): string {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
 export function PurchaseRequestCreatePage({
   selectedModule,
   currentMenuName,
@@ -96,7 +93,7 @@ export function PurchaseRequestCreatePage({
   const materialApplyPatchRef = useRef<((changes: Partial<PurchaseRequestDetailRow>) => void) | null>(null);
   const gridValidationActiveRef = useRef(false);
 
-  const [baseline, setBaseline] = useState({ requestDt: today(), remark: '' });
+  const [baseline, setBaseline] = useState({ requestDt: '', remark: '' });
   const [requestDt, setRequestDt] = useState(baseline.requestDt);
   const [remark, setRemark] = useState('');
   const [loginUser, setLoginUser] = useState({ name: '', departmentName: '' });
@@ -176,12 +173,23 @@ export function PurchaseRequestCreatePage({
     applyForm({ requestDt: item.requestDt, remark: item.remark ?? '' }, toPurchaseRequestRows(item));
   }, [applyForm]);
 
+  const { markTouched: markDateTouched, reload: reloadServerDate } = useServerDateDefault({
+    enabled: purchaseRequestId == null,
+    // 서버 날짜는 사용자의 변경이 아니므로 baseline도 함께 갱신해 변경사항으로 잡지 않는다.
+    onDate: (date) => {
+      setRequestDt(date);
+      setBaseline((current) => ({ ...current, requestDt: date }));
+    },
+    onError: setError,
+  });
+
   const resetToNew = useCallback(() => {
     setLoaded(null);
     setIsLocked(false);
     setError('');
-    applyForm({ requestDt: today(), remark: '' }, []);
-  }, [applyForm]);
+    applyForm({ requestDt: '', remark: '' }, []);
+    void reloadServerDate();
+  }, [applyForm, reloadServerDate]);
 
   useEffect(() => {
     if (purchaseRequestId == null) return;
@@ -256,8 +264,11 @@ export function PurchaseRequestCreatePage({
     if (loaded && !hasUnsavedChanges) return;
 
     const details = gridRef.current?.getActiveRows() ?? [];
-    const input = { requestDt, remark, details };
-    const { messages } = validatePurchaseRequestInput(input);
+    const dateCheck = normalizeFormDate(requestDt);
+    if (dateCheck.date && dateCheck.date !== requestDt) setRequestDt(dateCheck.date);
+    const input = { requestDt: dateCheck.date, remark, details };
+    const { messages: inputMessages } = validatePurchaseRequestInput(input);
+    const messages = dateCheck.invalid ? ['올바른 요청일을 입력해 주세요.'] : inputMessages;
     const isGridValid = gridRef.current?.validate() ?? true;
     gridValidationActiveRef.current = !isGridValid;
     setValidationMessages(messages);
@@ -443,18 +454,11 @@ export function PurchaseRequestCreatePage({
               value={loaded?.requestNo ?? '저장 시 자동 채번'}
               slotProps={{ input: { readOnly: true } }}
             />
-            <TextField
+            <FormDateField
               label="요청일"
-              type="date"
-              size="small"
-              required
               value={requestDt}
-              onChange={(event) => {
-                setRequestDt(event.target.value);
-                setValidationMessages([]);
-              }}
               disabled={!isEditable}
-              slotProps={{ inputLabel: { shrink: true } }}
+              onChange={(value) => { markDateTouched(); setRequestDt(value); setValidationMessages([]); }}
             />
             <TextField
               label="요청자"

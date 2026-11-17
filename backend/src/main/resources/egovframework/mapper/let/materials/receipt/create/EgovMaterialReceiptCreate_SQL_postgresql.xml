@@ -1,0 +1,371 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="MaterialReceiptDAO">
+
+    <!-- RETURNING을 쓰는 INSERT는 select로 선언되므로 flushCache로 같은 트랜잭션의 조회 캐시를 비운다(가입고 저장 직후 입고번호 재조회). -->
+    <select id="insertReceiptHeader" parameterType="map" resultType="long" flushCache="true">
+        INSERT INTO tb_material_receipt_hd (
+            tenant_id, receipt_no, receipt_dt, supplier_id, receiver_id, receiver_dept_id, currency_code,
+            tax_type, vat_included_at, supply_amt, vat_amt, total_amt, remark, created_by
+        )
+        SELECT t.tenant_id, #{receiptNo}, CAST(#{receiptDt} AS date), #{supplierId, jdbcType=BIGINT},
+               #{receiverId, jdbcType=BIGINT}, #{receiverDeptId, jdbcType=BIGINT}, #{currencyCode},
+               #{taxType}, #{vatIncludedAt}, #{supplyAmt, jdbcType=NUMERIC},
+               #{vatAmt, jdbcType=NUMERIC}, #{totalAmt, jdbcType=NUMERIC}, #{remark}, #{createdBy}
+        FROM tb_tenant t
+        WHERE t.tenant_id = #{tenantId, jdbcType=BIGINT}
+        RETURNING material_receipt_id
+    </select>
+
+    <select id="insertReceiptDetail" parameterType="map" resultType="long" flushCache="true">
+        INSERT INTO tb_material_receipt_dt (
+            material_receipt_id, tenant_id, line_no, material_arrival_detail_id, arrival_no,
+            material_inspection_detail_id, inspection_no,
+            purchase_order_detail_id, material_id, receipt_qty, unit_price, supply_amt, vat_amt, total_amt,
+            warehouse_id, manufacture_dt, expire_dt, lot_no, remark, created_by
+        ) VALUES (
+            #{materialReceiptId, jdbcType=BIGINT}, #{tenantId, jdbcType=BIGINT}, #{lineNo},
+            #{materialArrivalDetailId, jdbcType=BIGINT}, #{arrivalNo},
+            #{materialInspectionDetailId, jdbcType=BIGINT}, #{inspectionNo, jdbcType=VARCHAR},
+            #{purchaseOrderDetailId, jdbcType=BIGINT}, #{materialId, jdbcType=BIGINT},
+            #{receiptQty, jdbcType=NUMERIC}, #{unitPrice, jdbcType=NUMERIC},
+            #{supplyAmt, jdbcType=NUMERIC}, #{vatAmt, jdbcType=NUMERIC}, #{totalAmt, jdbcType=NUMERIC},
+            #{warehouseId, jdbcType=BIGINT}, CAST(#{manufactureDt, jdbcType=VARCHAR} AS date),
+            CAST(#{expireDt, jdbcType=VARCHAR} AS date), #{lotNo, jdbcType=VARCHAR},
+            #{remark}, #{createdBy}
+        )
+        RETURNING material_receipt_detail_id
+    </select>
+
+    <!-- 수정·취소 전에 입고 헤더를 잠근다. 없으면 null. -->
+    <select id="selectReceiptForUpdate" parameterType="map"
+            resultType="egovframework.let.materials.receipt.create.domain.model.MaterialReceiptVO">
+        SELECT rh.material_receipt_id AS materialReceiptId,
+               rh.receipt_no AS receiptNo,
+               rh.receipt_dt AS receiptDt,
+               rh.supplier_id AS supplierId,
+               rh.currency_code AS currencyCode,
+               rh.tax_type AS taxType,
+               rh.vat_included_at AS vatIncludedAt,
+               rh.use_at AS useAt
+        FROM tb_material_receipt_hd rh
+        WHERE rh.material_receipt_id = #{materialReceiptId, jdbcType=BIGINT}
+          AND rh.tenant_id = #{tenantId, jdbcType=BIGINT}
+        FOR UPDATE OF rh
+    </select>
+
+    <update id="updateReceiptHeader" parameterType="map">
+        UPDATE tb_material_receipt_hd
+        SET receipt_dt = CAST(#{receiptDt} AS date),
+            tax_type = #{taxType},
+            vat_included_at = #{vatIncludedAt},
+            supply_amt = #{supplyAmt, jdbcType=NUMERIC},
+            vat_amt = #{vatAmt, jdbcType=NUMERIC},
+            total_amt = #{totalAmt, jdbcType=NUMERIC},
+            remark = #{remark},
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE material_receipt_id = #{materialReceiptId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND use_at = 'Y'
+    </update>
+
+    <update id="updateReceiptDetail" parameterType="map">
+        UPDATE tb_material_receipt_dt
+        SET line_no = #{lineNo},
+            receipt_qty = #{receiptQty, jdbcType=NUMERIC},
+            unit_price = #{unitPrice, jdbcType=NUMERIC},
+            supply_amt = #{supplyAmt, jdbcType=NUMERIC},
+            vat_amt = #{vatAmt, jdbcType=NUMERIC},
+            total_amt = #{totalAmt, jdbcType=NUMERIC},
+            warehouse_id = #{warehouseId, jdbcType=BIGINT},
+            manufacture_dt = CAST(#{manufactureDt, jdbcType=VARCHAR} AS date),
+            expire_dt = CAST(#{expireDt, jdbcType=VARCHAR} AS date),
+            remark = #{remark},
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE material_receipt_detail_id = #{materialReceiptDetailId, jdbcType=BIGINT}
+          AND material_receipt_id = #{materialReceiptId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+    </update>
+
+    <delete id="deleteReceiptDetail" parameterType="map">
+        DELETE FROM tb_material_receipt_dt
+        WHERE material_receipt_detail_id = #{materialReceiptDetailId, jdbcType=BIGINT}
+          AND material_receipt_id = #{materialReceiptId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+    </delete>
+
+    <update id="cancelReceiptHeader" parameterType="map">
+        UPDATE tb_material_receipt_hd
+        SET use_at = 'N',
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE material_receipt_id = #{materialReceiptId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND use_at = 'Y'
+    </update>
+
+    <select id="selectReceipt" parameterType="map"
+            resultType="egovframework.let.materials.receipt.create.domain.model.MaterialReceiptVO">
+        SELECT rh.material_receipt_id AS materialReceiptId,
+               rh.receipt_no AS receiptNo,
+               rh.receipt_dt AS receiptDt,
+               rh.supplier_id AS supplierId,
+               c.customer_code AS supplierCode,
+               c.customer_name AS supplierName,
+               u.user_nm AS receiverName,
+               rh.currency_code AS currencyCode,
+               rh.tax_type AS taxType,
+               rh.vat_included_at AS vatIncludedAt,
+               rh.supply_amt AS supplyAmt,
+               rh.vat_amt AS vatAmt,
+               rh.total_amt AS totalAmt,
+               rh.remark AS remark,
+               rh.use_at AS useAt,
+               rh.created_by AS createdBy,
+               rh.created_at AS createdAt,
+               rh.updated_by AS updatedBy,
+               rh.updated_at AS updatedAt
+        FROM tb_material_receipt_hd rh
+        LEFT JOIN tb_customer_info c
+          ON c.customer_id = rh.supplier_id
+         AND c.tenant_id = rh.tenant_id
+        LEFT JOIN tb_user u
+          ON u.user_id = rh.receiver_id
+        WHERE rh.material_receipt_id = #{materialReceiptId, jdbcType=BIGINT}
+          AND rh.tenant_id = #{tenantId, jdbcType=BIGINT}
+    </select>
+
+    <select id="selectReceiptDetails" parameterType="map"
+            resultType="egovframework.let.materials.receipt.create.domain.model.MaterialReceiptDetailVO">
+        SELECT rd.material_receipt_detail_id AS materialReceiptDetailId,
+               rd.line_no AS lineNo,
+               rd.material_arrival_detail_id AS materialArrivalDetailId,
+               ad.material_arrival_id AS materialArrivalId,
+               ah.use_at AS arrivalActive,
+               ad.inspect_at AS inspectAt,
+               rd.arrival_no AS arrivalNo,
+               rd.material_inspection_detail_id AS materialInspectionDetailId,
+               rd.inspection_no AS inspectionNo,
+               rd.purchase_order_detail_id AS purchaseOrderDetailId,
+               oh.order_no AS orderNo,
+               rd.material_id AS materialId,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.material_spec AS materialSpec,
+               m.unit AS unit,
+               od.order_qty AS orderQty,
+               od.order_qty - COALESCE((SELECT sum(a2.arrival_qty)
+                                          FROM tb_material_arrival_dt a2
+                                          JOIN tb_material_arrival_hd ah2
+                                            ON ah2.material_arrival_id = a2.material_arrival_id
+                                           AND ah2.tenant_id = a2.tenant_id
+                                         WHERE a2.purchase_order_detail_id = rd.purchase_order_detail_id
+                                           AND ah2.tenant_id = #{tenantId, jdbcType=BIGINT}
+                                           AND ah2.use_at = 'Y'
+                                           AND (rd.material_arrival_detail_id IS NULL
+                                                OR a2.material_arrival_detail_id &lt;&gt; rd.material_arrival_detail_id)), 0)
+               + COALESCE((SELECT sum(fd.fail_qty)
+                             FROM tb_material_inspection_dt fd
+                             JOIN tb_material_inspection_hd ih
+                               ON ih.material_inspection_id = fd.material_inspection_id
+                              AND ih.tenant_id = fd.tenant_id
+                            WHERE fd.purchase_order_detail_id = rd.purchase_order_detail_id
+                              AND ih.tenant_id = #{tenantId, jdbcType=BIGINT}
+                              AND ih.use_at = 'Y'
+                              AND fd.material_arrival_detail_id IS NOT NULL
+                              AND (rd.material_arrival_detail_id IS NULL
+                                   OR fd.material_arrival_detail_id &lt;&gt; rd.material_arrival_detail_id)), 0) AS remainQty,
+               ad.arrival_qty AS arrivalQty,
+               CASE WHEN rd.material_inspection_detail_id IS NULL THEN NULL
+                    ELSE idt.pass_qty - COALESCE((SELECT sum(r2.receipt_qty)
+                                                    FROM tb_material_receipt_dt r2
+                                                    JOIN tb_material_receipt_hd rh2
+                                                      ON rh2.material_receipt_id = r2.material_receipt_id
+                                                     AND rh2.tenant_id = r2.tenant_id
+                                                   WHERE r2.material_inspection_detail_id = rd.material_inspection_detail_id
+                                                     AND rh2.tenant_id = #{tenantId, jdbcType=BIGINT}
+                                                     AND rh2.use_at = 'Y'
+                                                     AND rh2.material_receipt_id &lt;&gt; rd.material_receipt_id), 0)
+               END AS receivableQty,
+               rd.receipt_qty AS receiptQty,
+               rd.unit_price AS unitPrice,
+               rd.supply_amt AS supplyAmt,
+               rd.vat_amt AS vatAmt,
+               rd.total_amt AS totalAmt,
+               rd.warehouse_id AS warehouseId,
+               w.warehouse_name AS warehouseName,
+               rd.manufacture_dt AS manufactureDt,
+               rd.expire_dt AS expireDt,
+               rd.lot_no AS lotNo,
+               rd.remark AS remark,
+               rd.closing_month AS closingMonth
+        FROM tb_material_receipt_dt rd
+        LEFT JOIN tb_material_arrival_dt ad
+          ON ad.material_arrival_detail_id = rd.material_arrival_detail_id
+        LEFT JOIN tb_material_arrival_hd ah
+          ON ah.material_arrival_id = ad.material_arrival_id
+         AND ah.tenant_id = ad.tenant_id
+        LEFT JOIN tb_material_inspection_dt idt
+          ON idt.material_inspection_detail_id = rd.material_inspection_detail_id
+        JOIN tb_purchase_order_dt od
+          ON od.purchase_order_detail_id = rd.purchase_order_detail_id
+        JOIN tb_purchase_order_hd oh
+          ON oh.purchase_order_id = od.purchase_order_id
+         AND oh.tenant_id = od.tenant_id
+        LEFT JOIN tb_material_info m
+          ON m.material_id = rd.material_id
+         AND m.tenant_id = rd.tenant_id
+        LEFT JOIN tb_warehouse w
+          ON w.warehouse_id = rd.warehouse_id
+        WHERE rd.material_receipt_id = #{materialReceiptId, jdbcType=BIGINT}
+          AND rd.tenant_id = #{tenantId, jdbcType=BIGINT}
+        ORDER BY rd.line_no
+    </select>
+
+    <!-- 수입검사 행별 유효 입고수량 합(취소된 입고 제외). excludeReceiptId가 있으면 그 입고는 뺀다. -->
+    <sql id="receivedQtySubquery">
+        (SELECT rd.material_inspection_detail_id AS material_inspection_detail_id,
+                sum(rd.receipt_qty) AS received_qty
+         FROM tb_material_receipt_dt rd
+         JOIN tb_material_receipt_hd rh
+           ON rh.material_receipt_id = rd.material_receipt_id
+          AND rh.tenant_id = rd.tenant_id
+         WHERE rh.tenant_id = #{tenantId, jdbcType=BIGINT}
+           AND rh.use_at = 'Y'
+           AND rd.material_inspection_detail_id IS NOT NULL
+        <if test="excludeReceiptId != null">
+           AND rh.material_receipt_id &lt;&gt; #{excludeReceiptId, jdbcType=BIGINT}
+        </if>
+         GROUP BY rd.material_inspection_detail_id)
+    </sql>
+
+    <!-- 입고 대상: 정상 검사의 행 중 연결 가입고 행이 남아 있고 가입고가 정상이며 입고 가능량이 남은 행 -->
+    <sql id="candidateFrom">
+        FROM tb_material_inspection_dt idt
+        JOIN tb_material_inspection_hd ih
+          ON ih.material_inspection_id = idt.material_inspection_id
+         AND ih.tenant_id = idt.tenant_id
+        JOIN tb_material_arrival_dt ad
+          ON ad.material_arrival_detail_id = idt.material_arrival_detail_id
+        JOIN tb_material_arrival_hd ah
+          ON ah.material_arrival_id = ad.material_arrival_id
+         AND ah.tenant_id = ad.tenant_id
+        JOIN tb_purchase_order_dt od
+          ON od.purchase_order_detail_id = idt.purchase_order_detail_id
+        JOIN tb_purchase_order_hd oh
+          ON oh.purchase_order_id = od.purchase_order_id
+         AND oh.tenant_id = od.tenant_id
+        LEFT JOIN tb_customer_info c
+          ON c.customer_id = ah.supplier_id
+         AND c.tenant_id = ah.tenant_id
+        LEFT JOIN tb_material_info m
+          ON m.material_id = idt.material_id
+         AND m.tenant_id = idt.tenant_id
+        LEFT JOIN tb_warehouse w
+          ON w.warehouse_id = ad.warehouse_id
+        LEFT JOIN <include refid="receivedQtySubquery"/> rcv
+          ON rcv.material_inspection_detail_id = idt.material_inspection_detail_id
+        WHERE idt.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND ih.use_at = 'Y'
+          AND ah.use_at = 'Y'
+          AND idt.pass_qty - COALESCE(rcv.received_qty, 0) &gt; 0
+    </sql>
+
+    <select id="selectCandidates" parameterType="map"
+            resultType="egovframework.let.materials.receipt.create.domain.model.MaterialReceiptCandidateVO">
+        SELECT idt.material_inspection_detail_id AS materialInspectionDetailId,
+               ih.material_inspection_id AS materialInspectionId,
+               ih.inspection_no AS inspectionNo,
+               ih.inspection_dt AS inspectionDt,
+               idt.material_arrival_detail_id AS materialArrivalDetailId,
+               idt.arrival_no AS arrivalNo,
+               ah.supplier_id AS supplierId,
+               c.customer_code AS supplierCode,
+               c.customer_name AS supplierName,
+               ah.currency_code AS currencyCode,
+               ah.tax_type AS taxType,
+               ah.vat_included_at AS vatIncludedAt,
+               idt.purchase_order_detail_id AS purchaseOrderDetailId,
+               oh.order_no AS orderNo,
+               idt.material_id AS materialId,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.material_spec AS materialSpec,
+               m.unit AS unit,
+               idt.pass_qty AS passQty,
+               COALESCE(rcv.received_qty, 0) AS receivedQty,
+               idt.pass_qty - COALESCE(rcv.received_qty, 0) AS receivableQty,
+               ad.unit_price AS unitPrice,
+               ad.warehouse_id AS warehouseId,
+               w.warehouse_name AS warehouseName,
+               ad.manufacture_dt AS manufactureDt,
+               ad.expire_dt AS expireDt
+        <include refid="candidateFrom"/>
+        <if test="fromDt != null">
+          AND ih.inspection_dt &gt;= CAST(#{fromDt} AS date)
+        </if>
+        <if test="toDt != null">
+          AND ih.inspection_dt &lt;= CAST(#{toDt} AS date)
+        </if>
+        <if test="keyword != null">
+          AND (ih.inspection_no ILIKE '%' || #{keyword} || '%'
+               OR idt.arrival_no ILIKE '%' || #{keyword} || '%'
+               OR oh.order_no ILIKE '%' || #{keyword} || '%'
+               OR c.customer_name ILIKE '%' || #{keyword} || '%'
+               OR m.material_code ILIKE '%' || #{keyword} || '%'
+               OR m.material_name ILIKE '%' || #{keyword} || '%')
+        </if>
+        ORDER BY ih.inspection_dt DESC, ih.inspection_no DESC, idt.line_no
+        LIMIT 500
+    </select>
+
+    <!-- 조회 조건과 무관한 입고 가능 행의 전체 건수(등록 화면의 입고 가능 N건 안내용) -->
+    <select id="countCandidates" parameterType="map" resultType="integer">
+        SELECT count(*)
+        <include refid="candidateFrom"/>
+    </select>
+
+    <!-- 입고 저장 전에 수입검사 행과 헤더를 ID 순서로 조회·잠근다. 잠근 뒤 forUpdate=false로 다시 읽어 최신 입고량을 쓴다. -->
+    <select id="selectInspectionRows" parameterType="map"
+            resultType="egovframework.let.materials.receipt.create.domain.model.MaterialReceiptInspectionRowVO">
+        SELECT idt.material_inspection_detail_id AS materialInspectionDetailId,
+               ih.material_inspection_id AS materialInspectionId,
+               ih.use_at AS inspectionUseAt,
+               ih.inspection_no AS inspectionNo,
+               idt.material_arrival_detail_id AS materialArrivalDetailId,
+               ad.material_arrival_id AS materialArrivalId,
+               ah.use_at AS arrivalUseAt,
+               idt.arrival_no AS arrivalNo,
+               ah.supplier_id AS supplierId,
+               ah.currency_code AS currencyCode,
+               idt.purchase_order_detail_id AS purchaseOrderDetailId,
+               idt.material_id AS materialId,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               idt.pass_qty AS passQty,
+               COALESCE(rcv.received_qty, 0) AS receivedQty
+        FROM tb_material_inspection_dt idt
+        JOIN tb_material_inspection_hd ih
+          ON ih.material_inspection_id = idt.material_inspection_id
+         AND ih.tenant_id = idt.tenant_id
+        LEFT JOIN tb_material_arrival_dt ad
+          ON ad.material_arrival_detail_id = idt.material_arrival_detail_id
+        LEFT JOIN tb_material_arrival_hd ah
+          ON ah.material_arrival_id = ad.material_arrival_id
+         AND ah.tenant_id = ad.tenant_id
+        LEFT JOIN tb_material_info m
+          ON m.material_id = idt.material_id
+         AND m.tenant_id = idt.tenant_id
+        LEFT JOIN <include refid="receivedQtySubquery"/> rcv
+          ON rcv.material_inspection_detail_id = idt.material_inspection_detail_id
+        WHERE idt.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND idt.material_inspection_detail_id IN
+          <foreach collection="detailIds" item="id" open="(" separator="," close=")">#{id, jdbcType=BIGINT}</foreach>
+        ORDER BY idt.material_inspection_detail_id
+        <if test="forUpdate">
+        FOR UPDATE OF idt, ih
+        </if>
+    </select>
+</mapper>

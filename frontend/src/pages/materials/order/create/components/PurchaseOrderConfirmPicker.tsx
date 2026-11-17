@@ -200,6 +200,7 @@ export function PurchaseOrderConfirmPicker({ open, onClose, onSelect }: {
           <F1Grid
             ref={gridRef}
             ariaLabel="발주 대상 확정 품목 목록"
+            storageKey="materials-purchase-order-confirm-picker-grid-v1"
             rows={rows}
             columns={columns}
             rowKey="purchaseRequestDetailId"

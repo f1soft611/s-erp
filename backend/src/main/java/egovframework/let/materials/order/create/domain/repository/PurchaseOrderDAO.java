@@ -6,6 +6,7 @@ import java.util.Map;
 import org.egovframe.rte.psl.dataaccess.EgovAbstractMapper;
 import org.springframework.stereotype.Repository;
 
+import egovframework.let.materials.order.create.domain.model.PurchaseOrderArrivalQtyVO;
 import egovframework.let.materials.order.create.domain.model.PurchaseOrderCandidateVO;
 import egovframework.let.materials.order.create.domain.model.PurchaseOrderConfirmRowVO;
 import egovframework.let.materials.order.create.domain.model.PurchaseOrderDetailVO;
@@ -110,5 +111,11 @@ public class PurchaseOrderDAO extends EgovAbstractMapper {
 
     public List<PurchaseOrderDetailVO> selectOrderDetails(Map<String, Object> params) throws Exception {
         return selectList(NS + "selectOrderDetails", params);
+    }
+
+    /** 발주 행별 유효한 가입고 수량 합. 가입고가 없는 행은 결과에 나오지 않는다. */
+    public List<PurchaseOrderArrivalQtyVO> selectArrivedQtyByOrderDetail(Map<String, Object> params)
+            throws Exception {
+        return selectList(NS + "selectArrivedQtyByOrderDetail", params);
     }
 }
