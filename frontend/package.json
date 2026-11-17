@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 4173 --open",
     "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
     "lint": "oxlint",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
     "test": "vitest run",
+    "test:ci": "vitest run --pool=threads --maxWorkers=2 --reporter=default",
     "test:watch": "vitest"
   },
   "dependencies": {

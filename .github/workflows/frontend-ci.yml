@@ -1,0 +1,56 @@
+name: Frontend CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, socra710]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: frontend-${{ matrix.check }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check: lint
+            command: npm run lint
+          - check: build
+            command: npm run typecheck && npm run build
+          - check: tests
+            command: npm run test:ci
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-fund --no-audit
+      - run: ${{ matrix.command }}
+
+  frontend-required:
+    name: frontend-required
+    if: always()
+    needs: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Require all frontend checks to succeed
+        env:
+          CHECK_RESULT: ${{ needs.frontend.result }}
+        run: test "$CHECK_RESULT" = success
