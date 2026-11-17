@@ -70,6 +70,23 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 
 ## 추가 반영 기능 요약 (2026-09-01 기준)
 
+### 통합검색어 강조 (2026-11-17)
+
+현황 화면의 통합검색어와 일치하는 글자를 셀에서 빨간색으로 표시한다. `F1Grid`에 조회에 적용된 검색어를 `highlightKeyword`로 넘기고, 강조할 컬럼에 `highlightSearch: true`를 지정한다. 입력 중인 값이 아니라 마지막 조회에 적용된 검색어를 넘기고, 서버가 실제로 검색하는 컬럼에만 지정한다.
+
+```tsx
+const columns: F1GridColumn<Row>[] = [
+  { field: 'orderNo', headerName: '수주번호', highlightSearch: true },
+  { field: 'customerName', headerName: '거래처명', highlightSearch: true },
+];
+<F1Grid rows={rows} columns={columns} rowKey="id" highlightKeyword={appliedKeyword} />
+```
+
+- 대소문자를 구분하지 않는 부분 일치이며, 모든 일치 구간을 강조한다. 앞뒤 공백은 제거한다.
+- 기본 텍스트 셀에는 자동 적용된다. `renderCell` 컬럼은 context의 `highlightKeyword`를 `F1GridHighlightText`에 넘겨 직접 적용한다(`highlightSearch` 컬럼에만 전달됨).
+- 성능: 검색어가 비었거나 `highlightSearch` 컬럼이 없으면 Grid가 값을 내리지 않아 행·셀 memo가 그대로 유지된다. 일치 탐색은 정규식 없이 `indexOf`로 수행한다. 컬럼 배열은 검색어에 의존하지 않게 유지한다.
+- 적용 화면: 영업관리 현황(수주·견적·출하·출하계획·거래명세서)을 비롯한 통합검색이 있는 화면. 결과: `docs/result/20261117/search-keyword-highlight`.
+
 ### 컬럼 집계 행 (2026-11-12)
 
 `features={[{ ftype: 'summary', dock: 'top' }]}` 또는 `dock: 'bottom'`으로 집계 행을 표시한다. 각 컬럼에 `summaryType: 'sum' | 'average' | 'min' | 'max'`를 지정한다. 예:
@@ -871,6 +888,10 @@ Escape
 선택한 ID·코드·명을 `applyPatch`로 같은 행에 반영하며, 행 추가/삭제는
 `F1GridRef.addRow()`와 `deleteSelectedRows()`를 사용한다.
 
+상세의 행 번호 헤더는 `No`로 표시하며, 신규 상세 행은 생성 시점의 기본정보 납기일을
+초기값으로 받는다. 행별 납기일은 이후에도 개별 수정할 수 있다. 진행상태 표시는
+수주 공통코드 이름을 사용하되 저장값은 기존 `lineStatus` 코드로 유지한다.
+
 상세 그리드 제목 옆의 `품목 선택` 버튼은 행을 하나 선택했을 때 활성화된다.
 버튼은 키보드로도 실행할 수 있으며, 도움창에서 고른 마스터 옵션을
 `F1GridRef.setCellValue()`로 선택 행에 전달한다. 품목코드 컬럼의
@@ -879,9 +900,11 @@ Escape
 
 주문수량 또는 단가가 바뀌면 공급가와 VAT 10%를 소수 둘째 자리까지 다시
 계산한다. VAT 셀을 직접 수정하면 해당 행의 총액만 갱신하고, 이후 수량이나
-단가가 변경될 때 VAT를 기본 10%로 재계산한다. 출하수량과 라인상태는 신규
-수주 작성 단계에서 읽기 전용으로 둔다. 화면 금액은 입력 중 미리보기이며,
-저장 시 서버가 금액을 다시 계산한다.
+단가가 변경될 때 VAT를 기본 10%로 재계산한다. 출하수량과 진행상태는 신규
+수주 작성 단계에서 읽기 전용으로 둔다. 계산 결과가 지원 범위를 넘으면 새
+수량/단가와 계산 금액을 행에 적용하지 않고 기존 값을 유지하며, 페이지 오류
+영역에 원인을 표시한다. 화면 금액은 입력 중 미리보기이며, 저장 시 서버가
+금액을 다시 계산한다.
 
 ## 행 폼 모달 플러그인
 

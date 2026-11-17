@@ -340,6 +340,7 @@ export const RoleManagementPanel = forwardRef<
     {
       field: 'group',
       headerName: '역할 코드',
+      highlightSearch: true,
       flex: 1,
       editable: isUncommittedNewRole,
       required: true,
@@ -348,6 +349,7 @@ export const RoleManagementPanel = forwardRef<
     {
       field: 'name',
       headerName: '역할명',
+      highlightSearch: true,
       flex: 1,
       editable: true,
       required: true,
@@ -356,6 +358,7 @@ export const RoleManagementPanel = forwardRef<
     {
       field: 'description',
       headerName: '설명',
+      highlightSearch: true,
       flex: 2,
       editable: true,
       wrapText: true,
@@ -868,6 +871,7 @@ export const RoleManagementPanel = forwardRef<
                 key={roleGridKey}
                 ref={roleGridRef}
                 rows={displayedRoles}
+                highlightKeyword={searchQuery.trim()}
                 columns={
                   saving
                     ? roleColumns.map((column) => ({ ...column, editable: false }))

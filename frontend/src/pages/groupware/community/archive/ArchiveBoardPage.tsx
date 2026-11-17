@@ -666,6 +666,7 @@ export function ArchiveBoardPage({
           canUpdate={canUpdate}
           canDelete={canDelete}
           canExportExcel={selectedMenuPermissions?.excel ?? false}
+          highlightKeyword={archiveList.filters.keyword}
         />
       </Box>
 

@@ -31,6 +31,7 @@ type GridRowProps<T extends object> = {
   renderedColumnIndexes?: Set<number>;
   columnLine: boolean;
   stripeRows: boolean;
+  highlightKeyword?: string;
   isSelected: boolean;
   selectionMode?: 'cell' | 'row';
   rowHeight: number;
@@ -212,6 +213,7 @@ const areGridRowPropsEqual = <T extends object>(
     prev.renderedColumnIndexes === next.renderedColumnIndexes &&
     prev.columnLine === next.columnLine &&
     prev.stripeRows === next.stripeRows &&
+    prev.highlightKeyword === next.highlightKeyword &&
     prev.isSelected === next.isSelected &&
     prev.selectionMode === next.selectionMode &&
     prev.rowHeight === next.rowHeight &&
@@ -255,6 +257,7 @@ const GridRowInner = <T extends object>({
   renderedColumnIndexes,
   columnLine,
   stripeRows,
+  highlightKeyword,
   isSelected,
   selectionMode = 'cell',
   rowHeight,
@@ -590,6 +593,7 @@ const GridRowInner = <T extends object>({
             showCheckbox={showCheckbox}
             columnLine={columnLine}
             stripeRows={stripeRows}
+            highlightKeyword={column.highlightSearch ? highlightKeyword : undefined}
             focused={focused}
             selectionMode={selectionMode}
             editing={editing}

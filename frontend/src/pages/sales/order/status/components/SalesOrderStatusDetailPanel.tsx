@@ -18,12 +18,19 @@ import { ProfileAvatar } from '../../../../../shared/components/ProfileAvatar';
 import { PageAreaOverlay } from '../../../../../shared/components/view-mode/PageAreaOverlay';
 import type { SalesOrderItem } from '../../create/types/salesOrder.types';
 import { SalesOrderActionsMenu } from './SalesOrderActionsMenu';
+import {
+  getSalesOrderCodeLabel,
+  type SalesOrderCodeOption,
+} from '../../services/salesOrderCommonCode.service';
 
 type SalesOrderStatusDetailPanelProps = {
   order: SalesOrderItem | null;
   loading: boolean;
   error: string;
   canEdit: boolean;
+  orderStatusOptions: SalesOrderCodeOption[];
+  progressStatusOptions: SalesOrderCodeOption[];
+  deliveryMethodOptions: SalesOrderCodeOption[];
   onClose: () => void;
   onView: () => void;
   onEdit: () => void;
@@ -87,6 +94,9 @@ export function SalesOrderStatusDetailPanel({
   loading,
   error,
   canEdit,
+  orderStatusOptions,
+  progressStatusOptions,
+  deliveryMethodOptions,
   onClose,
   onView,
   onEdit,
@@ -133,7 +143,11 @@ export function SalesOrderStatusDetailPanel({
                 </Box>
               </Stack>
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                <Chip size="small" color={STATUS_COLORS[order.status] ?? 'default'} label={order.status} />
+                <Chip
+                  size="small"
+                  color={STATUS_COLORS[order.status] ?? 'default'}
+                  label={getSalesOrderCodeLabel(orderStatusOptions, order.status)}
+                />
                 <Divider orientation="vertical" flexItem />
                 <SalesOrderActionsMenu canEdit={canEdit} onView={onView} onEdit={onEdit} />
               </Stack>
@@ -193,7 +207,9 @@ export function SalesOrderStatusDetailPanel({
             >
               <InfoGroup title="수주 정보">
                 <InfoItem label="견적번호">{order.quotNo || '-'}</InfoItem>
-                <InfoItem label="배송방법">{order.deliveryMethod || '-'}</InfoItem>
+                <InfoItem label="배송방법">
+                  {getSalesOrderCodeLabel(deliveryMethodOptions, order.deliveryMethod) || '-'}
+                </InfoItem>
               </InfoGroup>
               <InfoGroup title="납품 정보">
                 <InfoItem label="납품장소" wide>{order.deliveryPlace || '-'}</InfoItem>
@@ -229,14 +245,14 @@ export function SalesOrderStatusDetailPanel({
                 >
                   <TableHead>
                     <TableRow>
-                      <TableCell align="center">행</TableCell>
+                      <TableCell align="center">No</TableCell>
                       <TableCell>품목코드</TableCell>
                       <TableCell>품목명</TableCell>
                       <TableCell align="right">수량</TableCell>
                       <TableCell align="right">단가</TableCell>
                       <TableCell align="right">합계</TableCell>
                       <TableCell align="center">납기</TableCell>
-                      <TableCell align="center">행상태</TableCell>
+                      <TableCell align="center">진행상태</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -263,7 +279,9 @@ export function SalesOrderStatusDetailPanel({
                             {formatAmount(detail.totalAmt)}
                           </TableCell>
                           <TableCell align="center">{detail.deliveryDt || '-'}</TableCell>
-                          <TableCell align="center">{detail.lineStatus || '-'}</TableCell>
+                          <TableCell align="center">
+                            {getSalesOrderCodeLabel(progressStatusOptions, detail.lineStatus) || '-'}
+                          </TableCell>
                         </TableRow>
                       ))
                     ) : (

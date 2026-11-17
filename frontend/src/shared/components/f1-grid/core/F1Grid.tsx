@@ -157,6 +157,7 @@ function F1GridInner<T extends object>(
     ariaLabel = 'F1-GRID',
     columnLine = true,
     stripeRows = true,
+    highlightKeyword,
     storageKey,
     height,
     minHeight,
@@ -490,6 +491,11 @@ function F1GridInner<T extends object>(
       ),
     [hiddenColumnFields, orderedColumns, pinnedFields],
   );
+  const hasHighlightColumn = useMemo(
+    () => Boolean(highlightKeyword?.trim()) && visibleColumns.some((column) => column.highlightSearch),
+    [highlightKeyword, visibleColumns],
+  );
+  const normalizedHighlightKeyword = highlightKeyword?.trim();
   const { leftOffsets, rightOffsets } = useMemo(
     () =>
       getGridColumnPinOffsets(
@@ -3112,6 +3118,7 @@ function F1GridInner<T extends object>(
             rowKey={rowKey}
             columnLine={columnLine}
             stripeRows={stripeRows}
+            highlightKeyword={hasHighlightColumn ? normalizedHighlightKeyword : undefined}
             columnTracks={columnTracks}
             defaultRowHeight={defaultRowHeight}
             minRowHeight={normalizedMinRowHeight}

@@ -69,4 +69,25 @@ describe('usePageSearchDefaults', () => {
     });
     expect(mockedGetSystemDate).toHaveBeenCalledTimes(2);
   });
+
+  it('waits for its input fields to become available before resolving defaults', async () => {
+    mockedGetSystemDate.mockResolvedValue('2026-10-20');
+    const { result, rerender } = renderHook(
+      ({ enabled }) => usePageSearchDefaults(fields, enabled),
+      { initialProps: { enabled: false } },
+    );
+
+    expect(result.current.loading).toBe(true);
+    expect(result.current.values).toBeNull();
+    expect(mockedGetSystemDate).not.toHaveBeenCalled();
+
+    rerender({ enabled: true });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.values).toEqual({
+      fixedRange: { from: '2026-01-01', to: '' },
+      systemRange: { from: '', to: '2026-10-20' },
+    });
+    expect(mockedGetSystemDate).toHaveBeenCalledOnce();
+  });
 });

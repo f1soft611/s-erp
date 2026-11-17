@@ -7,11 +7,13 @@ import {
 type SearchResultMessageProps = {
   resultCount: number;
   horizontalPadding?: PageMessageHorizontalPadding;
+  onDismiss?: () => void;
 };
 
 export function SearchResultMessage({
   resultCount,
   horizontalPadding,
+  onDismiss,
 }: SearchResultMessageProps) {
   const [dismissed, setDismissed] = useState(false);
 
@@ -29,7 +31,10 @@ export function SearchResultMessage({
       role="status"
       compact
       horizontalPadding={horizontalPadding}
-      onClose={() => setDismissed(true)}
+      onClose={() => {
+        setDismissed(true);
+        onDismiss?.();
+      }}
     />
   );
 }

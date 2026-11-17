@@ -8,6 +8,10 @@ import {
   roundSalesOrderAmount,
   type SalesOrderAmounts,
 } from './salesOrderAmounts';
+import {
+  getSalesOrderCodeLabel,
+  type SalesOrderCodeOption,
+} from '../../services/salesOrderCommonCode.service';
 
 export type SalesOrderDetailRow = SalesOrderAmounts & {
   rowId: string;
@@ -25,7 +29,7 @@ export type OpenMaterialPicker = (
   applyPatch: (changes: Partial<SalesOrderDetailRow>) => void,
 ) => void;
 
-export function createSalesOrderDetailRow(): SalesOrderDetailRow {
+export function createSalesOrderDetailRow(deliveryDt = ''): SalesOrderDetailRow {
   return {
     rowId: `order-line-${crypto.randomUUID()}`,
     materialId: null,
@@ -36,7 +40,7 @@ export function createSalesOrderDetailRow(): SalesOrderDetailRow {
     supplyAmount: 0,
     vatAmount: 0,
     totalAmount: 0,
-    deliveryDt: '',
+    deliveryDt,
     shippedQty: 0,
     lineStatus: '대기',
   };
@@ -77,17 +81,27 @@ export function resolveActiveSalesOrderRows(
 export function createSalesOrderDetailColumns(
   onOpenMaterialPicker: OpenMaterialPicker,
   disabled = false,
+  progressStatusOptions: SalesOrderCodeOption[] = [],
+  onCalculationError?: (error: Error) => void,
 ): F1GridColumn<SalesOrderDetailRow>[] {
-  const recalculateAmounts = (quantity: number, unitPrice: number) => ({
-    orderQty: quantity,
-    unitPrice,
-    ...calculateSalesOrderAmounts(quantity, unitPrice),
-  });
+  const recalculateAmounts = (quantity: number, unitPrice: number) => {
+    try {
+      return {
+        orderQty: quantity,
+        unitPrice,
+        ...calculateSalesOrderAmounts(quantity, unitPrice),
+      };
+    } catch (cause) {
+      if (!(cause instanceof Error)) throw cause;
+      onCalculationError?.(cause);
+      return {};
+    }
+  };
 
   return [
     {
       field: 'rowId',
-      headerName: '행',
+      headerName: 'No',
       type: 'rownumber',
       width: 56,
       align: 'center',
@@ -176,11 +190,20 @@ export function createSalesOrderDetailColumns(
       editable: !disabled,
       min: 0,
       onValueChange: (row, value) => {
-        const vatAmount = roundSalesOrderAmount(numericValue(value));
-        return {
-          vatAmount,
-          totalAmount: roundSalesOrderAmount(row.supplyAmount + vatAmount),
-        };
+        try {
+          const vatAmount = roundSalesOrderAmount(numericValue(value), '부가세');
+          return {
+            vatAmount,
+            totalAmount: roundSalesOrderAmount(
+              row.supplyAmount + vatAmount,
+              '계산된 라인 합계',
+            ),
+          };
+        } catch (cause) {
+          if (!(cause instanceof Error)) throw cause;
+          onCalculationError?.(cause);
+          return {};
+        }
       },
     },
     {
@@ -194,8 +217,9 @@ export function createSalesOrderDetailColumns(
     },
     {
       field: 'deliveryDt',
-      headerName: '납기',
+      headerName: '납기일',
       type: 'date',
+      align: 'center',
       width: 130,
       editable: !disabled,
     },
@@ -209,11 +233,13 @@ export function createSalesOrderDetailColumns(
     },
     {
       field: 'lineStatus',
-      headerName: '라인상태',
+      headerName: '진행상태',
       type: 'text',
       width: 110,
       align: 'center',
       editable: false,
+      renderCell: ({ row }) =>
+        getSalesOrderCodeLabel(progressStatusOptions, row.lineStatus),
     },
   ];
 }

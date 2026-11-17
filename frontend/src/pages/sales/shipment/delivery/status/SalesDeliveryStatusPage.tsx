@@ -7,7 +7,7 @@ import { PageLoadBoundary } from '../../../../../shared/components/PageLoadBound
 import { PageMessageArea } from '../../../../../shared/components/PageMessageArea';
 import { PageSearchArea } from '../../../../../shared/components/PageSearchArea';
 import { SearchResultMessage } from '../../../../../shared/components/SearchResultMessage';
-import { F1Grid, type F1GridColumn } from '../../../../../shared/components/f1-grid';
+import { F1Grid, F1GridHighlightText, type F1GridColumn } from '../../../../../shared/components/f1-grid';
 import type { PageSearchField, PageSearchFieldValue } from '../../../../../shared/components/page-search/searchFields';
 import { usePageSessionState } from '../../../../../shared/hooks/usePageSessionState';
 import type { MenuPermission, MenuTreeNode } from '../../../../dashboard/types/dashboard';
@@ -119,21 +119,22 @@ export function SalesDeliveryStatusPage(props: DeliveryPageProps) {
   }, [detailValues, keyword, setSession]);
   const columns = useMemo<F1GridColumn<DeliveryStatusRow>[]>(() => [
     { field: 'salesDeliveryDetailId', headerName: 'No', type: 'rownumber', width: 56, align: 'center', pinned: 'left', search: { hidden: true }, form: { hidden: true } },
-    { field: 'deliveryNo', headerName: '출하번호', width: 140, align: 'center', mergeRows: true, renderCell: ({ row }) => (
+    { field: 'deliveryNo', headerName: '출하번호', width: 140, align: 'center', mergeRows: true, highlightSearch: true, renderCell: ({ row, highlightKeyword }) => (
       <Link component="button" type="button" underline="hover" disabled={!canRead} onClick={(event) => {
         event.stopPropagation(); if (canRead) { setDetail(null); setSelectedId(row.salesDeliveryId); }
-      }} aria-label={`${row.deliveryNo} 상세 보기`} sx={{ position: 'relative', zIndex: 1, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600, fontSize: 'inherit', verticalAlign: 'baseline' }}>{row.deliveryNo}</Link>
+      }} aria-label={`${row.deliveryNo} 상세 보기`} sx={{ position: 'relative', zIndex: 1, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600, fontSize: 'inherit', verticalAlign: 'baseline' }}>
+        {highlightKeyword ? <F1GridHighlightText text={row.deliveryNo} keyword={highlightKeyword} /> : row.deliveryNo}</Link>
     ) },
     { field: 'deliveryDt', headerName: '출하일자', type: 'date', width: 80, align: 'center', mergeRows: true },
-    { field: 'customerCode', headerName: '거래처코드', width: 80, align: 'center', mergeRows: true },
-    { field: 'customerName', headerName: '거래처명', width: 160, align: 'center', mergeRows: true },
+    { field: 'customerCode', headerName: '거래처코드', width: 80, align: 'center', mergeRows: true, highlightSearch: true },
+    { field: 'customerName', headerName: '거래처명', width: 160, align: 'center', mergeRows: true, highlightSearch: true },
     { field: 'orderNo', headerName: '연결 수주번호', width: 140, align: 'center', mergeRows: true },
     { field: 'deliveryType', headerName: '출하구분', width: 80, align: 'center', mergeRows: true, renderCell: ({ row }) => row.deliveryType === 'ORDER' ? '수주출하' : '직출하' },
     { field: 'deliveryPlace', headerName: '출하장소', width: 150, align: 'left', mergeRows: true },
     { field: 'deliveryMethod', headerName: '배송방법', width: 110, align: 'left', mergeRows: true },
     { field: 'lineNo', headerName: '행', width: 56, align: 'center' },
-    { field: 'materialCode', headerName: '품목코드', width: 120, align: 'center' },
-    { field: 'materialName', headerName: '품목명', width: 180, align: 'center' },
+    { field: 'materialCode', headerName: '품목코드', width: 120, align: 'center', highlightSearch: true },
+    { field: 'materialName', headerName: '품목명', width: 180, align: 'center', highlightSearch: true },
     { field: 'unit', headerName: '단위', width: 80, align: 'center' },
     ...(['deliveryQty', 'unitPrice', 'supplyAmt', 'vatAmt', 'totalAmt'] as const).map((field, index) => ({
       field, headerName: ['출하수량', '단가', '공급가', 'VAT', '합계'][index],
@@ -170,7 +171,7 @@ export function SalesDeliveryStatusPage(props: DeliveryPageProps) {
       ) : null}
       <Box data-testid="sales-status-content" sx={{ px: { xs: 1, sm: 2 }, pt: 1, pb: 2, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 360, flex: 1 }}>
         <Box sx={{ flex: 1, minHeight: 320, minWidth: 0, overflow: 'hidden' }}>
-        <F1Grid ariaLabel="출하현황 목록" rows={rows} columns={columns} rowKey="salesDeliveryDetailId"
+        <F1Grid ariaLabel="출하현황 목록" rows={rows} columns={columns} rowKey="salesDeliveryDetailId" highlightKeyword={filters.keyword}
           storageKey="sales-delivery-status-grid-v1" loading={loading} showCheckbox={false} height="100%" minHeight={320}
           selectionMode="row" selectRowOnContextMenu={false}
           allowAddRowInContextMenu={false} allowDuplicateRowInContextMenu={false} allowDeleteRowInContextMenu={false}

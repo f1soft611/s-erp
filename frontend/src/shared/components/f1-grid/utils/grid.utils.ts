@@ -11,6 +11,31 @@ export function getStateKey(rowId: F1GridRowId): string {
   return String(rowId);
 }
 
+/** 대소문자를 무시하고 검색어와 일치하는 구간으로 텍스트를 나눈다. 정규식을 쓰지 않아 대량 셀에서도 가볍다. */
+export function splitByHighlight(
+  text: string,
+  keyword: string,
+): Array<{ text: string; match: boolean }> {
+  if (!keyword || !text) return [{ text, match: false }];
+  const haystack = text.toLowerCase();
+  const needle = keyword.toLowerCase();
+  // 소문자 변환 시 길이가 달라지는 문자는 위치가 어긋나므로 강조하지 않는다.
+  if (haystack.length !== text.length || !haystack.includes(needle)) {
+    return [{ text, match: false }];
+  }
+  const parts: Array<{ text: string; match: boolean }> = [];
+  let cursor = 0;
+  let index = haystack.indexOf(needle);
+  while (index !== -1) {
+    if (index > cursor) parts.push({ text: text.slice(cursor, index), match: false });
+    parts.push({ text: text.slice(index, index + needle.length), match: true });
+    cursor = index + needle.length;
+    index = haystack.indexOf(needle, cursor);
+  }
+  if (cursor < text.length) parts.push({ text: text.slice(cursor), match: false });
+  return parts;
+}
+
 export function hasGridRowId<T extends object>(
   rows: T[],
   rowKey: keyof T,

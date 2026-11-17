@@ -11,6 +11,7 @@ import {
   Button,
   IconButton,
   InputAdornment,
+  MenuItem,
   Paper,
   TextField,
   Tooltip,
@@ -36,6 +37,8 @@ import type {
 } from '../../../dashboard/types/dashboard';
 import { getSystemDate } from '../../../../shared/services/systemDateService';
 import { sumSalesOrderAmounts } from './data/salesOrderAmounts';
+import { getSalesOrderCodeLabel } from '../services/salesOrderCommonCode.service';
+import { useSalesOrderCommonCodes } from '../hooks/useSalesOrderCommonCodes';
 import {
   SalesOrderDetailGrid,
 } from './components/SalesOrderDetailGrid';
@@ -130,6 +133,12 @@ export function SalesOrderCreatePage({
   onEmbeddedActionsChange,
 }: Props) {
   const { confirm, dialog } = useCommonConfirmDialog();
+  const {
+    codes: commonCodes,
+    loading: commonCodesLoading,
+    error: commonCodesError,
+    retry: retryCommonCodes,
+  } = useSalesOrderCommonCodes();
   const isReadOnly = mode === 'view';
   const gridRef = useRef<F1GridRef<SalesOrderDetailRow>>(null);
   const savingRef = useRef(false);
@@ -164,9 +173,15 @@ export function SalesOrderCreatePage({
   const [validationErrors, setValidationErrors] =
     useState<SalesOrderValidationErrors | null>(null);
   const [error, setError] = useState('');
-  const orderDateTouchedRef = useRef(false);
   const [isLoadingOrder, setIsLoadingOrder] = useState(salesOrderId != null);
+  const orderDateTouchedRef = useRef(false);
   const gridValidationActiveRef = useRef(false);
+  const missingCommonCodes =
+    !commonCodesLoading &&
+    !commonCodesError &&
+    (!commonCodes.orderStatusOptions.length ||
+      !commonCodes.progressStatusOptions.length ||
+      !commonCodes.deliveryMethodOptions.length);
 
   const canCreate = Boolean(selectedMenuPermissions?.create);
   const canUpdate = Boolean(selectedMenuPermissions?.update);
@@ -220,8 +235,8 @@ export function SalesOrderCreatePage({
       rows: SalesOrderDetailRow[],
     ) => {
       setCustomer(nextCustomer);
-      orderDateTouchedRef.current = true;
       setOrderDate(header.orderDt);
+      orderDateTouchedRef.current = true;
       setQuotationNumber(header.quotNo);
       setSelectedQuotationCustomerId(null);
       setDeliveryDate(header.deliveryDt);
@@ -273,6 +288,7 @@ export function SalesOrderCreatePage({
       setIsLoadingOrder(false);
     }
   }, [applyForm]);
+
   useEffect(() => {
     if (salesOrderId != null || mode !== 'create') return;
     let active = true;
@@ -291,7 +307,6 @@ export function SalesOrderCreatePage({
       });
     return () => { active = false; };
   }, [mode, salesOrderId]);
-
 
   useEffect(() => {
     if (salesOrderId == null) return;
@@ -329,12 +344,17 @@ export function SalesOrderCreatePage({
           changes.deletedRows.length > 0,
       );
       clearValidationErrors();
+      setError('');
       if (gridValidationActiveRef.current) {
         gridValidationActiveRef.current = !(gridRef.current?.validate() ?? true);
       }
     },
     [clearValidationErrors, gridRows],
   );
+
+  const handleCalculationError = useCallback((cause: Error) => {
+    setError(cause.message);
+  }, []);
 
   const openMaterialPicker = useCallback(
     (applyPatch: (changes: Partial<SalesOrderDetailRow>) => void) => {
@@ -388,8 +408,11 @@ export function SalesOrderCreatePage({
     const normalizedDeliveryDate = deliveryDate.trim() ? normalizeDateInput(deliveryDate) : '';
     const nextOrderDateError = normalizedOrderDate ? ''
       : orderDate.trim() ? '올바른 수주일자를 입력해 주세요.' : '수주일자를 입력해 주세요.';
-    const nextDeliveryDateError = deliveryDate.trim() && !normalizedDeliveryDate
-      ? '올바른 납기일자를 입력해 주세요.' : '';
+    const nextDeliveryDateError = normalizedDeliveryDate
+      ? ''
+      : deliveryDate.trim()
+        ? '올바른 납기일자를 입력해 주세요.'
+        : '납기일자를 입력해 주세요.';
     setOrderDateError(nextOrderDateError);
     setDeliveryDateError(nextDeliveryDateError);
 
@@ -405,11 +428,12 @@ export function SalesOrderCreatePage({
     };
     const errors = validateSalesOrderInput(input);
     if (nextOrderDateError) errors.orderDt = nextOrderDateError;
+    errors.deliveryDt = nextDeliveryDateError;
     const isGridValid = gridRef.current?.validate() ?? true;
     gridValidationActiveRef.current = !isGridValid;
     const validationMessages = [
       errors.orderDt,
-      nextDeliveryDateError,
+      errors.deliveryDt,
       errors.customerId,
       errors.details,
       ...errors.detailMessages,
@@ -672,6 +696,19 @@ export function SalesOrderCreatePage({
           </Alert>
         )}
         {notice && <Alert severity="success">{notice}</Alert>}
+        {commonCodesError || missingCommonCodes ? (
+          <Alert
+            severity="error"
+            action={
+              <Button color="inherit" size="small" onClick={retryCommonCodes}>
+                공통코드 다시 불러오기
+              </Button>
+            }
+          >
+            {commonCodesError ||
+              '수주 공통코드가 등록되지 않았습니다. 공통코드를 등록한 뒤 다시 불러와 주세요.'}
+          </Alert>
+        ) : null}
         {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
         <Paper
           variant="outlined"
@@ -788,6 +825,7 @@ export function SalesOrderCreatePage({
               label="납기일자"
               variant="outlined"
               autoFocus={false}
+              required
               value={deliveryDate}
               onChange={(value) => {
                 setDeliveryDate(value);
@@ -817,17 +855,31 @@ export function SalesOrderCreatePage({
             <TextField
               label="배송방법"
               size="small"
+              select
               value={deliveryMethod}
               onChange={(event) => {
                 setDeliveryMethod(event.target.value);
                 clearValidationErrors();
               }}
-              disabled={!isEditable}
-            />
+              disabled={!isEditable || commonCodesLoading || Boolean(commonCodesError) || !commonCodes.deliveryMethodOptions.length}
+            >
+              {deliveryMethod &&
+              !commonCodes.deliveryMethodOptions.some(({ value }) => value === deliveryMethod) ? (
+                <MenuItem value={deliveryMethod}>{deliveryMethod}</MenuItem>
+              ) : null}
+              {commonCodes.deliveryMethodOptions.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
             <TextField
               label="수주상태"
               size="small"
-              value={loadedOrder?.status ?? EDITABLE_ORDER_STATUS}
+              value={getSalesOrderCodeLabel(
+                commonCodes.orderStatusOptions,
+                loadedOrder?.status ?? EDITABLE_ORDER_STATUS,
+              )}
               slotProps={{ input: { readOnly: true } }}
               sx={{ '& .MuiInputBase-root': { backgroundColor: 'action.disabledBackground' } }}
             />
@@ -915,6 +967,9 @@ export function SalesOrderCreatePage({
               onChangesChange={handleChangesChange}
               onSelectionChange={setSelectedRowIds}
               onOpenMaterialPicker={openMaterialPicker}
+              deliveryDate={normalizeDateInput(deliveryDate) || deliveryDate}
+              progressStatusOptions={commonCodes.progressStatusOptions}
+              onCalculationError={handleCalculationError}
               disabled={!isEditable}
             />
           </Box>

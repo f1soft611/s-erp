@@ -260,6 +260,7 @@ export function ItemPartnerPriceManagementPage({
         <Box sx={{ flex: 1, minHeight: 280, minWidth: 0, p: 1 }}>
           <ItemPartnerPriceGrid
             rows={management.rows}
+            highlightKeyword={management.appliedFilters.keyword}
             canCreate={canCreate && !management.loading && !management.saving}
             canUpdate={canUpdate && !management.loading && !management.saving}
             canExportExcel={Boolean(selectedMenuPermissions?.excel)}

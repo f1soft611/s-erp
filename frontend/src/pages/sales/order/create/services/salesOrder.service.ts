@@ -20,12 +20,15 @@ const SALES_ORDER_PATH = '/api/v1/sales/orders';
 const MAX_NUMERIC_15_2 = 9_999_999_999_999.99;
 
 export function validateSalesOrderInput(
-  input: Pick<SalesOrderCreateInput, 'orderDt' | 'customerId' | 'details'>,
+  input: Pick<SalesOrderCreateInput, 'orderDt' | 'deliveryDt' | 'customerId' | 'details'>,
 ): SalesOrderValidationErrors {
   const errors: SalesOrderValidationErrors = { detailRows: {}, detailMessages: [] };
 
   if (!input.orderDt.trim()) {
     errors.orderDt = '수주일자를 입력해 주세요.';
+  }
+  if (!input.deliveryDt?.trim()) {
+    errors.deliveryDt = '납기일자를 입력해 주세요.';
   }
   if (
     input.customerId == null ||

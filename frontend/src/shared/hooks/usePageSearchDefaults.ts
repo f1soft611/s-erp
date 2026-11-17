@@ -12,7 +12,10 @@ type PageSearchDefaultsState = {
   error: string | null;
 };
 
-export function usePageSearchDefaults(fields: PageSearchField[]) {
+export function usePageSearchDefaults(
+  fields: PageSearchField[],
+  enabled = true,
+) {
   const [state, setState] = useState<PageSearchDefaultsState>({
     values: null,
     loading: true,
@@ -23,6 +26,11 @@ export function usePageSearchDefaults(fields: PageSearchField[]) {
 
   useEffect(() => {
     let active = true;
+    if (!enabled) {
+      return () => {
+        active = false;
+      };
+    }
     start();
     setState({ values: null, loading: true, error: null });
 
@@ -46,11 +54,15 @@ export function usePageSearchDefaults(fields: PageSearchField[]) {
     return () => {
       active = false;
     };
-  }, [fields, retryToken, start, succeed, fail]);
+  }, [enabled, fields, retryToken, start, succeed, fail]);
 
   const retry = useCallback(() => {
     setRetryToken((current) => current + 1);
   }, []);
 
-  return { ...state, retry, initialLoad };
+  return {
+    ...(enabled ? state : { values: null, loading: true, error: null }),
+    retry,
+    initialLoad,
+  };
 }

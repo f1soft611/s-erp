@@ -8,6 +8,7 @@ type Props = {
   loading: boolean;
   canExportExcel: boolean;
   onOpenQuotation: (row: QuotationStatusRow) => void;
+  highlightKeyword?: string;
 };
 
 export function QuotationStatusGrid({
@@ -15,6 +16,7 @@ export function QuotationStatusGrid({
   loading,
   canExportExcel,
   onOpenQuotation,
+  highlightKeyword,
 }: Props) {
   const columns = useMemo(
     () => createQuotationStatusColumns({ onOpenQuotation }),
@@ -27,6 +29,7 @@ export function QuotationStatusGrid({
       storageKey="quotationStatusGrid"
       rowKey="quotationDetailId"
       rows={rows}
+      highlightKeyword={highlightKeyword}
       loading={loading}
       features={[{ ftype: 'summary', dock: 'bottom' }]}
       showCheckbox

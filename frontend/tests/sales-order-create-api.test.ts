@@ -38,11 +38,13 @@ describe('sales order create API', () => {
   it('rejects missing header fields and incomplete detail rows', () => {
     const errors = validateSalesOrderInput({
       orderDt: '',
+      deliveryDt: '',
       customerId: null,
       details: [],
     });
 
     expect(errors.orderDt).toBe('수주일자를 입력해 주세요.');
+    expect(errors.deliveryDt).toBe('납기일자를 입력해 주세요.');
     expect(errors.customerId).toBe('거래처를 선택해 주세요.');
     expect(errors.details).toBe('품목 상세를 1건 이상 입력해 주세요.');
   });
@@ -50,6 +52,7 @@ describe('sales order create API', () => {
   it('requires a selected material and positive quantity on every detail', () => {
     const errors = validateSalesOrderInput({
       orderDt: '2026-10-27',
+      deliveryDt: '2026-11-27',
       customerId: 10,
       details: [detailRow({ materialId: null, orderQty: 0 })],
     });
@@ -61,6 +64,7 @@ describe('sales order create API', () => {
   it('collects detail validation messages once regardless of row count', () => {
     const errors = validateSalesOrderInput({
       orderDt: '2026-10-27',
+      deliveryDt: '2026-11-27',
       customerId: 10,
       details: [
         detailRow({ rowId: 'line-1', orderQty: 0 }),

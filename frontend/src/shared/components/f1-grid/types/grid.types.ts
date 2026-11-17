@@ -134,6 +134,8 @@ export type F1GridCellRenderContext<T extends object> = {
   field: keyof T;
   value: unknown;
   rowIndex: number;
+  /** `highlightSearch` 컬럼에만 전달되는 통합검색어. */
+  highlightKeyword?: string;
 };
 
 export type F1GridCellProps = {
@@ -164,6 +166,8 @@ export type F1GridColumn<T extends object> = {
   headerGroup?: string;
   form?: F1GridColumnFormOptions<T>;
   search?: F1GridColumnSearchOptions;
+  /** true이면 Grid의 `highlightKeyword`와 일치하는 글자를 빨간색으로 표시한다. 기본 텍스트 셀은 자동 적용되고, `renderCell` 컬럼은 context.highlightKeyword를 `F1GridHighlightText`에 넘겨 직접 적용한다. */
+  highlightSearch?: boolean;
   getValue?: (row: T) => unknown;
   onValueChange?: (row: T, value: unknown) => Partial<T>;
   width?: number;
@@ -297,6 +301,8 @@ export type F1GridProps<T extends object> = {
   ariaLabel?: string;
   columnLine?: boolean;
   stripeRows?: boolean;
+  /** 조회에 적용된 통합검색어. `highlightSearch` 컬럼에서 일치 글자를 빨간색으로 표시한다. */
+  highlightKeyword?: string;
   storageKey?: string;
   height?: number | string;
   minHeight?: number | string;
