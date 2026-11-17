@@ -223,7 +223,6 @@ export function PurchaseOrderStatusPage({
                 storageKey="materialsPurchaseOrderStatusGrid"
                 rowKey="purchaseOrderDetailId"
                 rows={list.rows}
-                highlightKeyword={search.appliedFilters?.keyword}
                 loading={list.loading}
                 showCheckbox={false}
                 selectionMode="row"
