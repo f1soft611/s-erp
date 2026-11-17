@@ -10,6 +10,7 @@ import {
   updatePurchaseOrder,
 } from '../src/pages/materials/order/create/services/purchaseOrder.service';
 import {
+  PURCHASE_ORDER_STATUS_OPTIONS,
   searchPurchaseOrderStatus,
   toPurchaseOrderStatusFilters,
 } from '../src/pages/materials/order/status/services/purchaseOrderStatus.service';
@@ -72,6 +73,17 @@ describe('purchase order status service', () => {
     apiGetMock.mockResolvedValue({ resultList: [] });
     await searchPurchaseOrderStatus({ keyword: 'PO', status: 'ACTIVE' });
     expect(apiGetMock).toHaveBeenLastCalledWith('/api/v1/materials/purchase-order-status?keyword=PO&status=ACTIVE');
+  });
+
+  it('offers normal (default), canceled and all as the status choices and keeps normal when none is chosen', () => {
+    expect(PURCHASE_ORDER_STATUS_OPTIONS).toEqual([
+      { value: 'ACTIVE', label: '정상' },
+      { value: 'CANCELED', label: '취소' },
+      { value: 'ALL', label: '전체' },
+    ]);
+    expect(toPurchaseOrderStatusFilters('', { orderDt: { from: '2026-11-01', to: '2026-11-30' } }).status)
+      .toBe('ACTIVE');
+    expect(toPurchaseOrderStatusFilters('', { status: 'ALL' }).status).toBe('ALL');
   });
 
   it('calls get, update and cancel endpoints', async () => {
@@ -138,6 +150,17 @@ describe('PurchaseOrderStatusPage', () => {
     });
     apiPutMock.mockResolvedValue({ item: { ...orderItem('Y'), overOrderedLineNos: [] } });
     apiPostMock.mockResolvedValue({ item: orderItem('N') });
+  });
+
+  it('lists only the normal orders by default', async () => {
+    renderPage();
+    await screen.findByRole('grid', { name: '발주현황 목록' });
+    await waitFor(() => expect(apiGetMock).toHaveBeenCalled());
+    const listCalls = apiGetMock.mock.calls
+      .map(([path]) => path as string)
+      .filter((path) => path.startsWith('/api/v1/materials/purchase-order-status'));
+    expect(listCalls.length).toBeGreaterThan(0);
+    expect(listCalls.every((path) => path.includes('status=ACTIVE'))).toBe(true);
   });
 
   async function openDetail() {
@@ -213,7 +236,7 @@ describe('PurchaseOrderStatusPage', () => {
     const grid = await within(dialog).findByRole('grid', { name: '발주 상세 목록' });
     await within(grid).findByText('품목 11');
     // 마감 외에는 전부 읽기 전용: 헤더 입력, 행 빼기, 발주 취소가 없다
-    expect(within(dialog).getByLabelText(/^발주일/)).toBeDisabled();
+    expect(within(dialog).getByRole('textbox', { name: /^발주일/ })).toBeDisabled();
     expect(within(dialog).getByRole('textbox', { name: /^비고/ })).toBeDisabled();
     expect(within(dialog).queryByRole('button', { name: '선택 행 빼기' })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: '발주 취소' })).not.toBeInTheDocument();

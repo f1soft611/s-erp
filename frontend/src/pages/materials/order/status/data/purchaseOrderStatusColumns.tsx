@@ -2,6 +2,7 @@ import { Link } from '@mui/material';
 import type { F1GridColumn } from '../../../../../shared/components/f1-grid/types/grid.types';
 import { PURCHASE_ORDER_SOURCE_OPTIONS, PURCHASE_ORDER_STATUS_OPTIONS } from '../services/purchaseOrderStatus.service';
 import type { PurchaseOrderStatusRow } from '../types/purchaseOrderStatus.types';
+import { F1GridHighlightText } from '../../../../../shared/components/f1-grid';
 
 export type PurchaseOrderStatusColumnOptions = {
   onOpenOrder?: (row: PurchaseOrderStatusRow) => void;
@@ -40,14 +41,15 @@ export function createPurchaseOrderStatusColumns({
     {
       type: 'text',
       field: 'orderNo',
+      highlightSearch: true,
       headerName: '발주번호',
       width: 160,
       editable: false,
       mergeRows: true,
       align: 'center',
-      search: { label: '발주번호', order: 2, span: 2, group: '발주정보' },
+      search: { label: '발주번호', order: 2, span: 1, group: '텍스트' },
       renderCell: onOpenOrder
-        ? ({ row }) => (
+        ? ({ row, highlightKeyword }) => (
             <Link
               component="button"
               type="button"
@@ -70,7 +72,7 @@ export function createPurchaseOrderStatusColumns({
                 verticalAlign: 'baseline',
               }}
             >
-              {row.orderNo}
+              {highlightKeyword ? <F1GridHighlightText text={row.orderNo} keyword={highlightKeyword} /> : row.orderNo}
             </Link>
           )
         : undefined,
@@ -87,7 +89,7 @@ export function createPurchaseOrderStatusColumns({
         required: true,
         label: '발주일',
         order: 1,
-        span: 4,
+        span: 2,
         group: '발주일',
         defaultValue: {
           from: { type: 'systemDate', offset: { months: -1 } },
@@ -97,15 +99,17 @@ export function createPurchaseOrderStatusColumns({
     },
     {
       field: 'supplierName',
+      highlightSearch: true,
       headerName: '구매처',
       type: 'text',
       width: 150,
       editable: false,
       mergeRows: true,
-      search: { label: '구매처', order: 3, span: 2, group: '발주정보' },
+      search: { label: '구매처', order: 3, span: 1, group: '텍스트' },
     },
     {
       field: 'ordererName',
+      highlightSearch: true,
       headerName: '발주자',
       type: 'text',
       width: 90,
@@ -123,7 +127,7 @@ export function createPurchaseOrderStatusColumns({
       align: 'center',
       editable: false,
       mergeRows: true,
-      search: { label: '상태', order: 4, span: 2, group: '발주정보' },
+      search: { label: '상태', order: 5, span: 1, group: '선택', required: true, allowEmpty: false },
     },
     {
       field: 'sourceType',
@@ -134,20 +138,21 @@ export function createPurchaseOrderStatusColumns({
       align: 'center',
       editable: false,
       mergeRows: true,
-      search: { label: '출처', order: 5, span: 2, group: '발주정보' },
+      search: { label: '출처', order: 6, span: 1, group: '선택' },
     },
     { field: 'lineNo', headerName: '행', type: 'number', width: 50, align: 'center', editable: false, search: { hidden: true } },
     { field: 'confirmNo', headerName: '확정번호', type: 'text', width: 150, align: 'center', editable: false, search: { hidden: true } },
     {
       field: 'materialCode',
+      highlightSearch: true,
       headerName: '품목코드',
       type: 'text',
       width: 110,
       align: 'center',
       editable: false,
-      search: { label: '품목', order: 6, span: 2, group: '품목정보' },
+      search: { label: '품목', order: 4, span: 1, group: '텍스트' },
     },
-    { field: 'materialName', headerName: '품목명', type: 'text', width: 180, editable: false, search: { hidden: true } },
+    { field: 'materialName', highlightSearch: true, headerName: '품목명', type: 'text', width: 180, editable: false, search: { hidden: true } },
     { field: 'materialSpec', headerName: '규격', type: 'text', width: 110, editable: false, search: { hidden: true } },
     { field: 'unit', headerName: '단위', type: 'text', width: 60, align: 'center', editable: false, search: { hidden: true } },
     amountColumn('orderQty', '발주수량', 2, 100),
@@ -162,7 +167,7 @@ export function createPurchaseOrderStatusColumns({
       width: 100,
       align: 'center',
       editable: false,
-      search: { label: '납기일', order: 7, span: 4, group: '품목정보' },
+      search: { label: '납기일', order: 7, span: 2, group: '부가날짜' },
     },
     { field: 'warehouseName', headerName: '입고창고', type: 'text', width: 110, align: 'center', editable: false, search: { hidden: true } },
     {

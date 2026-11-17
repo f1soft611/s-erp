@@ -10,9 +10,12 @@ import type {
 
 const PURCHASE_ORDER_STATUS_PATH = '/api/v1/materials/purchase-order-status';
 
+/** 상태 조회 조건: 정상(기본), 취소, 전체(취소 포함). 취소 이력이 있는 모든 현황 화면의 공통 규칙이다. */
+export const PURCHASE_ORDER_STATUS_DEFAULT = 'ACTIVE';
 export const PURCHASE_ORDER_STATUS_OPTIONS = [
   { value: 'ACTIVE', label: '정상' },
   { value: 'CANCELED', label: '취소' },
+  { value: 'ALL', label: '전체' },
 ];
 
 export const PURCHASE_ORDER_SOURCE_OPTIONS = [
@@ -83,7 +86,8 @@ export function toPurchaseOrderStatusFilters(
     orderDtFrom: orderDt.from,
     orderDtTo: orderDt.to,
     supplierKeyword: readText(values, 'supplierName'),
-    status: readText(values, 'status'),
+    // 상태를 비우면 서버도 정상만 조회하므로 같은 값을 명시해 둔다(예전에 저장된 검색 세션 복원 포함).
+    status: readText(values, 'status') ?? PURCHASE_ORDER_STATUS_DEFAULT,
     sourceType: readText(values, 'sourceType'),
     materialKeyword: readText(values, 'materialCode'),
     deliveryDtFrom: deliveryDt.from,
