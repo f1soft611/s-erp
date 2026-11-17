@@ -44,7 +44,7 @@ export function createQuotationStatusColumns({
       editable: false,
       mergeRows: true,
       align: 'center',
-      search: { label: '견적번호', order: 2, span: 2, group: '견적정보' },
+      search: { label: '견적번호', order: 2, span: 1, group: '텍스트' },
       highlightSearch: true,
       renderCell: onOpenQuotation
         ? ({ row, highlightKeyword }) => (
@@ -86,7 +86,7 @@ export function createQuotationStatusColumns({
         required: true,
         label: '견적작성일',
         order: 1,
-        span: 4,
+        span: 2,
         group: '견적작성일',
         defaultValue: {
           from: { type: 'systemDate', offset: { months: -1 } },
@@ -102,7 +102,7 @@ export function createQuotationStatusColumns({
       align: 'center',
       editable: false,
       mergeRows: true,
-      search: { label: '제출일', order: 5, span: 4, group: '견적정보' },
+      search: { label: '제출일', order: 5, span: 2, group: '부가날짜' },
     },
     {
       field: 'customerCode',
@@ -121,7 +121,7 @@ export function createQuotationStatusColumns({
       editable: false,
       mergeRows: true,
       highlightSearch: true,
-      search: { label: '거래처', order: 3, span: 2, group: '견적정보' },
+      search: { label: '거래처', order: 3, span: 1, group: '텍스트' },
     },
     {
       field: 'lineNo',
@@ -147,7 +147,7 @@ export function createQuotationStatusColumns({
       width: 180,
       editable: false,
       highlightSearch: true,
-      search: { label: '품목', order: 4, span: 2, group: '견적정보' },
+      search: { label: '품목', order: 4, span: 1, group: '텍스트' },
     },
     {
       field: 'materialSpec',

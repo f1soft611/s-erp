@@ -57,7 +57,7 @@ export function createSalesOrderStatusColumns({
       editable: false,
       mergeRows: true,
       align: 'center',
-      search: { label: '수주번호', order: 2, span: 2, group: '수주정보' },
+      search: { label: '수주번호', order: 2, span: 1, group: '텍스트' },
       highlightSearch: true,
       renderCell: onOpenOrder
         ? ({ row, highlightKeyword }) => (
@@ -100,7 +100,7 @@ export function createSalesOrderStatusColumns({
         required: true,
         label: '수주일자',
         order: 1,
-        span: 4,
+        span: 2,
         group: '수주일자',
         defaultValue: {
           from: { type: 'systemDate', offset: { months: -1 } },
@@ -125,7 +125,7 @@ export function createSalesOrderStatusColumns({
       editable: false,
       mergeRows: true,
       highlightSearch: true,
-      search: { label: '거래처', order: 3, span: 2, group: '수주정보' },
+      search: { label: '거래처', order: 3, span: 1, group: '텍스트' },
     },
     {
       field: 'quotNo',
@@ -134,7 +134,7 @@ export function createSalesOrderStatusColumns({
       editable: false,
       mergeRows: true,
       highlightSearch: true,
-      search: { label: '견적번호', order: 4, span: 2, group: '수주정보' },
+      search: { label: '견적번호', order: 4, span: 1, group: '텍스트' },
     },
     {
       field: 'lineStatus',
@@ -146,7 +146,7 @@ export function createSalesOrderStatusColumns({
       editable: false,
       renderCell: ({ row }) =>
         getSalesOrderCodeLabel(progressStatusOptions, row.lineStatus),
-      search: { label: '진행상태', order: 8, span: 2, group: '품목정보' },
+      search: { label: '진행상태', order: 7, span: 1, group: '선택' },
     },
     {
       field: 'status',
@@ -158,7 +158,7 @@ export function createSalesOrderStatusColumns({
       editable: false,
       hidden: true,
       mergeRows: true,
-      search: { label: '수주상태', order: 5, span: 2, group: '수주정보' },
+      search: { label: '수주상태', order: 6, span: 1, group: '선택' },
     },
     {
       field: 'deliveryPlace',
@@ -203,7 +203,7 @@ export function createSalesOrderStatusColumns({
       width: 180,
       editable: false,
       highlightSearch: true,
-      search: { label: '품목', order: 6, span: 2, group: '품목정보' },
+      search: { label: '품목', order: 5, span: 1, group: '텍스트' },
     },
     {
       field: 'unit',
@@ -225,7 +225,7 @@ export function createSalesOrderStatusColumns({
       width: 80,
       align: 'center',
       editable: false,
-      search: { label: '납기일자', order: 7, span: 4, group: '품목정보' },
+      search: { label: '납기일자', order: 8, span: 2, group: '부가날짜' },
     },
     amountColumn('shippedQty', '출하수량', 'decimal'),
     {
