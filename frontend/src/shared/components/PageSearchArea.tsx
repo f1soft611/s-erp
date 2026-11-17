@@ -25,6 +25,7 @@ import KeyboardArrowUpRoundedIcon from '@mui/icons-material/KeyboardArrowUpRound
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import { DateEditor, normalizeDateInput } from './f1-grid/editing/DateEditor';
+import { formatMonthValue, MonthEditor, normalizeMonthInput } from './f1-grid/editing/MonthEditor';
 import { useF1GridFormattedInput } from './f1-grid/editing/useF1GridFormattedInput';
 import { QUICK_DATE_PRESETS, resolveQuickDate } from './page-search/quickDates';
 import { getSystemDate } from '../services/systemDateService';
@@ -332,6 +333,13 @@ export function PageSearchArea({
           (typeof value === 'string' && value.trim() === ''))
       ) {
         nextRequiredErrors[field.field] = true;
+      } else if (
+        field.type === 'month' &&
+        typeof value === 'string' &&
+        value.trim() !== '' &&
+        !normalizeMonthInput(value)
+      ) {
+        nextDateErrors[field.field] = true;
       }
     }
     setDateErrors(nextDateErrors);
@@ -416,6 +424,24 @@ export function PageSearchArea({
               );
             })}
           </Box>
+        ) : field.type === 'month' ? (
+          <MonthEditor
+            label={field.label}
+            required={field.required}
+            value={typeof value === 'string' ? value : ''}
+            onChange={(next) => {
+              setDateErrors((current) => ({ ...current, [field.field]: false }));
+              updateValue(field.field, next);
+            }}
+            error={Boolean(requiredErrors[field.field] || dateErrors[field.field])}
+            helperText={
+              requiredErrors[field.field]
+                ? '필수 입력입니다.'
+                : dateErrors[field.field]
+                  ? '올바른 월을 입력하세요.'
+                  : undefined
+            }
+          />
         ) : field.type === 'select' || field.type === 'checkbox' ? (
           <FormControl
             size="small"
@@ -438,7 +464,7 @@ export function PageSearchArea({
               onChange={(event) => updateValue(field.field, event.target.value)}
               inputProps={{ 'aria-label': field.label }}
             >
-              <MenuItem value="">전체</MenuItem>
+              {field.allowEmpty === false ? null : <MenuItem value="">전체</MenuItem>}
               {(field.options ?? []).map((option) => (
                 <MenuItem
                   key={String(option.value)}
@@ -521,7 +547,11 @@ export function PageSearchArea({
     const option = field.options?.find(
       (candidate) => String(candidate.value) === displayValue,
     );
-    return [{ field, value, displayValue: option?.label ?? displayValue }];
+    return [{
+      field,
+      value,
+      displayValue: field.type === 'month' ? formatMonthValue(displayValue) : (option?.label ?? displayValue),
+    }];
   });
   const visibleDetailFilters = activeDetailFilters.filter(
     ({ field }) => !pendingRemovalFields[field.field],

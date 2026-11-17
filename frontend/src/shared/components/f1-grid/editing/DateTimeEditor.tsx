@@ -2,6 +2,8 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import dayjs from 'dayjs';
+import 'dayjs/locale/ko';
+import { koKR } from '@mui/x-date-pickers/locales';
 import type { KeyboardEvent } from 'react';
 
 type DateTimeEditorProps = {
@@ -22,7 +24,11 @@ export function DateTimeEditor({
   const parsedValue = value ? dayjs(value, DATE_TIME_FORMAT) : null;
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs}>
+    <LocalizationProvider
+      dateAdapter={AdapterDayjs}
+      adapterLocale="ko"
+      localeText={koKR.components.MuiLocalizationProvider.defaultProps.localeText}
+    >
       <DateTimePicker
         value={parsedValue}
         format={DATE_TIME_FORMAT}
