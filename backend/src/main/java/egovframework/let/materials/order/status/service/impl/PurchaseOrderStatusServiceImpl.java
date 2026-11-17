@@ -46,11 +46,23 @@ public class PurchaseOrderStatusServiceImpl extends EgovAbstractServiceImpl impl
         params.put("orderNo", text(condition.getOrderNo()));
         params.put("supplierKeyword", text(condition.getSupplierKeyword()));
         params.put("materialKeyword", text(condition.getMaterialKeyword()));
-        params.put("status", enumValue(condition.getStatus(), "ACTIVE", "CANCELED"));
+        params.put("status", status(condition.getStatus()));
         params.put("sourceType", enumValue(condition.getSourceType(), "CONFIRM", "DIRECT"));
         putDateRange(params, "orderDt", condition.getOrderDtFrom(), condition.getOrderDtTo());
         putDateRange(params, "deliveryDt", condition.getDeliveryDtFrom(), condition.getDeliveryDtTo());
         return purchaseOrderStatusDAO.selectOrderStatusList(params);
+    }
+
+    /** 상태 조건이 없으면 정상만 조회한다(취소건은 취소·전체를 고를 때만 나온다). */
+    private String status(String value) {
+        String text = text(value);
+        if (text == null) {
+            return "ACTIVE";
+        }
+        if (!"ACTIVE".equals(text) && !"CANCELED".equals(text) && !"ALL".equals(text)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "검색 조건이 올바르지 않습니다.");
+        }
+        return text;
     }
 
     private String enumValue(String value, String first, String second) {
