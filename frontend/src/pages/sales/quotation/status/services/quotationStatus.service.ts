@@ -11,10 +11,12 @@ const QUOTATION_STATUS_PATH = '/api/v1/sales/quotation-status';
 
 export function toQuotationStatusFilters(
   values: QuotationStatusSearchValues,
+  keyword = '',
 ): QuotationStatusFilters {
   const quotationDt = readDateRange(values, 'quotationDt');
   const submitDt = readDateRange(values, 'submitDt');
   const filters: QuotationStatusFilters = {
+    keyword: keyword.trim() || undefined,
     quotationDtFrom: quotationDt.from ?? '',
     quotationDtTo: quotationDt.to ?? '',
     submitDtFrom: submitDt.from,
@@ -91,8 +93,9 @@ export function cloneQuotationStatusSearchValues(
 
 export function isQuotationStatusSearchSession(
   value: unknown,
-): value is { detailValues: QuotationStatusSearchValues } {
+): value is { keyword?: string; detailValues: QuotationStatusSearchValues } {
   if (!isRecord(value) || !isRecord(value.detailValues)) return false;
+  if (value.keyword !== undefined && typeof value.keyword !== 'string') return false;
   const detailValues = value.detailValues as QuotationStatusSearchValues;
   const hasValidFields = Object.values(detailValues).every((item) => {
     if (item === null || typeof item === 'string' || typeof item === 'boolean') return true;

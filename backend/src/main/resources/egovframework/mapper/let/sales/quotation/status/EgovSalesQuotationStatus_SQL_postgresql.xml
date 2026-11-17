@@ -21,6 +21,13 @@
         <if test="quotationNo != null">AND h.quotation_no ILIKE '%' || #{quotationNo} || '%'</if>
         <if test="customerKeyword != null">AND (c.customer_name ILIKE '%' || #{customerKeyword} || '%' OR c.customer_code ILIKE '%' || #{customerKeyword} || '%')</if>
         <if test="materialKeyword != null">AND d.material_name ILIKE '%' || #{materialKeyword} || '%'</if>
+        <if test="keyword != null">
+            AND (h.quotation_no ILIKE '%' || #{keyword} || '%'
+                OR c.customer_code ILIKE '%' || #{keyword} || '%'
+                OR c.customer_name ILIKE '%' || #{keyword} || '%'
+                OR d.material_code ILIKE '%' || #{keyword} || '%'
+                OR d.material_name ILIKE '%' || #{keyword} || '%')
+        </if>
         ORDER BY h.quotation_dt DESC, h.quotation_id DESC, d.line_no
     </select>
 </mapper>

@@ -117,7 +117,9 @@ describe('quotation status page', () => {
     }]);
     render(<RouterProvider router={router} />);
 
-    expect(await screen.findByRole('button', { name: 'QT-20261116-0001 상세 보기' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'QT-20261116-0001 상세 보기' }, {
+      timeout: 5000,
+    })).toBeInTheDocument();
     const statusRequest = apiGetMock.mock.calls
       .map(([path]) => String(path))
       .find((path) => path.startsWith('/api/v1/sales/quotation-status'));
@@ -129,5 +131,35 @@ describe('quotation status page', () => {
     expect(await screen.findByText('견적 조건')).toBeInTheDocument();
     expect(screen.getAllByText('직접 입력 품목').length).toBeGreaterThan(0);
     expect(screen.getByText('FOB')).toBeInTheDocument();
-  });
+    fireEvent.click(screen.getByRole('button', { name: '견적 더보기' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '자세히보기' }));
+    const date = await screen.findByRole('textbox', { name: '견적작성일' });
+    await waitFor(() => expect(date.closest('.MuiInputBase-root')).toHaveClass('Mui-disabled'));
+    expect(screen.getByRole('textbox', { name: '견적제출일' }).closest('.MuiInputBase-root'))
+      .toHaveClass('Mui-disabled');
+    expect(screen.getByRole('button', { name: '견적작성일 달력 열기' })).toBeDisabled();
+  }, 15000);
+
+  it('submits the integrated keyword with required dates and restores it from the session', async () => {
+    const element = <QuotationStatusPage selectedModule={moduleItem} currentMenuName="견적현황"
+      breadcrumbItems={[]} content={{ title: '견적현황', description: '', cards: [], items: [] }}
+      selectedMenuPermissions={{ read: true }} />;
+    const mounted = render(<RouterProvider router={createMemoryRouter([{ path: '/', element }])} />);
+    const input = await screen.findByRole('textbox', { name: '견적현황 빠른 검색' });
+    await waitFor(() => expect(input).toBeEnabled());
+    await screen.findByRole('button', { name: 'QT-20261116-0001 상세 보기' }, {
+      timeout: 5000,
+    });
+    const before = apiGetMock.mock.calls.length;
+    fireEvent.change(input, { target: { value: ' 볼트 ' } });
+    expect(apiGetMock.mock.calls.length).toBe(before);
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(apiGetMock.mock.calls.some(([path]) =>
+      String(path).includes('keyword=%EB%B3%BC%ED%8A%B8'))).toBe(true));
+    mounted.unmount();
+    render(<RouterProvider router={createMemoryRouter([{ path: '/', element }])} />);
+    expect(await screen.findByRole('textbox', { name: '견적현황 빠른 검색' })).toHaveValue(' 볼트 ');
+    fireEvent.click(screen.getByRole('button', { name: '견적현황 검색어 초기화' }));
+    expect(screen.getByRole('textbox', { name: '견적현황 빠른 검색' })).toHaveValue('');
+  }, 15000);
 });

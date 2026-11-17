@@ -11,6 +11,7 @@ import {
   type OpenMaterialPicker,
   type QuotationDetailRow,
 } from '../data/quotationDetail';
+import type { QuotationCodeOption } from '../services/quotationCommonCode.service';
 
 type Props = {
   gridRef: RefObject<F1GridRef<QuotationDetailRow> | null>;
@@ -18,6 +19,7 @@ type Props = {
   onChangesChange: (changes: F1GridChanges<QuotationDetailRow>) => void;
   onSelectionChange: (rowIds: (string | number)[]) => void;
   onOpenMaterialPicker: OpenMaterialPicker;
+  unitOptions: QuotationCodeOption[];
   disabled?: boolean;
 };
 
@@ -27,11 +29,12 @@ export function QuotationDetailGrid({
   onChangesChange,
   onSelectionChange,
   onOpenMaterialPicker,
+  unitOptions,
   disabled = false,
 }: Props) {
   const columns = useMemo(
-    () => createQuotationDetailColumns(onOpenMaterialPicker, disabled),
-    [disabled, onOpenMaterialPicker],
+    () => createQuotationDetailColumns(onOpenMaterialPicker, disabled, unitOptions),
+    [disabled, onOpenMaterialPicker, unitOptions],
   );
   return (
     <F1Grid
