@@ -17,7 +17,6 @@ import {
   Typography,
 } from '@mui/material';
 import { PageHeader } from '../../../../shared/components/PageHeader';
-import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useCommonConfirmDialog } from '../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
@@ -616,14 +615,9 @@ export function SalesOrderCreatePage({
           minWidth: 0,
           overflowX: 'hidden',
           overflowY: 'auto',
-          p: embedded
-            ? 0
-            : error
-              ? { xs: 2, sm: 2, lg: 2 }
-              : undefined,
-          px: !embedded && !error ? { xs: 1, sm: 2 } : undefined,
-          pt: !embedded && !error ? 1 : undefined,
-          pb: !embedded && !error ? 2 : undefined,
+          px: embedded ? 0 : { xs: 1, sm: 2 },
+          pt: embedded ? 0 : 1,
+          pb: embedded ? 0 : 2,
         }}
       >
         {validationMessages.length > 0 && (
@@ -636,12 +630,7 @@ export function SalesOrderCreatePage({
           </Alert>
         )}
         {notice && <Alert severity="success">{notice}</Alert>}
-        <PageMessageArea
-          message={error}
-          onClose={() => setError('')}
-          severity="error"
-          compact
-        />
+        {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
         <Paper
           variant="outlined"
           sx={{ p: { xs: 1.5, sm: 2 }, minWidth: 0, borderRadius: 1 }}

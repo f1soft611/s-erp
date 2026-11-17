@@ -25,6 +25,7 @@ export function planRowsFromDetails(details: DeliveryPlanDetail[]): PlanRow[] {
       orderNo: detail.orderNo,
       customerName: detail.customerName,
       orderQty: Number(detail.orderQty),
+      deliveredQty: Number(detail.deliveredQty),
     });
     groups.set(sourceKey, group);
   }

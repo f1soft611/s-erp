@@ -289,7 +289,7 @@ describe('sales order entry page', () => {
     expect(within(grid).queryByLabelText('납기 필수')).not.toBeInTheDocument();
   });
 
-  it('uses compact spacing for order-save errors', async () => {
+  it('uses the same content spacing for order-save errors and validation messages', async () => {
     createSalesOrderMock.mockRejectedValue(new Error('수주 저장에 실패했습니다.'));
     renderSalesOrderPage();
     await selectCustomer();
@@ -301,7 +301,7 @@ describe('sales order entry page', () => {
     expect(alert).toHaveTextContent('수주 저장에 실패했습니다.');
     expect(alert.parentElement).toHaveStyle({
       paddingTop: '8px',
-      paddingBottom: '8px',
+      paddingBottom: '16px',
     });
   }, 15000);
 

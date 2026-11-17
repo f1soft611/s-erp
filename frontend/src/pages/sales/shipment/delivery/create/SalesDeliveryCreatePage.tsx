@@ -9,7 +9,6 @@ import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined
 import type { PermissionActionGroupDefinition } from '../../../../../shared/components/PermissionGroup';
 import { PageHeader } from '../../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../../shared/components/PageLoadBoundary';
-import { PageMessageArea } from '../../../../../shared/components/PageMessageArea';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useCommonConfirmDialog } from '../../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../../shared/hooks/useUnsavedChangesBeforeUnload';
@@ -177,8 +176,8 @@ export function SalesDeliveryCreatePage({
     <Box role="region" aria-label="출하 입력 내용" aria-busy={pending || loading}
       sx={{ px: embedded ? 0 : { xs: 1, sm: 2 }, pt: embedded ? 0 : 1, pb: embedded ? 0 : 2,
         display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
-      <PageMessageArea message={error} onClose={() => setError('')} />
       {notice ? <Alert severity="success">{notice}</Alert> : null}
+      {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
       {locked && savedId ? <Button startIcon={<SearchIcon />} disabled={pending || loading} onClick={() => void load(savedId)}>재조회</Button> : null}
       {loading ? <Typography role="status">출하를 불러오는 중입니다.</Typography> : null}
       <PageLoadBoundary loading={loading} error={loadError ? 'server' : null} label="출하등록"

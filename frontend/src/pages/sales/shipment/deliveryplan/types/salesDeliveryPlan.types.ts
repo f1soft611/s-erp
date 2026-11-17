@@ -40,6 +40,7 @@ export type PlanRow = DeliveryPlanDetailRequest & {
   customerName: string;
   orderQty: number;
   remainingPlanQty?: number;
+  deliveredQty?: number;
 };
 
 export type DeliveryPlanItem = {

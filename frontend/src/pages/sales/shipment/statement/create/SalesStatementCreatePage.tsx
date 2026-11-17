@@ -5,7 +5,6 @@ import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined
 import PrintIcon from '@mui/icons-material/Print';
 import { Alert, Box, IconButton, InputAdornment, Paper, TextField, Typography } from '@mui/material';
 import { PageHeader } from '../../../../../shared/components/PageHeader';
-import { PageMessageArea } from '../../../../../shared/components/PageMessageArea';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import { StatementSourcePicker } from './components/StatementSourcePicker';
 import { StatementDetailGrid } from './components/StatementDetailGrid';
@@ -38,8 +37,8 @@ export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
       sx={{ px: embedded ? 0 : { xs: 1, sm: 2 }, pt: embedded ? 0 : 1, pb: embedded ? 0 : 2,
         display: 'flex', flexDirection: 'column',
         minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
-      <PageMessageArea message={error} onClose={() => setError('')} />
       {notice ? <Alert severity="success">{notice}</Alert> : null}
+      {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
       <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, minWidth: 0, borderRadius: 1 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>거래명세서 기본정보</Typography>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' },
