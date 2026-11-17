@@ -12,6 +12,7 @@ type SalesOrderStatusGridProps = {
   orderStatusOptions?: SalesOrderCodeOption[];
   progressStatusOptions?: SalesOrderCodeOption[];
   deliveryMethodOptions?: SalesOrderCodeOption[];
+  highlightKeyword?: string;
 };
 
 export function SalesOrderStatusGrid({
@@ -22,6 +23,7 @@ export function SalesOrderStatusGrid({
   orderStatusOptions = [],
   progressStatusOptions = [],
   deliveryMethodOptions = [],
+  highlightKeyword,
 }: SalesOrderStatusGridProps) {
   const columns = useMemo(
     () =>
@@ -41,6 +43,7 @@ export function SalesOrderStatusGrid({
       storageKey="salesOrderStatusGrid"
       rowKey="salesOrderDetailId"
       rows={rows}
+      highlightKeyword={highlightKeyword}
       loading={loading}
       features={[{ ftype: 'summary', dock: 'bottom' }]}
       showCheckbox

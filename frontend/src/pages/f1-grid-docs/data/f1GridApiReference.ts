@@ -44,6 +44,12 @@ const sections: DocSection[] = [
       api('columnLine', 'boolean', '컬럼 사이 세로 구분선을 표시.', 'true'),
       api('stripeRows', 'boolean', '홀수 행 배경 스트라이프를 표시.', 'true'),
       api(
+        'highlightKeyword',
+        'string',
+        '조회에 적용된 통합검색어. highlightSearch 컬럼에서 일치 글자를 빨간색으로 표시.',
+        'undefined',
+      ),
+      api(
         'storageKey',
         'string',
         '컬럼 순서·너비·고정·표시 레이아웃의 저장 키. 그리드별로 고유한 값을 사용.',
@@ -349,6 +355,7 @@ const sections: DocSection[] = [
       ),
       api('headerAlign', "'left' | 'center' | 'right'", '헤더 콘텐츠 정렬.', "'left'"),
       api('wrapText', 'boolean', '셀 텍스트 줄바꿈 허용.', 'false'),
+      api('highlightSearch', 'boolean', '통합검색어와 일치하는 글자를 빨간색으로 표시.', 'false'),
       api('mergeRows', 'boolean', '연속된 동일 값 셀의 세로 병합을 활성화.', 'false'),
       api(
         'headerCheckbox',

@@ -70,6 +70,23 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 
 ## 추가 반영 기능 요약 (2026-09-01 기준)
 
+### 통합검색어 강조 (2026-11-17)
+
+현황 화면의 통합검색어와 일치하는 글자를 셀에서 빨간색으로 표시한다. `F1Grid`에 조회에 적용된 검색어를 `highlightKeyword`로 넘기고, 강조할 컬럼에 `highlightSearch: true`를 지정한다. 입력 중인 값이 아니라 마지막 조회에 적용된 검색어를 넘기고, 서버가 실제로 검색하는 컬럼에만 지정한다.
+
+```tsx
+const columns: F1GridColumn<Row>[] = [
+  { field: 'orderNo', headerName: '수주번호', highlightSearch: true },
+  { field: 'customerName', headerName: '거래처명', highlightSearch: true },
+];
+<F1Grid rows={rows} columns={columns} rowKey="id" highlightKeyword={appliedKeyword} />
+```
+
+- 대소문자를 구분하지 않는 부분 일치이며, 모든 일치 구간을 강조한다. 앞뒤 공백은 제거한다.
+- 기본 텍스트 셀에는 자동 적용된다. `renderCell` 컬럼은 context의 `highlightKeyword`를 `F1GridHighlightText`에 넘겨 직접 적용한다(`highlightSearch` 컬럼에만 전달됨).
+- 성능: 검색어가 비었거나 `highlightSearch` 컬럼이 없으면 Grid가 값을 내리지 않아 행·셀 memo가 그대로 유지된다. 일치 탐색은 정규식 없이 `indexOf`로 수행한다. 컬럼 배열은 검색어에 의존하지 않게 유지한다.
+- 적용 화면: 영업관리 현황(수주·견적·출하·출하계획·거래명세서)을 비롯한 통합검색이 있는 화면. 결과: `docs/result/20261117/search-keyword-highlight`.
+
 ### 컬럼 집계 행 (2026-11-12)
 
 `features={[{ ftype: 'summary', dock: 'top' }]}` 또는 `dock: 'bottom'`으로 집계 행을 표시한다. 각 컬럼에 `summaryType: 'sum' | 'average' | 'min' | 'max'`를 지정한다. 예:

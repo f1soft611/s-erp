@@ -1,4 +1,5 @@
 import { Link } from '@mui/material';
+import { F1GridHighlightText } from '../../../../../shared/components/f1-grid';
 import type { F1GridColumn } from '../../../../../shared/components/f1-grid/types/grid.types';
 import type { SalesOrderStatusRow } from '../types/salesOrderStatus.types';
 import {
@@ -57,8 +58,9 @@ export function createSalesOrderStatusColumns({
       mergeRows: true,
       align: 'center',
       search: { label: '수주번호', order: 2, span: 2, group: '수주정보' },
+      highlightSearch: true,
       renderCell: onOpenOrder
-        ? ({ row }) => (
+        ? ({ row, highlightKeyword }) => (
             <Link
               component="button"
               type="button"
@@ -81,7 +83,7 @@ export function createSalesOrderStatusColumns({
                 verticalAlign: 'baseline',
               }}
             >
-              {row.orderNo}
+              {highlightKeyword ? <F1GridHighlightText text={row.orderNo} keyword={highlightKeyword} /> : row.orderNo}
             </Link>
           )
         : undefined,
@@ -114,6 +116,7 @@ export function createSalesOrderStatusColumns({
       editable: false,
       mergeRows: true,
       search: { hidden: true },
+      highlightSearch: true,
     },
     {
       field: 'customerName',
@@ -121,6 +124,7 @@ export function createSalesOrderStatusColumns({
       width: 160,
       editable: false,
       mergeRows: true,
+      highlightSearch: true,
       search: { label: '거래처', order: 3, span: 2, group: '수주정보' },
     },
     {
@@ -129,6 +133,7 @@ export function createSalesOrderStatusColumns({
       width: 140,
       editable: false,
       mergeRows: true,
+      highlightSearch: true,
       search: { label: '견적번호', order: 4, span: 2, group: '수주정보' },
     },
     {
@@ -189,6 +194,7 @@ export function createSalesOrderStatusColumns({
       width: 80,
       align: 'center',
       editable: false,
+      highlightSearch: true,
       search: { hidden: true },
     },
     {
@@ -196,6 +202,7 @@ export function createSalesOrderStatusColumns({
       headerName: '품목명',
       width: 180,
       editable: false,
+      highlightSearch: true,
       search: { label: '품목', order: 6, span: 2, group: '품목정보' },
     },
     {

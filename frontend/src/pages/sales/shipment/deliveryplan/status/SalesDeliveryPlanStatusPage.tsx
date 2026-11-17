@@ -9,7 +9,7 @@ import { PageMessageArea } from '../../../../../shared/components/PageMessageAre
 import { PageSearchArea } from '../../../../../shared/components/PageSearchArea';
 import { PostDetailPanel } from '../../../../../shared/components/feed/PostDetailPanel';
 import { PageAreaOverlay } from '../../../../../shared/components/view-mode/PageAreaOverlay';
-import { F1Grid, type F1GridColumn, type F1GridRef } from '../../../../../shared/components/f1-grid';
+import { F1Grid, F1GridHighlightText, type F1GridColumn, type F1GridRef } from '../../../../../shared/components/f1-grid';
 import { useCommonConfirmDialog } from '../../../../../shared/hooks/useCommonConfirmDialog';
 import { DeliveryPlanForm } from '../components/DeliveryPlanForm';
 import type { PageSearchField, PageSearchFieldValue } from '../../../../../shared/components/page-search/searchFields';
@@ -52,6 +52,7 @@ export function SalesDeliveryPlanStatusPage({
   const { confirm, dialog } = useCommonConfirmDialog();
   const [filters, setFilters] = useState<DeliveryPlanFilters>(() => defaultDeliveryPlanFilters());
   const [rows, setRows] = useState<DeliveryPlanStatusRow[]>([]);
+  const [appliedKeyword, setAppliedKeyword] = useState('');
   const [selected, setSelected] = useState<DeliveryPlanItem | DeliveryPlanStatusRow | null>(null);
   const [details, setDetails] = useState<DeliveryPlanDetail[]>([]);
   const [editRows, setEditRows] = useState<PlanRow[]>([]);
@@ -74,7 +75,7 @@ export function SalesDeliveryPlanStatusPage({
     if (!validDeliveryPlanPeriod(next)) { setError('계획일 기간의 시작일과 종료일을 확인해 주세요.'); return; }
     setLoading(true);
     setError('');
-    try { setRows(await getDeliveryPlanStatus(next)); }
+    try { setRows(await getDeliveryPlanStatus(next)); setAppliedKeyword(next.keyword.trim()); }
     catch (cause) { setError(cause instanceof Error ? cause.message : '출하계획 현황 조회에 실패했습니다.'); }
     finally { setLoading(false); }
   }, []);
@@ -144,17 +145,18 @@ export function SalesDeliveryPlanStatusPage({
   }];
   const columns = useMemo<F1GridColumn<DeliveryPlanStatusRow>[]>(() => [
     { field: 'salesDeliveryPlanId', headerName: 'No', type: 'rownumber', width: 56, align: 'center' },
-    { field: 'planNo', headerName: '계획번호', width: 150, align: 'center', mergeRows: true,
-      renderCell: ({ row }) => <Link component="button" type="button" underline="hover" aria-label={`${row.planNo} 상세 보기`}
+    { field: 'planNo', headerName: '계획번호', width: 150, align: 'center', mergeRows: true, highlightSearch: true,
+      renderCell: ({ row, highlightKeyword }) => <Link component="button" type="button" underline="hover" aria-label={`${row.planNo} 상세 보기`}
         onClick={(event) => { event.stopPropagation(); void open(row); }}
         sx={{ position: 'relative', zIndex: 1, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap', fontWeight: 600, fontSize: 'inherit', verticalAlign: 'baseline' }}>{row.planNo}</Link> },
-    { field: 'orderNo', headerName: '수주번호', width: 150, align: 'center' },
+          whiteSpace: 'nowrap', fontWeight: 600, fontSize: 'inherit', verticalAlign: 'baseline' }}>
+        {highlightKeyword ? <F1GridHighlightText text={row.planNo} keyword={highlightKeyword} /> : row.planNo}</Link> },
+    { field: 'orderNo', headerName: '수주번호', width: 150, align: 'center', highlightSearch: true },
     { field: 'orderDt', headerName: '수주일자', type: 'date', width: 100, align: 'center' },
-    { field: 'customerName', headerName: '거래처', width: 180, align: 'left' },
+    { field: 'customerName', headerName: '거래처', width: 180, align: 'left', highlightSearch: true },
     { field: 'planDt', headerName: '계획일', type: 'date', width: 100, align: 'center' },
-    { field: 'materialCode', headerName: '품목코드', width: 120, align: 'center' },
-    { field: 'materialName', headerName: '품목명', width: 180, align: 'left' },
+    { field: 'materialCode', headerName: '품목코드', width: 120, align: 'center', highlightSearch: true },
+    { field: 'materialName', headerName: '품목명', width: 180, align: 'left', highlightSearch: true },
     { field: 'orderQty', headerName: '수주수량', type: 'decimal', width: 110, align: 'right' },
     { field: 'plannedQty', headerName: '계획수량', type: 'decimal', width: 110, align: 'right' },
     { field: 'deliveredQty', headerName: '출하수량', type: 'decimal', width: 110, align: 'right' },
@@ -240,7 +242,7 @@ export function SalesDeliveryPlanStatusPage({
         horizontalPadding="none"
       />
       <Box data-testid="delivery-plan-status-grid-shell" sx={{ flex: 1, minHeight: 240, minWidth: 0, overflow: 'hidden' }}>
-        <F1Grid storageKey="sales-delivery-plan-status-grid-v1" ariaLabel="출하계획 현황 목록" rows={rows} columns={columns} rowKey="salesDeliveryPlanDetailId"
+        <F1Grid storageKey="sales-delivery-plan-status-grid-v1" ariaLabel="출하계획 현황 목록" rows={rows} columns={columns} rowKey="salesDeliveryPlanDetailId" highlightKeyword={appliedKeyword}
           loading={loading} showCheckbox={false} height="100%" minHeight={240} selectionMode="row"
           allowAddRowInContextMenu={false} allowDuplicateRowInContextMenu={false} allowDeleteRowInContextMenu={false}
           canExportExcel={Boolean(permissions?.excel)} />

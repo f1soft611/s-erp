@@ -221,6 +221,7 @@ export function PurchaseRequestStatusPage({
                 storageKey="materialsPurchaseRequestStatusGrid"
                 rowKey="purchaseRequestDetailId"
                 rows={list.rows}
+                highlightKeyword={search.appliedFilters?.keyword}
                 loading={list.loading}
                 showCheckbox={false}
                 selectionMode="row"

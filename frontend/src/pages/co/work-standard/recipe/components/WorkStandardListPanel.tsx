@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Box, Chip, Paper, Typography } from '@mui/material';
-import { F1Grid, type F1GridColumn, type F1GridRowId } from '../../../../../shared/components/f1-grid';
+import { F1Grid, F1GridHighlightText, type F1GridColumn, type F1GridRowId } from '../../../../../shared/components/f1-grid';
 import type {
   WorkStandardListRow,
   WorkStandardListSegment,
@@ -15,6 +15,7 @@ type Props = {
   selectedId: number | null;
   onSelect: (workStandardId: number) => void;
   loading?: boolean;
+  highlightKeyword?: string;
 };
 
 const columns: F1GridColumn<WorkStandardListRow>[] = [
@@ -25,14 +26,15 @@ const columns: F1GridColumn<WorkStandardListRow>[] = [
     flex: 1,
     width: 120,
     editable: false,
+    highlightSearch: true,
     getValue: (row) => `${row.materialCode} ${row.materialName}`,
-    renderCell: ({ row }) => (
+    renderCell: ({ row, highlightKeyword }) => (
       <Box sx={{ minWidth: 0, overflow: 'hidden' }} title={`${row.materialCode} ${row.materialName}`}>
         <Typography variant="caption" color="text.secondary" component="span" sx={{ mr: 0.5 }}>
-          {row.materialCode}
+          <F1GridHighlightText text={row.materialCode} keyword={highlightKeyword} />
         </Typography>
         <Typography variant="body2" component="span" noWrap>
-          {row.materialName}
+          <F1GridHighlightText text={row.materialName} keyword={highlightKeyword} />
         </Typography>
       </Box>
     ),
@@ -70,6 +72,7 @@ export function WorkStandardListPanel({
   selectedId,
   onSelect,
   loading = false,
+  highlightKeyword,
 }: Props) {
   const initialSelectedRowIds = useMemo<F1GridRowId[]>(
     () => (selectedId === null ? [] : [selectedId]),
@@ -117,6 +120,7 @@ export function WorkStandardListPanel({
           ariaLabel="작업표준서 목록"
           storageKey="work-standard-recipe-list-grid-v1"
           rows={rows}
+          highlightKeyword={highlightKeyword}
           columns={columns}
           rowKey="workStandardId"
           selectionMode="row"

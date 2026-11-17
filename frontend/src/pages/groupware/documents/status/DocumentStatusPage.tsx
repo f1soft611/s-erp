@@ -138,6 +138,7 @@ export function DocumentStatusPage({
               loading={list.loading}
               canExportExcel={selectedMenuPermissions?.excel ?? false}
               onOpenDocument={detail.handleOpenDocument}
+              highlightKeyword={search.appliedFilters.keyword}
             />
           </Box>
         ) : null}

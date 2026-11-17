@@ -1,4 +1,5 @@
 import { Link } from '@mui/material';
+import { F1GridHighlightText } from '../../../../../shared/components/f1-grid';
 import type { F1GridColumn } from '../../../../../shared/components/f1-grid/types/grid.types';
 import { PURCHASE_ORDER_SOURCE_OPTIONS, PURCHASE_ORDER_STATUS_OPTIONS } from '../services/purchaseOrderStatus.service';
 import type { PurchaseOrderStatusRow } from '../types/purchaseOrderStatus.types';
@@ -46,8 +47,9 @@ export function createPurchaseOrderStatusColumns({
       mergeRows: true,
       align: 'center',
       search: { label: '발주번호', order: 2, span: 2, group: '발주정보' },
+      highlightSearch: true,
       renderCell: onOpenOrder
-        ? ({ row }) => (
+        ? ({ row, highlightKeyword }) => (
             <Link
               component="button"
               type="button"
@@ -70,7 +72,7 @@ export function createPurchaseOrderStatusColumns({
                 verticalAlign: 'baseline',
               }}
             >
-              {row.orderNo}
+              {highlightKeyword ? <F1GridHighlightText text={row.orderNo} keyword={highlightKeyword} /> : row.orderNo}
             </Link>
           )
         : undefined,
@@ -102,6 +104,7 @@ export function createPurchaseOrderStatusColumns({
       width: 150,
       editable: false,
       mergeRows: true,
+      highlightSearch: true,
       search: { label: '구매처', order: 3, span: 2, group: '발주정보' },
     },
     {
@@ -112,6 +115,7 @@ export function createPurchaseOrderStatusColumns({
       align: 'center',
       editable: false,
       mergeRows: true,
+      highlightSearch: true,
       search: { hidden: true },
     },
     {
@@ -145,9 +149,10 @@ export function createPurchaseOrderStatusColumns({
       width: 110,
       align: 'center',
       editable: false,
+      highlightSearch: true,
       search: { label: '품목', order: 6, span: 2, group: '품목정보' },
     },
-    { field: 'materialName', headerName: '품목명', type: 'text', width: 180, editable: false, search: { hidden: true } },
+    { field: 'materialName', headerName: '품목명', type: 'text', width: 180, editable: false, highlightSearch: true, search: { hidden: true } },
     { field: 'materialSpec', headerName: '규격', type: 'text', width: 110, editable: false, search: { hidden: true } },
     { field: 'unit', headerName: '단위', type: 'text', width: 60, align: 'center', editable: false, search: { hidden: true } },
     amountColumn('orderQty', '발주수량', 2, 100),
