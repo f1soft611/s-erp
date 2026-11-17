@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Box, Button, Chip, CircularProgress, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, CircularProgress, IconButton, InputAdornment, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
+import ClearIcon from '@mui/icons-material/Clear';
 import AddIcon from '@mui/icons-material/Add';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { CommonDialog } from '../../../../shared/components/CommonDialog';
@@ -75,6 +76,8 @@ export function SystemPolicyPage({ isPlatformAdmin, selectedMenuPermissions, bre
   const categories = [...new Set(policies.map((policy) => policy.category))].sort();
   const filtered = policies.filter((policy) => (!category || category === policy.category)
     && `${policy.policyName} ${policy.policyCode} ${policy.description}`.toLowerCase().includes(query.trim().toLowerCase()));
+  const categoryCount = (name: string) => policies.filter((policy) => policy.category === name).length;
+  const groups = categories.map((name) => [name, filtered.filter((policy) => policy.category === name)] as const).filter(([, items]) => items.length > 0);
   return (
     <Box sx={{ display: 'flex', flex: 1, flexDirection: 'column', minHeight: 0, minWidth: 0, height: '100%', width: '100%' }}>
       <PageHeader breadcrumbItems={breadcrumbItems ?? ['환경설정', '시스템 관리', '시스템 정책']}
@@ -93,10 +96,10 @@ export function SystemPolicyPage({ isPlatformAdmin, selectedMenuPermissions, bre
         {error && !deleting && <Alert severity="error" action={<Button color="inherit" size="small" onClick={() => void load()}>다시 조회</Button>}>{error}</Alert>}
         {notice && <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert>}
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '180px minmax(0, 1fr)' }, gap: 2 }}>
-          <TextField select size="small" label="업무 분류" value={category} onChange={(event) => setCategory(event.target.value)}>
-            <MenuItem value="">전체 분류</MenuItem>{categories.map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
+          <TextField select size="small" label="업무 분류" sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'background.paper' } }} value={category} onChange={(event) => setCategory(event.target.value)}>
+            <MenuItem value="">전체 분류 ({policies.length})</MenuItem>{categories.map((name) => <MenuItem key={name} value={name}>{name} ({categoryCount(name)})</MenuItem>)}
           </TextField>
-          <TextField fullWidth size="small" label="정책 검색" placeholder="이름, 코드, 설명으로 검색" value={query} onChange={(event) => setQuery(event.target.value)} />
+          <TextField fullWidth size="small" label="정책 검색" sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'background.paper' } }} placeholder="이름, 코드, 설명으로 검색" value={query} onChange={(event) => setQuery(event.target.value)} slotProps={{ input: { endAdornment: query ? <InputAdornment position="end"><IconButton size="small" edge="end" aria-label="검색어 지우기" onClick={() => setQuery('')}><ClearIcon fontSize="small" /></IconButton></InputAdornment> : undefined } }} />
         </Box>
         <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>정책 목록</Typography>
@@ -104,8 +107,13 @@ export function SystemPolicyPage({ isPlatformAdmin, selectedMenuPermissions, bre
         </Stack>
         {loading && <Box role="status" sx={{ display: 'flex', gap: 1, alignItems: 'center' }}><CircularProgress size={18} /><Typography>정책 조회 중</Typography></Box>}
         {!loading && !filtered.length && <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}><Typography color="text.secondary">{policies.length ? '검색 조건에 맞는 정책이 없습니다.' : '등록된 정책이 없습니다. 정책 추가로 시작하세요.'}</Typography></Paper>}
+        {groups.map(([groupName, items]) => <Box key={groupName} component="section" aria-label={`${groupName} 정책`} sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <Typography variant="subtitle1" component="h2" sx={{ fontWeight: 700 }}>{groupName}</Typography>
+            <Chip size="small" color="primary" label={`${items.length}건`} />
+          </Stack>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'repeat(2, minmax(0, 1fr))' }, gap: 2 }}>
-          {filtered.map((policy) => <Paper key={policy.policyId} variant="outlined" sx={{ p: 2.5, borderRadius: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          {items.map((policy) => <Paper key={policy.policyId} variant="outlined" sx={{ p: 2.5, borderRadius: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
               <Chip size="small" variant="outlined" label={policy.category} /><Chip size="small" label={POLICY_TYPES[policy.valueType]} />
               {policy.systemPolicy && <Chip size="small" color="primary" variant="outlined" label="시스템 필수" />}
@@ -114,7 +122,7 @@ export function SystemPolicyPage({ isPlatformAdmin, selectedMenuPermissions, bre
               <Typography variant="h6" sx={{ fontSize: '1rem', fontWeight: 700 }}>{policy.policyName}</Typography>
               <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>{policy.policyCode}</Typography>
             </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>{policy.description || '등록된 설명이 없습니다.'}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: 'anywhere', whiteSpace: 'pre-wrap', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: '4.5em' }} title={policy.description}>{policy.description || '등록된 설명이 없습니다.'}</Typography>
             <Box sx={{ p: 1.5, bgcolor: 'action.hover', borderRadius: 1, mt: 'auto', overflowWrap: 'anywhere' }}>
               <Typography variant="caption" color="text.secondary">현재 적용값</Typography>
               <Typography sx={{ fontWeight: 700, whiteSpace: 'pre-wrap' }}>{policyValueLabel(policy) || '(빈 값)'}</Typography>
@@ -126,6 +134,7 @@ export function SystemPolicyPage({ isPlatformAdmin, selectedMenuPermissions, bre
             </Stack>
           </Paper>)}
         </Box>
+        </Box>)}
         <Alert severity="info">새 정책을 추가해도 업무 동작이 자동 생성되지는 않습니다. 해당 업무에서 정책을 읽도록 연동해야 적용됩니다.</Alert>
       </Stack>
       {editor && <PolicyEditor policy={editor.policy} onClose={() => setEditor(null)} onSaved={(saved) => {

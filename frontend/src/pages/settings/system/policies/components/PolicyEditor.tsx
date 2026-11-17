@@ -22,6 +22,7 @@ export function PolicyEditor({ policy, onClose, onSaved }: { policy: SystemPolic
   const dirty = JSON.stringify(draft) !== initial;
   useUnsavedChangesBeforeUnload(dirty);
   const definitionLocked = Boolean(policy?.systemPolicy);
+  const duplicated = (value: string) => value.trim() !== '' && draft.options.filter((item) => item.value.trim() === value.trim()).length > 1;
   const set = <K extends keyof PolicyPayload>(key: K, value: PolicyPayload[K]) => setDraft((current) => ({ ...current, [key]: value }));
   const close = () => { if (!busy.current) { if (dirty) setDiscardOpen(true); else onClose(); } };
   const save = async () => {
@@ -56,7 +57,7 @@ export function PolicyEditor({ policy, onClose, onSaved }: { policy: SystemPolic
           <Button disabled={saving} onClick={close}>취소</Button>
         </>}
       >
-          <Stack spacing={2.5}>
+          <Stack spacing={2.5} sx={{ '& .MuiFormHelperText-root': { fontSize: '0.8125rem', color: 'text.secondary' } }}>
             {error && <Alert severity="error">{error}</Alert>}
             <Alert severity="info">{policy?.systemPolicy ? '시스템 필수 정책입니다. 허용된 정책값만 변경할 수 있습니다.' : '정책 등록은 설정값을 저장합니다. 실제 업무 적용에는 해당 기능의 정책 연동이 필요합니다.'}</Alert>
             {definitionLocked ? <Stack spacing={1}>
@@ -80,12 +81,12 @@ export function PolicyEditor({ policy, onClose, onSaved }: { policy: SystemPolic
             </Box>}
             {!definitionLocked && draft.valueType === 'SELECT' && <Stack spacing={1}>
               <Typography variant="subtitle2">선택지 설정</Typography>
-              {draft.options.map((option, index) => <Box key={index} sx={{ display: 'flex', alignItems: 'start', gap: 1 }}>
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1, flex: 1, minWidth: 0 }}>
-                  <TextField size="small" label={`선택지 ${index + 1} 값`} value={option.value} disabled={saving || definitionLocked} slotProps={{ htmlInput: { maxLength: 100 } }} onChange={(event) => set('options', draft.options.map((item, i) => i === index ? { ...item, value: event.target.value } : item))} />
-                  <TextField size="small" label={`선택지 ${index + 1} 표시명`} value={option.label} disabled={saving || definitionLocked} slotProps={{ htmlInput: { maxLength: 100 } }} onChange={(event) => set('options', draft.options.map((item, i) => i === index ? { ...item, label: event.target.value } : item))} />
-                </Box>
-                {!definitionLocked && <IconButton aria-label={`선택지 ${index + 1} 삭제`} disabled={saving} onClick={() => set('options', draft.options.filter((_item, i) => i !== index))}><DeleteOutlineIcon /></IconButton>}
+              {draft.options.map((option, index) => <Box key={index} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, minWidth: 0 }}>
+                <TextField size="small" label={`선택지 ${index + 1} 값`} value={option.value} error={option.value.trim() === '' && option.label.trim() !== '' || duplicated(option.value)} helperText={duplicated(option.value) ? '중복된 선택지 값입니다.' : option.value.trim() === '' && option.label.trim() !== '' ? '값을 입력하세요.' : undefined} disabled={saving || definitionLocked} slotProps={{ htmlInput: { maxLength: 100 } }} onChange={(event) => set('options', draft.options.map((item, i) => i === index ? { ...item, value: event.target.value } : item))} />
+                <TextField size="small" label={`선택지 ${index + 1} 표시명`} value={option.label} error={option.label.trim() === '' && option.value.trim() !== ''} helperText={option.label.trim() === '' && option.value.trim() !== '' ? '표시명을 입력하세요.' : undefined} disabled={saving || definitionLocked} slotProps={{
+                  htmlInput: { maxLength: 100 },
+                  input: { endAdornment: <IconButton size="small" edge="end" aria-label={`선택지 ${index + 1} 삭제`} disabled={saving} onClick={() => set('options', draft.options.filter((_item, i) => i !== index))}><DeleteOutlineIcon fontSize="small" /></IconButton> },
+                }} onChange={(event) => set('options', draft.options.map((item, i) => i === index ? { ...item, label: event.target.value } : item))} />
               </Box>)}
               {!definitionLocked && <Button sx={{ alignSelf: 'start' }} disabled={saving || draft.options.length >= 50} onClick={() => set('options', [...draft.options, { value: '', label: '' }])}>선택지 추가</Button>}
             </Stack>}

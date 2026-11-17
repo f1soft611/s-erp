@@ -92,6 +92,7 @@ try {
     const reply = (result) => route.fulfill({
       headers, contentType: 'application/json', body: JSON.stringify({ resultCode: 200, result }),
     });
+    if (url.pathname === '/api/v1/common/system-date') return reply({ today: '2026-11-16' });
     const base = '/api/v1/sales/statements';
     if (url.pathname === `${base}/source-deliveries`) return reply({ items: [source] });
     if (url.pathname === '/api/v1/sales/deliveries/1') return reply({ item: {
@@ -153,6 +154,25 @@ try {
     await preview.waitFor();
     assert.equal(await preview.locator('.statement-print-copy').count(), 2);
     await screenshot('print', width);
+    if (width === 1280) {
+      const printHost = page.locator('body > .statement-print-host');
+      await page.emulateMedia({ media: 'print' });
+      assert.notEqual(await page.locator('#root').evaluate((element) => getComputedStyle(element).display), 'none');
+      assert.equal(await printHost.evaluate((element) => getComputedStyle(element).display), 'none');
+
+      await page.evaluate(() => document.body.classList.add('statement-printing'));
+      assert.equal(await page.locator('#root').evaluate((element) => getComputedStyle(element).display), 'none');
+      assert.equal(await printHost.evaluate((element) => getComputedStyle(element).display), 'block');
+      const pdf = await page.pdf({
+        path: path.join(screenshotDirectory, 'statement-print-a4.pdf'),
+        format: 'A4',
+        printBackground: true,
+      });
+      assert.ok(pdf.length > 1000, 'A4 output should contain the statement print host.');
+      assert.equal((pdf.toString('latin1').match(/\/Type\s*\/Page\b/g) ?? []).length, 1);
+      await page.evaluate(() => document.body.classList.remove('statement-printing'));
+      await page.emulateMedia({ media: 'screen' });
+    }
     await preview.getByTestId('common-dialog-actions').getByRole('button', { name: '닫기', exact: true }).click();
   }
   assert.equal(requests.filter((request) => request.method === 'POST').length, 3);

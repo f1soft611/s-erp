@@ -2,8 +2,9 @@ import { createPortal } from 'react-dom';
 import PrintIcon from '@mui/icons-material/Print';
 import { Box, Button } from '@mui/material';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
+import { amountInKorean } from '../../../../../shared/utils/amountInKorean';
 import type { StatementDetail, StatementItem } from '../types/salesStatement.types';
-import { amount, amountInKorean, emptyPrintRowCount, statementPrintPages, text } from '../data/statementPrint';
+import { amount, emptyPrintRowCount, statementPrintPages, text } from '../data/statementPrint';
 import './statement-print.css';
 
 function PrintCopy({ item, rows }: { item: StatementItem; rows: StatementDetail[] }) {
@@ -65,9 +66,19 @@ function PrintSheet({ item }: { item: StatementItem }) {
 }
 
 export function StatementPrint({ item, onClose }: { item: StatementItem; onClose: () => void }) {
+  const print = () => {
+    const addedClass = !document.body.classList.contains('statement-printing');
+    if (addedClass) document.body.classList.add('statement-printing');
+    try {
+      window.print();
+    } finally {
+      if (addedClass) document.body.classList.remove('statement-printing');
+    }
+  };
+
   return <>
     <CommonDialog open title="거래명세표 미리보기" onClose={onClose} size="lg" fullScreenOnMobile
-      actions={<><Button startIcon={<PrintIcon />} variant="contained" onClick={() => window.print()}>인쇄</Button>
+      actions={<><Button startIcon={<PrintIcon />} variant="contained" onClick={print}>인쇄</Button>
         <Button onClick={onClose}>닫기</Button></>}>
       <Box sx={{ overflowX: 'auto', bgcolor: '#eee', p: 2 }}>
         <div className="statement-print-preview"><PrintSheet item={item} /></div>

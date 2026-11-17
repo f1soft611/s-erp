@@ -26,8 +26,8 @@
 .statement-print-cut { border-top: 1px dashed #aaa; }
 @page { size: A4; margin: 10mm; }
 @media print {
-  body > :not(.statement-print-host) { display: none !important; }
-  .statement-print-host { display: block; }
+  body.statement-printing > :not(.statement-print-host) { display: none !important; }
+  body.statement-printing > .statement-print-host { display: block; }
   .statement-print-sheet, .statement-print-page { width: 100%; }
   .statement-print-page { break-after: page; }
   .statement-print-page:last-child { break-after: auto; }
