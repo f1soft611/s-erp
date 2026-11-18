@@ -1,5 +1,6 @@
 # 잔여 의존성 권고 재평가 결과
 
+- 이 문서는 의존성 재평가 단위의 기록이다. 이후 동일 frontend 코드의 원격 재실행에서 발견된 수주 테스트 닫힘 경합과 최신 CI 상태는 [후속 결과 024](20261118_024_sales-order-dialog-readiness_결과.md)를 따른다.
 - [작업지시서](../../../directions/20261118/20261118_023_dependency-advisories_작업지시서.md)
 - [계획서](../../../plan/20261118/20261118_023_dependency-advisories_계획서.md)
 - [상세사양](../../../spec/20261118/20261118_023_dependency-advisories_상세사양서.md)
