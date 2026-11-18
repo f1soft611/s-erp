@@ -2,6 +2,7 @@ import {
   memo,
   useCallback,
   useMemo,
+  useState,
   type FocusEvent,
   type KeyboardEvent,
   type MouseEvent,
@@ -155,7 +156,7 @@ const GridCellInner = <T extends object>({
   pinOffset,
   adornment,
 }: GridCellProps<T>) => {
-  const cellAnchorRef = useRef<HTMLDivElement | null>(null);
+  const [userAnchorEl, setUserAnchorEl] = useState<HTMLElement | null>(null);
   const value = column.getValue?.(row) ?? row[column.field];
   const editable = isCellEditable(column, row);
   const cellRenderContext = useMemo(
@@ -239,10 +240,10 @@ const GridCellInner = <T extends object>({
   );
   const handleCellRef = useCallback(
     (node: HTMLElement | null) => {
-      cellAnchorRef.current = node as HTMLDivElement | null;
+      if (column.type === 'user' && editing) setUserAnchorEl(node);
       onCellRef(node);
     },
-    [onCellRef],
+    [column.type, editing, onCellRef],
   );
 
   return (
@@ -412,7 +413,7 @@ const GridCellInner = <T extends object>({
           column={column}
           value={String(draftValue ?? '')}
           userValue={draftValue}
-          userAnchorEl={cellAnchorRef.current}
+          userAnchorEl={userAnchorEl}
           onChange={onDraftChange}
           onUserChange={onDraftChange}
           onCommitEdit={() => onBlur?.()}

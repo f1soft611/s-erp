@@ -187,6 +187,7 @@ const columns: F1GridColumn<Row>[] = [
 - 편집 문자열 변경으로 헤더를 다시 만들지 않으며, 비체크박스 열에서는 헤더 전체 선택 상태를 계산하지 않는다.
 - 표시를 memo로 생략해도 이벤트는 최신 편집·선택 상태를 사용한다. Enter/Tab 확정, Escape 취소 및 셀 이동 계약은 유지한다.
 - 헤더 이벤트는 마지막으로 commit된 callback을 사용한다. Suspense로 대기 중인 재렌더는 기존 DOM의 전체 선택/정렬·필터 이벤트를 바꾸지 않으며 commit 뒤 새 callback을 사용한다. checkbox 표시용 getter는 현재 rows/columns의 render 입력으로 별도 계산하고, callback identity만 바뀐 편집 draft는 기존 헤더 memo를 유지한다.
+- 사용자 편집 셀의 popup inset은 DOM 연결 결과를 state로 게시해 계산한다. 최초부터 편집 상태로 mount되어도 연결된 셀 기준 위치를 반영하며, 일반 셀의 DOM 연결에는 이 state 게시를 추가하지 않는다.
 - 범위 드래그 중 표시 컬럼 수가 바뀌면 경계 hit-test도 현재 컬럼 수를 사용한다. 표시 행 참조·행 키·표시 컬럼 수가 유지되는 부모의 컬럼 metadata 재렌더는 대기 중인 pointer frame을 취소하지 않는다. 범위 테두리의 스크롤·리사이즈 좌표 계산은 유지한다.
 - 품목·거래처 페이지는 저장 성공 응답의 해당 행만 `acceptSavedRows`로 확정한다. 저장 후 목록/옵션 재조회나 그리드 초기화 없이 서버의 최종값·실제 ID·자동 코드를 반영한다.
 - 이 개선은 프론트엔드 렌더 비용에 대한 것이며, 저장 API/DB의 응답시간을 보장하지 않는다.

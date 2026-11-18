@@ -1,8 +1,9 @@
 import { createRef, startTransition, Suspense } from 'react';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { F1Grid, type F1GridColumn, type F1GridRef } from '../src/shared/components/f1-grid';
 import { GridHeader } from '../src/shared/components/f1-grid/core/GridHeader';
+import { GridCell } from '../src/shared/components/f1-grid/core/GridCell';
 
 type Row = { id: string; name: string; code: string };
 
@@ -59,6 +60,47 @@ function createHeaderProps() {
 }
 
 describe('F1Grid interaction render isolation', () => {
+  it('anchors a user editor to its attached cell on the first editing mount', async () => {
+    type UserRow = { id: string; assignee: string | null };
+    const column: F1GridColumn<UserRow> = {
+      field: 'assignee', headerName: 'Assignee', type: 'user', editable: true,
+      userOptions: [{ value: 'user-1', label: 'Synthetic User' }],
+    };
+    const onSelectChange = vi.fn();
+    const viewport = vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(375);
+    const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      const left = this === document.documentElement || this === document.body
+        ? 0
+        : this.getAttribute('role') === 'gridcell' ? 100 : 104;
+      return {
+        x: left, y: 0, left, top: 0, width: 180, height: 32, right: left + 180, bottom: 32,
+        toJSON: () => ({}),
+      };
+    });
+    try {
+      render(
+        <GridCell
+          row={{ id: '1', assignee: null }} rowId="1" column={column} columnIndex={0}
+          columnLine stripeRows={false} focused editing selected={false} merged={false}
+          rowHeight={32} defaultRowHeight={32} rowIndex={0} draftValue=""
+          onFocus={vi.fn()} onMouseDown={vi.fn()} onMouseEnter={vi.fn()} onMouseUp={vi.fn()}
+          onStopEdit={vi.fn()} onDoubleClick={vi.fn()} onDraftChange={vi.fn()} onKeyDown={vi.fn()}
+          onSelectChange={onSelectChange} onCheckboxChange={vi.fn()} onCodePick={vi.fn()} onCellRef={vi.fn()}
+        />,
+      );
+      const listbox = await screen.findByRole('listbox');
+      await waitFor(() => {
+        expect((listbox.closest('.MuiAutocomplete-popper') as HTMLElement).style.transform)
+          .toMatch(/^translate(?:3d)?\(100px,/);
+      });
+      fireEvent.click(screen.getByRole('option', { name: /Synthetic User/ }));
+      expect(onSelectChange).toHaveBeenCalledExactlyOnceWith('user-1');
+    } finally {
+      bounds.mockRestore();
+      viewport.mockRestore();
+    }
+  });
+
   it('keeps committed header events while a later callback render suspends', async () => {
     const props = createHeaderProps();
     const committed = vi.fn();
