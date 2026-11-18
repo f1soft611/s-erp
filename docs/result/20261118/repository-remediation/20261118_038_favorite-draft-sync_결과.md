@@ -27,6 +27,8 @@
 
 raw 증거는 세션의 `lint038-red.json`, `lint038-related.json`, `lint038-oxlint.json`, `lint038-typecheck.log`, `lint038-build.log`다. [scope audit](screenshots/favorite-draft-sync/scope-audit.json)과 [브라우저 수치·콜백](screenshots/favorite-draft-sync/verification.json)을 저장소에 보관했다. 이전 037 SHA의 전체 CI **226파일/2,657개** 성공은 해당 결과에 구분했으며 이번 038 소스의 전체 CI 결과로 재사용하지 않는다.
 
+후속 확인: 정확한 SHA `d41d9d2a460318b1103066690dbeb0ec16555377`의 [Frontend CI 44303486843](https://github.com/f1soft611/s-erp/actions/runs/44303486843)에서 전체 **226파일/2,663개**와 build/lint/tests/required 네 job이 모두 success였다. 마지막 aggregate raw log와 source SHA를 함께 대조했다([CI 요약](screenshots/favorite-draft-sync/remote-ci.json)).
+
 ## 실제 브라우저
 
 실제 MenuFavoriteEditDialog/CommonDialog와 앱 light 테마를 합성 A/B 대상으로 mount했다. native fill/click/keypress로 조작했으며 fixture의 native 키는 metadata 갱신/대상 교체/실패 콜백 전환만 제어한다. 실제 API/사용자 데이터/업무 서버 저장을 사용하지 않았다.
