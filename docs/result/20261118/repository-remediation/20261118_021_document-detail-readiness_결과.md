@@ -1,5 +1,6 @@
 # 문서 상세 메뉴 준비 조건 안정화 결과
 
+- 이 문서는 프론트 전체 CI 완료 시점의 기록이다. 이후 backend 설정 의존 오류 두 개의 분리와 전체 검증은 [후속 결과 022](20261118_022_backend-config-fixtures_결과.md)를 따른다.
 - [계획서](../../../plan/20261118/20261118_021_document-detail-readiness_계획서.md)
 - [상세사양](../../../spec/20261118/20261118_021_document-detail-readiness_상세사양서.md)
 - 상태: **코드 커밋 8937faec의 전체 원격 CI 통과**. 프론트엔드 226파일·2,641개 모두 통과했고 lint/typecheck/build/required도 성공했다.
