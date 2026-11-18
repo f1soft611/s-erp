@@ -2,7 +2,7 @@
 
 - [계획서](../../../plan/20261118/20261118_018_ci-contract-stability_계획서.md)
 - [상세사양](../../../spec/20261118/20261118_018_ci-contract-stability_상세사양서.md)
-- 현재 상태: **관련 다섯 파일 223/223 통과, 후속 코드 원격 전체 CI 대기**.
+- 현재 상태: **관련 다섯 파일 통과, 후속 원격 전체는 2,640/2,641 통과·별도 router 1개 실패**.
 
 ## 원격 RED와 최소 수정
 
@@ -24,13 +24,17 @@ code commit `61a70ef4`의 run `44243224117`은 lint/build 성공, 테스트 2,63
 | 세 CI 파일 UTC 전체, worker 1 | **63/63 통과**, 76.05초 |
 | 문서작성 두 파일 포함 관련 다섯 파일 KST/2 workers | **223/223 통과**, 347.07초, 제외 0 |
 | 후속 테스트 lint | exit 0 |
-| 후속 code commit 원격 전체 | push 후 별도 기록 |
+| 최종 ISO 문자열 fixture UTC/KST | 각각 summary 2/2 통과 |
+| 후속 d7e5e233 원격 전체 run 44248961094 | **2,640/2,641 통과, router 1개 실패**, 646.70초. 이번 세 파일 63개와 문서 두 파일 160개는 통과 |
+| 같은 원격 코드의 lint/typecheck/build | 모두 성공, tests/required는 실패 |
 
-직접 검토에서 기존 정상 문자열 파싱 검증도 보존하도록 createdAt fixture를 로컬 numeric Date의 ISO 문자열로 직렬화했다. 현재 시각 인수만 Date 객체로 유지한다. 위 223개 실행 후 이 마지막 직렬화 변경은 summary 두 사례를 UTC/KST에서 별도 확인하고 최종 원격 전체 입력에도 포함한다.
+직접 검토에서 기존 정상 문자열 파싱 검증도 보존하도록 createdAt fixture를 로컬 numeric Date의 ISO 문자열로 직렬화했다. 현재 시각 인수만 Date 객체로 유지한다. 위 223개 실행 후 이 마지막 직렬화 변경은 summary 두 사례를 UTC/KST에서 별도 확인했고 최종 원격 전체 입력에도 포함했다. tracked frontend 865개의 root/소유 worktree hash 불일치와 새 우회 설정은 모두 0이다.
 
 문서작성 닫기/재열기 추가 RED와 controlled host의 책임 근거·단언 보존은 [결과 017](20261118_017_document-test-stability_결과.md)에 기록했다. 최종 관련 실행의 직접 it 127개·expect 982개는 원격 기준 문서작성 테스트와 동일하다.
 
 기존 로컬 전체는 알려진 실패가 확인되어 중단했으며 완료 JSON이 없다. 해당 부분 실행을 전체 통과로 사용하지 않는다. 세션 증거에는 UTC RED, UTC 63개 GREEN, KST 223개 GREEN의 로그와 JSON을 별도 보관했다.
+
+새 원격 전체에서 남은 app-router-not-found의 분리 DOM 단언과 후속 검증은 [결과 019](20261118_019_router-dom-stability_결과.md)로 이어진다.
 
 ## 동기화와 잔여 위험
 
