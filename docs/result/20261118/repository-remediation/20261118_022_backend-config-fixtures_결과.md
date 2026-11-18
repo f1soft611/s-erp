@@ -4,6 +4,7 @@
 - [계획서](../../../plan/20261118/20261118_022_backend-config-fixtures_계획서.md)
 - [상세사양](../../../spec/20261118/20261118_022_backend-config-fixtures_상세사양서.md)
 - 상태: **전체 backend clean test failure 0/error 0**, 기존 제외 3개 유지.
+- 동기화: 단위 커밋 **7f7a7a45**를 non-force push했다. 이후 [잔여 의존성 재평가 023](20261118_023_dependency-advisories_결과.md)을 진행했다.
 
 ## 원인과 최소 변경
 
