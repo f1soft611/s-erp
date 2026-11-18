@@ -127,10 +127,7 @@ const createItemRow = (groupId: string): CommonCodeItemRow => ({
 const EMPTY_MODULE_OPTIONS: CommonCodeModuleOption[] = [];
 
 const itemColumns = (
-  onOpenParentPicker?: (
-    row: CommonCodeItemRow,
-    applyPatch: (changes: Partial<CommonCodeItemRow>) => void,
-  ) => void,
+  parentPickerEnabled: boolean,
 ): F1GridColumn<CommonCodeItemRow>[] => [
   {
     field: 'id',
@@ -159,14 +156,10 @@ const itemColumns = (
   {
     field: 'parentItemNm',
     headerName: '상위코드명',
-    editable: () => Boolean(onOpenParentPicker),
+    editable: () => parentPickerEnabled,
     width: 150,
     type: 'code',
-    onOpenCodePicker: onOpenParentPicker
-      ? (row, applyPatch) => {
-          onOpenParentPicker(row, applyPatch);
-        }
-      : undefined,
+    onOpenCodePicker: undefined,
   },
   {
     field: 'useAt',
@@ -477,9 +470,20 @@ export const CommonCodeManagementPanel = forwardRef<
     [onError, parentGroupId, saving],
   );
 
-  const itemGridColumns = itemColumns(
-    parentGroup && !saving ? openParentPicker : undefined,
-  ).map((column) => (saving ? { ...column, editable: false } : column));
+  const parentPickerEnabled = Boolean(parentGroup && !saving);
+  const itemGridColumns = itemColumns(parentPickerEnabled).map((column) => {
+    const boundColumn: F1GridColumn<CommonCodeItemRow> = column.field === 'parentItemNm'
+      ? {
+          ...column,
+          onOpenCodePicker: parentPickerEnabled
+            ? (row, applyPatch) => {
+                void openParentPicker(row, applyPatch);
+              }
+            : undefined,
+        }
+      : column;
+    return saving ? { ...boundColumn, editable: false } : boundColumn;
+  });
   const groupGridColumns = useMemo(
     () =>
       buildGroupColumns(moduleOptions).map((column) =>

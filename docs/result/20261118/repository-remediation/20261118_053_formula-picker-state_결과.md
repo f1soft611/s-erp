@@ -46,6 +46,8 @@ column factory는 원래도 callback을 즉시 실행하지 않으므로 이번 
 
 [052의 정확한 SHA CI](20261118_052_comment-submit-ref_결과.md) **226파일·2,682개**와 tests/build/lint/required 네 job success를 원본 집계로 확인했다. 완료 뒤에만 이번 단위를 별도 커밋·비강제 푸시한다. 이번 053의 정확한 SHA 전체 CI는 별도로 확인하며 선행 결과를 재사용하지 않는다.
 
+053은 `7b38be1ba748a8555d2b49d02767e92a28882dbc`로 별도 커밋·비강제 푸시했고 원격 SHA 일치를 확인했다. [정확한 SHA CI 44348087515](https://github.com/f1soft611/s-erp/actions/runs/44348087515)의 원본 마지막 집계는 **227파일·2,685개 통과**이며 tests/build/lint/required 네 job 모두 success다. [CI 근거](screenshots/formula-picker-state/remote-ci.json)는 다음 054 단위에 함께 기록한다.
+
 최초 206개 중 118개를 제거했고 **88개 경고는 순차 처리 중**이다(state-in-effect 82/ref 6/exhaustive-deps 0). 공식 호환 경로 없는 권고 2건은 [027](20261118_027_dependency-remediation-boundary_결과.md)의 BLOCKED를 유지한다. 기존 TreeProjection 3단계 및 자료실 모바일 관찰은 이 단위에서 수정하지 않았다.
 
 ```text

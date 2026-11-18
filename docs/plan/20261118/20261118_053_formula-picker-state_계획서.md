@@ -70,4 +70,4 @@ MaterialPickerDialog만 `open={pickerTarget !== null && !disabled}`로 바꾼다
 - [x] 위 두 파일을 함께 실행하고 typecheck/build/Oxc에서 대상 1건 제거·새 진단 0을 확인한다.
 - [x] source/AST 대조로 위 대상 저장 방식 외 JSX/스타일·기존 callback/계산·서비스/공개 계약을 보존하고 frontend tracked 파일 byte 차이 0을 확인한다.
 - [x] 공유 4173의 소유 탭에서 실제 컴포넌트의 셀/toolbar picker·취소·행별 반영·disabled·계산 표시를 375/768/1280px로 검증한다. 네트워크/영구 저장소는 합성 fixture로 한정하고 미검증 범위는 명시한다.
-- [ ] 결과/스크린샷 저장, 052 정확한 SHA 전체 CI 완료 확인 뒤 allowlist 커밋·비강제 푸시·원격 일치를 확인한다. 053 정확한 SHA CI도 별도로 확인한다.
+- [x] 결과/스크린샷 저장, 052 정확한 SHA 전체 CI 완료 확인 뒤 allowlist 커밋·비강제 푸시·원격 일치를 확인한다. 053 정확한 SHA CI도 별도로 확인한다.

@@ -233,6 +233,58 @@ describe('CommonCode management page', () => {
     );
   }
 
+  it('binds the parent-code picker only to deferred edit events and preserves cancel/reopen selection', async () => {
+    const defaultGet = apiMocks.apiGet.getMockImplementation()!;
+    apiMocks.apiGet.mockImplementation((path: string) => {
+      if (path === '/api/v1/co/master/common-code/groups/2/items') {
+        return Promise.resolve({ resultList: [{
+          commonCodeItemId: 20,
+          groupId: 2,
+          itemCode: 'OWNED_CHILD',
+          itemNm: 'Owned child detail',
+          parentItemId: 10,
+          parentItemNm: 'Owned old parent',
+          sortOrder: 1,
+          useAt: 'Y',
+          itemDc: '',
+        }] });
+      }
+      return defaultGet(path);
+    });
+    render(
+      <CommonCodeManagementPanel
+        groups={[
+          { id: '1', groupCode: 'OWNED_PARENT', groupNm: 'Owned parent group', groupDc: '', moduleCd: '', parentGroupId: null, sortOrder: 1, useAt: 'Y' },
+          { id: '2', groupCode: 'OWNED_CHILD', groupNm: 'Owned child group', groupDc: '', moduleCd: '', parentGroupId: '1', sortOrder: 1, useAt: 'Y' },
+        ]}
+        initialSelectedGroupId="2"
+        initialSelectedGroupRowIds={['2']}
+      />,
+    );
+    await screen.findByRole('gridcell', { name: 'Owned old parent' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    const parentRequests = () => apiMocks.apiGet.mock.calls.filter(
+      ([path]) => path === '/api/v1/co/master/common-code/groups/1/items',
+    ).length;
+    const beforeOpen = parentRequests();
+    const openPicker = async () => {
+      fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'Owned old parent' }));
+      fireEvent.click(screen.getByRole('button', { name: '코드 선택' }));
+      return screen.findByRole('dialog', { name: '상위코드 선택' });
+    };
+    const first = await openPicker();
+    fireEvent.click(within(first).getByRole('button', { name: '닫기' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('gridcell', { name: 'Owned old parent' })).toBeInTheDocument();
+    const reopened = await openPicker();
+    fireEvent.click(within(reopened).getByText('사업자등록증'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('gridcell', { name: '사업자등록증' })).toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: 'Owned child detail' })).toBeInTheDocument();
+    expect(parentRequests()).toBe(beforeOpen + 2);
+    expect(apiMocks.apiPost).not.toHaveBeenCalled();
+  });
+
   it('locks common-code editing through save and quiet refresh without hiding current rows', async () => {
     let resolveSave!: (value: unknown) => void;
     let resolveGroups!: (value: unknown) => void;
