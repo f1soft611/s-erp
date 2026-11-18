@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { Profiler } from 'react';
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
+import { Profiler, useLayoutEffect } from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiGet, apiPost } from '../src/shared/services/apiClient';
@@ -15,9 +15,19 @@ import {
   toMaterialReceiptClosingFilters,
 } from '../src/pages/materials/receipt/closing/services/materialReceiptClosing.service';
 import type {
+  MaterialReceiptClosingFilters,
   MaterialReceiptClosingRow,
   MaterialReceiptClosingSupplier,
 } from '../src/pages/materials/receipt/closing/types/materialReceiptClosing.types';
+import {
+  useMaterialReceiptClosingData,
+  useMaterialReceiptClosingSearch,
+} from '../src/pages/materials/receipt/closing/hooks/useMaterialReceiptClosing';
+
+const closingDefaultsControl = vi.hoisted(() => ({
+  values: { receiptDt: { from: '2026-11-01', to: '2026-11-30' } } as
+    { receiptDt: { from: string; to: string } } | null,
+}));
 
 vi.mock('../src/shared/services/apiClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/shared/services/apiClient')>();
@@ -26,7 +36,7 @@ vi.mock('../src/shared/services/apiClient', async (importOriginal) => {
 
 vi.mock('../src/shared/hooks/usePageSearchDefaults', () => ({
   usePageSearchDefaults: () => ({
-    values: { receiptDt: { from: '2026-11-01', to: '2026-11-30' } },
+    values: closingDefaultsControl.values,
     loading: false,
     error: null,
     retry: vi.fn(),
@@ -118,6 +128,7 @@ describe('closing row columns', () => {
 describe('MaterialReceiptClosingPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    closingDefaultsControl.values = { receiptDt: { from: '2026-11-01', to: '2026-11-30' } };
     window.sessionStorage.clear();
     apiGetMock.mockImplementation(async (path: string) => {
       if (path.startsWith('/api/v1/materials/purchase-closings/suppliers')) return { resultList: suppliers() };
@@ -132,6 +143,151 @@ describe('MaterialReceiptClosingPage', () => {
     await screen.findByRole('grid', { name: '매입마감 입고 행' });
     await waitFor(() => expect(screen.getAllByText('MI-A-1').length).toBeGreaterThan(0));
   }
+
+  it.each([false, true])('publishes closing defaults in the first eligible commit with passive versioned storage and restored server-month choices (initially ready: %s)', (initiallyReady) => {
+    const key = 's-erp:page:materials-material-receipt-closing';
+    const defaults = { receiptDt: { from: '2026-11-01', to: '2026-11-30' } };
+    closingDefaultsControl.values = initiallyReady ? defaults : null;
+    const writes = vi.spyOn(Storage.prototype, 'setItem');
+    const commits: Array<{
+      initialized: boolean; keyword: string; values: Record<string, unknown>;
+      applied: Record<string, unknown>; filters: MaterialReceiptClosingFilters | null; writes: number;
+    }> = [];
+    try {
+      const { result, rerender, unmount } = renderHook(() => {
+        const search = useMaterialReceiptClosingSearch();
+        useLayoutEffect(() => {
+          commits.push({
+            initialized: search.defaultsInitialized, keyword: search.keyword, values: search.detailValues,
+            applied: search.appliedDetailValues, filters: search.appliedFilters,
+            writes: writes.mock.calls.filter(([storedKey]) => storedKey === key).length,
+          });
+        });
+        return search;
+      });
+      if (!initiallyReady) {
+        expect(result.current.defaultsInitialized).toBe(false);
+        expect(window.sessionStorage.getItem(key)).toBeNull();
+        act(() => result.current.setKeyword('Owned pending'));
+        commits.length = 0;
+        closingDefaultsControl.values = defaults;
+        rerender();
+      }
+      const initialValues = { ...defaults, closingMonth: MONTH, closeType: 'ALL' };
+      expect(commits[0]).toMatchObject({
+        initialized: true, keyword: '', values: initialValues, applied: initialValues,
+        filters: { receiptFrom: '2026-11-01', receiptTo: '2026-11-30', closingMonth: MONTH, closeType: 'ALL' }, writes: 0,
+      });
+      expect(JSON.parse(window.sessionStorage.getItem(key)!)).toEqual({ version: 1, value: { keyword: '', detailValues: initialValues } });
+      const originalSnapshot = window.sessionStorage.getItem(key);
+      act(() => {
+        result.current.setKeyword('Owned applied');
+        result.current.setDetailValues({ ...initialValues, closingMonth: '202610', closeType: 'OPEN', orderNo: 'OWNED-PO' });
+      });
+      expect(result.current.appliedFilters?.closeType).toBe('ALL');
+      expect(window.sessionStorage.getItem(key)).toBe(originalSnapshot);
+      act(() => result.current.applySearch());
+      expect(result.current.appliedFilters).toMatchObject({ keyword: 'Owned applied', closingMonth: '202610', closeType: 'OPEN', orderNo: 'OWNED-PO' });
+      const appliedSnapshot = window.sessionStorage.getItem(key);
+      const latestDefaults = { receiptDt: { from: '2026-12-01', to: '2026-12-31' } };
+      closingDefaultsControl.values = latestDefaults;
+      rerender();
+      expect(window.sessionStorage.getItem(key)).toBe(appliedSnapshot);
+      unmount();
+      const reopened = renderHook(() => useMaterialReceiptClosingSearch());
+      expect(reopened.result.current.keyword).toBe('Owned applied');
+      expect(reopened.result.current.appliedFilters).toMatchObject({ receiptFrom: '2026-11-01', closingMonth: '202610', closeType: 'OPEN' });
+      act(() => reopened.result.current.resetSearch());
+      expect(reopened.result.current.keyword).toBe('');
+      expect(reopened.result.current.detailValues).toEqual({ ...latestDefaults, closingMonth: '202612', closeType: 'ALL' });
+      expect(apiGetMock).not.toHaveBeenCalled();
+      expect(apiPostMock).not.toHaveBeenCalled();
+    } finally {
+      writes.mockRestore();
+    }
+  });
+
+  it.each([false, true])('publishes closing data-start commits while preserving atomic pairs, quiet versions and cancellation (initially ready: %s)', async (initiallyReady) => {
+    const requests: Array<{
+      resolve: (value: { resultList: MaterialReceiptClosingSupplier[] | MaterialReceiptClosingRow[] }) => void;
+      reject: (error: Error) => void;
+    }> = [];
+    apiGetMock.mockImplementation(() => new Promise<{ resultList: MaterialReceiptClosingSupplier[] | MaterialReceiptClosingRow[] }>((resolve, reject) => {
+      requests.push({ resolve, reject });
+    }));
+    const filters: MaterialReceiptClosingFilters = { receiptFrom: '2026-11-01', receiptTo: '2026-11-30', closingMonth: MONTH, closeType: 'ALL' };
+    const initialProps: { filters: MaterialReceiptClosingFilters | null } = { filters: initiallyReady ? filters : null };
+    const commits: Array<{ loading: boolean; hasLoaded: boolean; error: string; initialLoading: boolean }> = [];
+    const { result, rerender } = renderHook(({ filters: current }) => {
+      const data = useMaterialReceiptClosingData(current);
+      useLayoutEffect(() => {
+        commits.push({ loading: data.loading, hasLoaded: data.hasLoaded, error: data.error, initialLoading: data.initialLoad.loading });
+      });
+      return data;
+    }, { initialProps });
+    if (!initiallyReady) {
+      expect(requests).toHaveLength(0);
+      commits.length = 0;
+      rerender({ filters });
+    }
+    const normalStart = { loading: true, hasLoaded: false, error: '', initialLoading: true };
+    const quietStart = { ...normalStart, loading: false };
+    expect(commits[0]).toEqual(normalStart);
+    await act(async () => requests[0].reject(new Error('Owned closing pair failure')));
+    expect(result.current.error).toBe('Owned closing pair failure');
+    commits.length = 0;
+    act(() => result.current.retry());
+    expect(commits[0]).toEqual(normalStart);
+    const currentSuppliers = suppliers(), currentRows = rows();
+    await act(async () => requests[2].resolve({ resultList: currentSuppliers }));
+    expect(result.current.suppliers).toEqual([]);
+    expect(result.current.rows).toEqual([]);
+    expect(result.current.hasLoaded).toBe(false);
+    expect(result.current.loading).toBe(true);
+    await act(async () => {
+      requests[1].resolve({ resultList: [] });
+      requests[3].resolve({ resultList: currentRows });
+    });
+    expect(result.current.suppliers).toEqual(currentSuppliers);
+    expect(result.current.rows).toEqual(currentRows);
+    commits.length = 0;
+    act(() => result.current.refreshQuietly());
+    expect(commits[0]).toEqual(quietStart);
+    expect(result.current.suppliers).toEqual(currentSuppliers);
+    expect(result.current.rows).toEqual(currentRows);
+    await act(async () => {
+      requests[4].resolve({ resultList: currentSuppliers }); requests[5].resolve({ resultList: currentRows });
+    });
+    commits.length = 0;
+    rerender({ filters: { ...filters, keyword: 'Owned changed' } });
+    expect(commits[0]).toEqual(normalStart);
+    rerender({ filters: { ...filters, keyword: 'Owned latest' } });
+    await act(async () => {
+      requests[6].resolve({ resultList: [] }); requests[7].resolve({ resultList: [] });
+    });
+    expect(result.current.suppliers).toEqual(currentSuppliers);
+    expect(result.current.rows).toEqual(currentRows);
+    expect(result.current.loading).toBe(true);
+    await act(async () => {
+      requests[8].resolve({ resultList: currentSuppliers }); requests[9].resolve({ resultList: currentRows });
+    });
+    rerender({ filters: null });
+    act(() => result.current.refreshQuietly());
+    expect(requests).toHaveLength(10);
+    expect(result.current.loading).toBe(false);
+    commits.length = 0;
+    rerender({ filters });
+    expect(commits[0]).toEqual(quietStart);
+    await act(async () => {
+      requests[10].resolve({ resultList: currentSuppliers }); requests[11].resolve({ resultList: currentRows });
+    });
+    rerender({ filters });
+    expect(requests).toHaveLength(12);
+    expect(result.current.loading).toBe(false);
+    expect(result.current.hasLoaded).toBe(true);
+    expect(result.current.dataVersion).toBe(3);
+    expect(apiPostMock).not.toHaveBeenCalled();
+  });
 
   it('clears supplier, row selection and edits from the first reloaded data commit only', async () => {
     const commits: Array<{ filtered: boolean; checked: number; text: string }> = [];

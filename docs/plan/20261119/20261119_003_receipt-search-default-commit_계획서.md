@@ -41,4 +41,4 @@ if (defaultValues && searchSession === null) {
 
 - [x] owned frontend에서 관련 Vitest3파일58개(현황16개)·tsc -b·Vite build가 통과했다. Oxc69→68 제거1/추가0, 같은 파일 진단0/다른 진단 전체 label 동일이다. nullable default 제어 외 기존14개 본문·초기화 wrapper 외 소스 보존과891파일 byte parity0을 확인했다.
 - [x] 375/768/1280px 실제 search/session 훅/layout observer의 합성 probe에서 지연 기본값 첫 commit·첫 layout write0/commit 뒤 저장·입력/적용·default 변경/재열기 세션 우선·최신 default 초기화를 native 검증했다. 메모리 Storage와 합성 default provider만 사용하고 모든 API/기타 transport와 영구 저장소를 차단했다. 오류/이탈/문서 가로 넘침0, PNG6, 소유 탭을 닫았다. 전체 업무 화면 검증이 아니다.
-- [ ] 결과/직접 작은 diff 리뷰·선행069 정확 CI를 보관한다. allowlist 별도 커밋/비강제 푸시·원격 일치와 정확한070 CI를 확인한다.
+- [x] 결과/직접 작은 diff 리뷰·선행069 정확 CI를 보관했다.17파일 allowlist로 `eb58f171f797558e4a728c5fea46540d612bb4d7`을 별도 커밋/비강제 푸시하고 원격 일치를 확인했다. 정확한 CI44418384450은 마지막 집계227파일2,718개와 build/tests/lint/required 네 job 모두 성공했다. 최종 근거는 후속071 커밋에 포함한다.

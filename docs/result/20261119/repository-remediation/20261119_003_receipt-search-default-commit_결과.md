@@ -36,7 +36,9 @@ default provider는 합성이고 저장소는 메모리 대체다. 전체 Page/G
 
 ## 원격과 잔여
 
-선행069 `b0209a642e8969c84350a444ae141c5574e66dc0`의 정확한 CI44416894632는 마지막 집계227파일2,716개 및 네 job 성공이며 [최종 판정](screenshots/receipt-status-request-start/remote-ci.json)을 함께 보관한다.070은 별도 커밋/비강제 푸시 후 정확한 SHA 전체 CI를 확인한다.
+선행069 `b0209a642e8969c84350a444ae141c5574e66dc0`의 정확한 CI44416894632는 마지막 집계227파일2,716개 및 네 job 성공이며 [최종 판정](screenshots/receipt-status-request-start/remote-ci.json)을 함께 보관했다.
+
+070은 `eb58f171f797558e4a728c5fea46540d612bb4d7`으로17파일만 별도 커밋/비강제 푸시하고 원격 일치를 확인했다. 정확한 [CI44418384450](https://github.com/f1soft611/s-erp/actions/runs/44418384450)은 마지막 집계227파일2,718개와 build/tests/lint/required 네 job 모두 성공했다. [최종 판정](screenshots/receipt-search-default-commit/remote-ci.json)은 후속071 커밋에 보관한다.
 
 backend/API/DB/의존성 변경 없음. DB MCP·스키마 스크립트 대상이 아니다. 잔여 state-in-effect68개와 기존 의존성 권고2건이 있어 전체 요청은 아직 완료로 표시하지 않는다.
 

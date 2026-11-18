@@ -1,0 +1,66 @@
+{
+  "actualClosingSearchDataSessionHooksLayoutObserver": true,
+  "notFullBusinessScreen": true,
+  "defaultsProviderAndDeferredGetsSynthetic": true,
+  "memoryStorageOnly": true,
+  "allWritesAndUnownedTransportBlocked": true,
+  "firstSearchDefaultAndDataStartCommitConsistent": true,
+  "noStorageWriteBeforeFirstEligibleLayout": true,
+  "allMemoryStorageWritesAfterCommit": true,
+  "halfPairNotPublishedAndBothDatasetsPublishedAtomically": true,
+  "quietKeepsBothDatasets": true,
+  "quietThenFilterIsNormalLoading": true,
+  "cancelledPairIgnored": true,
+  "pausedQuietLastStartedVersionPreserved": true,
+  "sameConditionsNoRequestAndDataVersionPreserved": true,
+  "editApplyAndRestoredServerMonthSessionPreserved": true,
+  "resetUsesLatestServerDateMonth": true,
+  "unknownRequests": 0,
+  "errors": 0,
+  "documentOverflow": 0,
+  "getPairsPerWidth": 8,
+  "getsPerWidth": 16,
+  "widths": [
+    375,
+    768,
+    1280
+  ],
+  "images": [
+    {
+      "file": "closing071-initial-375.png",
+      "width": 375,
+      "height": 1280,
+      "bytes": 36188
+    },
+    {
+      "file": "closing071-quiet-375.png",
+      "width": 375,
+      "height": 1280,
+      "bytes": 36592
+    },
+    {
+      "file": "closing071-initial-768.png",
+      "width": 768,
+      "height": 1280,
+      "bytes": 35612
+    },
+    {
+      "file": "closing071-quiet-768.png",
+      "width": 768,
+      "height": 1280,
+      "bytes": 35859
+    },
+    {
+      "file": "closing071-initial-1280.png",
+      "width": 1280,
+      "height": 1280,
+      "bytes": 36643
+    },
+    {
+      "file": "closing071-quiet-1280.png",
+      "width": 1280,
+      "height": 1280,
+      "bytes": 36964
+    }
+  ]
+}
