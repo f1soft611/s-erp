@@ -1,0 +1,46 @@
+{
+  "actualGridRow": true,
+  "actualGridCellsAndEditor": true,
+  "transport": "All fetch blocked; no transport attempted",
+  "storage": "Tab memory only; no persistent reads or writes",
+  "widths": [
+    {
+      "width": 375,
+      "pendingRenderAttempted": true,
+      "retainsCommittedRowAndCellEvents": true,
+      "currentCommitOwnsBothConnectedCellRegistrations": true,
+      "currentEditingCellRegistered": true,
+      "unmountClearsMapAndEditingRef": true,
+      "documentWidth": 375
+    },
+    {
+      "width": 768,
+      "pendingRenderAttempted": true,
+      "retainsCommittedRowAndCellEvents": true,
+      "currentCommitOwnsBothConnectedCellRegistrations": true,
+      "currentEditingCellRegistered": true,
+      "unmountClearsMapAndEditingRef": true,
+      "documentWidth": 768
+    },
+    {
+      "width": 1280,
+      "pendingRenderAttempted": true,
+      "retainsCommittedRowAndCellEvents": true,
+      "currentCommitOwnsBothConnectedCellRegistrations": true,
+      "currentEditingCellRegistered": true,
+      "unmountClearsMapAndEditingRef": true,
+      "documentWidth": 1280
+    }
+  ],
+  "callbackCalls": 12,
+  "unknownRequests": 0,
+  "limitations": "Direct actual Row/Cells/TextEditor using synthetic fixed values and a fixture registration map, not a live API save or full-grid browser workflow. Integrated grid editing/performance is covered by the related 278 tests.",
+  "images": [
+    "pending-375.png",
+    "committed-375.png",
+    "pending-768.png",
+    "committed-768.png",
+    "pending-1280.png",
+    "committed-1280.png"
+  ]
+}

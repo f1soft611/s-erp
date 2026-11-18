@@ -35,6 +35,12 @@ fixture의 표시 값은 고정하고 callback만 기록했다. 직접 Cell/Text
 
 커밋·푸시는 정확한 057 CI 완료 후 수행하며 058 자체 전체 CI도 정확한 SHA로 별도 확인한다.
 
+## 원격 동기화와 전체 CI
+
+- 커밋 `b32f93914629d088a223bdf93f89b3218b99ee86`, 18파일 allowlist·비강제 푸시·원격 SHA 일치.
+- [정확한 SHA CI](https://github.com/f1soft611/s-erp/actions/runs/44362686887): 227파일·2,691개, frontend-build/tests/lint/required 모두 성공. 원본 로그의 마지막 집계까지 확인했다.
+- [원격 CI 판정](screenshots/grid-cell-commit/remote-ci.json)은 후속 059 변경에 포함한다.
+
 ## 복사 가능한 커밋
 
 ```text

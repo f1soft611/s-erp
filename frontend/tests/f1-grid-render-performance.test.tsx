@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { F1Grid, type F1GridColumn, type F1GridRef } from '../src/shared/components/f1-grid';
 import { GridHeader } from '../src/shared/components/f1-grid/core/GridHeader';
 import { GridCell } from '../src/shared/components/f1-grid/core/GridCell';
+import { GridRow } from '../src/shared/components/f1-grid/core/GridRow';
 
 type Row = { id: string; name: string; code: string };
 
@@ -59,7 +60,88 @@ function createHeaderProps() {
   } satisfies Parameters<typeof GridHeader<HeaderRow>>[0];
 }
 
+function createRowProps() {
+  type CheckboxRow = { id: string; enabled: boolean };
+  const row: CheckboxRow = { id: '1', enabled: false };
+  const columns: F1GridColumn<CheckboxRow>[] = [
+    { field: 'enabled', headerName: 'Enabled', type: 'checkbox', editable: true },
+  ];
+  return {
+    row, rowId: '1', rowIndex: 0, renderIndex: 0, columns, columnLine: true, stripeRows: false,
+    isSelected: false, rowHeight: 32, defaultRowHeight: 32, minRowHeight: 24, maxRowHeight: 200,
+    resizableRows: false, dragSelectionStateRef: { current: { active: false, previousCell: null } },
+    draftValue: '', mergeInfoByColumn: [[]], visibleRows: [row], selectedIds: [], rowKey: 'id',
+    onSelectRow: vi.fn(), onSetRowSelection: vi.fn(), onSetFocusedCell: vi.fn(),
+    onCellSelectionStart: vi.fn(), onCellSelectionDrag: vi.fn(), onCellSelectionEnd: vi.fn(),
+    onCommitEdit: vi.fn(), onStartEdit: vi.fn(), onDraftChange: vi.fn(), onKeyDown: vi.fn(),
+    onUpdateCell: vi.fn(), onUpdateRow: vi.fn(), getCellError: () => undefined, onStopEdit: vi.fn(),
+    onCellRef: vi.fn(), onEditingCellRef: vi.fn(), onUpdateRowHeight: vi.fn(),
+    getMergeEditing: () => false, getMerged: () => false, getPinOffset: () => undefined,
+  } satisfies Parameters<typeof GridRow<CheckboxRow>>[0];
+}
+
 describe('F1Grid interaction render isolation', () => {
+  it('keeps committed row events while a later callback render suspends', async () => {
+    const props = createRowProps();
+    const committed = vi.fn(), next = vi.fn(), attempted = vi.fn();
+    const pending = new Promise<void>(() => undefined);
+    function SuspendUpdate({ blocked }: { blocked: boolean }) {
+      if (blocked) {
+        attempted();
+        throw pending;
+      }
+      return null;
+    }
+    const view = (useNext = false, blocked = false) => (
+      <Suspense fallback={<span>Updating row</span>}>
+        <GridRow {...props} onSetRowSelection={useNext ? next : committed} />
+        <SuspendUpdate blocked={blocked} />
+      </Suspense>
+    );
+    const { rerender } = render(view());
+    await act(async () => { startTransition(() => rerender(view(true, true))); });
+    expect(attempted).toHaveBeenCalled();
+    expect(screen.queryByText('Updating row')).not.toBeInTheDocument();
+    fireEvent.click(within(screen.getByLabelText('1 행 선택')).getByRole('checkbox'));
+    expect(next).not.toHaveBeenCalled();
+    expect(committed).toHaveBeenCalledExactlyOnceWith('1', true);
+    rerender(view(true));
+    fireEvent.click(within(screen.getByLabelText('1 행 선택')).getByRole('checkbox'));
+    expect(next).toHaveBeenCalledExactlyOnceWith('1', true);
+    expect(committed).toHaveBeenCalledTimes(1);
+  });
+
+  it('registers child cells with the current commit callbacks and clears the shared cache', () => {
+    const props = createRowProps();
+    const nodes = new Map<string, HTMLElement>();
+    let editingNode: HTMLElement | null = null;
+    const register = (rowId: string | number, columnIndex: number, node: HTMLElement | null) => {
+      const key = `${String(rowId)}:${columnIndex}`;
+      if (node) nodes.set(key, node);
+      else nodes.delete(key);
+    };
+    const previous = vi.fn(register), current = vi.fn(register);
+    const previousEditing = vi.fn((node: HTMLElement | null) => { editingNode = node; });
+    const currentEditing = vi.fn((node: HTMLElement | null) => { editingNode = node; });
+    const editingCell = { rowId: '1', columnIndex: 0 };
+    const { rerender, unmount } = render(
+      <GridRow {...props} editingCell={editingCell} onCellRef={previous} onEditingCellRef={previousEditing} />,
+    );
+    const cell = screen.getByRole('checkbox', { name: 'Enabled 1' }).closest('[role="gridcell"]');
+    expect(nodes.get('1:0')).toBe(cell);
+    expect(editingNode).toBe(cell);
+    rerender(
+      <GridRow {...props} rowHeight={36} editingCell={editingCell}
+        onCellRef={current} onEditingCellRef={currentEditing} />,
+    );
+    expect(current).toHaveBeenCalledWith('1', 0, cell);
+    expect(currentEditing).toHaveBeenCalledWith(cell);
+    expect(nodes.get('1:0')).toBe(cell);
+    unmount();
+    expect(nodes.size).toBe(0);
+    expect(editingNode).toBeNull();
+  });
+
   it('keeps committed cell events while a later callback render suspends', async () => {
     type CheckboxRow = { id: string; enabled: boolean };
     const column: F1GridColumn<CheckboxRow> = {

@@ -51,4 +51,4 @@ useLayoutEffect(() => {
 - [x] basename selector의 같은 3파일 276개, typecheck/build/Oxc에서 새 진단 0과 ref 1개 제거(84 → 83)를 확인한다.
 - [x] 기존 테스트 byte 보존·source/검증 workspace 891파일 parity와 직접 작은 diff 리뷰를 수행한다.
 - [x] 실제 GridCell checkbox/텍스트 편집 fixture에서 대기 중 revision 0과 commit 후 revision 1의 native checkbox/입력 callback을 375/768/1280px로 확인한다. 네트워크/영구 저장소는 차단한다. callback 12회·요청 0.
-- [ ] 결과/스크린샷과 정확한 057 CI 근거를 보관한 뒤 allowlist 별도 커밋·비강제 푸시·원격 일치, 정확한 058 CI를 확인한다.
+- [x] 결과/스크린샷과 정확한 057 CI 근거를 보관한 뒤 allowlist 별도 커밋·비강제 푸시·원격 일치, 정확한 058 CI를 확인한다. `b32f93914629d088a223bdf93f89b3218b99ee86` / run `44362686887`, 227파일·2,691개, 4 job 성공.

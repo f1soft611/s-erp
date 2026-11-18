@@ -2,6 +2,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   type KeyboardEvent,
@@ -679,7 +680,9 @@ const MemoizedGridRow = memo(GridRowInner, areGridRowPropsEqual) as typeof GridR
 
 export function GridRow<T extends object>(props: GridRowProps<T>) {
   const latestProps = useRef(props);
-  latestProps.current = props;
+  useLayoutEffect(() => {
+    latestProps.current = props;
+  });
 
   const handlers = useMemo(() => ({
     onSelectRow: (...args: Parameters<GridRowProps<T>['onSelectRow']>) => latestProps.current.onSelectRow(...args),
@@ -695,8 +698,6 @@ export function GridRow<T extends object>(props: GridRowProps<T>) {
     onUpdateCell: (...args: Parameters<GridRowProps<T>['onUpdateCell']>) => latestProps.current.onUpdateCell(...args),
     onUpdateRow: (...args: Parameters<GridRowProps<T>['onUpdateRow']>) => latestProps.current.onUpdateRow(...args),
     onStopEdit: () => latestProps.current.onStopEdit(),
-    onCellRef: (...args: Parameters<GridRowProps<T>['onCellRef']>) => latestProps.current.onCellRef(...args),
-    onEditingCellRef: (...args: Parameters<GridRowProps<T>['onEditingCellRef']>) => latestProps.current.onEditingCellRef(...args),
     onUpdateRowHeight: (...args: Parameters<GridRowProps<T>['onUpdateRowHeight']>) => latestProps.current.onUpdateRowHeight(...args),
     onOpenRowForm: (row: T) => latestProps.current.onOpenRowForm?.(row),
   }), []);
