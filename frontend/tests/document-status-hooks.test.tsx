@@ -21,21 +21,22 @@ describe('document status hooks', () => {
     service.search.mockImplementationOnce(() => new Promise<DocumentStatusResult>((resolve) => {
       resolveFirst = resolve;
     })).mockResolvedValue({ rows: [], totalRowCount: 2 });
-    const onLoadStart = vi.fn();
     const { result, rerender, unmount } = renderHook(
       ({ enabled, filters }: { enabled: boolean; filters: DocumentStatusFilters }) =>
-        useDocumentStatusList(filters, enabled, onLoadStart),
+        useDocumentStatusList(filters, enabled),
       { initialProps: { enabled: false, filters: {} } },
     );
     expect(service.search).not.toHaveBeenCalled();
     rerender({ enabled: true, filters: {} });
+    expect(result.current.loading).toBe(true);
     const firstSignal = service.search.mock.calls[0][1] as AbortSignal;
     rerender({ enabled: true, filters: { keyword: 'new' } });
     await waitFor(() => expect(result.current.totalRowCount).toBe(2));
     expect(firstSignal.aborted).toBe(true);
     await act(async () => resolveFirst({ rows: [], totalRowCount: 99 }));
     expect(result.current.totalRowCount).toBe(2);
-    expect(onLoadStart).toHaveBeenCalledTimes(2);
+    expect(service.search).toHaveBeenCalledTimes(2);
+    expect(result.current.loading).toBe(false);
     const latestSignal = service.search.mock.calls[1][1] as AbortSignal;
     unmount();
     expect(latestSignal.aborted).toBe(true);
@@ -45,9 +46,8 @@ describe('document status hooks', () => {
     service.search.mockRejectedValueOnce(new Error('Search failed'))
       .mockResolvedValue({ rows: [], totalRowCount: 0 });
     const filters = { title: 'Plan' };
-    const onLoadStart = vi.fn();
     const { result } = renderHook(() =>
-      useDocumentStatusList(filters, true, onLoadStart));
+      useDocumentStatusList(filters, true));
     await waitFor(() => expect(result.current.error).toBe('Search failed'));
     expect(result.current.hasLoaded).toBe(false);
     act(() => result.current.retry());
@@ -65,10 +65,9 @@ describe('document status hooks', () => {
     })).mockImplementationOnce(() => new Promise<DocumentStatusResult>((resolve) => {
       resolveLatest = resolve;
     }));
-    const onLoadStart = vi.fn();
     const { result, rerender } = renderHook(
       ({ filters }: { filters: DocumentStatusFilters }) =>
-        useDocumentStatusList(filters, true, onLoadStart),
+        useDocumentStatusList(filters, true),
       { initialProps: { filters: {} } },
     );
     rerender({ filters: { keyword: 'latest' } });
