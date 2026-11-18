@@ -4,11 +4,17 @@
 
 **Goal:** 운영 화면·제한 시간·검증 단언을 바꾸지 않고 문서작성 회귀의 불필요한 준비·전역 조회 비용과 분리 DOM 대기를 바로잡는다.
 
-**Architecture:** 실제 DocumentComposerDialog와 서비스 mock을 그대로 사용한다. 격리 worktree에서 실패 사례의 단계별 비용을 먼저 측정한다. 순수 composer 동작만 검증하는 케이스는 실제 leaf dialog 경계에서 렌더하고, Dashboard 통합·열기/닫기·refresh 검증은 기존 Dashboard 경계를 유지한다. 비동기 교체되는 feed 노드는 대기 callback 안에서 재조회한다.
+**Architecture:** 실제 DocumentComposerDialog와 서비스 mock을 그대로 사용한다. 격리 worktree에서 실패 사례의 단계별 비용을 먼저 측정한다. 순수 composer 동작은 실제 dialog 경계에서 검증하고, 초기화 사례는 동일 instance를 유지하는 최소 controlled host를 사용한다. Dashboard 고유 통합·refresh 사례는 기존 경계를 유지한다. 비동기 교체되는 feed 노드는 대기 callback 안에서 재조회한다.
 
 **Tech Stack:** React, Testing Library, Vitest threads, npm exact-lock.
 
 ---
+
+## 후속 계측에 따른 경계 정정
+
+초기 보수적 계획은 닫기/재열기를 Dashboard에 남겼으나 로컬 전체와 관련 223개 실행에서 이 한 사례가 각각 10,850/11,157ms로 계속 실패했다. 단순 조회 축소만으로 해결됐다고 주장하지 않는다.
+
+운영 소스를 재확인하면 실제 제목·결재·참조 초기화는 useDocumentComposer.closeComposer가 소유하고, DocumentWritePage의 onClose는 별도로 quiet refresh와 detail 갱신까지 실행한다. 따라서 **초기화만 단언하는 이 사례도 실제 dialog를 open state로 제어하는 얇은 React host**로 바꾼다. 버튼 클릭→onClose→실제 닫힘→동일 instance 재열기와 원래 값/참여자 단언은 그대로 유지한다. Dashboard 자체 통합은 다른 기존 사례를 유지하며 제품 코드·시간 제한은 바꾸지 않는다.
 
 ### Task 1: 계측과 근거 고정
 
@@ -29,7 +35,7 @@ render(<DocumentComposerDialog open onClose={vi.fn()} />);
 await waitForComposerReady();
 ```
 
-- [x] host 경계를 줄인 뒤 추가 전역 조회 치환을 최소화해 닫기/재열기의 제목만 같은 공개 label로 조회했다. 옵션 조회는 기존 동작을 보존했다.
+- [x] 닫기/재열기의 공개 label과 실제 연결된 picker listbox로 조회 범위를 좁힌다. 이 변경만으로 관련 전체 실행이 실패했으므로 최종 초기화 검증에는 위 책임 분석에 따른 controlled host도 사용한다.
 
 ```tsx
 const composer = within(screen.getByRole('dialog', { name: '문서 작성' }));
@@ -48,7 +54,8 @@ await waitFor(() =>
 );
 ```
 
-- [x] 기존 ID·payload·권한·상태·UI 단언, 실제 Dashboard 열기/닫기·조회 integration 사례를 보존한다. skip·재시도·시간 제한 상향은 금지한다.
+- [x] 기존 ID·payload·권한·상태·UI 단언과 Dashboard 고유 integration 사례를 보존한다. 초기화 사례에서도 실제 닫기 callback과 open state 전환을 사용한다. skip·재시도·시간 제한 상향은 금지한다.
+- [x] 관련 다섯 파일 223개 전체를 KST/2 workers에서 확인했다. 초기화 사례는 7,050ms로 기존 10초 이내이며 직접 it 127개·expect 982개도 유지한다.
 
 ### Task 3: 검증·커밋·동기화
 

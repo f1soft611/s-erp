@@ -9,6 +9,7 @@ import {
   waitFor,
 } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
+import { useState } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAppTheme } from '../src/theme/theme';
@@ -6213,25 +6214,42 @@ describe('Document write page', () => {
   });
 
   it('clears the compose title when the dialog closes and reopens', async () => {
-    render(<DashboardContent {...pageProps} />);
+    function ComposerSession() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>문서 작성</button>
+          <DocumentComposerDialog open={open} onClose={() => setOpen(false)} />
+        </>
+      );
+    }
+
+    render(<ComposerSession />);
 
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await waitForComposerReady();
-    const approvalPicker = screen.getByRole('combobox', {
-      name: '결재선 2 사용자 선택',
-    });
+    const approvalPicker = screen.getByLabelText('결재선 2 사용자 선택', { selector: 'input' });
     fireEvent.change(approvalPicker, { target: { value: '김민수' } });
-    fireEvent.click(await screen.findByRole('option', { name: /김민수/ }));
-    fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
+    fireEvent.click(
+      await waitFor(() =>
+        within(getPickerListbox(approvalPicker)).getByRole('option', { name: /김민수/ }),
+      ),
+    );
+    fireEvent.click(
+      within(screen.getByTestId('document-approval-input-row'))
+        .getByRole('button', { name: '결재 추가' }),
+    );
     fireEvent.keyDown(
-      screen.getByRole('combobox', { name: '결재선 3 사용자 선택' }),
+      screen.getByLabelText('결재선 3 사용자 선택', { selector: 'input' }),
       { key: 'Escape' },
     );
-    const referencePicker = screen.getByRole('combobox', {
-      name: '참조자 선택',
-    });
+    const referencePicker = screen.getByLabelText('참조자 선택', { selector: 'input' });
     fireEvent.change(referencePicker, { target: { value: '박서준' } });
-    fireEvent.click(await screen.findByRole('option', { name: /박서준/ }));
+    fireEvent.click(
+      await waitFor(() =>
+        within(getPickerListbox(referencePicker)).getByRole('option', { name: /박서준/ }),
+      ),
+    );
     fireEvent.change(screen.getByLabelText('제목'), {
       target: { value: '작성 중 제목' },
     });
@@ -6239,7 +6257,10 @@ describe('Document write page', () => {
       '작성 중 제목',
     );
 
-    clickComposerClose();
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: '문서 작성' }))
+        .getByText('닫기', { selector: 'button' }),
+    );
     await waitForElementToBeRemoved(() =>
       screen.queryByRole('dialog', { name: '문서 작성' }),
     );
@@ -6254,7 +6275,7 @@ describe('Document write page', () => {
     expect(screen.queryByTestId('document-reference-list')).not.toBeInTheDocument();
     expect(
       screen
-        .getByRole('combobox', { name: '참조자 선택' })
+        .getByLabelText('참조자 선택', { selector: 'input' })
         .closest('.MuiAutocomplete-root'),
     ).not.toHaveTextContent(/박서준/);
   }, 10000);
