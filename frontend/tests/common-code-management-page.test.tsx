@@ -8,6 +8,7 @@ import {
   within,
 } from '@testing-library/react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { Profiler } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import {
@@ -766,6 +767,87 @@ describe('CommonCode management page', () => {
     expect(separator).toHaveStyle({ display: 'flex' });
     expect(panes[0]).toHaveStyle({ flex: '3 1 0%' });
     expect(panes[2]).toHaveStyle({ flex: '2 1 0%' });
+  });
+
+  it('commits both external flex ratios without an old frame and preserves a drag on the same props', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 1200 });
+    const commits = vi.fn();
+    const view = (leftFlex: number, rightFlex: number) => (
+      <Profiler id="split-ratios" onRender={() => commits([
+        screen.getByText('ratio-left').parentElement?.style.flex,
+        screen.getByText('ratio-right').parentElement?.style.flex,
+      ])}>
+        <Splitter leftFlex={leftFlex} rightFlex={rightFlex} minSize={100}>
+          <div>ratio-left</div>
+          <div>ratio-right</div>
+        </Splitter>
+      </Profiler>
+    );
+    const { rerender } = render(view(1, 1));
+    const handle = screen.getByRole('separator');
+    Object.defineProperty(handle.parentElement, 'clientWidth', { configurable: true, value: 1000 });
+    fireEvent.pointerDown(handle, { clientX: 500 });
+    fireEvent.pointerMove(window, { clientX: 600 });
+    fireEvent.pointerUp(window);
+    rerender(view(1, 1));
+    expect(screen.getByText('ratio-left').parentElement).toHaveStyle({ flex: '1.2 1 0%' });
+    expect(screen.getByText('ratio-right').parentElement).toHaveStyle({ flex: '0.8 1 0%' });
+
+    commits.mockClear();
+    rerender(view(2, 1));
+    expect(commits).toHaveBeenNthCalledWith(1, ['2 1 0%', '1 1 0%']);
+  });
+
+  it('preserves an omitted ratio and the pixel size across flex mode changes', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 1200 });
+    const view = (leftFlex?: number, rightFlex?: number) => (
+      <Splitter leftFlex={leftFlex} rightFlex={rightFlex} initialSize={320} minSize={100}>
+        <div>ratio-left</div>
+        <div>ratio-right</div>
+      </Splitter>
+    );
+    const { rerender } = render(view(1, 1));
+    const handle = screen.getByRole('separator');
+    Object.defineProperty(handle.parentElement, 'clientWidth', { configurable: true, value: 1000 });
+    fireEvent.pointerDown(handle, { clientX: 500 });
+    fireEvent.pointerMove(window, { clientX: 600 });
+    fireEvent.pointerUp(window);
+
+    rerender(view(undefined, 3));
+    expect(screen.getByText('ratio-left').parentElement).toHaveStyle({ flex: '1.2 1 0%' });
+    expect(screen.getByText('ratio-right').parentElement).toHaveStyle({ flex: '3 1 0%' });
+    rerender(view());
+    expect(screen.getByText('ratio-left').parentElement).toHaveStyle({ flex: '0 0 320px' });
+    rerender(view(2));
+    expect(screen.getByText('ratio-left').parentElement).toHaveStyle({ flex: '2 1 0%' });
+    expect(screen.getByText('ratio-right').parentElement).toHaveStyle({ flex: '3 1 0%' });
+  });
+
+  it('keeps effect dependency equality for signed zero changes and repeated NaN ratios', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 1200 });
+    const commits = vi.fn();
+    const view = (leftFlex: number) => (
+      <Profiler id="split-equality" onRender={() => commits([
+        screen.getByText('ratio-left').parentElement?.style.flex,
+        screen.getByText('ratio-right').parentElement?.style.flex,
+      ])}>
+        <Splitter leftFlex={leftFlex} rightFlex={1} minSize={100}>
+          <div>ratio-left</div>
+          <div>ratio-right</div>
+        </Splitter>
+      </Profiler>
+    );
+    const { rerender } = render(view(0));
+    const handle = screen.getByRole('separator');
+    Object.defineProperty(handle.parentElement, 'clientWidth', { configurable: true, value: 1000 });
+    fireEvent.pointerDown(handle, { clientX: 0 });
+    fireEvent.pointerMove(window, { clientX: 200 });
+    fireEvent.pointerUp(window);
+    commits.mockClear();
+    rerender(view(-0));
+    expect(commits).toHaveBeenNthCalledWith(1, ['0 1 0%', '1 1 0%']);
+    expect(() => rerender(view(Number.NaN))).not.toThrow();
+    expect(() => rerender(view(Number.NaN))).not.toThrow();
   });
 
   it('stacks the role management panels vertically on mobile screens', () => {

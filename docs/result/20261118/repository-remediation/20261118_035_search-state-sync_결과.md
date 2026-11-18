@@ -32,6 +32,8 @@ JSX·스타일·props 타입·기존 state/ref 초기화와 이벤트/비동기 
 
 raw 증거는 세션의 `lint035-red.json`, `lint035-green.json`, `lint035-render-cancel-mutant.json`, `lint035-related.json`, `lint035-oxlint.json`, `lint035-typecheck.log`, `lint035-build.log`에 있다. 저장소에는 [범위 검증](screenshots/search-state-sync/scope-audit.json)과 [화면·콜백 검증](screenshots/search-state-sync/verification.json)을 보관했다. 이전 033·034의 전체 CI 결과는 이 미커밋 035 소스의 전체 테스트 결과가 아니다.
 
+커밋 후 이 단위 `018151ade26f1b97da9bceca340962ee3bc81090`의 [원격 CI 44297028119](https://github.com/f1soft611/s-erp/actions/runs/44297028119)를 source SHA와 raw log로 확인했다. **226파일/2,652개 전체 통과**, build/lint/tests/required 네 job 모두 success다. [원격 증거](screenshots/search-state-sync/remote-ci.json)를 추가했다. 후속 036 Splitter 변경의 전체 결과로 재사용하지 않는다.
+
 ## 실제 브라우저
 
 실제 PageSearchArea와 앱 light 테마를 합성 이름·상태·날짜로 mount했다. searchField와 children 액션을 구분하는 공개 조합을 사용했다. 업무 API·테넌트 데이터는 사용하지 않았고 공유 4173 서버를 변경하지 않았다. 검증 후 소유 탭만 닫았다.

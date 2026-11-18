@@ -51,6 +51,7 @@ export function Splitter({
   });
   const [leftRatio, setLeftRatio] = useState<number>(leftFlex ?? 1);
   const [rightRatio, setRightRatio] = useState<number>(rightFlex ?? 1);
+  const [previousFlex, setPreviousFlex] = useState({ leftFlex, rightFlex });
   const rootRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef({
     active: false,
@@ -66,14 +67,18 @@ export function Splitter({
   const hasExplicitFlex =
     typeof leftFlex === 'number' || typeof rightFlex === 'number';
 
-  useEffect(() => {
+  if (
+    !Object.is(previousFlex.leftFlex, leftFlex) ||
+    !Object.is(previousFlex.rightFlex, rightFlex)
+  ) {
+    setPreviousFlex({ leftFlex, rightFlex });
     if (typeof leftFlex === 'number') {
       setLeftRatio(leftFlex);
     }
     if (typeof rightFlex === 'number') {
       setRightRatio(rightFlex);
     }
-  }, [leftFlex, rightFlex]);
+  }
 
   const clampSize = useCallback(
     (nextValue: number) => {

@@ -1,0 +1,31 @@
+{
+  "jsxPreserved": true,
+  "publicPropsPreserved": true,
+  "originalStateAndEventAndStyleDeclarationsPreserved": true,
+  "pointerAndResizeEffectsPreserved": true,
+  "sameNumericConditionsAsOldEffect": true,
+  "objectIsInputGuard": true,
+  "renderGuardsWithoutRefAccess": 1,
+  "existingTestsPreserved": true,
+  "addedTests": 3,
+  "sourceFiles": 890,
+  "mismatches": [],
+  "changed": [
+    "frontend/src/shared/components/Splitter.tsx",
+    "frontend/tests/common-code-management-page.test.tsx"
+  ],
+  "lint": {
+    "before": 111,
+    "after": 110,
+    "removed": 1,
+    "added": 0
+  },
+  "red": {
+    "passed": 31,
+    "failed": 2
+  },
+  "tests": {
+    "files": 3,
+    "passed": 99
+  }
+}
