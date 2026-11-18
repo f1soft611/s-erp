@@ -26,6 +26,8 @@ Splitter의 leftFlex/rightFlex 복사 effect가 외부 비율 변경 시 이전 
 
 raw 증거는 세션의 `lint036-red.json`, `lint036-related.json`, `lint036-oxlint.json`, `lint036-typecheck.log`, `lint036-build.log`에 있다. 저장소에는 [범위 검증](screenshots/splitter-ratio-sync/scope-audit.json)과 [실제 브라우저 검증](screenshots/splitter-ratio-sync/verification.json)을 보관했다. 앞선 035의 전체 226파일/2,652개 CI는 다른 SHA의 근거이며 이 단위의 전체 검증으로 재사용하지 않는다.
 
+커밋 후 이 단위 `0a804615f0bf367597e75aad57075f06b3e3c343`의 [원격 CI 44299260146](https://github.com/f1soft611/s-erp/actions/runs/44299260146)를 source SHA와 raw log로 확인했다. **226파일/2,655개 전체 통과**, build/lint/tests/required 네 job 모두 success다. [원격 증거](screenshots/splitter-ratio-sync/remote-ci.json)를 추가했다. 후속 037 행 폼 변경의 전체 결과로 재사용하지 않는다.
+
 ## 실제 브라우저
 
 실제 Splitter를 합성 좌우 패널과 부모 제어 버튼으로 mount했다. 운영 JSX·스타일을 바꾸지 않았으며 업무 API·테넌트 데이터를 사용하지 않았다. 공유 4173 서버를 변경하지 않았고 검증 후 소유 탭만 닫았다.

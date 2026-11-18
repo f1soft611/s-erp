@@ -5,7 +5,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
-import { createRef, useState } from 'react';
+import { createRef, Profiler, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { F1Grid } from '../src/shared/components/f1-grid';
 import { getGridColumnPinOffsets } from '../src/shared/components/f1-grid/columns/GridColumnPin';
@@ -778,6 +778,60 @@ const renderRowFormModal = (
 };
 
 describe('row form modal', () => {
+  it('commits a changed row without the previous draft or local validation error', async () => {
+    const commits = vi.fn();
+    const onDraftChange = vi.fn();
+    const onApply = vi.fn();
+    const columns = createModalColumns();
+    const initialRow = { ...modalRow, name: '' };
+    const nextRow = { ...modalRow, id: 'EMP-002', name: 'next-row' };
+    const view = (row: ModalRow) => (
+      <Profiler id="row-form-values" onRender={() => commits({
+        name: (screen.queryByLabelText(/성명/) as HTMLInputElement | null)?.value ?? null,
+        error: Boolean(screen.queryByText('성명은(는) 필수입니다.')),
+      })}>
+        <F1GridFormModal open mode="edit" row={row} columns={columns} rowKey="id"
+          plugin={{}} onCancel={vi.fn()} onApply={onApply} onDraftChange={onDraftChange} />
+      </Profiler>
+    );
+    const { rerender } = render(view(initialRow));
+    fireEvent.click(screen.getByRole('button', { name: '적용', exact: true }));
+    expect(screen.getByText('성명은(는) 필수입니다.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText(/성명/)).toHaveFocus());
+
+    commits.mockClear();
+    rerender(view(nextRow));
+    expect(commits).toHaveBeenNthCalledWith(1, { name: 'next-row', error: false });
+    expect(onDraftChange).not.toHaveBeenCalled();
+    expect(initialRow.name).toBe('');
+    fireEvent.click(screen.getByRole('button', { name: '적용', exact: true }));
+    expect(onApply).toHaveBeenCalledExactlyOnceWith(nextRow);
+  });
+
+  it('keeps the draft while closed and commits the current row on reopening', () => {
+    const commits = vi.fn();
+    const columns = createModalColumns();
+    const nextRow = { ...modalRow, id: 'EMP-002', name: 'reopened-row' };
+    const getTitle = vi.fn(({ row }: { row: ModalRow }) => `Row ${row.id}`);
+    const view = (row: ModalRow, open: boolean) => (
+      <Profiler id="row-form-reopen" onRender={() => commits(
+        (screen.queryByLabelText(/성명/) as HTMLInputElement | null)?.value ?? null,
+      )}>
+        <F1GridFormModal open={open} mode="edit" row={row} columns={columns} rowKey="id"
+          plugin={{ getTitle }} onCancel={vi.fn()} onApply={vi.fn()} />
+      </Profiler>
+    );
+    const { rerender } = render(view(modalRow, true));
+    fireEvent.change(screen.getByLabelText(/성명/), { target: { value: 'local-draft' } });
+    rerender(view(nextRow, false));
+    expect(getTitle.mock.lastCall?.[0].row.name).toBe('local-draft');
+
+    commits.mockClear();
+    rerender(view(nextRow, true));
+    expect(commits).toHaveBeenNthCalledWith(1, 'reopened-row');
+    expect(nextRow.name).toBe('reopened-row');
+  });
+
   it('updates a row-dependent unit label and disables the count for NONE', () => {
     const columns: F1GridColumn<ExpiryFormRow>[] = [
       {
