@@ -407,6 +407,7 @@ function DashboardPage() {
     selectedModule.id === 'groupware' && currentMenu.id === 'notice'
       ? [selectedModule.name, '커뮤니티', currentMenu.name]
       : breadcrumbItems;
+  const recentBreadcrumbPath = recentBreadcrumbItems.join(' > ');
 
   const isValidDashboardRoute = useMemo(() => {
     const normalizedPath = normalizeRoutePath(effectivePath);
@@ -632,7 +633,7 @@ function DashboardPage() {
       menuId: selectedMenuId,
       moduleId: selectedModuleId,
       moduleName: selectedModule.name,
-      breadcrumbPath: recentBreadcrumbItems.join(' > '),
+      breadcrumbPath: recentBreadcrumbPath,
       label: currentMenu.name,
       path: nextPath,
       visitedAt: Date.now(),
@@ -670,6 +671,7 @@ function DashboardPage() {
     hasAccessibleMenu,
     location.pathname,
     menusLoading,
+    recentBreadcrumbPath,
     selectedMenuId,
     selectedModule,
     selectedModuleId,

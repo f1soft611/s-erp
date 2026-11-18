@@ -39,6 +39,10 @@ native fill/Enter/click만으로 조작했다. 합성 날짜 요청 1회·파일
 
 375px 캡처의 파일 보조정보가 행 높이 경계에서 일부 잘리는 모습은 별도 확인 대상이다. 이번 단위는 해당 렌더링/CSS를 변경하지 않았으며 변경 전 브라우저 대조 없이 원인이나 회귀 여부를 단정하지 않는다.
 
+## 정확한 SHA 전체 CI
+
+커밋 `a553b7415fac9ec7244e8a56283b912b64eb7cbf`의 [Frontend CI 44323092197](https://github.com/f1soft611/s-erp/actions/runs/44323092197)이 완료됐다. build/tests/lint/required 네 job 모두 success이며 원본 로그의 마지막 집계는 **226파일·2,678개 전부 통과**다. [정확한 SHA 근거](screenshots/archive-filter-deps/remote-ci.json)를 후속 046 기록에 함께 반영했다.
+
 ## 이전 CI와 잔여
 
 [043](20261118_043_notice-list-deps_결과.md)의 정확한 SHA 전체 CI **226파일·2,676개**, [044](20261118_044_notice-initial-cursor_결과.md)의 **226파일·2,678개**를 각각 네 job success와 원본 로그로 확인해 별도 기록했다. 044 완료를 확인한 뒤에만 다음 push를 진행해 branch concurrency에 의한 취소를 피한다. 이전 집계를 이번 045 소스의 전체 결과로 재사용하지 않는다.
