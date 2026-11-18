@@ -519,12 +519,15 @@ describe('sales order status page', () => {
     expect(within(grid).getByText('거래처 10')).toBeInTheDocument();
     expect(within(grid).getByText('Q-1')).toBeInTheDocument();
     expect(createSalesOrderStatusColumns().map((column) => column.headerName)).toEqual([
-      'No', '수주번호', '수주일자', '거래처코드', '거래처명', '견적번호', '진행상태', '수주상태', '납품장소', '배송방법',
-      '행', '품목코드', '품목명', '단위', '주문수량', '단가', '공급가', '부가세', '합계',
+      'No', '수주번호', '수주일자', '거래처코드', '거래처명', '견적번호', '수주상태', '납품장소', '배송방법',
+      '행', '진행상태', '품목코드', '품목명', '단위', '주문수량', '단가', '공급가', '부가세', '합계',
       '납기일자', '출하수량', '비고',
     ]);
     expect(within(grid).queryByText('수주상태')).not.toBeInTheDocument();
-    expect(within(grid).getByText('진행상태')).toBeInTheDocument();
+    fireEvent.scroll(within(grid).getByTestId('f1-grid-body-scroll'), {
+      target: { scrollLeft: 800 },
+    });
+    expect(await within(grid).findByText('진행상태')).toBeInTheDocument();
     expect(within(grid).getByText('대기 중')).toBeInTheDocument();
 
     const request = listRequests().at(-1)!;

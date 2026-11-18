@@ -1630,7 +1630,7 @@ describe('CommunityNoticePage local updates', () => {
     expect(
       await screen.findByText('서버가 내려준 댓글', {}, { timeout: 3000 }),
     ).toBeInTheDocument();
-    const input = screen.getByRole('textbox', { name: '댓글 입력' });
+    const input = await screen.findByRole('textbox', { name: '댓글 입력' });
     fireEvent.input(input, { target: { innerHTML: '<p>저장 실패 댓글</p>' } });
     fireEvent.click(screen.getByRole('button', { name: '등록' }));
 

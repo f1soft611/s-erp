@@ -11,7 +11,7 @@ const notices: NoticeSummaryInput[] = [
     viewCount: 20,
     commentCount: 2,
     isPinned: 'N',
-    createdAt: '2026-09-21T08:00:00+09:00',
+    createdAt: new Date(2026, 8, 21, 8).toISOString(),
     attachmentCount: 1,
   },
   {
@@ -20,7 +20,7 @@ const notices: NoticeSummaryInput[] = [
     viewCount: 100,
     commentCount: 4,
     isPinned: 'Y',
-    createdAt: '2026-09-21T09:00:00+09:00',
+    createdAt: new Date(2026, 8, 21, 9).toISOString(),
     attachmentCount: 2,
   },
   {
@@ -29,7 +29,7 @@ const notices: NoticeSummaryInput[] = [
     viewCount: 40,
     commentCount: 80,
     isPinned: 'N',
-    createdAt: '2026-09-21T07:00:00+09:00',
+    createdAt: new Date(2026, 8, 21, 7).toISOString(),
     attachmentCount: 0,
   },
   {
@@ -38,7 +38,7 @@ const notices: NoticeSummaryInput[] = [
     viewCount: 50,
     commentCount: 10,
     isPinned: 'N',
-    createdAt: '2026-09-20T06:00:00+09:00',
+    createdAt: new Date(2026, 8, 20, 6).toISOString(),
     attachmentCount: 3,
   },
   {
@@ -47,7 +47,7 @@ const notices: NoticeSummaryInput[] = [
     viewCount: 50,
     commentCount: 10,
     isPinned: 'N',
-    createdAt: '2026-09-18T09:00:00+09:00',
+    createdAt: new Date(2026, 8, 18, 9).toISOString(),
     attachmentCount: 0,
   },
 ];
@@ -56,7 +56,7 @@ describe('deriveNoticeSummary', () => {
   it('calculates live stats and ranks recent issues by views plus comments', () => {
     const result = deriveNoticeSummary(
       notices,
-      new Date('2026-09-21T12:00:00+09:00'),
+      new Date(2026, 8, 21, 12),
     );
     expect(result.stats).toEqual([
       { label: '전체 공지', value: '5' },
@@ -101,7 +101,7 @@ describe('deriveNoticeSummary', () => {
           createdAt: 'invalid-date',
         },
       ],
-      new Date('2026-09-21T12:00:00+09:00'),
+      new Date(2026, 8, 21, 12),
     );
     expect(result.stats).toEqual([
       { label: '전체 공지', value: '1' },
@@ -113,7 +113,7 @@ describe('deriveNoticeSummary', () => {
       { id: 9, title: '누락 데이터', viewCount: 0, commentCount: 0, score: 0 },
     ]);
     expect(
-      deriveNoticeSummary([], new Date('2026-09-21T12:00:00+09:00')),
+      deriveNoticeSummary([], new Date(2026, 8, 21, 12)),
     ).toEqual({
       stats: [
         { label: '전체 공지', value: '0' },
