@@ -240,6 +240,8 @@ export const CommonCodeManagementPanel = forwardRef<
   >([]);
   const [groupGridDirty, setGroupGridDirty] = useState(false);
   const [itemGridDirty, setItemGridDirty] = useState(false);
+  const [deletedGroupIds, setDeletedGroupIds] = useState<string[]>([]);
+  const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
   const [pendingGroupId, setPendingGroupId] = useState<string>();
   const [groupSwitchDialogOpen, setGroupSwitchDialogOpen] = useState(false);
 
@@ -411,6 +413,13 @@ export const CommonCodeManagementPanel = forwardRef<
           changes.updatedRows.length > 0 ||
           changes.deletedRows.length > 0,
       );
+      const deletedIds = changes.deletedRows.map((row) => normalizeRowId(row.id));
+      setDeletedGroupIds((current) =>
+        current.length === deletedIds.length &&
+        current.every((id, index) => id === deletedIds[index])
+          ? current
+          : deletedIds,
+      );
     },
     [],
   );
@@ -423,6 +432,13 @@ export const CommonCodeManagementPanel = forwardRef<
         changes.deletedRows.length > 0;
       itemGridDirtyRef.current = dirty;
       setItemGridDirty(dirty);
+      const deletedIds = changes.deletedRows.map((row) => normalizeRowId(row.id));
+      setDeletedItemIds((current) =>
+        current.length === deletedIds.length &&
+        current.every((id, index) => id === deletedIds[index])
+          ? current
+          : deletedIds,
+      );
     },
     [],
   );
@@ -880,7 +896,17 @@ export const CommonCodeManagementPanel = forwardRef<
                 disableContextMenu={saving}
                 deleteMenuDisabled={
                   saving ||
-                  Boolean(selectedGroup && isGroupDeleteDisabled(selectedGroup))
+                  Boolean(
+                    selectedGroup &&
+                      normalizeRowId(selectedGroup.id) &&
+                      getGroupDeleteBlockedMessage({
+                        blockedGroupIds: [selectedGroup.id],
+                        groups: filteredGroups,
+                        itemRows,
+                        deletedGroupIds,
+                        deletedItemIds,
+                      }),
+                  )
                 }
                 ariaLabel="공통코드 그룹 트리"
                 initialSelectedRowIds={

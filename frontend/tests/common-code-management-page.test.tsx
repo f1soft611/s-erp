@@ -233,6 +233,51 @@ describe('CommonCode management page', () => {
     );
   }
 
+  it('enables group deletion after the last detail is removed from an already dirty batch', async () => {
+    const defaultGet = apiMocks.apiGet.getMockImplementation()!;
+    apiMocks.apiGet.mockImplementation((path: string) =>
+      path === '/api/v1/co/master/common-code/groups/1/items'
+        ? Promise.resolve({ resultList: commonCodeItems.map((row) => ({ ...row, itemDc: '' })) })
+        : defaultGet(path),
+    );
+    render(
+      <CommonCodeManagementPanel
+        groups={[
+          { id: '1', groupCode: 'OWNED_LEAF', groupNm: 'Owned leaf group', groupDc: '', moduleCd: '', parentGroupId: null, sortOrder: 1, useAt: 'Y' },
+        ]}
+        initialSelectedGroupId="1"
+        initialSelectedGroupRowIds={['1']}
+      />,
+    );
+    await screen.findByRole('gridcell', { name: '사업자등록증' });
+    const openGroupDelete = async () => {
+      fireEvent.contextMenu(screen.getByRole('gridcell', { name: 'Owned leaf group' }));
+      return screen.findByRole('menuitem', { name: '행 삭제' });
+    };
+    const closeMenu = async () => {
+      fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+    };
+    expect(await openGroupDelete()).toHaveAttribute('aria-disabled', 'true');
+    await closeMenu();
+    for (const name of ['거래명세서', '사업자등록증']) {
+      fireEvent.contextMenu(screen.getByRole('gridcell', { name }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: '행 삭제' }));
+      await waitFor(() => {
+        expect(screen.queryByRole('gridcell', { name })).not.toBeInTheDocument();
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+      });
+      const action = await openGroupDelete();
+      if (name === '거래명세서') {
+        expect(action).toHaveAttribute('aria-disabled', 'true');
+      } else {
+        expect(action).not.toHaveAttribute('aria-disabled', 'true');
+      }
+      await closeMenu();
+    }
+    expect(apiMocks.apiPost).not.toHaveBeenCalled();
+  });
+
   it('binds the parent-code picker only to deferred edit events and preserves cancel/reopen selection', async () => {
     const defaultGet = apiMocks.apiGet.getMockImplementation()!;
     apiMocks.apiGet.mockImplementation((path: string) => {

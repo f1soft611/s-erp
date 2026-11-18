@@ -43,6 +43,8 @@ saving prop만 바꾸는 합성 부모는 실제 saveInFlightRef가 없어 기�
 
 [053 정확한 SHA CI](20261118_053_formula-picker-state_결과.md) **227파일·2,685개**, tests/build/lint/required 네 job success를 확인했다. 그 완료 뒤에만 이번 단위를 별도 커밋·비강제 푸시한다. 054의 정확한 SHA 전체 CI는 별도로 확인하며 선행 결과를 재사용하지 않는다.
 
+054는 `93abcd93290d1341275c53fa021f386be66d3bd4`로 별도 커밋·비강제 푸시했고 원격 SHA 일치를 확인했다. [정확한 SHA CI 44352484307](https://github.com/f1soft611/s-erp/actions/runs/44352484307)의 원본 마지막 집계는 **227파일·2,686개 통과**이며 tests/build/lint/required 네 job 모두 success다. [CI 근거](screenshots/common-code-picker-binding/remote-ci.json)는 다음 055 단위에 함께 기록한다.
+
 최초 206개 중 119개를 제거했고 **87개 경고는 순차 처리 중**이다(state-in-effect 82/ref 5/exhaustive-deps 0). 공식 호환 경로 없는 권고 2건은 [027](20261118_027_dependency-remediation-boundary_결과.md)의 BLOCKED를 유지한다. 기존 TreeProjection 3단계와 자료실 모바일 관찰은 이 단위에서 수정하지 않았다.
 
 ```text
