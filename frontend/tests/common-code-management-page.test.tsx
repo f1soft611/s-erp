@@ -233,6 +233,63 @@ describe('CommonCode management page', () => {
     );
   }
 
+  it.each([false, true])('selects a valid group from the first ready commit and preserves valid choices (loading=%s)', async (initialLoading) => {
+    const groups = [
+      { id: '1', groupCode: 'OWNED_FIRST', groupNm: 'Owned first', groupDc: '', moduleCd: '', parentGroupId: null, sortOrder: 1, useAt: 'Y' as const },
+      { id: '2', groupCode: 'OWNED_SECOND', groupNm: 'Owned second', groupDc: '', moduleCd: '', parentGroupId: null, sortOrder: 2, useAt: 'Y' as const },
+    ];
+    const commits: Array<string | null> = [];
+    const onSelectedGroupChange = vi.fn();
+    const view = (loading: boolean, source = groups) => (
+      <Profiler id="group-selection" onRender={() => {
+        commits.push(screen.queryByText(/^선택 그룹:/)?.textContent?.trim() ?? null);
+      }}>
+        <CommonCodeManagementPanel groups={source} groupsLoading={loading}
+          onSelectedGroupChange={onSelectedGroupChange} />
+      </Profiler>
+    );
+    const { rerender } = render(view(initialLoading));
+    if (initialLoading) {
+      expect(commits[0]).toBeNull();
+      expect(apiMocks.apiGet).not.toHaveBeenCalled();
+      commits.length = 0;
+      rerender(view(false));
+    }
+    expect(commits[0]).toBe('선택 그룹: Owned first');
+    await screen.findByRole('gridcell', { name: '거래명세서' });
+    fireEvent.click(screen.getByRole('gridcell', { name: 'Owned second' }));
+    await waitFor(() => expect(onSelectedGroupChange).toHaveBeenLastCalledWith('2'));
+    const requests = apiMocks.apiGet.mock.calls.length;
+    commits.length = 0;
+    rerender(view(false, [...groups]));
+    expect(commits[0]).toBe('선택 그룹: Owned second');
+    expect(apiMocks.apiGet).toHaveBeenCalledTimes(requests);
+    commits.length = 0;
+    rerender(view(false, [groups[0]]));
+    expect(commits[0]).toBe('선택 그룹: Owned first');
+    expect(onSelectedGroupChange).toHaveBeenLastCalledWith('1');
+    rerender(view(true, []));
+    expect(onSelectedGroupChange).toHaveBeenLastCalledWith('1');
+    rerender(view(false, []));
+    expect(onSelectedGroupChange).toHaveBeenLastCalledWith('');
+    expect(screen.getByText('선택 그룹이 없습니다')).toBeInTheDocument();
+    expect(apiMocks.apiPost).not.toHaveBeenCalled();
+  });
+
+  it('keeps an unsaved group id instead of replacing it with the first loaded group', () => {
+    const onSelectedGroupChange = vi.fn();
+    render(
+      <CommonCodeManagementPanel
+        groups={[{ id: '1', groupCode: 'OWNED_FIRST', groupNm: 'Owned first', groupDc: '', moduleCd: '', parentGroupId: null, sortOrder: 1, useAt: 'Y' }]}
+        initialSelectedGroupId="new-common-group-owned"
+        onSelectedGroupChange={onSelectedGroupChange}
+      />,
+    );
+    expect(onSelectedGroupChange).toHaveBeenCalledExactlyOnceWith('new-common-group-owned');
+    expect(apiMocks.apiGet).not.toHaveBeenCalled();
+    expect(screen.getByText('선택 그룹이 없습니다')).toBeInTheDocument();
+  });
+
   it('enables group deletion after the last detail is removed from an already dirty batch', async () => {
     const defaultGet = apiMocks.apiGet.getMockImplementation()!;
     apiMocks.apiGet.mockImplementation((path: string) =>

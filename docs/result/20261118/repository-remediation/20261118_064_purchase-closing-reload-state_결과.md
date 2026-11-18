@@ -37,7 +37,9 @@
 
 backend/API/DB/의존성 변경 없음. DB MCP·스키마 스크립트 대상이 아니다. 잔여 state-in-effect 78개와 기존 의존성 권고 2건이 있어 전체 요청은 아직 완료로 표시하지 않는다.
 
-정확한 063 CI 성공 근거를 포함해 별도 커밋·푸시하며 064 전체 CI는 해당 SHA로 확인한다.
+정확한 063 CI 성공 근거를 포함해 `bff5a5cf31f0533e7995de2c919717eaabc92b3b`로 별도 커밋·비강제 푸시했고 원격 SHA 일치를 확인했다.
+
+정확한 [064 CI 44374311956](https://github.com/f1soft611/s-erp/actions/runs/44374311956)는 위 SHA에서 네 job 모두 성공했다. 원본 로그의 마지막 전체 집계는 **227파일 2,701개 통과**다. [CI 판정](screenshots/purchase-closing-reload-state/remote-ci.json)에 보관한다.
 
 ## 복사 가능한 커밋
 

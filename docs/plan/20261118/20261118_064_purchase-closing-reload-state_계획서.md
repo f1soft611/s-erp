@@ -36,4 +36,4 @@ if (previousData === null || previousData.rows !== list.rows || previousData.sup
 
 - [x] `vitest run --pool=threads --maxWorkers=2 tests/material-receipt-closing.test.tsx tests/material-receipt-create.test.tsx tests/material-receipt-status.test.tsx` 3파일 53개와 `tsc -b`, `vite build`, `oxlint --format=json`을 격리 검증 workspace에서 확인했다. Oxc 79 → 78, 제거1/추가0이며 다른 진단은 label까지 동일하다. 기존 테스트 본문 byte 보존·frontend source 891파일 parity를 확인했다.
 - [x] 실제 페이지/Profiler 375/768/1280px에서 native 구매처/행 선택·조회 → 새 결과의 첫 commit 초기화를 확인했다. 합성 GET 응답과 메모리 저장소만 사용하고 POST/다른 transport를 차단했다. 단가 편집은 단위 회귀가 확인한다. 요청 이탈/문서 넘침 0, 소유 탭을 닫았다.
-- [ ] 결과/스크린샷·작은 전체 diff 리뷰·정확한 063 CI를 보관한다. allowlist 커밋·비강제 푸시·원격 일치와 정확한 064 CI를 확인한다.
+- [x] 결과/스크린샷·작은 전체 diff 리뷰·정확한 063 CI를 보관하고 allowlist 17파일을 `bff5a5cf31f0533e7995de2c919717eaabc92b3b`로 커밋·비강제 푸시·원격 일치를 확인했다. 정확한 064 CI 44374311956 네 job과 마지막 전체 집계 227파일 2,701개 통과를 확인했다.

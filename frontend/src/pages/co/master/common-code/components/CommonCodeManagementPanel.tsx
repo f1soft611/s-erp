@@ -364,25 +364,18 @@ export const CommonCodeManagementPanel = forwardRef<
     [onError],
   );
 
-  useEffect(() => {
-    if (groupsLoading) {
-      return;
-    }
+  if (!groupsLoading) {
     if (!filteredGroups.length) {
-      setSelectedGroupId('');
-      return;
-    }
-    if (selectedGroupId.startsWith('new-common-group-')) {
-      return;
-    }
-    if (
+      if (selectedGroupId !== '') setSelectedGroupId('');
+    } else if (
+      !selectedGroupId.startsWith('new-common-group-') &&
       !filteredGroups.some(
         (group) => normalizeRowId(group.id) === normalizeRowId(selectedGroupId),
       )
     ) {
       setSelectedGroupId(String(filteredGroups[0].id));
     }
-  }, [filteredGroups, groupsLoading, selectedGroupId]);
+  }
 
   const selectedGroup = filteredGroups.find(
     (group) => normalizeRowId(group.id) === normalizeRowId(selectedGroupId),
