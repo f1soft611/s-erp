@@ -1,4 +1,5 @@
 import type { F1GridColumn } from '../types/grid.types';
+import { normalizeDateInput } from '../editing/DateEditor';
 
 export function parseGridTsv(value: string): string[][] {
   return value
@@ -37,6 +38,12 @@ export function coerceClipboardValue<T extends object>(
 
     const numericValue = Number(value.replace(/,/g, ''));
     return Number.isFinite(numericValue) ? numericValue : undefined;
+  }
+
+  if (column.type === 'date') {
+    if (value.trim() === '') return '';
+    // 유효하지 않은 날짜는 undefined로 반환해 붙여넣기에서 제외한다.
+    return normalizeDateInput(value) || undefined;
   }
 
   return value;

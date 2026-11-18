@@ -3093,6 +3093,21 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
     { id: 'line-1', itemCode: 'ITEM-001', itemName: '기존 품목', qty: 1 },
   ];
 
+  it('ignores invalid dates and normalizes valid dates when pasting', () => {
+    const gridRef = createRef<F1GridRef<MenuRow>>();
+    render(<F1Grid ref={gridRef} rows={rows} columns={columns} rowKey="id" />);
+
+    const dateCell = screen.getByRole('gridcell', { name: '2026-08-27' });
+    fireEvent.click(dateCell);
+    fireEvent.paste(dateCell, { clipboardData: { getData: () => '2026-13-45' } });
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([]);
+
+    fireEvent.paste(dateCell, { clipboardData: { getData: () => '20260901' } });
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([
+      expect.objectContaining({ id: 'dashboard', startDate: '2026-09-01' }),
+    ]);
+  });
+
   it('pastes TSV from the focused cell and adds overflow rows as inserted', () => {
     const gridRef = createRef<F1GridRef<ItemRow>>();
     let nextId = 2;
@@ -4205,6 +4220,20 @@ describe('F1-GRID interaction', () => {
     expect(gridRef.current?.getChanges().updatedRows).toEqual([
       expect.objectContaining({ id: 'dashboard', startDate: expectedDate }),
     ]);
+  });
+
+  it('rejects an invalid date and keeps the previous value', () => {
+    const gridRef = createRef<F1GridRef<MenuRow>>();
+
+    render(<F1Grid ref={gridRef} rows={rows} columns={columns} rowKey="id" />);
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '2026-08-27' }));
+    const dateInput = screen.getByDisplayValue('2026-08-27');
+    fireEvent.change(dateInput, { target: { value: '2026-13-45' } });
+    fireEvent.keyDown(dateInput, { key: 'Enter' });
+
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([]);
+    expect(screen.getByRole('gridcell', { name: '2026-08-27' })).toBeTruthy();
   });
 
   it('keeps compact date text while the date cell is still being edited', () => {
