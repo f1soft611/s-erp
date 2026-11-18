@@ -17,6 +17,7 @@ import {
   InputLabel,
   MenuItem,
   Paper,
+  Portal,
   Select,
   TextField,
 } from '@mui/material';
@@ -598,6 +599,21 @@ export function PageSearchArea({
         transition: 'background-color 0.2s ease',
       })}
     >
+      {detailOpen && detailFields.length > 0 && (
+        // backdrop-filter가 fixed 기준을 부모로 바꾸므로 body로 포탈
+        <Portal>
+          <Box
+            aria-hidden="true"
+            data-testid="detail-search-backdrop"
+            sx={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 12,
+              bgcolor: 'rgba(15, 23, 42, 0.12)',
+            }}
+          />
+        </Portal>
+      )}
       <Box
         sx={{
           display: 'flex',
