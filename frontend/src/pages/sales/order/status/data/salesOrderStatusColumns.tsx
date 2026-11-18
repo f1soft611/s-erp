@@ -137,18 +137,6 @@ export function createSalesOrderStatusColumns({
       search: { label: '견적번호', order: 4, span: 1, group: '텍스트' },
     },
     {
-      field: 'lineStatus',
-      headerName: '진행상태',
-      type: 'select',
-      options: progressStatusOptions,
-      width: 80,
-      align: 'center',
-      editable: false,
-      renderCell: ({ row }) =>
-        getSalesOrderCodeLabel(progressStatusOptions, row.lineStatus),
-      search: { label: '진행상태', order: 7, span: 1, group: '선택' },
-    },
-    {
       field: 'status',
       headerName: '수주상태',
       type: 'select',
@@ -186,6 +174,18 @@ export function createSalesOrderStatusColumns({
       align: 'center',
       editable: false,
       search: { hidden: true },
+    },
+    {
+      field: 'lineStatus',
+      headerName: '진행상태',
+      type: 'select',
+      options: progressStatusOptions,
+      width: 80,
+      align: 'center',
+      editable: false,
+      renderCell: ({ row }) =>
+        getSalesOrderCodeLabel(progressStatusOptions, row.lineStatus),
+      search: { label: '진행상태', order: 7, span: 1, group: '선택' },
     },
     {
       field: 'materialCode',
