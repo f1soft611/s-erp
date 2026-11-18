@@ -143,10 +143,7 @@ describe('RoleManagementPage notifications', () => {
       expect(roleGrid).toBeVisible();
       expect(userGrid).toBeVisible();
       expect(screen.getByRole('gridcell', { name: '매핑 대상' })).toBeVisible();
-      expect(screen.queryAllByTestId('grid-loading-skeleton')).toHaveLength(0);
-      expect(
-        screen.queryAllByTestId('grid-loading-row-skeleton'),
-      ).toHaveLength(0);
+      expect(screen.queryAllByTestId('f1-grid-loading-overlay')).toHaveLength(0);
       expect(roleGrid.closest('[aria-busy="true"]')).toBeNull();
       expect(userGrid.closest('[aria-busy="true"]')).toBeNull();
       expect(saveButton).toBeDisabled();
@@ -314,7 +311,7 @@ describe('RoleManagementPage notifications', () => {
         expect(screen.getByText('선택 역할: 수정 운영자')).toBeVisible();
         expect(screen.getByLabelText('역할 검색')).toBeDisabled();
         expect(
-          screen.queryAllByTestId('grid-loading-row-skeleton'),
+          screen.queryAllByTestId('f1-grid-loading-overlay'),
         ).toHaveLength(0);
         expect(
           screen.getByRole('checkbox', { name: '매핑 여부 12' }),
@@ -1737,7 +1734,7 @@ describe('RoleManagementPage notifications', () => {
     expect(screen.getByLabelText('역할 검색')).toBeDisabled();
     expect(screen.getByRole('gridcell', { name: '저장 대상' })).toBeVisible();
     expect(screen.getByRole('gridcell', { name: '미할당 사용자' })).toBeVisible();
-    expect(screen.queryAllByTestId('grid-loading-row-skeleton')).toHaveLength(0);
+    expect(screen.queryAllByTestId('f1-grid-loading-overlay')).toHaveLength(0);
     userRefresh.reject(new Error('조용한 매핑 조회 실패'));
     await waitFor(() =>
       expect(screen.getByLabelText('역할 검색')).not.toBeDisabled(),
@@ -1799,7 +1796,7 @@ describe('RoleManagementPage notifications', () => {
       });
       expect(screen.getByLabelText('역할 검색')).toBeDisabled();
       expect(screen.getByRole('gridcell', { name: '운영자' })).toBeVisible();
-      expect(screen.queryAllByTestId('grid-loading-skeleton')).toHaveLength(0);
+      expect(screen.queryAllByTestId('f1-grid-loading-overlay')).toHaveLength(0);
       pending.reject(new Error(`${failure} 실패`));
       expect((await screen.findAllByText(`${failure} 실패`))[0]).toBeVisible();
       await waitFor(() =>
@@ -1821,7 +1818,7 @@ describe('RoleManagementPage notifications', () => {
     },
   );
 
-  it('fills the shared grid container when the loading skeleton is active', () => {
+  it('fills the shared grid container when the loading overlay is active', () => {
     const columns: F1GridColumn<{ id: number; roleNm: string }>[] = [
       { field: 'id', headerName: 'ID', width: 80 },
       { field: 'roleNm', headerName: '역할명', width: 220 },
@@ -1840,19 +1837,18 @@ describe('RoleManagementPage notifications', () => {
       </div>,
     );
 
-    expect(screen.getByTestId('grid-loading-skeleton')).not.toHaveStyle({
-      height: '100%',
+    const grid = screen.getByRole('grid', { name: 'F1-GRID 로딩 크기 검증' });
+    expect(grid).toHaveAttribute('aria-busy', 'true');
+    expect(grid).toHaveStyle({ height: '320px', position: 'relative' });
+    const overlay = within(grid).getByTestId('f1-grid-loading-overlay');
+    expect(overlay.parentElement).toBe(grid);
+    expect(overlay).toHaveStyle({
+      position: 'absolute',
+      inset: '0',
+      pointerEvents: 'auto',
     });
-    expect(screen.getByTestId('grid-loading-skeleton')).not.toHaveStyle({
-      overflow: 'hidden',
-    });
-
-    const rowSkeleton = screen.getAllByTestId('grid-loading-row-skeleton')[0];
-    expect(rowSkeleton).toHaveStyle({
-      gap: '0px',
-      minHeight: '32px',
-    });
-    expect(screen.getAllByTestId('grid-loading-row-skeleton')).toHaveLength(5);
+    expect(within(overlay).getByRole('progressbar')).toBeVisible();
+    expect(within(grid).getByRole('columnheader', { name: '역할명' })).toBeVisible();
   });
 
   it('shows a page error when loading roles fails', async () => {
@@ -1867,7 +1863,7 @@ describe('RoleManagementPage notifications', () => {
     expect(screen.queryByRole('grid')).not.toBeInTheDocument();
   });
 
-  it('keeps the grid header visible while only the body rows skeletonize during the real first fetch', async () => {
+  it('keeps the grid header present while the loading overlay covers the real first fetch', async () => {
     let resolveRoles:
       | ((value: { resultList: ReturnType<typeof createRole>[] }) => void)
       | undefined;
@@ -1885,28 +1881,29 @@ describe('RoleManagementPage notifications', () => {
 
     renderPage();
 
-    await waitFor(() => {
-      expect(
-        screen.getAllByTestId('grid-loading-row-skeleton').length,
-      ).toBeGreaterThan(0);
-    });
-    expect(screen.getByText('역할 코드')).toBeVisible();
-    expect(screen.getByText('역할명')).toBeVisible();
+    const roleGrid = await screen.findByRole('grid', { name: 'F1-GRID 권한 관리' });
+    expect(roleGrid).toHaveAttribute('aria-busy', 'true');
+    expect(within(roleGrid).getByTestId('f1-grid-loading-overlay')).toBeVisible();
+    expect(within(roleGrid).getByRole('columnheader', { name: '역할 코드' })).toBeVisible();
+    expect(within(roleGrid).getByRole('columnheader', { name: '역할명' })).toBeVisible();
 
     resolveRoles?.({ resultList: [createRole(7, '운영자')] });
 
-    await waitFor(() => {
-      expect(screen.queryAllByTestId('grid-loading-skeleton')).toHaveLength(0);
-    });
+    expect(await screen.findByRole('gridcell', { name: '운영자' })).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByRole('grid', { name: 'F1-GRID 권한 관리' }))
+        .not.toHaveAttribute('aria-busy', 'true'),
+    );
+    expect(screen.queryAllByTestId('f1-grid-loading-overlay')).toHaveLength(0);
   });
 
-  it('shows a page search area and F1Grid role layout', async () => {
+  it('shows the role search input and F1Grid role layout', async () => {
     apiMocks.apiGet.mockResolvedValue({ resultList: [] });
 
     renderPage();
 
-    expect(await screen.findByText('검색 조건')).toBeVisible();
-    expect(screen.getByLabelText('역할 검색')).toBeVisible();
+    expect(await screen.findByRole('textbox', { name: '역할 검색' }))
+      .toHaveAttribute('placeholder', '역할 코드/명/설명 검색');
     expect(screen.getByLabelText('F1-GRID 권한 관리')).toBeVisible();
   });
 
@@ -2286,7 +2283,7 @@ describe('RoleManagementPage notifications', () => {
       expect(screen.getByRole('gridcell', { name: '2' })).toBeVisible();
     });
 
-    expect(screen.queryAllByTestId('grid-loading-row-skeleton')).toHaveLength(
+    expect(screen.queryAllByTestId('f1-grid-loading-overlay')).toHaveLength(
       0,
     );
     expect(
@@ -2368,7 +2365,7 @@ describe('RoleManagementPage notifications', () => {
 
     fireEvent.click(saveButton);
     await waitFor(() => expect(apiMocks.apiPost).toHaveBeenCalledTimes(1));
-    expect(screen.queryAllByTestId('grid-loading-row-skeleton')).toHaveLength(
+    expect(screen.queryAllByTestId('f1-grid-loading-overlay')).toHaveLength(
       0,
     );
 
