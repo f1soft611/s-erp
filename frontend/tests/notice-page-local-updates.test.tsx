@@ -792,7 +792,7 @@ describe('CommunityNoticePage local updates', () => {
     expect(
       await screen.findByText('서버가 내려준 댓글', {}, { timeout: 3000 }),
     ).toBeInTheDocument();
-    const input = screen.getByRole('textbox', { name: '댓글 입력' });
+    const input = await screen.findByRole('textbox', { name: '댓글 입력' });
     fireEvent.input(input, { target: { innerHTML: '<p>새 댓글</p>' } });
     fireEvent.click(screen.getByRole('button', { name: '등록' }));
 
@@ -864,7 +864,7 @@ describe('CommunityNoticePage local updates', () => {
         { timeout: 3000 },
       ),
     ).toBeInTheDocument();
-    const input = screen.getByRole('textbox', { name: '댓글 입력' });
+    const input = await screen.findByRole('textbox', { name: '댓글 입력' });
     fireEvent.input(input, { target: { innerHTML: '<p>새 댓글</p>' } });
     fireEvent.click(screen.getByRole('button', { name: '등록' }));
 
@@ -1083,7 +1083,7 @@ describe('CommunityNoticePage local updates', () => {
       screen.getByRole('button', { name: '이전 댓글 보기 (1)' }),
     ).toBeInTheDocument();
 
-    const input = screen.getByRole('textbox', { name: '댓글 입력' });
+    const input = await screen.findByRole('textbox', { name: '댓글 입력' });
     fireEvent.input(input, { target: { innerHTML: '<p>방금 등록한 댓글</p>' } });
     fireEvent.click(screen.getByRole('button', { name: '등록' }));
 
@@ -1527,7 +1527,7 @@ describe('CommunityNoticePage local updates', () => {
       await screen.findByText('처음 불러온 이전 댓글'),
     ).toBeInTheDocument();
 
-    const composer = screen.getByRole('textbox', { name: '댓글 입력' });
+    const composer = await screen.findByRole('textbox', { name: '댓글 입력' });
     fireEvent.input(composer, { target: { innerHTML: '<p>새 댓글</p>' } });
     fireEvent.click(screen.getByRole('button', { name: '등록' }));
     await waitFor(() =>
@@ -1568,7 +1568,7 @@ describe('CommunityNoticePage local updates', () => {
     expect(
       await screen.findByText('서버가 내려준 댓글', {}, { timeout: 3000 }),
     ).toBeInTheDocument();
-    const input = screen.getByRole('textbox', { name: '댓글 입력' });
+    const input = await screen.findByRole('textbox', { name: '댓글 입력' });
     fireEvent.input(input, { target: { innerHTML: '<p>댓글</p>' } });
     fireEvent.change(screen.getByLabelText('댓글 첨부파일 선택'), {
       target: {
@@ -1612,7 +1612,7 @@ describe('CommunityNoticePage local updates', () => {
       (await screen.findAllByText('셋째 댓글', {}, { timeout: 3000 })).length,
     ).toBeGreaterThan(0);
 
-    const input = screen.getByRole('textbox', { name: '댓글 입력' });
+    const input = await screen.findByRole('textbox', { name: '댓글 입력' });
     fireEvent.input(input, { target: { innerHTML: '<p>새 댓글</p>' } });
     fireEvent.click(screen.getByRole('button', { name: '등록' }));
 
@@ -1630,7 +1630,7 @@ describe('CommunityNoticePage local updates', () => {
     expect(
       await screen.findByText('서버가 내려준 댓글', {}, { timeout: 3000 }),
     ).toBeInTheDocument();
-    const input = screen.getByRole('textbox', { name: '댓글 입력' });
+    const input = await screen.findByRole('textbox', { name: '댓글 입력' });
     fireEvent.input(input, { target: { innerHTML: '<p>저장 실패 댓글</p>' } });
     fireEvent.click(screen.getByRole('button', { name: '등록' }));
 

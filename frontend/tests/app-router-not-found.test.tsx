@@ -275,13 +275,10 @@ describe('AppRouter not found fallback', () => {
       ),
     );
 
-    expect(
-      await screen.findByRole(
-        'heading',
-        { name: '종합현황' },
-        { timeout: 5000 },
-      ),
-    ).toBeVisible();
+    await waitFor(
+      () => expect(screen.getByRole('heading', { name: '종합현황' })).toBeVisible(),
+      { timeout: 5000 },
+    );
     },
     30000,
   );
