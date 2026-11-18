@@ -1,0 +1,62 @@
+{
+  "actualNoticeFeed": true,
+  "transport": "All fetch blocked; callbacks return local synthetic comment pages",
+  "storage": "Tab-only memory storage; no persistent reads or writes",
+  "widths": [
+    {
+      "width": 375,
+      "documentWidth": 375,
+      "cursors": [
+        7,
+        4,
+        27
+      ],
+      "duplicateRequests": 0,
+      "metadataPreservesLocalHistoryAndCursor": true,
+      "changedServerPayloadPreservesOlderHistoryAndExhaustion": true,
+      "revisionResetsToOwnPayloadAndCursor": true,
+      "networkRequests": 0
+    },
+    {
+      "width": 768,
+      "documentWidth": 768,
+      "cursors": [
+        7,
+        4,
+        27
+      ],
+      "duplicateRequests": 0,
+      "metadataPreservesLocalHistoryAndCursor": true,
+      "changedServerPayloadPreservesOlderHistoryAndExhaustion": true,
+      "revisionResetsToOwnPayloadAndCursor": true,
+      "networkRequests": 0
+    },
+    {
+      "width": 1280,
+      "documentWidth": 1280,
+      "cursors": [
+        7,
+        4,
+        27
+      ],
+      "duplicateRequests": 0,
+      "metadataPreservesLocalHistoryAndCursor": true,
+      "changedServerPayloadPreservesOlderHistoryAndExhaustion": true,
+      "revisionResetsToOwnPayloadAndCursor": true,
+      "networkRequests": 0
+    }
+  ],
+  "remainingExhaustiveDeps": 0,
+  "firstCommitTiming": "Covered by the existing focused Vitest regression; browser covers normal native interactions",
+  "images": [
+    "loaded-375.png",
+    "complete-375.png",
+    "reset-375.png",
+    "loaded-768.png",
+    "complete-768.png",
+    "reset-768.png",
+    "loaded-1280.png",
+    "complete-1280.png",
+    "reset-1280.png"
+  ]
+}

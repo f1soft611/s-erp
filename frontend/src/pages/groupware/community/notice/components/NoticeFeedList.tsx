@@ -815,6 +815,13 @@ export function NoticeFeedList({
       }
     });
 
+    if (
+      !isServerReset &&
+      !items.some((item) => changedByNoticeId.get(item.id))
+    ) {
+      return;
+    }
+
     setLocalCommentsByNoticeId((current) => {
       const next = { ...current };
       items.forEach((item) => {
@@ -883,7 +890,7 @@ export function NoticeFeedList({
       );
     });
     serverItemRevisionRef.current = serverItemRevision;
-  }, [items, serverItemRevision]);
+  }, [items, serverItemRevision, localCommentsByNoticeId]);
 
   const handleLocalCommentAdd = async (
     noticeId: number,
