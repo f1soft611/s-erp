@@ -133,15 +133,12 @@ export function F1GridDocsPage({
     });
   }, [searchTerm]);
 
-  useEffect(() => {
-    if (filteredDocs.length === 0) {
-      return;
-    }
-
-    if (!filteredDocs.some((item) => item.id === selectedId)) {
-      setSelectedId(filteredDocs[0].id);
-    }
-  }, [filteredDocs, selectedId]);
+  if (
+    filteredDocs.length > 0 &&
+    !filteredDocs.some((item) => item.id === selectedId)
+  ) {
+    setSelectedId(filteredDocs[0].id);
+  }
 
   const doc = getF1GridDoc(selectedId);
   const normalizedSearch = searchTerm.trim();

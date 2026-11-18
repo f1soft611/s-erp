@@ -1,0 +1,206 @@
+{
+  "fixture": "Real F1GridDocsPage, AppSettingsContext, ThemeProvider and row-height playground; local theme state only",
+  "method": "Native browser click/fill/mouse actions; eval only for fixture setup, DOM observation and animation wait",
+  "settingsStorageAndBackendUnused": true,
+  "sharedServerUnchanged": true,
+  "scope": {
+    "baseline": "f61613e2e2b0f8d260383969e53a1dd9ba54bbaa",
+    "publicPropsAndImportsAndOtherFileStatementsPreserved": true,
+    "allOtherComponentStatementsPreserved": 17,
+    "jsxStatesHelpersEventsSearchAlgorithmAndPendingAnchorEffectPreserved": true,
+    "originalSelectionPredicateAndSetterPreserved": true,
+    "existingTestDeclarationsPreserved": 30,
+    "addedRuntimeTests": 3,
+    "sourceFiles": 890,
+    "mismatches": [],
+    "changed": [
+      "frontend/src/pages/f1-grid-docs/F1-GRID.md",
+      "frontend/src/pages/f1-grid-docs/F1GridDocsPage.tsx",
+      "frontend/tests/f1-grid-docs.test.tsx"
+    ],
+    "lint": {
+      "before": 101,
+      "after": 100,
+      "removed": 1,
+      "added": 0
+    },
+    "red": {
+      "passed": 32,
+      "failed": 1,
+      "originalTestsPassed": 30
+    },
+    "tests": {
+      "files": 2,
+      "passed": 49
+    }
+  },
+  "widths": [
+    {
+      "width": 375,
+      "initialHeight": "40px",
+      "editedHeight": "48px",
+      "noResultAndClearPreserveDocumentAndPlayground": true,
+      "theme": {
+        "lightAndDark": true,
+        "heightPreserved": true
+      },
+      "menu": {
+        "mobile": true,
+        "resultAndDocumentSelectionCloseMenu": true
+      },
+      "toc": {
+        "closedAndReopened": true
+      },
+      "api": {
+        "selectedByIdentifier": true,
+        "matchingSearchRetainsSelection": true,
+        "anchors": [
+          {
+            "attempt": 1,
+            "target": "api-shared-types-f1griduseroption-positionname",
+            "cssScrollMarginTop": "20px",
+            "centerError": 1.328125,
+            "targetTop": 536.21875,
+            "targetBottom": 609.265625,
+            "targetWidth": 680,
+            "mainClientWidth": 375,
+            "mainScrollWidth": 375,
+            "activeClassConsumed": true
+          },
+          {
+            "attempt": 2,
+            "target": "api-shared-types-f1griduseroption-positionname",
+            "cssScrollMarginTop": "20px",
+            "centerError": 0.328125,
+            "targetTop": 536.21875,
+            "targetBottom": 609.265625,
+            "targetWidth": 680,
+            "mainClientWidth": 375,
+            "mainScrollWidth": 375,
+            "activeClassConsumed": true
+          }
+        ]
+      },
+      "documentWidth": 375,
+      "nativeReturnToRowHeight": true
+    },
+    {
+      "width": 768,
+      "initialHeight": "40px",
+      "editedHeight": "48px",
+      "noResultAndClearPreserveDocumentAndPlayground": true,
+      "theme": {
+        "lightAndDark": true,
+        "heightPreserved": true
+      },
+      "menu": {
+        "mobile": false,
+        "resultAndDocumentSelectionCloseMenu": true
+      },
+      "toc": {
+        "closedAndReopened": true
+      },
+      "api": {
+        "selectedByIdentifier": true,
+        "matchingSearchRetainsSelection": true,
+        "anchors": [
+          {
+            "attempt": 1,
+            "target": "api-shared-types-f1griduseroption-positionname",
+            "cssScrollMarginTop": "20px",
+            "centerError": 0.3984375,
+            "targetTop": 534.96875,
+            "targetBottom": 589.15625,
+            "targetWidth": 740,
+            "mainClientWidth": 533,
+            "mainScrollWidth": 533,
+            "activeClassConsumed": true
+          },
+          {
+            "attempt": 2,
+            "target": "api-shared-types-f1griduseroption-positionname",
+            "cssScrollMarginTop": "20px",
+            "centerError": 0.3984375,
+            "targetTop": 534.96875,
+            "targetBottom": 589.15625,
+            "targetWidth": 740,
+            "mainClientWidth": 533,
+            "mainScrollWidth": 533,
+            "activeClassConsumed": true
+          }
+        ]
+      },
+      "documentWidth": 768,
+      "nativeReturnToRowHeight": true
+    },
+    {
+      "width": 1280,
+      "initialHeight": "40px",
+      "editedHeight": "48px",
+      "noResultAndClearPreserveDocumentAndPlayground": true,
+      "theme": {
+        "lightAndDark": true,
+        "heightPreserved": true
+      },
+      "menu": {
+        "mobile": false,
+        "resultAndDocumentSelectionCloseMenu": true
+      },
+      "toc": {
+        "closedAndReopened": true
+      },
+      "api": {
+        "selectedByIdentifier": true,
+        "matchingSearchRetainsSelection": true,
+        "anchors": [
+          {
+            "attempt": 1,
+            "target": "api-shared-types-f1griduseroption-positionname",
+            "cssScrollMarginTop": "20px",
+            "centerError": 0.0234375,
+            "targetTop": 535.34375,
+            "targetBottom": 589.53125,
+            "targetWidth": 740,
+            "mainClientWidth": 1005,
+            "mainScrollWidth": 1005,
+            "activeClassConsumed": true
+          },
+          {
+            "attempt": 2,
+            "target": "api-shared-types-f1griduseroption-positionname",
+            "cssScrollMarginTop": "20px",
+            "centerError": 0.0234375,
+            "targetTop": 535.34375,
+            "targetBottom": 589.53125,
+            "targetWidth": 740,
+            "mainClientWidth": 1005,
+            "mainScrollWidth": 1005,
+            "activeClassConsumed": true
+          }
+        ]
+      },
+      "documentWidth": 1280,
+      "nativeReturnToRowHeight": true
+    }
+  ],
+  "screenshots": [
+    "playground-375.png",
+    "dark-375.png",
+    "api-375.png",
+    "playground-768.png",
+    "dark-768.png",
+    "api-768.png",
+    "playground-1280.png",
+    "dark-1280.png",
+    "api-1280.png",
+    "empty-375.png"
+  ],
+  "anchorObserver": "Accounts for the existing 20px scroll-margin-top; no product CSS or scroll behavior change",
+  "remaining": {
+    "lint": 100,
+    "effectState": 83,
+    "dependencies": 9,
+    "refs": 8,
+    "docsPendingAnchorEffectUnchanged": true
+  }
+}

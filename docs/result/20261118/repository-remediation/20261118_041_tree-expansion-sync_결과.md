@@ -46,6 +46,10 @@ Root를 접고 [하위 draft](screenshots/tree-expansion-sync/draft-375.png)를 
 
 PNG 7개/JSON 2개를 보관했다. console error는 없고 소유 탭만 닫았으며 공유 4173 서버를 변경·종료하지 않았다.
 
+## 정확한 커밋의 전체 CI
+
+커밋 `f61613e2e2b0f8d260383969e53a1dd9ba54bbaa`의 [실행 44311742103](https://github.com/f1soft611/s-erp/actions/runs/44311742103)은 completed/success다. frontend-lint, frontend-build, frontend-tests, frontend-required 네 job의 성공과 원본 로그의 마지막 **226파일/2,673개 통과** 집계를 확인했다. [원격 CI 증거](screenshots/tree-expansion-sync/remote-ci.json)를 보관했다. 후속 문서 검색 변경의 전체 CI 결과와 혼동하지 않는다.
+
 ## 별도 기존 관찰 — 미해결
 
 최초 3단계 fixture에서는 Root를 접어도 Grandchild가 루트 수준에 재노출됐다. Root→Child→Grandchild와 Other, expandedIds=['child']의 기존 TreeProjection은 `['root', 'other', 'grandchild']`를 반환한다. 숨겨진 Child에서 visit을 일찍 반환한 뒤 미방문 손자를 orphan fallback이 다시 방문하는 경로다.
