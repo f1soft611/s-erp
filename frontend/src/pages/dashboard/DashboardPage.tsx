@@ -168,6 +168,7 @@ type RecentMenuEntry = {
 
 const RECENT_MENU_STORAGE_KEY = 's-erp:recent-menu-history';
 const COMMON_CODE_PAGE_SESSION_KEY = 's-erp:page:common-code-management';
+const MENU_MANAGEMENT_PAGE_SESSION_KEY = 's-erp:page:menu-management';
 const RECENT_MENU_LIMIT = 5;
 
 const readRecentMenus = (): RecentMenuEntry[] => {
@@ -536,6 +537,7 @@ function DashboardPage() {
 
   const handleLogout = () => {
     clearPageSessionState(COMMON_CODE_PAGE_SESSION_KEY);
+    clearPageSessionState(MENU_MANAGEMENT_PAGE_SESSION_KEY);
     logout();
     navigate('/login', { replace: true });
   };
