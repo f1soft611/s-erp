@@ -34,7 +34,9 @@
 
 대상은 `calendar-panels`, `date-editor-calendar`, `month-editor`, `date-editor`, `form-date-field`, `f1-grid-date-format`, `page-search-area-detail`, `material-receipt-closing`, `sales-order-create-page` 테스트다. 초기 GREEN 시도 중 새 Profiler 관찰자가 열린 MUI popup에 의해 접근성 트리에서 숨겨진 배경 textbox를 role로 찾는 문제가 있었다. 관찰자만 연결된 label로 DOM 값을 읽게 하고 popup 종료는 DOM 조건으로 기다렸다. 운영 코드나 기존 테스트를 우회하지 않았다.
 
-이 단위의 검증 근거는 위 9파일/158개다. 이전 031의 전체 226파일/2,643개는 `f1fd47a9` 소스의 결과이며 이번 단위 전체 결과로 재사용하지 않는다. raw 증거는 세션의 `lint033-red.json`, `lint033-related.json`, `lint033-oxlint.json`, `lint033-typecheck.log`, `lint033-build.log`에 있다. 저장소에는 [범위 검증](screenshots/calendar-state-sync/scope-audit.json)과 [화면 검증 요약](screenshots/calendar-state-sync/verification.json)을 함께 보관했다.
+위 표는 로컬 관련 검증 9파일/158개의 근거다. 이전 031의 전체 226파일/2,643개는 `f1fd47a9` 소스의 결과이며 이번 단위 전체 결과로 재사용하지 않는다. raw 증거는 세션의 `lint033-red.json`, `lint033-related.json`, `lint033-oxlint.json`, `lint033-typecheck.log`, `lint033-build.log`에 있다. 저장소에는 [범위 검증](screenshots/calendar-state-sync/scope-audit.json)과 [화면 검증 요약](screenshots/calendar-state-sync/verification.json)을 함께 보관했다.
+
+추가로 이 단위 커밋 `a6ddbecfc945eb10dd61713fee75618cb8086020`의 [원격 CI 44291637719](https://github.com/f1soft611/s-erp/actions/runs/44291637719)를 raw log와 source SHA로 확인했다. **226파일/2,647개 전체 통과**, build/lint/tests/required 네 job 모두 success다. [원격 증거](screenshots/calendar-state-sync/remote-ci.json)를 추가했다. 이는 후속 034·035 변경의 전체 검증을 대신하지 않는다.
 
 ## 실제 브라우저
 

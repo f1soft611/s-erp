@@ -26,6 +26,8 @@ ProfileAvatar의 실패 상태는 이미지 error 이벤트가 소유하므로 �
 
 raw 증거는 세션의 `lint034-red.json`, `lint034-related.json`, `lint034-oxlint.json`, `lint034-typecheck.log`, `lint034-build.log`에 있다. 저장소에는 [scope audit](screenshots/image-state-boundaries/scope-audit.json)과 [실제 화면 검증](screenshots/image-state-boundaries/verification.json)을 보관했다. 이전 031 또는 033의 CI를 이번 이미지 변경 전체 테스트 결과로 간주하지 않는다.
 
+추가로 이 단위 커밋 `e2b93480853e1a2bdecd7ab539715c5d5fe27179`의 [원격 CI 44293639019](https://github.com/f1soft611/s-erp/actions/runs/44293639019)를 raw log와 source SHA로 확인했다. **226파일/2,649개 전체 통과**, build/lint/tests/required 네 job 모두 success다. [원격 증거](screenshots/image-state-boundaries/remote-ci.json)를 보관했다. 후속 035 검색 변경의 전체 결과로 재사용하지 않는다.
+
 ## 실제 브라우저
 
 실제 두 컴포넌트와 createAppTheme를 합성 SVG·이름으로 mount했다. SVG는 불투명 빨강/파랑/초록 및 반투명 노랑과 빈 영역으로 구성했다. 데이터 URI만 사용했으며 업무 API·테넌트 데이터는 사용하지 않았다. 공유 4173 서버를 변경하지 않았고 검증 후 소유 탭만 닫았다.

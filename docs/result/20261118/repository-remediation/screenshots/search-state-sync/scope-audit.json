@@ -1,0 +1,32 @@
+{
+  "jsxPreserved": true,
+  "publicPropsPreserved": true,
+  "originalStateAndEventDeclarationsPreserved": true,
+  "helpersPreserved": true,
+  "cleanupPreserved": true,
+  "layoutEffectRefOnly": true,
+  "renderGuardsWithoutRefAccess": 2,
+  "existingTestsPreserved": true,
+  "addedTests": 3,
+  "sourceFiles": 890,
+  "mismatches": [],
+  "changed": [
+    "frontend/src/pages/f1-grid-docs/F1-GRID.md",
+    "frontend/src/shared/components/PageSearchArea.tsx",
+    "frontend/tests/page-search-area-detail.test.tsx"
+  ],
+  "lint": {
+    "before": 113,
+    "after": 111,
+    "removed": 2,
+    "added": 0
+  },
+  "tests": {
+    "files": 6,
+    "passed": 116
+  },
+  "mutationProof": {
+    "failed": 1,
+    "restoredToRootSnapshot": true
+  }
+}
