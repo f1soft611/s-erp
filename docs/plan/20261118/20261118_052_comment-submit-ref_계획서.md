@@ -98,4 +98,4 @@ callback 인자·첨부 누적·같은 파일 재선택을 위한 input clear는
 - [x] 같은 3파일을 실행해 집중 회귀와 기존 동작을 확인한다. typecheck/build/Oxc에서 대상 1건 제거·새 진단 0을 확인한다.
 - [x] source/AST 대조로 import/ref 대입 wrapper와 위 파일 배열 snapshot 외 변경이 없고 검증 workspace와 tracked frontend byte 차이가 0인지 확인한다.
 - [x] 실제 CommentThread를 메모리 fixture로 구동해 375/768/1280px에서 입력 유지, 일반 Enter·Shift+Enter, 첨부 포함 최신 callback, 성공 초기화/실패 유지·재시도를 확인한다. Suspense 시점은 집중 Vitest로 한정한다.
-- [ ] 스크린샷/결과를 저장하고 선행 051 정확한 SHA 전체 CI 완료 뒤에만 allowlist 커밋·비강제 푸시한다. 이번 정확한 SHA CI는 별도 확인한다.
+- [x] 스크린샷/결과를 저장하고 선행 051 정확한 SHA 전체 CI 완료 뒤에만 allowlist 커밋·비강제 푸시한다. 이번 정확한 SHA CI는 별도 확인한다.

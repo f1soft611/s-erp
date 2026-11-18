@@ -48,6 +48,8 @@ Suspense 시점은 집중 Vitest에서 검증했으며 native 브라우저 cover
 
 [051의 정확한 SHA 전체 CI](20261118_051_comment-sync-deps_결과.md) **226파일·2,680개**와 네 job success를 원본 집계로 확인했다. 그 실행 완료 뒤에만 이번 변경을 별도 커밋·비강제 푸시한다. 이번 052의 정확한 SHA 전체 CI는 별도로 확인하며 선행 결과를 재사용하지 않는다.
 
+052 커밋 `6b1ddea406921c9d00f5608da930c0a9f4b87a7b`의 [정확한 SHA CI](https://github.com/f1soft611/s-erp/actions/runs/44344493963)를 별도로 확인했다. 원본 마지막 집계 **226파일·2,682개**, tests/build/lint/required 네 job 모두 success이며 [확인 근거](screenshots/comment-submit-ref/remote-ci.json)를 보관했다. 원격 SHA 일치와 소유 탭 정리도 확인했다.
+
 최초 206개 중 117개를 제거했고 **89개 경고는 순차 처리 중**이다. exhaustive-deps 0/state-in-effect 82/ref 7이다. 공식 호환 경로 없는 권고 2건은 [027](20261118_027_dependency-remediation-boundary_결과.md)의 BLOCKED를 유지한다. 기존 TreeProjection 3단계 및 자료실 모바일 관찰은 이 단위에서 수정하지 않았다.
 
 ```text

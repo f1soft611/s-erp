@@ -38,6 +38,10 @@ type Props = {
   onRowCountChange?: (count: number) => void;
 };
 
+type FormulaPickerTarget =
+  | { rowId: F1GridRowId }
+  | { applyPatch: (changes: Partial<WorkStandardFormulaRow>) => void };
+
 const EMPTY_CHANGES: F1GridChanges<WorkStandardFormulaRow> = {
   insertedRows: [],
   updatedRows: [],
@@ -51,49 +55,42 @@ export function WorkStandardFormulaTab({
   onRowCountChange,
 }: Props) {
   const gridRef = useRef<F1GridRef<WorkStandardFormulaRow> | null>(null);
-  const applyPatchRef = useRef<((changes: Partial<WorkStandardFormulaRow>) => void) | null>(null);
-  const selectedRowIdRef = useRef<F1GridRowId | null>(null);
   const [changes, setChanges] = useState(EMPTY_CHANGES);
   const [selectedRowIds, setSelectedRowIds] = useState<F1GridRowId[]>([]);
   const [basis, setBasis] = useState<FormulaQuantityBasis>('batch');
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerTarget, setPickerTarget] = useState<FormulaPickerTarget | null>(null);
 
   const activeRows = useMemo(() => resolveActiveFormulaRows(rows, changes), [changes, rows]);
   const totals = useMemo(() => calculateFormulaTotals(activeRows, baseQty), [activeRows, baseQty]);
 
   const openMaterialPicker = useCallback(
     (applyPatch: (changes: Partial<WorkStandardFormulaRow>) => void) => {
-      selectedRowIdRef.current = null;
-      applyPatchRef.current = applyPatch;
-      setPickerOpen(true);
+      setPickerTarget({ applyPatch });
     },
     [],
   );
 
   const closeMaterialPicker = useCallback(() => {
-    selectedRowIdRef.current = null;
-    applyPatchRef.current = null;
-    setPickerOpen(false);
+    setPickerTarget(null);
   }, []);
 
   const openSelectedMaterialPicker = useCallback(() => {
     const [selectedRow] = gridRef.current?.getSelectedRows() ?? [];
     if (!selectedRow) return;
-    selectedRowIdRef.current = selectedRow.rowId;
-    setPickerOpen(true);
+    setPickerTarget({ rowId: selectedRow.rowId });
   }, []);
 
   const selectMaterial = useCallback(
     (option: MasterPickerOption) => {
-      const selectedRowId = selectedRowIdRef.current;
-      if (selectedRowId !== null) {
-        gridRef.current?.setCellValue(selectedRowId, 'materialCode', option);
+      if (pickerTarget === null) return;
+      if ('rowId' in pickerTarget) {
+        gridRef.current?.setCellValue(pickerTarget.rowId, 'materialCode', option);
       } else {
-        applyPatchRef.current?.(toFormulaMaterialPatch(option));
+        pickerTarget.applyPatch(toFormulaMaterialPatch(option));
       }
       closeMaterialPicker();
     },
-    [closeMaterialPicker],
+    [closeMaterialPicker, pickerTarget],
   );
 
   const columns = useMemo(
@@ -211,7 +208,7 @@ export function WorkStandardFormulaTab({
         <FormulaSummary label="1판당 합계(g)" value={totals.perPlateG} digits={1} />
       </Box>
       <MaterialPickerDialog
-        open={pickerOpen && !disabled}
+        open={pickerTarget !== null && !disabled}
         search={searchWorkStandardMaterials}
         onClose={closeMaterialPicker}
         onChange={selectMaterial}
