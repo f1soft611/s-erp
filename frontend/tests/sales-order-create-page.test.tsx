@@ -814,6 +814,7 @@ describe('sales order entry page', () => {
     confirmation = await screen.findByRole('dialog', { name: '확인' });
     fireEvent.click(within(confirmation).getByRole('button', { name: '확인' }));
 
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     await waitFor(() => expect(screen.getByLabelText('견적번호')).toHaveValue(''));
     expect(screen.getByRole('textbox', { name: '거래처' })).toHaveValue('');
     await waitFor(() => expect(screen.getByLabelText(/수주일자/, { selector: 'input' })).toHaveValue('2000-02-03'));
