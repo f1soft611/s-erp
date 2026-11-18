@@ -3179,6 +3179,57 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
     );
   });
 
+  it.each([
+    ['Delete', { key: 'Delete' }, { allowDeleteRowInContextMenu: false }],
+    ['Insert', { key: 'Insert' }, { allowAddRowInContextMenu: false }],
+    ['Ctrl+D', { key: 'd', ctrlKey: true }, { allowDuplicateRowInContextMenu: false }],
+  ] as const)('blocks the %s row shortcut when its action is disabled', (_name, key, props) => {
+    const gridRef = createRef<F1GridRef<ItemRow>>();
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={itemRows}
+        columns={itemColumns}
+        rowKey="id"
+        createRow={() => ({ ...itemRows[0], id: 'added' })}
+        createDuplicate={(row) => ({ ...row, id: 'duplicate' })}
+        {...props}
+      />,
+    );
+
+    const codeCell = screen.getByRole('gridcell', { name: 'ITEM-001' });
+    fireEvent.click(codeCell);
+    act(() => {
+      gridRef.current?.clearSelection();
+    });
+    fireEvent.click(screen.getByLabelText('line-1 행 선택'));
+    fireEvent.keyDown(codeCell, key);
+
+    expect(gridRef.current?.getChanges()).toMatchObject({
+      insertedRows: [],
+      updatedRows: [],
+      deletedRows: [],
+    });
+    expect(screen.getByRole('gridcell', { name: 'ITEM-001' })).toBeVisible();
+  });
+
+  it('deletes the selected row with Delete by default', () => {
+    const gridRef = createRef<F1GridRef<ItemRow>>();
+    render(
+      <F1Grid ref={gridRef} rows={itemRows} columns={itemColumns} rowKey="id" />,
+    );
+
+    const codeCell = screen.getByRole('gridcell', { name: 'ITEM-001' });
+    fireEvent.click(codeCell);
+    act(() => {
+      gridRef.current?.clearSelection();
+    });
+    fireEvent.click(screen.getByLabelText('line-1 행 선택'));
+    fireEvent.keyDown(codeCell, { key: 'Delete' });
+
+    expect(gridRef.current?.getChanges().deletedRows).toEqual([itemRows[0]]);
+  });
+
   it('uses Home, End, Insert, and Ctrl+D while leaving Backspace to the editor', () => {
     const gridRef = createRef<F1GridRef<ItemRow>>();
     let nextId = 2;

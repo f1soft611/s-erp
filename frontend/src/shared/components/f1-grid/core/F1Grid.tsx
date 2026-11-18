@@ -1882,13 +1882,13 @@ function F1GridInner<T extends object>(
 
     if (event.key === 'Insert') {
       event.preventDefault();
-      handleAddRow();
+      if (allowAddRowInContextMenu) handleAddRow();
       return;
     }
 
     if (event.ctrlKey && event.key.toLowerCase() === 'd') {
       event.preventDefault();
-      handleDuplicateSelectedRows();
+      if (allowDuplicateRowInContextMenu) handleDuplicateSelectedRows();
       return;
     }
 
@@ -1905,7 +1905,7 @@ function F1GridInner<T extends object>(
           );
         }
       } else if (selectedCount > 0) {
-        handleDeleteSelectedRows();
+        if (allowDeleteRowInContextMenu) handleDeleteSelectedRows();
       } else {
         if (row && column && isCellEditable(column, row)) {
           setData((current) =>

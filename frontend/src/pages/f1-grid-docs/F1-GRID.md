@@ -1263,6 +1263,8 @@ Ctrl + D
 → Row 복제
 ```
 
+행 동작 단축키는 대응하는 컨텍스트 메뉴 항목의 설정을 따릅니다. `allowAddRowInContextMenu={false}`이면 `Insert`, `allowDeleteRowInContextMenu={false}`이면 선택 행의 `Delete`, `allowDuplicateRowInContextMenu={false}`이면 `Ctrl+D`가 각각 행을 변경하지 않습니다. 행 삭제가 차단된 경우 셀 값 지우기로 전환하지 않습니다. 선택 행이 없는 편집 가능한 셀이나 이미지 셀의 값 지우기는 기존대로 동작합니다. `disableContextMenu` 자체는 메뉴 표시만 제어합니다.
+
 ---
 
 # 11-1. Row Merge
