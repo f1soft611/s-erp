@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { startTransition, Suspense } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useServerDateDefault } from '../src/shared/hooks/useServerDateDefault';
 import { getSystemDate } from '../src/shared/services/systemDateService';
@@ -96,4 +97,64 @@ describe('useServerDateDefault', () => {
     expect(first).not.toHaveBeenCalled();
     expect(getSystemDateMock).toHaveBeenCalledTimes(1);
   });
+
+  it.each(['date', 'error'] as const)(
+    'keeps the committed %s callback when a later render suspends',
+    async (outcome) => {
+      const pending = deferred<string>();
+      getSystemDateMock.mockReturnValue(pending.promise);
+      const committedDate = vi.fn();
+      const committedError = vi.fn();
+      const suspendedDate = vi.fn();
+      const suspendedError = vi.fn();
+      const renderAttempt = vi.fn();
+      const suspended = new Promise<void>(() => undefined);
+      const { result, rerender } = renderHook(
+        ({ suspend }) => {
+          const actions = useServerDateDefault({
+            enabled: true,
+            onDate: suspend ? suspendedDate : committedDate,
+            onError: suspend ? suspendedError : committedError,
+          });
+          if (suspend) {
+            renderAttempt();
+            throw suspended;
+          }
+          return actions;
+        },
+        {
+          initialProps: { suspend: false },
+          wrapper: ({ children }) => (
+            <Suspense fallback={null}>{children}</Suspense>
+          ),
+        },
+      );
+      const committedActions = result.current;
+
+      await act(async () => {
+        startTransition(() => rerender({ suspend: true }));
+      });
+      expect(renderAttempt).toHaveBeenCalled();
+      expect(result.current).toBe(committedActions);
+
+      await act(async () => {
+        if (outcome === 'date') pending.resolve('2031-02-03');
+        else pending.reject(new Error('서버 오류'));
+        await pending.promise.catch(() => undefined);
+      });
+
+      expect(suspendedDate).not.toHaveBeenCalled();
+      expect(suspendedError).not.toHaveBeenCalled();
+      if (outcome === 'date') {
+        expect(committedDate).toHaveBeenCalledWith('2031-02-03');
+        expect(committedError).not.toHaveBeenCalled();
+      } else {
+        expect(committedError).toHaveBeenCalledWith(
+          '서버 기준일을 불러오지 못했습니다. 서버 오류',
+        );
+        expect(committedDate).not.toHaveBeenCalled();
+      }
+      expect(getSystemDateMock).toHaveBeenCalledTimes(1);
+    },
+  );
 });

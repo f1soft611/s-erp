@@ -29,4 +29,4 @@ const parentGroupId = parentGroup ? String(parentGroup.id) : null;
 - [x] 전체 lint에서 두 진단만 제거되어 135개인지 확인했다.
 - [x] threads/worker 2·UTC로 `tests\common-code-management-page.test.tsx`를 실행했다. 기존 실제 저장 잠금/상위 선택 차단/dirty 전환/재시도 30개가 통과했다.
 - [x] typecheck·최소 diff·frontend 890파일 byte 일치·git diff --check를 확인했다.
-- [ ] 결과 029 작성 후 이 단위만 커밋·non-force push하고 다음 경고를 계속한다.
+- [x] 결과 029 작성 후 `94ae2f99`로 커밋·non-force push했다. 다음 경고를 계속 진행한다.
