@@ -1,0 +1,33 @@
+{
+  "baseline": "2c3806c5568ee81c97bd3bf2ac608229b200e29a",
+  "changed": [
+    "frontend/src/pages/groupware/community/notice/CommunityNoticePage.tsx",
+    "frontend/src/pages/groupware/community/notice/hooks/useNoticeList.ts"
+  ],
+  "onlyTwoDependencyArrayElementsAdded": true,
+  "allSourceOtherThanThoseDeclarationsPreserved": true,
+  "callbackAndEffectBodiesPreserved": true,
+  "existingTransitiveFilterDependencyConfirmed": true,
+  "stableRawStateSetterReturnedWithoutWrapper": true,
+  "apiRequestsGenerationPagingAndJSXUnchanged": true,
+  "sourceFiles": 890,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 100,
+    "after": 98,
+    "removedDependencies": 2,
+    "added": 0
+  },
+  "tests": {
+    "files": 3,
+    "passed": 76,
+    "addedTests": 0
+  },
+  "baselineObservation": {
+    "passed": 75,
+    "failed": 1,
+    "isolatedExistingTestPassed": true,
+    "unchangedFirstCommitCursorFallback": "A separate pre-change diagnostic observed cursor10 before cursor7 initialization; not fixed by declarations.",
+    "temporaryDiagnosticRemoved": true
+  }
+}

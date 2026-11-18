@@ -1,0 +1,116 @@
+{
+  "fixture": "Real CommunityNoticePage, notification/theme providers, notice/category hooks and service adapters",
+  "isolation": "Fetch is entirely synthetic with no network fallback; local/session storage are replaced only in the owned tab without reading or writing persisted values",
+  "method": "Native mouse selections and view toggles; eval limited to fixture setup, observation and waiting for the existing MUI Grow transition",
+  "widths": [
+    {
+      "width": 375,
+      "documentWidth": 375,
+      "operations": {
+        "regular": 1,
+        "pinned": 1
+      },
+      "bulletin": {
+        "regular": 1,
+        "pinned": 0
+      },
+      "all": {
+        "regular": 2,
+        "pinned": 1
+      },
+      "requestsPerChangedFilter": 2,
+      "requestsForSameFilter": 0,
+      "unknownRequests": 0
+    },
+    {
+      "width": 768,
+      "documentWidth": 768,
+      "operations": {
+        "regular": 1,
+        "pinned": 1
+      },
+      "bulletin": {
+        "regular": 1,
+        "pinned": 0
+      },
+      "all": {
+        "regular": 2,
+        "pinned": 1
+      },
+      "requestsPerChangedFilter": 2,
+      "requestsForSameFilter": 0,
+      "unknownRequests": 0
+    },
+    {
+      "width": 1280,
+      "documentWidth": 1280,
+      "operations": {
+        "regular": 1,
+        "pinned": 1
+      },
+      "bulletin": {
+        "regular": 1,
+        "pinned": 0
+      },
+      "all": {
+        "regular": 2,
+        "pinned": 1
+      },
+      "requestsPerChangedFilter": 2,
+      "requestsForSameFilter": 0,
+      "unknownRequests": 0
+    }
+  ],
+  "viewRoundTrip": {
+    "list": true,
+    "feed": true,
+    "existingRefreshPerChange": 2,
+    "totalSyntheticListRequests": 24
+  },
+  "scope": {
+    "baseline": "2c3806c5568ee81c97bd3bf2ac608229b200e29a",
+    "changed": [
+      "frontend/src/pages/groupware/community/notice/CommunityNoticePage.tsx",
+      "frontend/src/pages/groupware/community/notice/hooks/useNoticeList.ts"
+    ],
+    "onlyTwoDependencyArrayElementsAdded": true,
+    "allSourceOtherThanThoseDeclarationsPreserved": true,
+    "callbackAndEffectBodiesPreserved": true,
+    "existingTransitiveFilterDependencyConfirmed": true,
+    "stableRawStateSetterReturnedWithoutWrapper": true,
+    "apiRequestsGenerationPagingAndJSXUnchanged": true,
+    "sourceFiles": 890,
+    "byteMismatches": 0,
+    "lint": {
+      "before": 100,
+      "after": 98,
+      "removedDependencies": 2,
+      "added": 0
+    },
+    "tests": {
+      "files": 3,
+      "passed": 76,
+      "addedTests": 0
+    },
+    "baselineObservation": {
+      "passed": 75,
+      "failed": 1,
+      "isolatedExistingTestPassed": true,
+      "unchangedFirstCommitCursorFallback": "A separate pre-change diagnostic observed cursor10 before cursor7 initialization; not fixed by declarations.",
+      "temporaryDiagnosticRemoved": true
+    }
+  },
+  "screenshots": [
+    "filter-375.png",
+    "filter-768.png",
+    "filter-1280.png",
+    "list-1280.png"
+  ],
+  "observersCorrectedWithoutProductChange": [
+    "Wait for existing Grow opacity/transform to settle before measuring menu-item coordinates",
+    "View mode intentionally calls loadNoticePosts; verify that existing refresh rather than expecting zero requests"
+  ],
+  "unresolved": [
+    "Pre-existing first-commit comment cursor fallback is separate from these two dependency declarations"
+  ]
+}

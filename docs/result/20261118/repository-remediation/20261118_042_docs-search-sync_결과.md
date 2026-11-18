@@ -43,6 +43,10 @@ API 행의 기존 `scroll-margin-top: 20px`를 반영한 중앙 오차는 각 2p
 
 PNG 10개/JSON 2개를 보관했다. 소유 탭만 닫았으며 공유 4173 서버를 변경·종료하지 않았다.
 
+## 정확한 커밋의 전체 CI
+
+커밋 `2c3806c5568ee81c97bd3bf2ac608229b200e29a`의 [실행 44315266596](https://github.com/f1soft611/s-erp/actions/runs/44315266596)은 completed/success다. frontend-lint, frontend-build, frontend-tests, frontend-required 네 job의 성공과 원본 로그의 마지막 **226파일/2,676개 통과** 집계를 확인했다. [원격 CI 증거](screenshots/docs-search-sync/remote-ci.json)를 보관했다. 후속 공지 변경의 결과로 재사용하지 않는다.
+
 ## 잔여와 커밋
 
 최초 lint 206개 중 106개를 제거했고 **100개는 순차 처리 중**이다. 공식 호환 수정 경로가 없는 고유 의존성 권고 2건은 [027 결과](20261118_027_dependency-remediation-boundary_결과.md)의 BLOCKED 상태로 유지한다. 041에서 분리한 기존 3단계 TreeProjection 관찰도 이 수정으로 해결됐다고 주장하지 않는다. API/DB 변경이 없어 DB MCP·SQL 대상이 아니다.

@@ -152,7 +152,7 @@ export function useNoticeList({
         }
       }
     },
-    [loadAllPinnedPosts, mapPost, start, succeed, fail],
+    [loadAllPinnedPosts, mapPost, selectedNoticeFilter, start, succeed, fail],
   );
 
   const requestNoticePage = useCallback(

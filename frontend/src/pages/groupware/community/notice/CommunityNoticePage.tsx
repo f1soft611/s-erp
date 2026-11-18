@@ -221,7 +221,7 @@ export function CommunityNoticePage({
         };
       }),
     );
-  }, [noticeGubunNames]);
+  }, [noticeGubunNames, setNoticeItems]);
 
   useEffect(() => {
     void loadNoticePosts();
