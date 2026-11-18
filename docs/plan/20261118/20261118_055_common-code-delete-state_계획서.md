@@ -84,4 +84,4 @@ deleteMenuDisabled={
 - [x] 같은 3파일·typecheck/build/Oxc에서 대상 ref 1건 제거·새 진단 0을 확인한다.
 - [x] source/AST 대조로 실제 isGroupDeleteDisabled/checkGroupDeleteBlockedMessage/save/picker·기타 JSX/CSS·서비스/공개 계약 동일과 frontend byte 차이 0을 확인한다.
 - [x] 실제 375/768/1280px에서 상세 연속 삭제 전/중/후의 그룹 삭제 메뉴를 확인하고, 자식 그룹이 남아 있는 삭제 보호도 확인한다. 새 소유 탭·합성 GET·메모리 저장소를 사용하고 native 결과/스크린샷을 저장한다.
-- [ ] 결과를 작성한다. 054 정확한 SHA 전체 CI 완료 뒤 allowlist 커밋·비강제 푸시·원격 일치를 확인한다. 055 전체 CI도 정확한 SHA로 별도 확인한다.
+- [x] 결과를 작성한다. 054 정확한 SHA 전체 CI 완료 뒤 allowlist 커밋·비강제 푸시·원격 일치를 확인한다. 055 전체 CI도 정확한 SHA로 별도 확인한다.

@@ -50,6 +50,8 @@ render가 ref에서 삭제 목록을 읽지만 첫 삭제로 dirty=true가 된 �
 
 [054 정확한 SHA CI](20261118_054_common-code-picker-binding_결과.md) **227파일·2,686개**, tests/build/lint/required 네 job success를 원본 집계로 확인했다. 그 완료 뒤에만 이번 단위를 별도 커밋·비강제 푸시한다. 055의 정확한 SHA 전체 CI는 별도로 확인하며 선행 결과를 재사용하지 않는다.
 
+055는 `2120439c0aa6de32dc44ccf3f02cc8a99f40d544`로 별도 커밋·비강제 푸시했고 원격 SHA 일치를 확인했다. [정확한 SHA CI 44355433860](https://github.com/f1soft611/s-erp/actions/runs/44355433860)의 원본 마지막 집계는 **227파일·2,687개 통과**이며 tests/build/lint/required 네 job 모두 success다. [CI 근거](screenshots/common-code-delete-state/remote-ci.json)는 다음 056 단위에 함께 기록한다.
+
 최초 206개 중 120개를 제거했고 **86개 경고는 순차 처리 중**이다(state-in-effect 82/ref 4/exhaustive-deps 0). 공식 호환 경로 없는 권고 2건은 [027](20261118_027_dependency-remediation-boundary_결과.md)의 BLOCKED를 유지한다. 기존 TreeProjection 3단계와 자료실 모바일 관찰은 이 단위에서 수정하지 않았다.
 
 ```text

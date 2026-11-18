@@ -1,7 +1,8 @@
-import { createRef } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { createRef, startTransition, Suspense } from 'react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { F1Grid, type F1GridColumn, type F1GridRef } from '../src/shared/components/f1-grid';
+import { GridHeader } from '../src/shared/components/f1-grid/core/GridHeader';
 
 type Row = { id: string; name: string; code: string };
 
@@ -25,7 +26,86 @@ function renderGrid() {
   return { renderCell, cellAdornment, editable, ref };
 }
 
+function createHeaderProps() {
+  type HeaderRow = { id: string; enabled: boolean };
+  const rows: HeaderRow[] = [{ id: '1', enabled: false }];
+  const columns: F1GridColumn<HeaderRow>[] = [
+    { field: 'enabled', headerName: 'Enabled', type: 'checkbox', headerCheckbox: true, editable: true },
+  ];
+  return {
+    rows,
+    columns,
+    allColumns: columns,
+    columnLine: true,
+    selectedAll: false,
+    selectedCount: 0,
+    columnWidths: {},
+    columnTracks: '36px 150px',
+    multiSelect: true,
+    onResizeColumn: vi.fn(),
+    getColumnCheckboxState: vi.fn(() => ({ allChecked: false, indeterminate: false, hasEditableRows: true })),
+    onToggleAllRows: vi.fn(),
+    onToggleColumnCheckbox: vi.fn(),
+    onToggleColumnVisibility: vi.fn(),
+    sorts: [],
+    onToggleSort: vi.fn(),
+    filters: [],
+    onApplyFilter: vi.fn(),
+    pinnedFields: new Map(),
+    onPinColumn: vi.fn(),
+    leftOffsets: {},
+    rightOffsets: {},
+  } satisfies Parameters<typeof GridHeader<HeaderRow>>[0];
+}
+
 describe('F1Grid interaction render isolation', () => {
+  it('keeps committed header events while a later callback render suspends', async () => {
+    const props = createHeaderProps();
+    const committed = vi.fn();
+    const next = vi.fn();
+    const attempted = vi.fn();
+    const pending = new Promise<void>(() => undefined);
+    function SuspendUpdate({ blocked }: { blocked: boolean }) {
+      if (blocked) {
+        attempted();
+        throw pending;
+      }
+      return null;
+    }
+    const view = (useNext = false, blocked = false) => (
+      <Suspense fallback={<span>Updating header</span>}>
+        <GridHeader {...props} onToggleAllRows={useNext ? next : committed} />
+        <SuspendUpdate blocked={blocked} />
+      </Suspense>
+    );
+    const { rerender } = render(view());
+    await act(async () => { startTransition(() => rerender(view(true, true))); });
+    expect(attempted).toHaveBeenCalled();
+    expect(screen.queryByText('Updating header')).not.toBeInTheDocument();
+    fireEvent.click(within(screen.getByLabelText('전체 행 선택')).getByRole('checkbox'));
+    expect(next).not.toHaveBeenCalled();
+    expect(committed).toHaveBeenCalledTimes(1);
+    rerender(view(true));
+    fireEvent.click(within(screen.getByLabelText('전체 행 선택')).getByRole('checkbox'));
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(committed).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps header memo for callback-only updates but renders checkbox state from current rows', () => {
+    const props = createHeaderProps();
+    const { rerender } = render(<GridHeader {...props} />);
+    expect(screen.getByRole('checkbox', { name: 'Enabled 전체 선택' })).not.toBeChecked();
+    const unchanged = vi.fn(() => ({ allChecked: false, indeterminate: false, hasEditableRows: true }));
+    rerender(<GridHeader {...props} getColumnCheckboxState={unchanged} onToggleAllRows={vi.fn()} />);
+    expect(unchanged).not.toHaveBeenCalled();
+    const updated = vi.fn(() => ({ allChecked: true, indeterminate: false, hasEditableRows: true }));
+    rerender(
+      <GridHeader {...props} rows={[{ id: '1', enabled: true }]} getColumnCheckboxState={updated} />,
+    );
+    expect(screen.getByRole('checkbox', { name: 'Enabled 전체 선택' })).toBeChecked();
+    expect(updated).toHaveBeenCalledWith(props.columns[0]);
+  });
+
   it.each(['Enter', 'Tab', 'click'] as const)(
     'does not visit unrelated rows when committing a changed value with %s',
     (action) => {

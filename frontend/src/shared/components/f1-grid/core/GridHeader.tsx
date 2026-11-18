@@ -1,4 +1,4 @@
-import { memo, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { memo, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
@@ -924,14 +924,27 @@ function GridHeaderInner<T extends object>({
   );
 }
 
-const MemoizedGridHeader = memo(GridHeaderInner) as typeof GridHeaderInner;
+function areGridHeaderPropsEqual<T extends object>(
+  previous: Readonly<GridHeaderProps<T>>,
+  next: Readonly<GridHeaderProps<T>>,
+) {
+  const keys = Object.keys(previous) as Array<keyof GridHeaderProps<T>>;
+  return keys.length === Object.keys(next).length &&
+    keys.every((key) =>
+      Object.prototype.hasOwnProperty.call(next, key) &&
+      (key === 'getColumnCheckboxState' || Object.is(previous[key], next[key])),
+    );
+}
+
+const MemoizedGridHeader = memo(GridHeaderInner, areGridHeaderPropsEqual) as typeof GridHeaderInner;
 
 export function GridHeader<T extends object>(props: GridHeaderProps<T>) {
   const latestProps = useRef(props);
-  latestProps.current = props;
+  useLayoutEffect(() => {
+    latestProps.current = props;
+  });
   const handlers = useMemo(() => ({
     onResizeColumn: (...args: Parameters<GridHeaderProps<T>['onResizeColumn']>) => latestProps.current.onResizeColumn(...args),
-    getColumnCheckboxState: (...args: Parameters<GridHeaderProps<T>['getColumnCheckboxState']>) => latestProps.current.getColumnCheckboxState(...args),
     onToggleAllRows: () => latestProps.current.onToggleAllRows(),
     onToggleColumnCheckbox: (...args: Parameters<GridHeaderProps<T>['onToggleColumnCheckbox']>) => latestProps.current.onToggleColumnCheckbox(...args),
     onToggleColumnVisibility: (...args: Parameters<GridHeaderProps<T>['onToggleColumnVisibility']>) => latestProps.current.onToggleColumnVisibility(...args),
