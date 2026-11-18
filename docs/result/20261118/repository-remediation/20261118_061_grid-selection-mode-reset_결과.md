@@ -34,7 +34,9 @@ selectionMode 변경 effect가 범위 state를 비우기 전 첫 row-mode commit
 
 backend/API/DB/의존성 변경 없음. DB MCP·스키마 스크립트 대상이 아니다. 잔여 state-in-effect 80개와 기존 의존성 권고 2건이 있어 전체 요청은 아직 완료로 표시하지 않는다.
 
-정확한 060 CI 성공 근거를 포함해 별도 커밋·푸시하며 061 전체 CI는 해당 SHA로 확인한다.
+## 원격 CI
+
+커밋 `8b748f63ea915313ec220453c31fc8d1203a0b91`을 비강제 푸시하고 원격 일치를 확인했다. [전체 CI 44368176141](https://github.com/f1soft611/s-erp/actions/runs/44368176141)의 정확한 SHA·완료 상태·마지막 원본 집계는 **227파일 2,696개**, build/tests/lint/required 네 job 모두 성공이다. [원격 근거](screenshots/grid-selection-mode-reset/remote-ci.json)를 보관했다.
 
 ## 복사 가능한 커밋
 

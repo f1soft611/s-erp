@@ -173,6 +173,7 @@ const columns: F1GridColumn<Row>[] = [
 - 단일 선택에서 `initialSelectedRowIds`/ref `setSelectedRowIds`에 복수 ID를 전달하면 현재 표시 순서에서 첫 유효 행만 선택한다. 실행 중 true→false 전환도 첫 선택 행만 유지하며 다시 true로 바꿔도 이전 다중 선택을 복구하지 않는다. 콜백/ref/강조/행 복사는 같은 선택 상태를 사용한다.
 - Ctrl+C는 선택된 표시 행의 모든 표시 컬럼을 TSV로 복사한다. `cell`의 기존 셀/범위 복사와 붙여넣기·편집 계약은 유지한다.
 - `showCheckbox`와 독립적이다. 체크박스, `initialSelectedRowIds`, `onSelectionChange`, 선택 ref API는 동일한 행 선택 상태를 사용한다.
+- 유효한 `initialSelectedRowIds`는 적용 commit부터 checkbox/ref/callback에 일치한다. 문자열 ID로 구성한 동일 복원 key는 한 번만 적용하므로 사용자 해제 뒤 배열 참조만 바뀌어도 다시 선택하지 않는다. 새 key만 기존 표시 순서·단일/다중 제한으로 적용한다.
 - 강조는 실제 행 높이 단위이므로 병합 셀 그룹 전체가 아닌 선택된 상세 행에만 표시된다. 고정 열과 가로 스크롤에서도 정렬된다. `selectRowOnContextMenu={false}`이면 우클릭으로 선택 행을 바꾸지 않는다.
 - 실행 중 모드를 바꾸면 이전 셀 범위와 복사 표시를 해제하고 행 선택은 유지한다. 옵션은 수주현황·문서현황에 적용되며 다른 화면은 명시적으로 설정해야 한다.
 

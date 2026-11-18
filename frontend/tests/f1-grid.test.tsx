@@ -7,6 +7,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import { Dialog } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
@@ -2116,6 +2117,37 @@ describe('F1-GRID column management', () => {
 });
 
 describe('F1-GRID cell range selection', () => {
+  it.each([true, false])('restores initial row ids before the first layout commit and keeps user clearing (multiSelect=%s)', (multiSelect) => {
+    const selectionRows = [{ id: 'one', code: 'A' }, { id: 'two', code: 'B' }];
+    const selectionColumns: F1GridColumn<(typeof selectionRows)[number]>[] = [
+      { field: 'code', headerName: 'Code' },
+    ];
+    const gridRef = createRef<F1GridRef<(typeof selectionRows)[number]>>();
+    const commits: Array<Array<string | number>> = [];
+    function ObservedGrid({ ids, revision }: { ids: string[]; revision: number }) {
+      useLayoutEffect(() => {
+        commits.push(gridRef.current?.getSelectedRowIds() ?? []);
+      }, [ids, revision]);
+      return <F1Grid ref={gridRef} rows={selectionRows} columns={selectionColumns} rowKey="id"
+        initialSelectedRowIds={ids} multiSelect={multiSelect} />;
+    }
+    const expected = multiSelect ? ['one', 'two'] : ['one'];
+    const { rerender } = render(<ObservedGrid ids={['two', 'one']} revision={0} />);
+    expect(commits).toEqual([expected]);
+    for (const id of expected) {
+      fireEvent.click(within(screen.getByLabelText(`${id} 행 선택`)).getByRole('checkbox'));
+    }
+    expect(gridRef.current?.getSelectedRowIds()).toEqual([]);
+    commits.length = 0;
+    rerender(<ObservedGrid ids={['two', 'one']} revision={1} />);
+    expect(commits).toEqual([[]]);
+    expect(gridRef.current?.getSelectedRowIds()).toEqual([]);
+    commits.length = 0;
+    rerender(<ObservedGrid ids={['two']} revision={2} />);
+    expect(commits).toEqual([['two']]);
+    expect(within(screen.getByLabelText('two 행 선택')).getByRole('checkbox')).toBeChecked();
+  });
+
   it.each(['drag', 'copy'] as const)('clears a %s range before the selection-mode commit without losing row edits or selection', (kind) => {
     const rangeRows = [{ id: 'one', code: 'A' }, { id: 'two', code: 'B' }];
     const rangeColumns: F1GridColumn<(typeof rangeRows)[number]>[] = [
