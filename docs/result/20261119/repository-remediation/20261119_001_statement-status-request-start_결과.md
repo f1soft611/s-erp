@@ -37,7 +37,9 @@ GET deferred 응답만 합성했으며 실제 API/테넌트 데이터/저장을 
 
 ## 원격과 잔여
 
-선행067 commit `a4e36534c2b7728d58498d3fcd80401e48f8f6c4`의 정확한 CI44380976188은 마지막 집계227파일2,710개와 네 job 모두 성공했다. 해당 최종 근거를 기존20261118 결과에 보관한다.068은 별도 커밋/푸시 후 정확한 SHA 전체 CI를 확인한다.
+선행067 commit `a4e36534c2b7728d58498d3fcd80401e48f8f6c4`의 정확한 CI44380976188은 마지막 집계227파일2,710개와 네 job 모두 성공했다. 해당 최종 근거를 기존20261118 결과에 보관했다.
+
+068은 `aa3b694b421f973f61d4a771723f2d7ad4cbb643`으로17파일만 별도 커밋/비강제 푸시하고 원격 일치를 확인했다. 정확한 [CI44415048096](https://github.com/f1soft611/s-erp/actions/runs/44415048096)은 마지막 집계227파일2,713개와 build/tests/lint/required 네 job 모두 성공했다. [최종 판정](screenshots/statement-status-request-start/remote-ci.json)은 후속069 커밋에 보관한다.
 
 backend/API/DB/의존성 변경 없음. DB MCP·스키마 스크립트 대상이 아니다. 잔여 state-in-effect71개와 기존 의존성 권고2건이 있어 전체 요청은 아직 완료로 표시하지 않는다.
 

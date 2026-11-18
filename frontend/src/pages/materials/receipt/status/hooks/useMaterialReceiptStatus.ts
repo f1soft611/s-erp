@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toPageSearchFields } from '../../../../../shared/components/page-search/searchFields';
 import { useInitialLoadState } from '../../../../../shared/hooks/useInitialLoadState';
 import { usePageSearchDefaults } from '../../../../../shared/hooks/usePageSearchDefaults';
@@ -104,18 +104,31 @@ export function useMaterialReceiptStatusList(filters: MaterialReceiptStatusFilte
   const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState('');
   const [retryRequest, setRetryRequest] = useState({ version: 0, quiet: false });
-  const previousRetryVersion = useRef(0);
+  const [previousRequest, setPreviousRequest] = useState<{
+    filters: typeof filters | undefined;
+    retryRequest: typeof retryRequest;
+    retryVersion: number;
+  }>({ filters: undefined, retryRequest, retryVersion: 0 });
   const { start, succeed, fail, ...initialLoad } = useInitialLoadState();
+
+  if (previousRequest.filters !== filters || previousRequest.retryRequest !== retryRequest) {
+    const quiet = retryRequest.quiet && retryRequest.version !== previousRequest.retryVersion;
+    setPreviousRequest({
+      filters,
+      retryRequest,
+      retryVersion: filters ? retryRequest.version : previousRequest.retryVersion,
+    });
+    if (filters) {
+      start();
+      setHasLoaded(false);
+      if (!quiet) setLoading(true);
+      setError('');
+    }
+  }
 
   useEffect(() => {
     if (!filters) return undefined;
     let cancelled = false;
-    const quiet = retryRequest.quiet && retryRequest.version !== previousRetryVersion.current;
-    previousRetryVersion.current = retryRequest.version;
-    start();
-    setHasLoaded(false);
-    if (!quiet) setLoading(true);
-    setError('');
     void searchMaterialReceiptStatus(filters)
       .then((result) => {
         if (cancelled) return;
@@ -157,11 +170,19 @@ export function useMaterialReceiptStatusDetail() {
   const [refreshToken, setRefreshToken] = useState(0);
   const [editorMode, setEditorMode] = useState<MaterialReceiptEditorMode | null>(null);
 
+  const [previousRequest, setPreviousRequest] = useState({ id: selectedId, token: refreshToken });
+
+  if (previousRequest.id !== selectedId || previousRequest.token !== refreshToken) {
+    setPreviousRequest({ id: selectedId, token: refreshToken });
+    if (selectedId !== null) {
+      setLoading(true);
+      setError('');
+    }
+  }
+
   useEffect(() => {
     if (selectedId === null) return undefined;
     let active = true;
-    setLoading(true);
-    setError('');
     getMaterialReceipt(selectedId)
       .then((loaded) => {
         if (active) setItem(loaded);

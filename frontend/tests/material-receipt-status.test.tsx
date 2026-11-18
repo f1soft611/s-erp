@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { useLayoutEffect } from 'react';
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiGet, apiPost, apiPut } from '../src/shared/services/apiClient';
@@ -12,7 +13,11 @@ import {
   searchMaterialReceiptStatus,
   toMaterialReceiptStatusFilters,
 } from '../src/pages/materials/receipt/status/services/materialReceiptStatus.service';
-import type { MaterialReceiptStatusRow } from '../src/pages/materials/receipt/status/types/materialReceiptStatus.types';
+import type { MaterialReceiptStatusFilters, MaterialReceiptStatusRow } from '../src/pages/materials/receipt/status/types/materialReceiptStatus.types';
+import {
+  useMaterialReceiptStatusDetail,
+  useMaterialReceiptStatusList,
+} from '../src/pages/materials/receipt/status/hooks/useMaterialReceiptStatus';
 
 vi.mock('../src/shared/services/apiClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/shared/services/apiClient')>();
@@ -100,6 +105,135 @@ describe('MaterialReceiptStatusPage', () => {
     fireEvent.click(within(grid).getAllByRole('button', { name: 'MI-20261117-0001 상세 보기' })[0]);
     expect(await screen.findByText('입고번호: MI-20261117-0001')).toBeInTheDocument();
   }
+
+  it.each([false, true])('publishes receipt list-start commits without changing quiet reloads or paused request versions (initially ready: %s)', async (initiallyReady) => {
+    const requests: Array<{
+      resolve: (value: { resultList: MaterialReceiptStatusRow[] }) => void;
+      reject: (error: Error) => void;
+    }> = [];
+    apiGetMock.mockImplementation(() => new Promise<{ resultList: MaterialReceiptStatusRow[] }>((resolve, reject) => {
+      requests.push({ resolve, reject });
+    }));
+    const filters: MaterialReceiptStatusFilters = { receiptDtFrom: '2026-11-01', receiptDtTo: '2026-11-30', status: 'ACTIVE' };
+    const initialProps: { filters: MaterialReceiptStatusFilters | null } = { filters: initiallyReady ? filters : null };
+    const commits: Array<{ loading: boolean; hasLoaded: boolean; error: string; initialLoading: boolean }> = [];
+    const { result, rerender } = renderHook(({ filters: currentFilters }) => {
+      const list = useMaterialReceiptStatusList(currentFilters);
+      useLayoutEffect(() => {
+        commits.push({ loading: list.loading, hasLoaded: list.hasLoaded, error: list.error, initialLoading: list.initialLoad.loading });
+      });
+      return list;
+    }, { initialProps });
+    if (!initiallyReady) {
+      expect(requests).toHaveLength(0);
+      commits.length = 0;
+      rerender({ filters });
+    }
+    const normalStart = { loading: true, hasLoaded: false, error: '', initialLoading: true };
+    const quietStart = { ...normalStart, loading: false };
+    expect(commits[0]).toEqual(normalStart);
+    await act(async () => requests[0].reject(new Error('Owned receipt list failure')));
+    expect(result.current.error).toBe('Owned receipt list failure');
+    commits.length = 0;
+    act(() => result.current.retry());
+    expect(commits[0]).toEqual(normalStart);
+    const rows = [row(71)];
+    await act(async () => requests[1].resolve({ resultList: rows }));
+    expect(result.current.hasLoaded).toBe(true);
+
+    commits.length = 0;
+    act(() => result.current.refreshQuietly());
+    expect(commits[0]).toEqual(quietStart);
+    expect(result.current.rows).toEqual(rows);
+    await act(async () => requests[2].resolve({ resultList: rows }));
+    commits.length = 0;
+    rerender({ filters: { ...filters, keyword: 'Owned changed' } });
+    expect(commits[0]).toEqual(normalStart);
+    rerender({ filters: { ...filters, keyword: 'Owned latest' } });
+    expect(requests).toHaveLength(5);
+    await act(async () => requests[3].resolve({ resultList: [{ ...row(71), materialReceiptId: 901 }] }));
+    expect(result.current.rows).toEqual(rows);
+    expect(result.current.loading).toBe(true);
+    await act(async () => requests[4].resolve({ resultList: rows }));
+    expect(result.current.loading).toBe(false);
+    expect(result.current.hasLoaded).toBe(true);
+
+    rerender({ filters: null });
+    act(() => result.current.refreshQuietly());
+    expect(requests).toHaveLength(5);
+    expect(result.current.loading).toBe(false);
+    commits.length = 0;
+    rerender({ filters });
+    expect(commits[0]).toEqual(quietStart);
+    expect(result.current.rows).toEqual(rows);
+    await act(async () => requests[5].resolve({ resultList: rows }));
+    rerender({ filters });
+    expect(requests).toHaveLength(6);
+    expect(result.current.loading).toBe(false);
+    expect(result.current.hasLoaded).toBe(true);
+  });
+
+  it('publishes receipt detail-start commits without changing same-ID, editor or stale-response behavior', async () => {
+    const requests: Array<{
+      resolve: (value: { item: MaterialReceiptItem }) => void;
+      reject: (error: Error) => void;
+    }> = [];
+    apiGetMock.mockImplementation(() => new Promise<{ item: MaterialReceiptItem }>((resolve, reject) => {
+      requests.push({ resolve, reject });
+    }));
+    const commits: Array<{ id: number | null; loading: boolean; error: string }> = [];
+    const { result } = renderHook(() => {
+      const receipt = useMaterialReceiptStatusDetail();
+      useLayoutEffect(() => {
+        commits.push({ id: receipt.selectedId, loading: receipt.loading, error: receipt.error });
+      });
+      return receipt;
+    });
+    act(() => result.current.openDetail(900));
+    expect(commits.find(({ id }) => id === 900)).toEqual({ id: 900, loading: true, error: '' });
+    await act(async () => requests[0].reject(new Error('Owned receipt detail failure')));
+    expect(result.current.error).toBe('Owned receipt detail failure');
+    commits.length = 0;
+    act(() => result.current.refreshDetail());
+    expect(commits[0]).toEqual({ id: 900, loading: true, error: '' });
+    await act(async () => requests[1].resolve({ item: receiptItem('Y') }));
+    expect(result.current.item?.materialReceiptId).toBe(900);
+    act(() => result.current.openDetail(900));
+    expect(requests).toHaveLength(2);
+    expect(result.current.loading).toBe(false);
+    expect(result.current.item?.materialReceiptId).toBe(900);
+    act(() => result.current.openEditor('view'));
+    expect(result.current.editorMode).toBe('view');
+    act(() => result.current.closeEditor());
+    expect(result.current.editorMode).toBeNull();
+    commits.length = 0;
+    act(() => result.current.refreshDetail());
+    expect(commits[0]).toEqual({ id: 900, loading: true, error: '' });
+    expect(result.current.item?.materialReceiptId).toBe(900);
+    await act(async () => requests[2].resolve({ item: receiptItem('Y') }));
+    act(() => result.current.openDetail(901));
+    act(() => result.current.closeDetail());
+    commits.length = 0;
+    act(() => result.current.openDetail(900));
+    expect(commits[0]).toEqual({ id: 900, loading: true, error: '' });
+    expect(requests).toHaveLength(5);
+    await act(async () => requests[3].resolve({ item: { ...receiptItem('Y'), materialReceiptId: 901 } }));
+    expect(result.current.selectedId).toBe(900);
+    expect(result.current.item).toBeNull();
+    expect(result.current.loading).toBe(true);
+    await act(async () => requests[4].resolve({ item: receiptItem('Y') }));
+    expect(result.current.item?.materialReceiptId).toBe(900);
+    expect(result.current.loading).toBe(false);
+    act(() => result.current.openEditor('edit'));
+    act(() => result.current.closeDetail());
+    expect(result.current.editorMode).toBeNull();
+    act(() => result.current.refreshDetail());
+    expect(requests).toHaveLength(5);
+    expect(result.current.selectedId).toBeNull();
+    expect(result.current.loading).toBe(false);
+    expect(apiPostMock).not.toHaveBeenCalled();
+    expect(apiPutMock).not.toHaveBeenCalled();
+  });
 
   it('lists only the normal receipts by default', async () => {
     renderPage();
