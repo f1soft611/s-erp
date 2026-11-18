@@ -37,6 +37,12 @@ GridCell이 최초부터 사용자 편집 상태로 mount되면 render의 anchor
 
 선행 056의 정확한 SHA 전체 CI(run 44358784437, 227파일·2,689개, 4 job 성공) 근거를 함께 보관한다. 057 자체 CI는 커밋·푸시 후 정확한 SHA로 별도 확인한다.
 
+## 원격 동기화와 전체 CI
+
+- 커밋 `196700ff39dfb62960f7dff7f6198ae8a1cf8d7a`, 18파일 allowlist·비강제 푸시·원격 SHA 일치.
+- [정확한 SHA CI](https://github.com/f1soft611/s-erp/actions/runs/44360978252): 227파일·2,690개, frontend-build/tests/lint/required 모두 성공. 원본 로그의 마지막 집계까지 확인했다.
+- [원격 CI 판정](screenshots/grid-user-anchor/remote-ci.json)은 후속 058 변경에 포함한다.
+
 ## 복사 가능한 커밋
 
 ```text

@@ -60,6 +60,47 @@ function createHeaderProps() {
 }
 
 describe('F1Grid interaction render isolation', () => {
+  it('keeps committed cell events while a later callback render suspends', async () => {
+    type CheckboxRow = { id: string; enabled: boolean };
+    const column: F1GridColumn<CheckboxRow> = {
+      field: 'enabled', headerName: 'Enabled', type: 'checkbox', editable: true,
+    };
+    const props = {
+      row: { id: '1', enabled: false }, rowId: '1', column, columnIndex: 0,
+      columnLine: true, stripeRows: false, focused: false, editing: false,
+      selected: false, merged: false, rowHeight: 32, defaultRowHeight: 32, rowIndex: 0, draftValue: '',
+      onFocus: vi.fn(), onMouseDown: vi.fn(), onMouseEnter: vi.fn(), onMouseUp: vi.fn(),
+      onStopEdit: vi.fn(), onDoubleClick: vi.fn(), onDraftChange: vi.fn(), onKeyDown: vi.fn(),
+      onSelectChange: vi.fn(), onCheckboxChange: vi.fn(), onCodePick: vi.fn(), onCellRef: vi.fn(),
+    } satisfies Parameters<typeof GridCell<CheckboxRow>>[0];
+    const committed = vi.fn(), next = vi.fn(), attempted = vi.fn();
+    const pending = new Promise<void>(() => undefined);
+    function SuspendUpdate({ blocked }: { blocked: boolean }) {
+      if (blocked) {
+        attempted();
+        throw pending;
+      }
+      return null;
+    }
+    const view = (useNext = false, blocked = false) => (
+      <Suspense fallback={<span>Updating cell</span>}>
+        <GridCell {...props} onCheckboxChange={useNext ? next : committed} />
+        <SuspendUpdate blocked={blocked} />
+      </Suspense>
+    );
+    const { rerender } = render(view());
+    await act(async () => { startTransition(() => rerender(view(true, true))); });
+    expect(attempted).toHaveBeenCalled();
+    expect(screen.queryByText('Updating cell')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Enabled 1' }));
+    expect(next).not.toHaveBeenCalled();
+    expect(committed).toHaveBeenCalledExactlyOnceWith(true);
+    rerender(view(true));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Enabled 1' }));
+    expect(next).toHaveBeenCalledExactlyOnceWith(true);
+    expect(committed).toHaveBeenCalledTimes(1);
+  });
+
   it('anchors a user editor to its attached cell on the first editing mount', async () => {
     type UserRow = { id: string; assignee: string | null };
     const column: F1GridColumn<UserRow> = {

@@ -1,6 +1,7 @@
 import {
   memo,
   useCallback,
+  useLayoutEffect,
   useMemo,
   useState,
   type FocusEvent,
@@ -481,7 +482,9 @@ const MemoizedGridCell = memo(GridCellInner, areGridCellPropsEqual) as typeof Gr
 
 export function GridCell<T extends object>(props: GridCellProps<T>) {
   const latestProps = useRef(props);
-  latestProps.current = props;
+  useLayoutEffect(() => {
+    latestProps.current = props;
+  });
 
   // Visual memoization must not retain handlers that captured an older edit.
   const handlers = useMemo(() => ({

@@ -1,0 +1,40 @@
+{
+  "actualGridCell": true,
+  "actualTextEditor": true,
+  "transport": "All fetch blocked; no transport attempted",
+  "storage": "Tab memory only; no persistent reads or writes",
+  "widths": [
+    {
+      "width": 375,
+      "pendingRenderAttempted": true,
+      "retainsCommittedCheckboxAndDraftCallbacks": true,
+      "callbackOnlyCommitUsesNewRevision": true,
+      "documentWidth": 375
+    },
+    {
+      "width": 768,
+      "pendingRenderAttempted": true,
+      "retainsCommittedCheckboxAndDraftCallbacks": true,
+      "callbackOnlyCommitUsesNewRevision": true,
+      "documentWidth": 768
+    },
+    {
+      "width": 1280,
+      "pendingRenderAttempted": true,
+      "retainsCommittedCheckboxAndDraftCallbacks": true,
+      "callbackOnlyCommitUsesNewRevision": true,
+      "documentWidth": 1280
+    }
+  ],
+  "callbackCalls": 12,
+  "unknownRequests": 0,
+  "limitations": "Direct actual cells and TextEditor with synthetic fixed values; callbacks recorded only. No API save or full-grid browser workflow claimed; integrated editing/performance is covered by the related 276 tests.",
+  "images": [
+    "pending-375.png",
+    "committed-375.png",
+    "pending-768.png",
+    "committed-768.png",
+    "pending-1280.png",
+    "committed-1280.png"
+  ]
+}

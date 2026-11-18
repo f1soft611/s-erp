@@ -43,4 +43,4 @@ const handleCellRef = useCallback(
 - [x] 같은 3파일 275개, typecheck/build/Oxc에서 새 진단 0과 ref 읽기 1개 제거(85 → 84)를 확인한다. 최초 tests/ 경로 selector는 2파일 220개만 포함하여 basename selector로 같은 3파일 전체를 다시 확인했다.
 - [x] 일반 셀 성능과 키보드/선택 회귀를 보존하고 검증 workspace와 source 891파일 byte parity를 확인한다.
 - [x] 새 소유 탭에서 실제 GridCell/UserSelectEditor의 최초 편집·선택·재진입을 375/768/1280px native 동작으로 확인한다. 모든 fetch와 영구 저장소를 차단한다. 초기/재진입 popup과 셀 x가 모두 일치, 선택 6회·요청 0.
-- [ ] 결과와 스크린샷을 보관하고 정확한 056 CI 성공 후 allowlist 별도 커밋·비강제 푸시·원격 일치와 057 CI를 확인한다.
+- [x] 결과와 스크린샷을 보관하고 정확한 056 CI 성공 후 allowlist 별도 커밋·비강제 푸시·원격 일치와 057 CI를 확인한다. `196700ff39dfb62960f7dff7f6198ae8a1cf8d7a` / run `44360978252`, 227파일·2,690개, 4 job 성공.
