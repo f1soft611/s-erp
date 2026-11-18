@@ -1,4 +1,4 @@
-import { createRef, Profiler, useState } from 'react';
+import { createRef, Profiler, useLayoutEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import {
@@ -2116,6 +2116,52 @@ describe('F1-GRID column management', () => {
 });
 
 describe('F1-GRID cell range selection', () => {
+  it.each(['drag', 'copy'] as const)('clears a %s range before the selection-mode commit without losing row edits or selection', (kind) => {
+    const rangeRows = [{ id: 'one', code: 'A' }, { id: 'two', code: 'B' }];
+    const rangeColumns: F1GridColumn<(typeof rangeRows)[number]>[] = [
+      { field: 'code', headerName: 'Code', editable: true },
+    ];
+    const gridRef = createRef<F1GridRef<(typeof rangeRows)[number]>>();
+    const commits: Array<string | null> = [];
+    function ObservedGrid({ mode, revision }: { mode: 'cell' | 'row'; revision: number }) {
+      useLayoutEffect(() => {
+        commits.push(document.querySelector('[data-range-overlay]')?.getAttribute('data-range-overlay') ?? null);
+      }, [mode, revision]);
+      return <F1Grid ref={gridRef} rows={rangeRows} columns={rangeColumns} rowKey="id"
+        selectionMode={mode} initialSelectedRowIds={['one']} />;
+    }
+    const { rerender } = render(<ObservedGrid mode="cell" revision={0} />);
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'A' }));
+    fireEvent.change(screen.getByDisplayValue('A'), { target: { value: 'A-UPDATED' } });
+    fireEvent.keyDown(screen.getByDisplayValue('A-UPDATED'), { key: 'Enter' });
+    const changes = gridRef.current?.getChanges();
+    expect(changes?.updatedRows).toEqual([{ id: 'one', code: 'A-UPDATED' }]);
+    const first = screen.getByRole('gridcell', { name: 'A-UPDATED' });
+    const last = screen.getByRole('gridcell', { name: 'B' });
+    fireEvent.mouseDown(first);
+    fireEvent.mouseEnter(last);
+    fireEvent.mouseUp(last);
+    if (kind === 'copy') {
+      fireEvent.copy(screen.getByRole('grid', { name: 'F1-GRID' }), {
+        clipboardData: { getData: vi.fn(() => 'A-UPDATED\nB'), setData: vi.fn() },
+      });
+    }
+    expect(document.querySelector(`[data-range-overlay="${kind}"]`)).toBeInTheDocument();
+    commits.length = 0;
+    rerender(<ObservedGrid mode="cell" revision={1} />);
+    expect(commits).toEqual([kind]);
+    commits.length = 0;
+    rerender(<ObservedGrid mode="row" revision={2} />);
+    expect(commits).toEqual([null]);
+    expect(gridRef.current?.getSelectedRowIds()).toEqual(['one']);
+    expect(gridRef.current?.getChanges()).toEqual(changes);
+    commits.length = 0;
+    rerender(<ObservedGrid mode="cell" revision={3} />);
+    expect(commits).toEqual([null]);
+    expect(gridRef.current?.getSelectedRowIds()).toEqual(['one']);
+    expect(gridRef.current?.getChanges()).toEqual(changes);
+  });
+
   it('clears cell range and drag state when loading starts', () => {
     const gridRef = createRef<F1GridRef<{ id: string; code: string }>>();
     const rangeRows = [

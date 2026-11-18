@@ -36,7 +36,9 @@
 
 백엔드/API/DB/의존성 변경 없음. DB MCP·스키마 스크립트 대상이 아니다. 잔여 state-in-effect 81개와 기존 의존성 권고 2건이 있어 전체 요청은 아직 완료로 표시하지 않는다.
 
-정확한 059 CI 성공 근거를 포함해 별도 커밋·푸시하며 060 전체 CI는 해당 SHA로 확인한다.
+## 원격 CI
+
+커밋 `0390238a4d0eb45cd2b5d9d1e1b67c57606f6737`을 비강제 푸시하고 원격 일치를 확인했다. [전체 CI 44366152154](https://github.com/f1soft611/s-erp/actions/runs/44366152154)의 정확한 SHA·완료 상태·마지막 원본 집계는 **227파일 2,694개**, build/tests/lint/required 네 job 모두 성공이다. [원격 근거](screenshots/grid-policy-context-reset/remote-ci.json)를 보관했다.
 
 ## 복사 가능한 커밋
 

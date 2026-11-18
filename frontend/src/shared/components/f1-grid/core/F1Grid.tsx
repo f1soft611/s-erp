@@ -274,6 +274,14 @@ function F1GridInner<T extends object>(
     width: number;
     height: number;
   } | null>(null);
+  const [previousSelectionMode, setPreviousSelectionMode] = useState(selectionMode);
+  if (previousSelectionMode !== selectionMode) {
+    setPreviousSelectionMode(selectionMode);
+    setCellSelection(undefined);
+    setCopiedCellRange(undefined);
+    setIsCellSelectionDragging(false);
+    setRangeOverlay(null);
+  }
   const cellSelectionRef = useRef(cellSelection);
   const copiedCellRangeRef = useRef(copiedCellRange);
   const cellRangeDragRef = useRef<F1GridCellRange | null>(null);
@@ -1378,13 +1386,10 @@ function F1GridInner<T extends object>(
   }, [copiedCellRange]);
 
   useEffect(() => {
-    setCellSelection(undefined);
     cellSelectionRef.current = undefined;
-    setCopiedCellRange(undefined);
     copiedCellRangeRef.current = undefined;
     cellRangeDragRef.current = null;
     dragSelectionStateRef.current = { active: false, previousCell: null };
-    setIsCellSelectionDragging(false);
   }, [selectionMode]);
 
   useEffect(() => {

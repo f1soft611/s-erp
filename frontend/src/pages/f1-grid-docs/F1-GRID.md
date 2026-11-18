@@ -178,6 +178,8 @@ const columns: F1GridColumn<Row>[] = [
 
 다중 행 작업이 필요한 화면만 `<F1Grid selectionMode="row" multiSelect ... />`로 명시한다. `multiSelect`는 셀 모드의 직사각형 범위 선택·복사 및 F1Tree의 `treeCheckbox` 부모·자식 값 전파를 제한하지 않는다.
 
+`selectionMode`가 바뀐 commit에는 이전 셀 선택·복사 범위와 드래그 표시를 노출하지 않는다. 같은 모드의 일반 render에서는 범위를 유지하며, 모드 전환과 재진입은 행 checkbox 선택·포커스·편집값·Grid 변경 데이터를 초기화하지 않는다.
+
 ### 선택·편집 렌더 성능 (2026-10-23)
 
 - 고정열 위치는 객체 참조가 아니라 방향·오프셋·그림자 값으로 비교한다. 동일 위치의 셀은 다른 셀을 선택해도 불필요하게 다시 표시하지 않는다.

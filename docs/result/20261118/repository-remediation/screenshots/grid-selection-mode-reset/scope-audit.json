@@ -1,0 +1,35 @@
+{
+  "baseline": "0390238a4d0eb45cd2b5d9d1e1b67c57606f6737",
+  "changed": [
+    "frontend\\src\\pages\\f1-grid-docs\\F1-GRID.md",
+    "frontend\\src\\shared\\components\\f1-grid\\core\\F1Grid.tsx",
+    "frontend\\tests\\f1-grid.test.tsx"
+  ],
+  "onlyBoundedModeStateResetAndEffectSetterRemoval": true,
+  "refCleanupOrderAndAllOtherEffectsUnchanged": true,
+  "jsxCssEventsEditorsRowSelectionAndDataUnchanged": true,
+  "originalTestsBytePreserved": true,
+  "addedTests": 2,
+  "runtimeRed": {
+    "failed": 2,
+    "cause": "First row-mode layout commit exposed old drag/copy overlay"
+  },
+  "baselineTests": {
+    "files": 4,
+    "passed": 288
+  },
+  "relatedTests": {
+    "files": 4,
+    "passed": 290
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 81,
+    "after": 80,
+    "removed": 1,
+    "added": 0
+  },
+  "remainingRefs": 0,
+  "remainingStateInEffect": 80
+}
