@@ -6991,8 +6991,8 @@ describe('Document write page', () => {
     );
 
     await screen.findByRole('heading', { name: '문서 상세' });
-    fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '참조자 추가하기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '문서 더보기' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '참조자 추가하기' }));
     const picker = screen.getByRole('combobox', { name: '참조자 선택' });
     fireEvent.mouseDown(picker);
     expect(screen.queryByRole('option', { name: /기존 참조자/ })).not.toBeInTheDocument();
@@ -7050,8 +7050,8 @@ describe('Document write page', () => {
     );
 
     await screen.findByRole('heading', { name: '문서 상세' });
-    fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '참조자 추가하기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '문서 더보기' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '참조자 추가하기' }));
     const picker = screen.getByRole('combobox', { name: '참조자 선택' });
     fireEvent.mouseDown(picker);
     fireEvent.click(await screen.findByRole('option', { name: /새 참조자 A/ }));
@@ -7105,8 +7105,8 @@ describe('Document write page', () => {
     );
 
     await screen.findByRole('heading', { name: '문서 상세' });
-    fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '참조자 추가하기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '문서 더보기' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '참조자 추가하기' }));
     const picker = screen.getByRole('combobox', { name: '참조자 선택' });
     fireEvent.mouseDown(picker);
     fireEvent.click(await screen.findByRole('option', { name: /새 참조자 A/ }));
