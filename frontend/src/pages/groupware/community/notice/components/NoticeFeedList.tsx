@@ -1340,8 +1340,15 @@ export function NoticeFeedList({
                 }
                 onLoadPrevious={async () => {
                   if (loadingPreviousByNoticeId[item.id]) return;
+                  const hasInitializedCursor =
+                    Object.prototype.hasOwnProperty.call(
+                      previousCursorByNoticeId,
+                      item.id,
+                    );
                   const cursor =
-                    previousCursorByNoticeId[item.id] ?? visibleComments[0]?.id;
+                    (hasInitializedCursor
+                      ? previousCursorByNoticeId[item.id]
+                      : item.nextBeforeCommentId) ?? visibleComments[0]?.id;
                   if (!cursor || !onLoadPreviousComments) return;
 
                   setLoadingPreviousByNoticeId((current) => ({
