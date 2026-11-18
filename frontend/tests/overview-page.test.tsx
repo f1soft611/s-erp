@@ -87,7 +87,7 @@ describe('real-data overview', () => {
     get.mockImplementation(async (path) => ({ item: path.includes('/sales') ? sales : item }));
     mount();
 
-    const work = await screen.findByRole('region', { name: '지금 확인할 업무' });
+    const work = await screen.findByRole('region', { name: '지금 결재할 업무' });
     const references = await screen.findByRole('region', { name: '내가 확인할 문서' });
     expect(within(work).getByText('검증용 결재대기 문서')).toBeInTheDocument();
     expect(within(work).queryByText(referenceTitle)).not.toBeInTheDocument();

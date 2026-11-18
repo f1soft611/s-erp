@@ -6,7 +6,7 @@ import {
   within,
 } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { ThemeProvider } from '@mui/material/styles';
+import { alpha, ThemeProvider } from '@mui/material/styles';
 import { createAppTheme } from '../src/theme/theme';
 import { FeedCard } from '../src/shared/components/feed/FeedCard';
 import { FeedCommentsSection } from '../src/shared/components/feed/FeedCommentsSection';
@@ -534,7 +534,7 @@ describe('shared feed components', () => {
     expect(badge).toHaveTextContent(label);
     expect(badge).toHaveClass(`MuiChip-color${color[0].toUpperCase()}${color.slice(1)}`);
     expect(badge).toHaveClass(`MuiChip-${variant}`);
-    expect(badge).toHaveStyle({ borderRadius: '8px', height: '20px' });
+    expect(badge).toHaveStyle({ borderRadius: '6px', height: '20px' });
     expect(badgeLabel).toHaveStyle({
       fontSize: '0.75rem',
       paddingLeft: '6px',
@@ -552,15 +552,29 @@ describe('shared feed components', () => {
   it.each(['SUBMISSION_CANCELED', 'APPROVAL_CANCELED'])(
     'renders both the border and text red for %s',
     (eventType) => {
-      render(<CommentThread comments={[{
-        id: eventType, author: '시스템', time: '방금', content: '취소 처리',
-        isSystemEvent: true,
-        systemEventBadge: getApprovalSystemEventPresentation(eventType),
-      }]} showComposer={false} />);
+      const theme = createAppTheme('light');
+      render(
+        <ThemeProvider theme={theme}>
+          <CommentThread
+            comments={[{
+              id: eventType,
+              author: '시스템',
+              time: '방금',
+              content: '취소 처리',
+              isSystemEvent: true,
+              systemEventBadge: getApprovalSystemEventPresentation(eventType),
+            }]}
+            showComposer={false}
+          />
+        </ThemeProvider>,
+      );
       const badge = screen.getByTestId('system-event-badge');
       expect(badge).toHaveClass('MuiChip-colorError', 'MuiChip-outlined');
-      expect(badge).toHaveStyle({ borderColor: 'rgba(211, 47, 47, 0.7)', borderRadius: '8px' });
-      expect(badge).toHaveStyle({ color: '#d32f2f' });
+      expect(badge).toHaveStyle({
+        borderColor: alpha(theme.palette.error.main, 0.7),
+        borderRadius: '6px',
+        color: theme.palette.error.main,
+      });
     },
   );
 

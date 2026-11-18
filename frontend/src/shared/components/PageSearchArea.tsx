@@ -1,6 +1,7 @@
 import {
   Fragment,
   useEffect,
+  useRef,
   useState,
   type KeyboardEvent,
   type ReactNode,
@@ -17,6 +18,7 @@ import {
   InputLabel,
   MenuItem,
   Paper,
+  Portal,
   Select,
   TextField,
 } from '@mui/material';
@@ -207,13 +209,24 @@ export function PageSearchArea({
   const [pendingRemovalFields, setPendingRemovalFields] = useState<
     Record<string, boolean>
   >({});
+  const draftValuesRef = useRef(draftValues);
+  const quickDateRequestsRef = useRef(new Map<string, symbol>());
 
   useEffect(() => {
     const resolvedValues = mergeSearchValues(defaultValues, detailValues);
+    if (!areSearchValuesEqual(draftValuesRef.current, resolvedValues)) {
+      quickDateRequestsRef.current.clear();
+    }
+    draftValuesRef.current = resolvedValues;
     setDraftValues((current) =>
       areSearchValuesEqual(current, resolvedValues) ? current : resolvedValues,
     );
   }, [defaultValues, detailValues]);
+
+  useEffect(() => {
+    const requests = quickDateRequestsRef.current;
+    return () => requests.clear();
+  }, []);
 
   useEffect(() => {
     setPendingRemovalFields((current) => {
@@ -233,7 +246,9 @@ export function PageSearchArea({
   }, [appliedDetailValues, detailFields]);
 
   const updateValue = (field: string, value: PageSearchFieldValue) => {
-    const next = { ...draftValues, [field]: value };
+    quickDateRequestsRef.current.delete(field);
+    const next = { ...draftValuesRef.current, [field]: value };
+    draftValuesRef.current = next;
     setDraftValues(next);
     setPendingRemovalFields((current) => {
       if (!current[field]) return current;
@@ -255,8 +270,11 @@ export function PageSearchArea({
     field: PageSearchField,
     preset: (typeof QUICK_DATE_PRESETS)[number],
   ) => {
+    const request = Symbol();
+    quickDateRequestsRef.current.set(field.field, request);
     try {
       const today = await getSystemDate();
+      if (quickDateRequestsRef.current.get(field.field) !== request) return;
       const range = resolveQuickDate(preset, dayjs(today));
       setQuickDateError(false);
       setDateErrors((current) => {
@@ -267,11 +285,14 @@ export function PageSearchArea({
       });
       updateValue(field.field, range);
     } catch {
+      if (quickDateRequestsRef.current.get(field.field) !== request) return;
+      quickDateRequestsRef.current.delete(field.field);
       setQuickDateError(true);
     }
   };
 
   const closeDetails = () => {
+    quickDateRequestsRef.current.clear();
     setDetailOpen(false);
     onDetailClose?.();
   };
@@ -356,6 +377,7 @@ export function PageSearchArea({
   const searchDetails = () => {
     const next = validateSearchValues(draftValues);
     if (!next) return;
+    draftValuesRef.current = next;
     setDraftValues(next);
     if (!areSearchValuesEqual(draftValues, next)) {
       onDetailValuesChange?.(next);
@@ -565,6 +587,8 @@ export function PageSearchArea({
       ...draftValues,
       [field.field]: field.type === 'date' ? { from: '', to: '' } : '',
     };
+    quickDateRequestsRef.current.delete(field.field);
+    draftValuesRef.current = next;
     setDraftValues(next);
     setPendingRemovalFields((current) => ({ ...current, [field.field]: true }));
     setDateErrors((current) =>
@@ -598,6 +622,21 @@ export function PageSearchArea({
         transition: 'background-color 0.2s ease',
       })}
     >
+      {detailOpen && detailFields.length > 0 && (
+        // backdrop-filter가 fixed 기준을 부모로 바꾸므로 body로 포탈
+        <Portal>
+          <Box
+            aria-hidden="true"
+            data-testid="detail-search-backdrop"
+            sx={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 12,
+              bgcolor: 'rgba(15, 23, 42, 0.12)',
+            }}
+          />
+        </Portal>
+      )}
       <Box
         sx={{
           display: 'flex',
@@ -760,7 +799,10 @@ export function PageSearchArea({
               }
               aria-expanded={detailOpen}
               data-active={activeDetailFilters.length > 0}
-              onClick={() => setDetailOpen((current) => !current)}
+              onClick={() => {
+                quickDateRequestsRef.current.clear();
+                setDetailOpen((current) => !current);
+              }}
               sx={{
                 flex: '0 0 auto',
                 color: activeDetailFilters.length ? 'primary.main' : 'text.secondary',
@@ -945,6 +987,8 @@ export function PageSearchArea({
                 type="button"
                 variant="outlined"
                 onClick={() => {
+                  quickDateRequestsRef.current.clear();
+                  draftValuesRef.current = defaultValues;
                   setDraftValues(defaultValues);
                   setDateErrors({});
                   setRequiredErrors({});

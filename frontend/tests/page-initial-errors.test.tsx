@@ -32,6 +32,25 @@ describe('data-backed page initial failures', () => {
     ['groupware', 'documents'],
     ['groupware', 'write'],
   ])('replaces the full %s/%s body, not the header, on a connection failure', async (id, currentPageKey) => {
+    if (id === 'sales') {
+      api.apiGet.mockImplementation((path: string) => {
+        if (path === '/api/v1/common/system-date') {
+          return Promise.resolve({ today: '2026-11-18' });
+        }
+        if (path === '/api/v1/co/master/common-code/groups') {
+          return Promise.resolve({ resultList: [{
+            commonCodeGroupId: 1, groupCode: 'SALES_ORDER_STATUS', useAt: 'Y',
+          }] });
+        }
+        if (path === '/api/v1/co/master/common-code/groups/1/items') {
+          return Promise.resolve({ resultList: [{
+            commonCodeItemId: 1, groupId: 1, itemCode: '수주등록',
+            itemNm: '수주등록', sortOrder: 1, useAt: 'Y',
+          }] });
+        }
+        return Promise.reject(new ApiNetworkError());
+      });
+    }
     render(
       <NotificationProvider>
         <DashboardContent

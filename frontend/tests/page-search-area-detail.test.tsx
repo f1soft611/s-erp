@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import dayjs from 'dayjs';
 import { useState } from 'react';
@@ -13,7 +13,17 @@ vi.mock('../src/shared/services/systemDateService', async (importOriginal) => ({
   getSystemDate: getSystemDateMock,
 }));
 import { PageSearchArea } from '../src/shared/components/PageSearchArea';
-import { toPageSearchFields, type PageSearchField } from '../src/shared/components/page-search/searchFields';
+import { toPageSearchFields, type PageSearchField, type PageSearchFieldValue } from '../src/shared/components/page-search/searchFields';
+
+function deferredDate() {
+  let resolve!: (value: string) => void;
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<string>((resolveDate, rejectDate) => {
+    resolve = resolveDate;
+    reject = rejectDate;
+  });
+  return { promise, resolve, reject };
+}
 
 describe('PageSearchArea 상세 검색', () => {
   const fields: PageSearchField[] = [
@@ -524,6 +534,152 @@ describe('PageSearchArea 상세 검색', () => {
       expect.objectContaining({
         orderDt: { from: '2026-11-17', to: '2026-11-17' },
       }),
+    );
+  });
+
+  describe('deferred quick dates', () => {
+    const dateFields: PageSearchField[] = [
+      { field: 'name', label: '이름', type: 'text' },
+      { field: 'period', label: '기간', type: 'date', required: true },
+    ];
+    const defaults = {
+      name: 'original',
+      period: { from: '2026-10-01', to: '2026-10-31' },
+    };
+
+    function startRequest() {
+      const request = deferredDate();
+      getSystemDateMock.mockReset().mockReturnValueOnce(request.promise);
+      const onChange = vi.fn();
+      const props = {
+        detailFields: dateFields,
+        defaultValues: defaults,
+        onDetailValuesChange: onChange,
+      };
+      const view = render(<PageSearchArea {...props} />);
+      fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+      fireEvent.click(screen.getByRole('button', { name: '오늘', exact: true }));
+      return { ...view, request, onChange, props };
+    }
+
+    it('merges the response with newer text and controlled parent echoes', async () => {
+      const request = deferredDate();
+      getSystemDateMock.mockReset().mockReturnValueOnce(request.promise);
+      const onSearch = vi.fn();
+      function ControlledSearch() {
+        const [values, setValues] =
+          useState<Record<string, PageSearchFieldValue>>(defaults);
+        return (
+          <PageSearchArea
+            detailFields={dateFields}
+            defaultValues={defaults}
+            detailValues={values}
+            onDetailValuesChange={setValues}
+            onDetailSearch={onSearch}
+          />
+        );
+      }
+      render(<ControlledSearch />);
+      fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+      fireEvent.click(screen.getByRole('button', { name: '오늘', exact: true }));
+      fireEvent.change(screen.getByLabelText('이름'), { target: { value: 'latest' } });
+      await act(async () => request.resolve('2026-11-18'));
+      expect(screen.getByLabelText('이름')).toHaveValue('latest');
+      expect(screen.getByLabelText('기간 시작일')).toHaveValue('2026-11-18');
+      fireEvent.click(screen.getByRole('button', { name: '조회', exact: true }));
+      expect(onSearch).toHaveBeenCalledWith({
+        name: 'latest',
+        period: { from: '2026-11-18', to: '2026-11-18' },
+      });
+    });
+
+    it('preserves a manually edited date over an older response', async () => {
+      const { request, onChange } = startRequest();
+      fireEvent.change(screen.getByLabelText('기간 시작일'), {
+        target: { value: '2026-12-01' },
+      });
+      onChange.mockClear();
+      await act(async () => request.resolve('2026-11-18'));
+      expect(screen.getByLabelText('기간 시작일')).toHaveValue('2026-12-01');
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it.each(['resolve', 'reject'] as const)(
+      'ignores an older %s after the latest preset succeeds',
+      async (outcome) => {
+        const { request, onChange } = startRequest();
+        const latest = deferredDate();
+        getSystemDateMock.mockReturnValueOnce(latest.promise);
+        fireEvent.click(screen.getByRole('button', { name: '전월', exact: true }));
+        await act(async () => latest.resolve('2026-11-18'));
+        onChange.mockClear();
+        await act(async () => {
+          if (outcome === 'resolve') request.resolve('2026-12-18');
+          else request.reject(new Error('older request failed'));
+        });
+        expect(screen.getByLabelText('기간 시작일')).toHaveValue('2026-10-01');
+        expect(screen.getByLabelText('기간 종료일')).toHaveValue('2026-10-31');
+        expect(screen.queryByText('서버 날짜를 불러오지 못했습니다.')).toBeNull();
+        expect(onChange).not.toHaveBeenCalled();
+      },
+    );
+
+    it('keeps requests for different date fields independent', async () => {
+      const first = deferredDate();
+      const second = deferredDate();
+      getSystemDateMock.mockReset()
+        .mockReturnValueOnce(first.promise)
+        .mockReturnValueOnce(second.promise);
+      const onChange = vi.fn();
+      render(
+        <PageSearchArea
+          detailFields={[
+            ...dateFields,
+            { field: 'otherPeriod', label: '다른 기간', type: 'date', required: true },
+          ]}
+          defaultValues={defaults}
+          onDetailValuesChange={onChange}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+      for (const label of ['기간', '다른 기간']) {
+        fireEvent.click(within(screen.getByRole('group', {
+          name: `${label} 빠른 날짜 세팅`,
+        })).getByRole('button', { name: '오늘', exact: true }));
+      }
+      await act(async () => second.resolve('2026-11-19'));
+      await act(async () => first.resolve('2026-11-18'));
+      expect(screen.getByLabelText('기간 시작일')).toHaveValue('2026-11-18');
+      expect(screen.getByLabelText('다른 기간 시작일')).toHaveValue('2026-11-19');
+      expect(onChange).toHaveBeenLastCalledWith({
+        ...defaults,
+        period: { from: '2026-11-18', to: '2026-11-18' },
+        otherPeriod: { from: '2026-11-19', to: '2026-11-19' },
+      });
+    });
+
+    it.each(['reset', 'close', 'toggle', 'restore', 'unmount'] as const)(
+      'discards a pending response after %s',
+      async (action) => {
+        const { request, onChange, props, rerender, unmount } = startRequest();
+        if (action === 'reset') {
+          fireEvent.click(screen.getByRole('button', { name: '초기화', exact: true }));
+        } else if (action === 'close') {
+          fireEvent.click(screen.getByRole('button', { name: '검색 닫기' }));
+        } else if (action === 'toggle') {
+          fireEvent.click(screen.getByRole('button', { name: '상세 검색 닫기' }));
+        } else if (action === 'restore') {
+          rerender(<PageSearchArea {...props} detailValues={{ name: 'restored' }} />);
+        } else {
+          unmount();
+        }
+        onChange.mockClear();
+        await act(async () => request.resolve('2026-11-18'));
+        expect(onChange).not.toHaveBeenCalled();
+        if (action === 'reset' || action === 'restore') {
+          expect(screen.getByLabelText('기간 시작일')).toHaveValue('2026-10-01');
+        }
+      },
     );
   });
 

@@ -62,7 +62,7 @@ describe('Login page', () => {
 
     expect(document.documentElement.style.colorScheme).toBe('dark');
     expect(document.body.style.backgroundColor).toBe('rgb(15, 23, 42)');
-    expect(await screen.findByText(/통합 ERP 시스템 로그인/i)).toBeInTheDocument();
+    expect(await screen.findByText(/통합 MES 시스템 로그인/i)).toBeInTheDocument();
   });
 
   it('redirects to login when the stored JWT is expired and no refresh token exists', async () => {

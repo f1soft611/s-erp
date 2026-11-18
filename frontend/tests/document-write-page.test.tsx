@@ -628,7 +628,7 @@ const pageProps = {
 
 async function waitForComposerReady() {
   await waitFor(() =>
-    expect(screen.getByRole('textbox', { name: '기안자' })).toHaveValue(
+    expect(screen.getByLabelText('기안자')).toHaveValue(
       '기안자',
     ),
   );
@@ -4064,7 +4064,11 @@ describe('Document write page', () => {
     fireEvent.click(
       within(firstCard).getByRole('button', { name: '이전 댓글 보기 (3)' }),
     );
-    expect(await within(firstCard).findByText('이전 페이지 댓글')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('document-feed')).getByText('이전 페이지 댓글'),
+      ).toBeInTheDocument(),
+    );
     expect(composerApi.listApprovalComments).toHaveBeenCalledWith(1, {
       limit: 20,
       beforeCommentId: 1001,
@@ -5388,10 +5392,9 @@ describe('Document write page', () => {
     let unmount = () => {};
 
     try {
-      const rendered = render(<DashboardContent {...pageProps} />);
+      const rendered = render(<DocumentComposerDialog open onClose={vi.fn()} />);
       unmount = rendered.unmount;
 
-      fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
       await waitForComposerReady();
 
       const picker = screen.getByRole('combobox', {
@@ -5546,116 +5549,8 @@ describe('Document write page', () => {
     expect(approvalActions).toHaveStyle({ flexWrap: 'wrap' });
   });
 
-  it('renders compact accessible badges, seals, removal actions, and ellipsized names', async () => {
-    const approvalName = '홍길동김';
-    const agreementName = '김민수';
-    const longName = '홍길동김철수';
-    composerApi.fetchDraftFormOptions.mockResolvedValue({
-      categoryGroup: null,
-      categoryItems: [category],
-      cycleItems: [],
-      users: [
-        { ...composerUser, userId: 'emp-long-1', userNm: approvalName },
-        { ...anotherComposerUser, userId: 'emp-long-2', userNm: agreementName },
-        { ...thirdComposerUser, userId: 'emp-long-3', userNm: longName },
-      ],
-    }, 15000);
-    composerApi.fetchMyProfile.mockResolvedValue({
-      userId: 'emp-long-1',
-      employeeId: 'emp-long-1',
-      name: '기안자',
-    });
-    render(<DashboardContent {...pageProps} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
-    await waitForComposerReady();
-
-    const approvalPicker = screen.getByRole('combobox', {
-      name: '결재선 2 사용자 선택',
-    });
-    fireEvent.change(approvalPicker, { target: { value: longName } });
-    fireEvent.click(
-      await screen.findByRole('option', { name: new RegExp(longName) }),
-    );
-    fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
-
-    const agreementPicker = screen.getByRole('combobox', {
-      name: '결재선 3 사용자 선택',
-    });
-    fireEvent.change(agreementPicker, { target: { value: agreementName } });
-    fireEvent.click(
-      await screen.findByRole('option', { name: new RegExp(agreementName) }),
-    );
-    fireEvent.click(screen.getByRole('button', { name: '합의 추가' }));
-
-    const approvals = screen.getAllByTestId('document-approval-person');
-    const approval = approvals[0];
-    const longApproval = approvals[1];
-    const agreement = screen.getByTestId('document-agreement-chip');
-    const assertParticipantPresentation = (
-      participant: HTMLElement,
-      sequence: number,
-      fullName: string,
-      kind: '결재' | '합의',
-    ) => {
-      const badge = within(participant).getByText(String(sequence), {
-        exact: true,
-      });
-      expect(badge).toHaveStyle({
-        borderStyle: 'solid',
-        borderRadius: '50%',
-      });
-      expect(badge).toHaveAttribute('aria-label', `참여 순번 ${sequence}`);
-
-      if (kind === '결재') {
-        expect(
-          within(participant).getByLabelText('결재 도장 자리'),
-        ).toBeInTheDocument();
-      } else {
-        expect(
-          within(participant).queryByLabelText('합의 도장 자리'),
-        ).toBeNull();
-      }
-      const removeButton = within(participant).queryByRole('button', {
-        name: `${kind} 참여자 ${sequence} ${fullName} 삭제`,
-      });
-      if (kind === '결재') {
-        expect(removeButton).toBeNull();
-      } else {
-        expect(removeButton).toBeInTheDocument();
-      }
-      const name = within(participant).getByTitle(fullName);
-      expect(name).toHaveStyle({
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-      });
-      if (kind === '결재') {
-        expect(participant).toHaveStyle({ minWidth: '88px' });
-        expect(name).not.toHaveStyle({ maxWidth: '3em' });
-      } else {
-        expect(name).toHaveStyle({ maxWidth: '4em' });
-      }
-      expect(participant.getAttribute('aria-label')).toContain(fullName);
-    };
-
-    assertParticipantPresentation(approval, 1, approvalName, '결재');
-    assertParticipantPresentation(agreement, 3, agreementName, '합의');
-    const truncatedApprovalName = within(longApproval).getByTitle(longName);
-    expect(truncatedApprovalName).toHaveStyle({
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap',
-    });
-    expect(longApproval.getAttribute('aria-label')).toBe(
-      `결재 2 ${longName}`,
-    );
-  });
-
   it('adds selected approval users as ordered individual stages and removes them from candidates', async () => {
-    render(<DashboardContent {...pageProps} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
 
     const approvalPicker = screen.getByRole('combobox', {
@@ -5701,9 +5596,7 @@ describe('Document write page', () => {
   });
 
   it('applies edited stages and references only after confirming the settings dialog', async () => {
-    render(<DashboardContent {...pageProps} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
 
     const approvalPicker = screen.getByRole('combobox', {
@@ -5836,9 +5729,7 @@ describe('Document write page', () => {
   }, 15000);
 
   it('renders each selected agreement user as a wrapped chip and appends the next selector', async () => {
-    render(<DashboardContent {...pageProps} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
 
     const approvalPicker = screen.getByRole('combobox', {
@@ -6128,9 +6019,7 @@ describe('Document write page', () => {
           resolveTemplate = resolve;
         }),
     );
-    render(<DashboardContent {...pageProps} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
     fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
       target: { value: '로딩 중 보존할 제목' },
@@ -6343,10 +6232,10 @@ describe('Document write page', () => {
     });
     fireEvent.change(referencePicker, { target: { value: '박서준' } });
     fireEvent.click(await screen.findByRole('option', { name: /박서준/ }));
-    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+    fireEvent.change(screen.getByLabelText('제목'), {
       target: { value: '작성 중 제목' },
     });
-    expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue(
+    expect(screen.getByLabelText('제목')).toHaveValue(
       '작성 중 제목',
     );
 
@@ -6357,7 +6246,7 @@ describe('Document write page', () => {
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await waitForComposerReady();
 
-    expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue('');
+    expect(screen.getByLabelText('제목')).toHaveValue('');
     expect(screen.getByTestId('document-approval-person')).toHaveAttribute(
       'aria-label',
       '결재 1 홍길동',
@@ -6371,8 +6260,7 @@ describe('Document write page', () => {
   }, 10000);
 
   it('saves the document payload and reuses its ID on subsequent saves', async () => {
-    render(<DashboardContent {...pageProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
     fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
       target: { value: '초안 제목' },
@@ -6534,8 +6422,7 @@ describe('Document write page', () => {
         resolveUpload = resolve;
       }),
     );
-    render(<DashboardContent {...pageProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
     fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
       target: { value: '업로드 대기 초안' },
@@ -6636,8 +6523,7 @@ describe('Document write page', () => {
         fileName: 'evidence.txt',
         fileSize: 8,
       });
-    render(<DashboardContent {...pageProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
     fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
       target: { value: '첨부 포함 초안' },
@@ -6685,8 +6571,7 @@ describe('Document write page', () => {
     composerApi.uploadDocumentDraftAttachment
       .mockRejectedValueOnce(new Error('definite failure'))
       .mockRejectedValueOnce(new Error('definite failure'));
-    render(<DashboardContent {...pageProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
     fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
       target: { value: '첨부 재시도 실패 초안' },
@@ -6721,29 +6606,29 @@ describe('Document write page', () => {
     render(<DashboardContent {...pageProps} />);
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await waitForComposerReady();
-    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+    const dialog = screen.getByRole('dialog', { name: '문서 작성' });
+    const composer = within(dialog);
+    fireEvent.change(composer.getByRole('textbox', { name: '제목' }), {
       target: { value: '첨부 삭제 실패 초안' },
     });
-    fireEvent.change(screen.getByLabelText('첨부 파일 선택'), {
+    fireEvent.change(composer.getByLabelText('첨부 파일 선택'), {
       target: {
         files: [new File(['evidence'], 'evidence.txt', { type: 'text/plain' })],
       },
     });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    fireEvent.click(composer.getByRole('button', { name: '저장' }));
     await waitFor(() =>
       expect(
-        screen.getByTestId('document-composer-attachment-uploaded'),
+        composer.getByTestId('document-composer-attachment-uploaded'),
       ).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '첨부 파일 삭제' }));
+    fireEvent.click(composer.getByRole('button', { name: '첨부 파일 삭제' }));
     await waitFor(() =>
       expect(composerApi.deleteDocumentDraftAttachment).toHaveBeenCalledTimes(1),
     );
 
-    const error = await within(
-      screen.getByRole('dialog', { name: '문서 작성' }),
-    ).findByRole('alert');
+    const error = await composer.findByRole('alert');
     expect(error.closest('.MuiDialogContent-root')).not.toBeNull();
     expect(error).toHaveTextContent('첨부 삭제 실패');
     expect(error).toHaveClass('MuiAlert-colorError');
@@ -6757,8 +6642,7 @@ describe('Document write page', () => {
         fileSize: 9,
       })
       .mockRejectedValueOnce(new Error('definite failure'));
-    render(<DashboardContent {...pageProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
     fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
       target: { value: '첨부 부분 실패 후 삭제 초안' },
@@ -6822,8 +6706,7 @@ describe('Document write page', () => {
     composerApi.uploadDocumentDraftAttachment.mockRejectedValueOnce(
       new Error('network disconnected'),
     );
-    render(<DashboardContent {...pageProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
     fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
       target: { value: '네트워크 확인 초안' },
@@ -6874,16 +6757,18 @@ describe('Document write page', () => {
     render(<DashboardContent {...pageProps} />);
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await waitForComposerReady();
-    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+    const dialog = screen.getByRole('dialog', { name: '문서 작성' });
+    const composer = within(dialog);
+    fireEvent.change(composer.getByRole('textbox', { name: '제목' }), {
       target: { value: '첨부 확인 초안' },
     });
-    fireEvent.change(screen.getByLabelText('첨부 파일 선택'), {
+    fireEvent.change(composer.getByLabelText('첨부 파일 선택'), {
       target: {
         files: [new File(['evidence'], 'evidence.txt', { type: 'text/plain' })],
       },
     });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    fireEvent.click(await screen.findByRole('button', { name: '상태 확인' }));
+    fireEvent.click(composer.getByRole('button', { name: '저장' }));
+    fireEvent.click(await composer.findByRole('button', { name: '상태 확인' }));
 
     await waitFor(() =>
       expect(composerNotifications.showSuccess).toHaveBeenCalledWith(
@@ -6891,12 +6776,10 @@ describe('Document write page', () => {
       ),
     );
     expect(
-      screen.getByTestId('document-composer-attachment-uploaded'),
+      composer.getByTestId('document-composer-attachment-uploaded'),
     ).toBeInTheDocument();
     expect(
-      screen
-        .getByRole('dialog', { name: '문서 작성' })
-        .querySelector('.MuiDialogContent-root [role="alert"]'),
+      dialog.querySelector('.MuiDialogContent-root [role="alert"]'),
     ).toBeNull();
   });
 

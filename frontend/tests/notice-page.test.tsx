@@ -22,6 +22,8 @@ import { ListView } from '../src/shared/components/view-mode/ListView';
 import { PinnedItemsPanel } from '../src/shared/components/view-mode/PinnedItemsPanel';
 
 const noticeServices = vi.hoisted(() => ({
+  fetchNoticePosts: vi.fn(),
+  fetchPinnedNoticePosts: vi.fn(),
   fetchNoticePostDetail: vi.fn(),
 }));
 
@@ -31,6 +33,8 @@ vi.mock(
     ...(await importOriginal<
       typeof import('../src/pages/groupware/community/notice/services/noticeBoardService')
     >()),
+    fetchNoticePosts: noticeServices.fetchNoticePosts,
+    fetchPinnedNoticePosts: noticeServices.fetchPinnedNoticePosts,
     fetchNoticePostDetail: noticeServices.fetchNoticePostDetail,
   }),
 );
@@ -228,6 +232,19 @@ describe('Community notice page', () => {
   });
 
   it('keeps the initial skeleton loading state without showing a preloaded notice list', async () => {
+    let resolvePosts!: (posts: []) => void;
+    let resolvePinnedPosts!: (posts: []) => void;
+    noticeServices.fetchNoticePosts.mockReturnValueOnce(
+      new Promise<[]>((resolve) => {
+        resolvePosts = resolve;
+      }),
+    );
+    noticeServices.fetchPinnedNoticePosts.mockReturnValueOnce(
+      new Promise<[]>((resolve) => {
+        resolvePinnedPosts = resolve;
+      }),
+    );
+
     await act(async () => {
       render(
         <DashboardContent
@@ -265,6 +282,16 @@ describe('Community notice page', () => {
     expect(
       screen.queryByRole('heading', { name: /공지사항/i }),
     ).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolvePosts([]);
+      resolvePinnedPosts([]);
+    });
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId('notice-feed-skeleton'),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it('renders attachment and comment features for a notice feed item', async () => {

@@ -5,8 +5,12 @@ import { DashboardContent } from '../src/pages/dashboard/components/DashboardCon
 import { DashboardMenuTree } from '../src/pages/dashboard/components/DashboardMenuTree';
 import { buildModuleDescriptors } from '../src/pages/dashboard/services/menuService';
 
+vi.mock('../src/pages/groupware/community/notice/components/NoticeLoginPopupHost', () => ({
+  NoticeLoginPopupHost: () => null,
+}));
+
 async function loginAsAdmin() {
-  fireEvent.change(screen.getByLabelText(/업체코드/i), {
+  fireEvent.change(await screen.findByLabelText(/업체코드/i), {
     target: { value: 'A001' },
   });
   fireEvent.change(screen.getByLabelText(/사용자 ID/i), {
@@ -20,15 +24,81 @@ async function loginAsAdmin() {
   await screen.findByRole('button', { name: /프로필 메뉴 열기/i });
 }
 
+function renderAuthenticatedApp(path: string) {
+  window.localStorage.setItem('s-erp-auth', JSON.stringify({
+    tenantCode: 'A001',
+    userId: 'admin',
+    accessToken: 'mock-token',
+    expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+  }));
+  window.history.pushState({}, '', path);
+  return render(<App />);
+}
+
 describe('Dashboard sidebar', () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+    const defaultFetch = window.fetch;
+    const permissions = { read: true, create: true, update: true, delete: true, excel: true };
+    const response = (result: unknown) => new Response(
+      JSON.stringify({ resultCode: '200', result }),
+      { status: 200 },
+    );
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/boards/notice/login-popups')) {
+        return response({ resultList: [] });
+      }
+      if (url.includes('/api/v1/menus/my')) {
+        const body = await (await defaultFetch(input, init)).json();
+        return response({
+          ...body.result,
+          menus: [
+            { menuId: 1, name: '그룹웨어', path: '/groupware', children: [
+              { menuId: 11, name: '종합현황', path: '/groupware/overview', permissions },
+              { menuId: 12, name: '문서관리', path: '/groupware/documents', permissions },
+            ] },
+            { menuId: 2, name: '환경설정', path: '/settings', children: [
+              { menuId: 21, name: '권한관리', path: '/settings/roles', permissions },
+              { menuId: 22, name: '메뉴관리', path: '/settings/menus', permissions },
+            ] },
+          ],
+        });
+      }
+      if (url.includes('/api/v1/system/modules')) {
+        return response({ resultList: [
+          { moduleId: 1, moduleCode: 'groupware', moduleNm: '그룹웨어', moduleUrl: '/groupware', useAt: 'Y' },
+          { moduleId: 2, moduleCode: 'settings', moduleNm: '환경설정', moduleUrl: '/settings', useAt: 'Y' },
+        ] });
+      }
+      if (/\/api\/v1\/system\/roles(?:\?|$)/.test(url)) {
+        return response({ resultList: [{ roleId: 1, roleCode: 'ADMIN', roleNm: '관리자', useAt: 'Y' }] });
+      }
+      if (/\/api\/v1\/system\/roles\/\d+\/users/.test(url)) {
+        return response({ assignedUsers: [], unassignedUsers: [] });
+      }
+      if (url.includes('/api/v1/system/permissions')) {
+        return response({ resultList: [{ permissionId: 1, permissionCode: 'READ', permissionName: '조회' }] });
+      }
+      if (url.includes('/api/v1/system/menus?')) {
+        return response({ resultList: [{
+          menuId: 41, moduleId: 1, moduleNm: '그룹웨어', parentMenuId: null,
+          menuCode: 'SYNTHETIC', menuNm: '검증용 메뉴', menuUrl: '/groupware/synthetic',
+          sortOrder: 1, useAt: 'Y', permissionCodes: ['READ'],
+        }] });
+      }
+      return defaultFetch(input, init);
+    });
+  });
+
   it('shows only the groupware and settings modules with their menus', async () => {
     render(<App />);
     await loginAsAdmin();
 
-    expect(document.body).toHaveTextContent(/ERP/i);
+    expect(document.body).toHaveTextContent('iPlusMES');
     expect(await screen.findByText(/모듈 선택/i)).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /그룹웨어/i }),
+      screen.getByRole('button', { name: '그룹웨어' }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /환경설정/i }),
@@ -268,7 +338,10 @@ describe('Dashboard sidebar', () => {
     const menuPageSessionKey = 's-erp:page:menu-management';
     render(<App />);
     await loginAsAdmin();
-    window.sessionStorage.setItem(menuPageSessionKey, 'saved-menu-state');
+    window.sessionStorage.setItem(menuPageSessionKey, JSON.stringify({
+      version: 1,
+      value: { selectedModuleId: 1, selectedRoleId: '1', searchQuery: 'logout-check' },
+    }));
     await screen.findByRole('button', { name: /프로필 메뉴 열기/i });
 
     fireEvent.click(screen.getByRole('button', { name: /프로필 메뉴 열기/i }));
@@ -306,15 +379,11 @@ describe('Dashboard sidebar', () => {
 
     const systemGroup = screen.getByRole('treeitem', { name: /시스템 관리/i });
 
-    expect(
-      within(systemGroup).getByTestId('ExpandMoreOutlinedIcon'),
-    ).toBeVisible();
-    const branchLines = within(systemGroup).getAllByTestId('submenu-branch');
-    expect(branchLines).toHaveLength(2);
-    branchLines.forEach((branchLine) => {
-      expect(branchLine).toBeVisible();
-      expect(branchLine).toHaveStyle({ borderTopWidth: '1px' });
-    });
+    expect(systemGroup).toHaveAttribute('aria-expanded', 'true');
+    expect(systemGroup.querySelector('.MuiTreeItem-iconContainer svg')).toBeVisible();
+    const children = within(systemGroup).getByRole('group');
+    expect(children).toHaveStyle({ borderLeftWidth: '1px' });
+    expect(within(children).getAllByRole('treeitem')).toHaveLength(2);
   });
 
   it('collapses only the menu panel while keeping module selection visible', async () => {
@@ -368,10 +437,10 @@ describe('Dashboard sidebar', () => {
       ).toBeInTheDocument();
       expect(screen.queryByRole('tree')).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: /메뉴 열기/i }));
+      fireEvent.click(screen.getByRole('button', { name: '메뉴 열기' }));
       expect(screen.getByRole('tree')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: /메뉴 닫기/i }));
+      fireEvent.click(screen.getByRole('button', { name: '메뉴 닫기' }));
       expect(screen.queryByRole('tree')).not.toBeInTheDocument();
     } finally {
       Object.defineProperty(window, 'matchMedia', {
@@ -539,32 +608,31 @@ describe('Dashboard sidebar', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders the ERP-style role and menu management screens', async () => {
-    render(<App />);
-    await loginAsAdmin();
-
-    fireEvent.click(screen.getByRole('button', { name: /환경설정/i }));
-    fireEvent.click(screen.getByRole('treeitem', { name: /^권한관리$/i }));
+  it('renders the ERP-style role management screen', async () => {
+    renderAuthenticatedApp('/settings/roles');
 
     expect(
       await screen.findByRole('heading', { name: /^권한관리$/i }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/역할 목록/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/ADMIN/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/권한 매핑/i)).toBeInTheDocument();
+    expect(await screen.findByRole('grid', { name: 'F1-GRID 권한 관리' })).toBeVisible();
+    expect((await screen.findAllByText(/ADMIN/i)).length).toBeGreaterThan(0);
+    expect(screen.getByRole('grid', { name: 'F1-GRID 사용자 매핑' })).toBeVisible();
 
-    fireEvent.click(screen.getByRole('treeitem', { name: /^메뉴관리$/i }));
+  });
+
+  it('renders the ERP-style menu management screen', async () => {
+    renderAuthenticatedApp('/settings/menus');
 
     expect(
       await screen.findByRole('heading', { name: /^메뉴관리$/i }),
     ).toBeInTheDocument();
-    expect(screen.getAllByText(/메뉴 관리/i).length).toBeGreaterThan(0);
-    expect(
-      screen.getByRole('grid', { name: 'F1-TREE 메뉴 관리' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: '루트 메뉴 추가' }),
-    ).toBeInTheDocument();
+    fireEvent.mouseDown(await screen.findByRole('combobox', { name: '권한 선택' }));
+    fireEvent.click(screen.getByRole('option', { name: '관리자' }));
+    expect(await screen.findByText('검증용 메뉴')).toBeVisible();
+    const menuGrid = screen.getByRole('grid', { name: 'F1-TREE 메뉴 관리' });
+    expect(screen.getByRole('combobox', { name: '모듈 선택' })).toBeVisible();
     expect(screen.getAllByText(/사용 여부/i).length).toBeGreaterThan(0);
+    fireEvent.contextMenu(menuGrid.lastElementChild as HTMLElement);
+    expect(screen.getByRole('menuitem', { name: '루트 추가' })).toBeVisible();
   });
 });

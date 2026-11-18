@@ -364,7 +364,7 @@ export function DraftFormGrid({
       canExportExcel={canExportExcel}
       allowAddRowInContextMenu={canCreate && !saving}
       allowDuplicateRowInContextMenu={canCreate && !saving}
-      allowDeleteRowInContextMenu={false}
+      allowDeleteRowInContextMenu={canUpdate && !saving}
     />
   );
 }

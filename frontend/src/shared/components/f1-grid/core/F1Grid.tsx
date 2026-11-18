@@ -1745,7 +1745,7 @@ function F1GridInner<T extends object>(
             ? null
             : Number(draftText)
           : column.type === 'date'
-            ? normalizeDateInput(draftText) || draftText
+            ? normalizeDateInput(draftText)
             : (matchedAutocompleteOption?.value ??
               matchedSelectOption?.value ??
               (column.type === 'select' &&
@@ -1758,6 +1758,8 @@ function F1GridInner<T extends object>(
       column &&
       row &&
       column.type !== 'code' &&
+      // 잘못된 날짜 형식은 반영하지 않고 기존 값을 유지한다.
+      !(column.type === 'date' && draftText.trim() !== '' && value === '') &&
       ((column.type !== 'number' &&
         column.type !== 'decimal' &&
         column.type !== 'currency') ||
@@ -1882,13 +1884,13 @@ function F1GridInner<T extends object>(
 
     if (event.key === 'Insert') {
       event.preventDefault();
-      handleAddRow();
+      if (allowAddRowInContextMenu) handleAddRow();
       return;
     }
 
     if (event.ctrlKey && event.key.toLowerCase() === 'd') {
       event.preventDefault();
-      handleDuplicateSelectedRows();
+      if (allowDuplicateRowInContextMenu) handleDuplicateSelectedRows();
       return;
     }
 
@@ -1905,7 +1907,7 @@ function F1GridInner<T extends object>(
           );
         }
       } else if (selectedCount > 0) {
-        handleDeleteSelectedRows();
+        if (allowDeleteRowInContextMenu) handleDeleteSelectedRows();
       } else {
         if (row && column && isCellEditable(column, row)) {
           setData((current) =>

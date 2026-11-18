@@ -315,10 +315,14 @@ describe('F1-Grid context menu', () => {
     );
 
     const body = screen.getByTestId('f1-grid-body-scroll');
+    const displayedRowHeight = Number(
+      screen.getByLabelText('row-0 행 높이 조절').getAttribute('aria-valuenow'),
+    );
+    const initialScrollTop = 50 * displayedRowHeight;
     Object.defineProperties(body, {
-      clientHeight: { configurable: true, value: 96 },
-      scrollHeight: { configurable: true, value: 250 * 32 },
-      scrollTop: { configurable: true, value: 50 * 32, writable: true },
+      clientHeight: { configurable: true, value: 3 * displayedRowHeight },
+      scrollHeight: { configurable: true, value: rows.length * displayedRowHeight },
+      scrollTop: { configurable: true, value: initialScrollTop, writable: true },
     });
     fireEvent.scroll(body);
     await waitFor(() =>
@@ -335,7 +339,7 @@ describe('F1-Grid context menu', () => {
         container.querySelector('[data-f1-grid-row-id="inserted"]'),
       ).toBeInTheDocument(),
     );
-    expect(body.scrollTop).toBeGreaterThan(50 * 32);
+    expect(body.scrollTop).toBeGreaterThan(initialScrollTop);
     expect(
       screen.getByRole('gridcell', { name: 'Inserted' }),
     ).toHaveAttribute('tabindex', '0');
@@ -653,62 +657,47 @@ describe('F1-Grid context menu', () => {
     expect(screen.getByRole('gridcell', { name: '새 행' })).toBeVisible();
   });
 
-  it('clears tree sorting from the shared context menu', async () => {
+  it.each([
+    { policy: 'default props', props: {} },
+    {
+      policy: 'explicit false props',
+      props: { disableSorting: false, disableFiltering: false },
+    },
+  ])('preserves tree query protection with $policy', ({ props }) => {
     render(
       <F1Tree
-        rows={treeRows}
+        {...props}
+        rows={[
+          { id: 'root', parentId: null, name: 'Zulu', order: 1 },
+          { id: 'alpha', parentId: 'root', name: 'Alpha', order: 2 },
+          { id: 'beta', parentId: 'root', name: 'Beta', order: 1 },
+        ]}
         columns={treeColumns}
         rowKey="id"
         parentKey="parentId"
         treeColumn="name"
-        ariaLabel="정렬 테스트 트리"
+        getRowOrder={(row) => row.order}
+        ariaLabel="계층 보호 테스트 트리"
       />,
     );
 
+    const grid = screen.getByRole('grid', { name: '계층 보호 테스트 트리' });
+    const names = () =>
+      within(grid).getAllByRole('gridcell').map((cell) => cell.textContent);
+    expect(names()).toEqual(['Zulu', 'Beta', 'Alpha']);
     fireEvent.click(screen.getByRole('button', { name: '이름 컬럼 메뉴' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '내림차순 정렬' }));
-
-    expect(screen.getAllByRole('gridcell').map((cell) => cell.textContent)).toEqual(
-      ['Beta', 'Alpha'],
-    );
-
-    fireEvent.contextMenu(getGridBody('정렬 테스트 트리'));
-    fireEvent.click(screen.getByRole('menuitem', { name: '정렬 해제' }));
-
-    await waitFor(() => {
-      expect(screen.getAllByRole('gridcell').map((cell) => cell.textContent)).toEqual(
-        ['Alpha', 'Beta'],
-      );
-    });
-  });
-
-  it('clears tree filters from the shared context menu', async () => {
-    render(
-      <F1Tree
-        rows={treeRows}
-        columns={treeColumns}
-        rowKey="id"
-        parentKey="parentId"
-        treeColumn="name"
-        ariaLabel="필터 테스트 트리"
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: '이름 컬럼 메뉴' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '필터' }));
-    fireEvent.change(screen.getByLabelText('이름 필터 값'), {
-      target: { value: 'Alpha' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '적용' }));
-
-    expect(screen.queryByRole('gridcell', { name: 'Beta' })).not.toBeInTheDocument();
-
-    fireEvent.contextMenu(getGridBody('필터 테스트 트리'));
-    fireEvent.click(screen.getByRole('menuitem', { name: '필터 해제' }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('gridcell', { name: 'Beta' })).toBeVisible();
-    });
+    expect(screen.getByRole('menu')).toBeVisible();
+    for (const name of ['오름차순 정렬', '내림차순 정렬', '필터']) {
+      expect(screen.queryByRole('menuitem', { name })).not.toBeInTheDocument();
+    }
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    fireEvent.contextMenu(getGridBody('계층 보호 테스트 트리'));
+    expect(screen.getByRole('menu')).toBeVisible();
+    for (const name of ['정렬 해제', '필터 해제']) {
+      expect(screen.queryByRole('menuitem', { name })).not.toBeInTheDocument();
+    }
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    expect(names()).toEqual(['Zulu', 'Beta', 'Alpha']);
   });
 
   it('deletes only the row that was right-clicked when nothing else is selected', () => {

@@ -6,12 +6,15 @@ import { CommentThread } from '../src/shared/components/feed/CommentThread';
 import { DocumentLinkPreviews } from '../src/pages/groupware/documents/write/components/DocumentLinkPreviews';
 import { DocumentApprovalDetailFeed } from '../src/pages/groupware/documents/write/components/DocumentApprovalDetailFeed';
 import type { DocumentApprovalFeedRecord } from '../src/pages/groupware/documents/write/types/documentWrite.types';
-import { createDocumentShareToken, listDocumentApprovals } from '../src/pages/groupware/documents/write/services/documentApproval.service';
+import { createDocumentShareToken, getExternalLinkPreview, listDocumentApprovals } from '../src/pages/groupware/documents/write/services/documentApproval.service';
 
 const notices = vi.hoisted(() => ({ showSuccess: vi.fn(), showError: vi.fn() }));
 vi.mock('../src/shared/context/NotificationContext', () => ({ useNotification: () => notices }));
 vi.mock('../src/pages/groupware/documents/write/services/documentApproval.service', async (importOriginal) => ({
-  ...await importOriginal<object>(), listDocumentApprovals: vi.fn(), createDocumentShareToken: vi.fn(),
+  ...await importOriginal<object>(), listDocumentApprovals: vi.fn(), createDocumentShareToken: vi.fn(), getExternalLinkPreview: vi.fn(),
+}));
+vi.mock('../src/pages/co/workflow/form/services/draftFormManagement.service', () => ({
+  fetchDraftFormUsers: vi.fn().mockResolvedValue([]),
 }));
 
 const url = () => `${window.location.origin}/groupware/doc/write?documentId=42`;
@@ -29,6 +32,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(listDocumentApprovals).mockResolvedValue([record]);
   vi.mocked(createDocumentShareToken).mockResolvedValue(`v1.${'A'.repeat(59)}`);
+  vi.mocked(getExternalLinkPreview).mockResolvedValue({
+    siteName: 'Example', title: '외부 링크', description: '합성 미리보기', imageUrl: null,
+  });
 });
 afterEach(() => { Reflect.deleteProperty(navigator, 'clipboard'); });
 
@@ -87,7 +93,10 @@ describe('document link content integration', () => {
       renderContentPreview={(html) => <DocumentLinkPreviews html={html} onOpenDocument={vi.fn()} />} />);
     expect(await screen.findByText('링크된 문서')).toBeInTheDocument();
     act(() => { editor?.chain().setTextSelection(5).extendMarkRange('link').setLink({ href: 'https://example.com' }).run(); });
-    await waitFor(() => expect(screen.queryByTestId('document-link-previews')).not.toBeInTheDocument());
+    expect((await screen.findByText('외부 링크')).closest('a'))
+      .toHaveAttribute('href', 'https://example.com/');
+    expect(screen.queryByRole('button', { name: '문서 상세 열기: 링크된 문서' }))
+      .not.toBeInTheDocument();
     expect(editor?.getText()).toBe(url());
   });
 
