@@ -37,7 +37,9 @@ quiet 완료 뒤 filters만 바뀌면 일반 로딩이며, null 중 대기한 qu
 
 ## 원격과 잔여
 
-선행068 `aa3b694b421f973f61d4a771723f2d7ad4cbb643`의 정확한 CI44415048096은 마지막 집계227파일2,713개 및 네 job 성공이며 [최종 판정](screenshots/statement-status-request-start/remote-ci.json)을 함께 보관한다.069은 별도 커밋/비강제 푸시 후 정확한 SHA 전체 CI를 확인한다.
+선행068 `aa3b694b421f973f61d4a771723f2d7ad4cbb643`의 정확한 CI44415048096은 마지막 집계227파일2,713개 및 네 job 성공이며 [최종 판정](screenshots/statement-status-request-start/remote-ci.json)을 함께 보관했다.
+
+069은 `b0209a642e8969c84350a444ae141c5574e66dc0`으로17파일만 별도 커밋/비강제 푸시하고 원격 일치를 확인했다. 정확한 [CI44416894632](https://github.com/f1soft611/s-erp/actions/runs/44416894632)는 마지막 집계227파일2,716개와 build/tests/lint/required 네 job 모두 성공했다. [최종 판정](screenshots/receipt-status-request-start/remote-ci.json)은 후속070 커밋에 보관한다.
 
 backend/API/DB/의존성 변경 없음. DB MCP·스키마 스크립트 대상이 아니다. 잔여 state-in-effect69개와 기존 의존성 권고2건이 있어 전체 요청은 아직 완료로 표시하지 않는다.
 

@@ -17,7 +17,13 @@ import type { MaterialReceiptStatusFilters, MaterialReceiptStatusRow } from '../
 import {
   useMaterialReceiptStatusDetail,
   useMaterialReceiptStatusList,
+  useMaterialReceiptStatusSearch,
 } from '../src/pages/materials/receipt/status/hooks/useMaterialReceiptStatus';
+
+const defaultSearchControl = vi.hoisted(() => ({
+  values: { receiptDt: { from: '2026-11-01', to: '2026-11-30' } } as
+    { receiptDt: { from: string; to: string } } | null,
+}));
 
 vi.mock('../src/shared/services/apiClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/shared/services/apiClient')>();
@@ -38,7 +44,7 @@ vi.mock('../src/pages/co/master/common-code/services/commonCodeManagement.servic
 
 vi.mock('../src/shared/hooks/usePageSearchDefaults', () => ({
   usePageSearchDefaults: () => ({
-    values: { receiptDt: { from: '2026-11-01', to: '2026-11-30' } },
+    values: defaultSearchControl.values,
     loading: false,
     error: null,
     retry: vi.fn(),
@@ -87,6 +93,7 @@ describe('MaterialReceiptStatusPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    defaultSearchControl.values = { receiptDt: { from: '2026-11-01', to: '2026-11-30' } };
     window.sessionStorage.clear();
     current = receiptItem('Y');
     apiGetMock.mockImplementation(async (path: string) => {
@@ -105,6 +112,80 @@ describe('MaterialReceiptStatusPage', () => {
     fireEvent.click(within(grid).getAllByRole('button', { name: 'MI-20261117-0001 상세 보기' })[0]);
     expect(await screen.findByText('입고번호: MI-20261117-0001')).toBeInTheDocument();
   }
+
+  it.each([false, true])('publishes receipt defaults in the first eligible commit while preserving passive storage, edits and restored sessions (initially ready: %s)', (initiallyReady) => {
+    const key = 's-erp:page:materials-material-receipt-status';
+    const defaults = { receiptDt: { from: '2026-11-01', to: '2026-11-30' } };
+    defaultSearchControl.values = initiallyReady ? defaults : null;
+    const writes = vi.spyOn(Storage.prototype, 'setItem');
+    const commits: Array<{
+      initialized: boolean; keyword: string; detailValues: Record<string, unknown>;
+      appliedDetailValues: Record<string, unknown>; filters: MaterialReceiptStatusFilters | null; writes: number;
+    }> = [];
+    try {
+      const { result, rerender, unmount } = renderHook(() => {
+        const search = useMaterialReceiptStatusSearch();
+        useLayoutEffect(() => {
+          commits.push({
+            initialized: search.defaultsInitialized, keyword: search.keyword, detailValues: search.detailValues,
+            appliedDetailValues: search.appliedDetailValues, filters: search.appliedFilters,
+            writes: writes.mock.calls.filter(([storedKey]) => storedKey === key).length,
+          });
+        });
+        return search;
+      });
+      if (!initiallyReady) {
+        expect(result.current.defaultsInitialized).toBe(false);
+        expect(window.sessionStorage.getItem(key)).toBeNull();
+        act(() => result.current.setKeyword('Owned pending edit'));
+        commits.length = 0;
+        defaultSearchControl.values = defaults;
+        rerender();
+      }
+      const initialValues = { ...defaults, status: 'ACTIVE' };
+      expect(commits[0]).toMatchObject({
+        initialized: true, keyword: '', detailValues: initialValues, appliedDetailValues: initialValues,
+        filters: { receiptDtFrom: '2026-11-01', receiptDtTo: '2026-11-30', status: 'ACTIVE' }, writes: 0,
+      });
+      expect(JSON.parse(window.sessionStorage.getItem(key)!)).toEqual({
+        version: 2, value: { keyword: '', detailValues: initialValues },
+      });
+      const initialSnapshot = window.sessionStorage.getItem(key);
+      act(() => {
+        result.current.setKeyword('Owned applied');
+        result.current.setDetailValues({ ...initialValues, status: 'CANCELED', receiptNo: 'OWNED-MI' });
+      });
+      expect(result.current.appliedFilters?.keyword).toBeUndefined();
+      expect(result.current.appliedFilters?.status).toBe('ACTIVE');
+      expect(window.sessionStorage.getItem(key)).toBe(initialSnapshot);
+      act(() => result.current.applySearch());
+      expect(result.current.appliedFilters).toMatchObject({ keyword: 'Owned applied', status: 'CANCELED', receiptNo: 'OWNED-MI' });
+      const appliedSnapshot = window.sessionStorage.getItem(key);
+      const latestDefaults = { receiptDt: { from: '2026-12-01', to: '2026-12-31' } };
+      defaultSearchControl.values = latestDefaults;
+      rerender();
+      expect(window.sessionStorage.getItem(key)).toBe(appliedSnapshot);
+      expect(result.current.detailValues.status).toBe('CANCELED');
+      unmount();
+      const reopened = renderHook(() => useMaterialReceiptStatusSearch());
+      expect(reopened.result.current.keyword).toBe('Owned applied');
+      expect(reopened.result.current.appliedFilters).toMatchObject({
+        receiptDtFrom: '2026-11-01', receiptDtTo: '2026-11-30', status: 'CANCELED', receiptNo: 'OWNED-MI',
+      });
+      expect(window.sessionStorage.getItem(key)).toBe(appliedSnapshot);
+      act(() => reopened.result.current.resetSearch());
+      expect(reopened.result.current.keyword).toBe('');
+      expect(reopened.result.current.detailValues).toEqual({ ...latestDefaults, status: 'ACTIVE' });
+      expect(reopened.result.current.appliedFilters).toMatchObject({
+        receiptDtFrom: '2026-12-01', receiptDtTo: '2026-12-31', status: 'ACTIVE',
+      });
+      expect(apiGetMock).not.toHaveBeenCalled();
+      expect(apiPostMock).not.toHaveBeenCalled();
+      expect(apiPutMock).not.toHaveBeenCalled();
+    } finally {
+      writes.mockRestore();
+    }
+  });
 
   it.each([false, true])('publishes receipt list-start commits without changing quiet reloads or paused request versions (initially ready: %s)', async (initiallyReady) => {
     const requests: Array<{

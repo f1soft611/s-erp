@@ -58,13 +58,12 @@ export function useMaterialReceiptStatusSearch() {
     setAppliedFilters(toMaterialReceiptStatusFilters(snapshot.keyword, snapshot.detailValues));
   }, [setSearchSession]);
 
-  useEffect(() => {
-    if (!defaultValues || searchSession !== null) return;
+  if (defaultValues && searchSession === null) {
     const snapshot = { keyword: '', detailValues: cloneMaterialReceiptStatusSearchValues(defaultValues) };
     setKeyword('');
     setDetailValues(snapshot.detailValues);
     applySnapshot(snapshot);
-  }, [applySnapshot, defaultValues, searchSession]);
+  }
 
   const applySearch = useCallback((values: MaterialReceiptStatusSearchValues = detailValues) => {
     applySnapshot({ keyword, detailValues: cloneMaterialReceiptStatusSearchValues(values) });

@@ -53,4 +53,4 @@ if (previousRequest.id !== selectedId || previousRequest.token !== refreshToken)
 
 - [x] 입고현황/등록/매입마감3파일56개(현황14개)·tsc -b·Vite build가 통과했다. Oxc71→69 제거2/추가0이며 같은 파일의 search 초기화 기존 진단1개는 그대로다. source token/다른 진단 label·기존 테스트·search 함수 보존과891파일 byte parity0을 확인했다.
 - [x] 375/768/1280px 실제 두 훅/layout observer의 합성 probe에서 native 목록 일반/quiet/취소/중단과 상세 열기/재조회/같은 ID/닫기/재열기/늦은 응답·editor 상태를 검증했다. GET만 합성하고 쓰기/기타 transport와 영구 저장소를 차단했다. 오류/이탈/문서 가로 넘침0, PNG6, 소유 탭을 닫았다. 전체 업무 화면 브라우저 검증이 아니다.
-- [ ] 결과/직접 작은 diff 리뷰·선행068 정확 CI를 보관한다. allowlist 별도 커밋/비강제 푸시·원격 일치 및 정확한069 CI를 확인한다.
+- [x] 결과/직접 작은 diff 리뷰·선행068 정확 CI를 보관했다.17파일 allowlist로 `b0209a642e8969c84350a444ae141c5574e66dc0`을 별도 커밋/비강제 푸시하고 원격 일치를 확인했다. 정확한 CI44416894632는 마지막 집계227파일2,716개와 build/tests/lint/required 네 job 모두 성공했다. 최종 근거는 후속070 커밋에 포함한다.

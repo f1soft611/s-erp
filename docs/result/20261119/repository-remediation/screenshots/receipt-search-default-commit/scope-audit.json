@@ -1,0 +1,42 @@
+{
+  "baseline": "b0209a642e8969c84350a444ae141c5574e66dc0",
+  "changed": [
+    "frontend\\src\\pages\\materials\\receipt\\status\\hooks\\useMaterialReceiptStatus.ts",
+    "frontend\\tests\\material-receipt-status.test.tsx"
+  ],
+  "onlySearchDefaultInitializationEffectWrapperChanged": true,
+  "sameOwnerRawReactSessionSetterVerified": true,
+  "sharedSessionHookBytePreservedAndStorageStillPassive": true,
+  "listDetailRequestsAndEventCallbacksBytePreserved": true,
+  "renderRefStorageOrTransportAccessAdded": false,
+  "servicesApiTypesUiJsxCssSearchApplyResetAndSessionContractsUnchanged": true,
+  "originalTestsBytePreservedExceptNullableDefaultMockControl": true,
+  "addedTests": 2,
+  "runtimeRed": {
+    "failed": 2,
+    "cause": "First eligible initial/delayed default commits exposed initialized=false, empty edit/applied values and null filters"
+  },
+  "baselineTests": {
+    "files": 1,
+    "passed": 14
+  },
+  "relatedTests": {
+    "files": 3,
+    "passed": 58,
+    "statusPassed": 16
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 69,
+    "after": 68,
+    "removed": 1,
+    "added": 0,
+    "removedTokens": [
+      "setKeyword"
+    ],
+    "otherDiagnosticsUnchangedIncludingLabels": true
+  },
+  "remainingRefs": 0,
+  "remainingStateInEffect": 68
+}
