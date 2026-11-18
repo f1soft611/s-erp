@@ -236,6 +236,7 @@ const currentRows = grid.acceptSavedRows(savedRows);
 - `stripeRows` 기본값은 `true`이며, 홀수 행에 스트라이프 배경을 적용해 가독성을 높인다. 고정(pinned) 컬럼에서도 동일한 규칙을 유지하며, sticky 레이어가 다른 셀과 겹치지 않도록 별도 stacking context를 유지한다.
 - `rowHeight`, `minRowHeight`, `maxRowHeight`, `resizableRows`를 통해 Grid 인스턴스 단위의 행 높이를 제어한다.
 - `loading` 상태에서는 그리드 전체 입력을 막는 오버레이의 중앙에 공통 `AppLoadingSpinner`를 34px·2.4px 두께로 표시한다. 색상은 테마 기본값을 사용하고, 오버레이는 테마 `background.default`를 84% 불투명도로 적용한다. 스피너는 MUI 기본 indeterminate 애니메이션을 사용해 원호 길이가 변하면서 회전한다. F1Grid/F1Tree와 다른 기본 로딩 화면은 같은 2.4px 기본 두께를 사용한다. 앱 첫 접속 로더만 기존 외형 보존을 위해 3.6px를 명시한다. F1Tree의 `loading`도 내부 F1Grid로 전달된다. 화면별 loading 정책은 변경하지 않는다. `minHeight`를 넘겨 부모 영역에서 내부 스크롤을 유지할 수 있다.
+- 로딩 회귀 검증은 root의 `aria-busy`와 전체 영역 `f1-grid-loading-overlay`, 헤더 보존, 완료 후 실제 행 및 오버레이 제거를 확인한다. 저장 후 조용한 재조회에는 오버레이가 없어야 한다. 과거 `grid-loading-skeleton`/`grid-loading-row-skeleton` 식별자의 부재만으로 현재 로딩이 없다고 판단하지 않는다.
 - 외부 `loading`, 내부 조회 또는 data-source loading이 시작되면 셀 범위 선택·복사 표시와 진행 중 포인터 드래그를 초기화한다. 행 checkbox 선택, 행 데이터와 편집 변경은 유지한다. 포인터가 가리키는 행과 선택 오버레이의 행 위치는 기존 `rowIndexById` 인덱스로 조회해 드래그마다 전체 행을 선형 탐색하지 않는다.
 - 부모의 조회 결과 `rows`는 내부 그리드 편집 모델에 브라우저 페인트 전에 반영한다. 조회 로딩이 종료되는 화면 프레임에 이전 빈 상태가 먼저 노출되지 않으며, API 요청과 페이지별 `loading` 상태 계약은 유지한다.
 - `F1GridColumn.pinned` 옵션으로 초기 좌/우 고정 컬럼을 지정할 수 있다.
@@ -261,6 +262,7 @@ const currentRows = grid.acceptSavedRows(savedRows);
 - 저장 뒤 목록을 재조회하는 기존 페이지는 저장 상태와 Grid `loading`을 분리한다. 품목관리와 거래처관리는 저장 후 재조회 자체를 하지 않는다. 두 화면 모두 저장 진행 아이콘·중복 저장 방지·편집 잠금을 유지하고, 최초/사용자 조회에만 Grid 로딩을 표시한다.
 - 인라인 편집 중 같은 Grid의 다른 셀 또는 툴바/액션으로 이동하면 edit를 commit하고 dirty 변경 집합에 반영한다. Grid가 중첩 MUI Dialog/Modal 안에 있어도 조상 모달의 이벤트를 editor popup으로 오인하지 않는다. 실제 editor popup으로 포인터/포커스가 이동할 때만 commit을 보류한다. 따라서 폼 바깥의 저장 버튼도 편집 commit으로 갱신된 dirty 상태를 기준으로 동작한다.
 - 컨텍스트 메뉴 등으로 추가한 신규 행을 저장 전에 삭제하면 해당 행은 `deleted` 변경으로 남지 않는다. 행과 원본·dirty 상태를 함께 제거하므로 `getChanges()`의 inserted/updated/deleted 목록에서 모두 제외되며, 변경이 없으면 페이지 저장 액션도 비활성화할 수 있다.
+- 기안양식관리의 행 삭제는 수정 권한이 있고 저장 중이 아닐 때만 제공한다. 기존 행은 저장 시 기존 수정 API의 `useAt=N`으로 사용 해제하며 물리 삭제하지 않는다. 저장 요청과 조용한 재조회 동안 메뉴·단축키의 행 삭제도 차단한다.
 - dirty 표시는 컬럼 타입에 관계없이 동일하게 적용된다(텍스트, 숫자, 체크박스, 날짜, 시간 등). 컬럼 타입별 렌더링 분기와 무관하게 셀 루트에서 공통으로 마크를 그리기 때문이다.
 - `column.getValue`로 값을 파생시키는 컬럼(예: 여러 체크박스가 하나의 배열 필드를 공유하는 권한 체크박스)은 dirty 판정도 `getValue(row)`를 원본 값과 비교해 계산한다. `onValueChange`가 실제로 갱신하는 필드명이 `column.field`와 다르더라도(예: `permissionCodes` 배열을 갱신하지만 컬럼은 `readPermission`) 해당 컬럼 셀에 정확히 dirty 마크가 표시된다.
 - `type: 'user'` 컬럼은 `userOptions`의 사용자 항목(`value`, `label`, `avatarUrl`, `positionName`, `departmentName`)을 검색/선택한다. 셀 편집과 row form modal은 같은 avatar/name/position/department 선택 UI를 사용하고, `form.multiple: true`면 선택 ID 배열과 개별 chip 해제를 제공한다.
@@ -735,6 +737,8 @@ search: {
 #### 빠른 날짜 세팅
 
 상세검색에 필수(`search.required`) 날짜 범위 필드(기준일)가 있으면 해당 필드 옆에 `오늘`, `이번주`(월~일), `이번달`, `전월`, `최근 30일` 버튼이 한 줄로 표시된다. 버튼을 누르면 `GET /api/v1/common/system-date`의 서버 날짜 기준으로 시작일·종료일이 채워지며(자동 조회는 하지 않음), 서버 날짜 조회에 실패하면 프런트엔드 시계로 대체하지 않고 오류 문구를 표시한다. 필수가 아닌 날짜 필드에는 표시되지 않는다. 날짜 필드와 버튼 폭은 `search.span`(영업관리 현황은 2: 시작일·종료일 각 1칸, 버튼은 나머지 칸)으로 조절한다.
+
+서버 응답을 기다리는 동안 다른 상세조건을 수정해도 최신 입력을 유지한다. 같은 날짜를 직접 수정하거나 다음 빠른 날짜 버튼을 누르면 이전 요청은 무효다. 초기화·패널 닫기·외부 조건 복원·화면 해제 후 도착한 응답은 값이나 오류를 바꾸지 않는다. 서로 다른 날짜 필드의 요청은 독립적으로 적용하며 자동 조회·기존 callback 계약은 유지한다.
 
 기본값이 지정된 날짜 필드는 첫 조회와 상세검색 초기화에 해석된 기본값을 사용한다. 초기화 시 공통 검색 영역은 값을 갱신하지만 자동 조회 여부는 페이지가 선택한다. 문서현황은 서버 날짜 해석이 완료된 뒤 첫 목록을 조회하고, 저장된 탭 세션 조건이 있으면 이를 우선 복원한다. 사용자가 초기화하면 최근 1개월 범위를 서버 날짜 기준으로 다시 적용하고 같은 조건을 세션에 저장한다.
 
@@ -1892,7 +1896,7 @@ interface GridDataState<T> {
 설정을 기본값으로 복원
 ```
 
-F1Tree는 `루트 추가` 항목이 `컬럼 길이 자동 조정` 아래, `행 추가` 위에 추가로 표시된다. F1Tree도 `F1Grid`와 동일하게 호출자가 전달한 `disableSorting`/`disableFiltering` 정책을 따르므로, 두 기능이 활성화된 화면에서는 필터 해제/정렬 해제 항목을 사용할 수 있다.
+F1Tree는 `루트 추가` 항목이 `컬럼 길이 자동 조정` 아래, `행 추가` 위에 추가로 표시된다. [20261014 공통 Grid 사양 §6](../../../../docs/spec/20261014/20261014_002_f1_grid_docs_overhaul_사양서.md)에 따라 계층 보존을 위해 정렬·필터를 비활성화하며, `disableSorting={false}`/`disableFiltering={false}`로도 이 보호를 해제하지 않는다. 헤더 정렬·필터 및 본문 정렬 해제·필터 해제 항목은 표시되지 않는다. 일반 F1Grid의 해당 기능은 유지한다. 단순히 제한을 제거하면 투영된 자식이 부모보다 먼저 정렬될 수 있으므로 변경하지 않는다. 최신 사양에 따른 구형 회귀 정정 근거는 [후속 사양](../../../../docs/spec/20261118/20261118_010_tree-policy-alignment_상세사양서.md)을 참고한다.
 
 `disableFiltering`과 `disableSorting`으로 필터 해제/정렬 해제 항목이 모두 숨겨지면 해당 빈 그룹 앞 구분선도 숨기고, 설정 복원 앞 구분선만 유지한다. 두 항목 중 하나라도 표시되면 그룹 구분선은 기존처럼 표시된다.
 
