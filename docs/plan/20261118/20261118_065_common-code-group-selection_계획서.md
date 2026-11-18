@@ -33,4 +33,4 @@ if (!groupsLoading) {
 
 - [x] `vitest run --pool=threads --maxWorkers=2 tests/common-code-management-page.test.tsx tests/role-management-notification.test.tsx` 2파일 91개, `tsc -b`, `vite build`, `oxlint --format=json`을 확인했다. Oxc 78 → 77, 제거1/추가0이며 기존 상세 조회 진단은 그대로다. source 891파일 byte parity·기존 테스트 보존을 확인했다.
 - [x] 실제 Panel/Tree/Profiler 375/768/1280px native 목록 적용/그룹 선택/목록 교체를 검증했다. 상세 GET 경계만 합성하고 모든 쓰기/기타 transport와 영구 저장소를 차단했다. 첫 ready/대체 commit부터 표기가 일치하며 요청 이탈/오류/문서 넘침 0, 소유 탭을 닫았다.
-- [ ] 결과/스크린샷·작은 전체 diff 리뷰·정확한 064 CI를 보관한다. allowlist 커밋·비강제 푸시·원격 일치와 정확한 065 CI를 확인한다.
+- [x] 결과/스크린샷·작은 전체 diff 리뷰·정확한 064 CI를 보관했다. allowlist 커밋 `6bb5fa134fcce82c9a07675710df9ef1950c27b4`를 비강제 푸시하고 원격 일치를 확인했다. 정확한 CI44376512911의 마지막 전체 집계는 227파일 2,704개 통과이며 네 job 모두 성공했다.

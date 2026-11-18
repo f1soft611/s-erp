@@ -1,8 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useLayoutEffect } from 'react';
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiGet } from '../src/shared/services/apiClient';
 import { QuotationStatusPage } from '../src/pages/sales/quotation/status/QuotationStatusPage';
+import { useQuotationStatusDetail } from '../src/pages/sales/quotation/status/hooks/useQuotationStatusDetail';
 import type { QuotationStatusRow } from '../src/pages/sales/quotation/status/types/quotationStatus.types';
 import type { QuotationItem } from '../src/pages/sales/quotation/create/types/quotation.types';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
@@ -100,6 +102,63 @@ describe('quotation status page', () => {
       if (path === '/api/v1/sales/quotations/21') return Promise.resolve({ item: quotation });
       return Promise.resolve({ resultList: [statusRow], resultCnt: 1 });
     });
+  });
+
+  it('publishes quotation request-start state in the first commit without changing cancellation or same-ID behavior', async () => {
+    const requests: Array<{
+      resolve: (value: { item: QuotationItem }) => void;
+      reject: (error: Error) => void;
+    }> = [];
+    apiGetMock.mockImplementation(() => new Promise<{ item: QuotationItem }>((resolve, reject) => {
+      requests.push({ resolve, reject });
+    }));
+    const commits: Array<{ id: number | null; loading: boolean; error: string }> = [];
+    const { result } = renderHook(() => {
+      const detail = useQuotationStatusDetail();
+      useLayoutEffect(() => {
+        commits.push({ id: detail.selectedQuotationId, loading: detail.loading, error: detail.error });
+      });
+      return detail;
+    });
+
+    act(() => result.current.openDetail(21));
+    expect(commits.find(({ id }) => id === 21)).toEqual({ id: 21, loading: true, error: '' });
+    await act(async () => requests[0].reject(new Error('Owned quotation detail failure')));
+    expect(result.current.error).toBe('Owned quotation detail failure');
+    commits.length = 0;
+    act(() => result.current.refreshDetail());
+    expect(commits[0]).toEqual({ id: 21, loading: true, error: '' });
+    await act(async () => requests[1].resolve({ item: quotation }));
+    expect(result.current.quotation?.quotationId).toBe(21);
+    expect(result.current.loading).toBe(false);
+
+    act(() => result.current.openDetail(21));
+    expect(requests).toHaveLength(2);
+    expect(result.current.loading).toBe(false);
+    expect(result.current.quotation?.quotationId).toBe(21);
+    commits.length = 0;
+    act(() => result.current.refreshDetail());
+    expect(commits[0]).toEqual({ id: 21, loading: true, error: '' });
+    expect(result.current.quotation?.quotationId).toBe(21);
+    await act(async () => requests[2].resolve({ item: quotation }));
+    act(() => result.current.openDetail(22));
+    act(() => result.current.closeDetail());
+    commits.length = 0;
+    act(() => result.current.openDetail(21));
+    expect(commits[0]).toEqual({ id: 21, loading: true, error: '' });
+    expect(requests).toHaveLength(5);
+    await act(async () => requests[3].resolve({ item: { ...quotation, quotationId: 22 } }));
+    expect(result.current.selectedQuotationId).toBe(21);
+    expect(result.current.quotation).toBeNull();
+    expect(result.current.loading).toBe(true);
+    await act(async () => requests[4].resolve({ item: quotation }));
+    expect(result.current.quotation?.quotationId).toBe(21);
+    expect(result.current.loading).toBe(false);
+    act(() => result.current.closeDetail());
+    act(() => result.current.refreshDetail());
+    expect(requests).toHaveLength(5);
+    expect(result.current.selectedQuotationId).toBeNull();
+    expect(result.current.loading).toBe(false);
   });
 
   it('requires a date range, lists detail-based results, and opens quotation detail', async () => {

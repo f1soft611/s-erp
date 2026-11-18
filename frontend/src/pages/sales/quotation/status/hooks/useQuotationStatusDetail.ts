@@ -11,12 +11,19 @@ export function useQuotationStatusDetail() {
   const [error, setError] = useState('');
   const [refreshToken, setRefreshToken] = useState(0);
   const [editorMode, setEditorMode] = useState<QuotationEditorMode | null>(null);
+  const [previousRequest, setPreviousRequest] = useState({ id: selectedQuotationId, token: refreshToken });
+
+  if (previousRequest.id !== selectedQuotationId || previousRequest.token !== refreshToken) {
+    setPreviousRequest({ id: selectedQuotationId, token: refreshToken });
+    if (selectedQuotationId !== null) {
+      setLoading(true);
+      setError('');
+    }
+  }
 
   useEffect(() => {
     if (selectedQuotationId === null) return;
     let active = true;
-    setLoading(true);
-    setError('');
     getQuotation(selectedQuotationId)
       .then((loaded) => { if (active) setQuotation(loaded); })
       .catch((loadError: unknown) => {

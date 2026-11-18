@@ -1,0 +1,77 @@
+{
+  "actualHooksLayoutObserver": true,
+  "notFullBusinessScreen": true,
+  "syntheticDeferredDetailGetOnly": true,
+  "allWritesAndUnownedTransportBlocked": true,
+  "memoryStorageOnly": true,
+  "widths": [
+    375,
+    768,
+    1280
+  ],
+  "firstOpenRetryLoadedRefreshAndReopenCommitLoadingAndErrorCorrect": true,
+  "loadedRefreshRetainsCurrentDetail": true,
+  "sameIdAndClosedRefreshDoNotRequestOrStickLoading": true,
+  "cancelledOldResponseIgnored": true,
+  "unknownRequests": 0,
+  "errors": 0,
+  "documentOverflow": 0,
+  "syntheticGetsPerHookPerWidth": 5,
+  "images": [
+    {
+      "file": "detail066-retry-375.png",
+      "width": 375,
+      "height": 984,
+      "bytes": 27806
+    },
+    {
+      "file": "detail066-reopened-375.png",
+      "width": 375,
+      "height": 984,
+      "bytes": 27591
+    },
+    {
+      "file": "detail066-retry-768.png",
+      "width": 768,
+      "height": 984,
+      "bytes": 25956
+    },
+    {
+      "file": "detail066-reopened-768.png",
+      "width": 768,
+      "height": 984,
+      "bytes": 25728
+    },
+    {
+      "file": "detail066-retry-1280.png",
+      "width": 1280,
+      "height": 984,
+      "bytes": 26569
+    },
+    {
+      "file": "detail066-reopened-1280.png",
+      "width": 1280,
+      "height": 984,
+      "bytes": 26410
+    }
+  ],
+  "relatedTests": {
+    "files": 2,
+    "passed": 26
+  },
+  "typecheck": "passed",
+  "build": "passed",
+  "lint": {
+    "before": 77,
+    "after": 75,
+    "removed": 2,
+    "added": 0,
+    "removedTokens": [
+      "setLoading",
+      "setLoading"
+    ],
+    "otherDiagnosticsUnchangedIncludingLabels": true
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0
+}

@@ -1,8 +1,10 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { useLayoutEffect } from 'react';
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiGet, apiPut } from '../src/shared/services/apiClient';
 import { SalesOrderStatusPage } from '../src/pages/sales/order/status/SalesOrderStatusPage';
 import { SalesOrderStatusGrid } from '../src/pages/sales/order/status/components/SalesOrderStatusGrid';
+import { useSalesOrderStatusDetail } from '../src/pages/sales/order/status/hooks/useSalesOrderStatusDetail';
 import { createSalesOrderStatusColumns } from '../src/pages/sales/order/status/data/salesOrderStatusColumns';
 import { fetchSalesOrderCommonCodes } from '../src/pages/sales/order/services/salesOrderCommonCode.service';
 import type { SalesOrderStatusRow } from '../src/pages/sales/order/status/types/salesOrderStatus.types';
@@ -183,6 +185,63 @@ describe('sales order status page', () => {
     });
 
     apiPutMock.mockImplementation(() => Promise.resolve({ item: orderItem }));
+  });
+
+  it('publishes order request-start state in the first commit without changing cancellation or same-ID behavior', async () => {
+    const requests: Array<{
+      resolve: (value: { item: SalesOrderItem }) => void;
+      reject: (error: Error) => void;
+    }> = [];
+    apiGetMock.mockImplementation(() => new Promise<{ item: SalesOrderItem }>((resolve, reject) => {
+      requests.push({ resolve, reject });
+    }));
+    const commits: Array<{ id: number | null; loading: boolean; error: string }> = [];
+    const { result } = renderHook(() => {
+      const detail = useSalesOrderStatusDetail();
+      useLayoutEffect(() => {
+        commits.push({ id: detail.selectedOrderId, loading: detail.loading, error: detail.error });
+      });
+      return detail;
+    });
+
+    act(() => result.current.openDetail(300));
+    expect(commits.find(({ id }) => id === 300)).toEqual({ id: 300, loading: true, error: '' });
+    await act(async () => requests[0].reject(new Error('Owned order detail failure')));
+    expect(result.current.error).toBe('Owned order detail failure');
+    commits.length = 0;
+    act(() => result.current.refreshDetail());
+    expect(commits[0]).toEqual({ id: 300, loading: true, error: '' });
+    await act(async () => requests[1].resolve({ item: createOrderItem() }));
+    expect(result.current.order?.salesOrderId).toBe(300);
+    expect(result.current.loading).toBe(false);
+
+    act(() => result.current.openDetail(300));
+    expect(requests).toHaveLength(2);
+    expect(result.current.loading).toBe(false);
+    expect(result.current.order?.salesOrderId).toBe(300);
+    commits.length = 0;
+    act(() => result.current.refreshDetail());
+    expect(commits[0]).toEqual({ id: 300, loading: true, error: '' });
+    expect(result.current.order?.salesOrderId).toBe(300);
+    await act(async () => requests[2].resolve({ item: createOrderItem() }));
+    act(() => result.current.openDetail(301));
+    act(() => result.current.closeDetail());
+    commits.length = 0;
+    act(() => result.current.openDetail(300));
+    expect(commits[0]).toEqual({ id: 300, loading: true, error: '' });
+    expect(requests).toHaveLength(5);
+    await act(async () => requests[3].resolve({ item: createOrderItem({ salesOrderId: 301 }) }));
+    expect(result.current.selectedOrderId).toBe(300);
+    expect(result.current.order).toBeNull();
+    expect(result.current.loading).toBe(true);
+    await act(async () => requests[4].resolve({ item: createOrderItem() }));
+    expect(result.current.order?.salesOrderId).toBe(300);
+    expect(result.current.loading).toBe(false);
+    act(() => result.current.closeDetail());
+    act(() => result.current.refreshDetail());
+    expect(requests).toHaveLength(5);
+    expect(result.current.selectedOrderId).toBeNull();
+    expect(result.current.loading).toBe(false);
   });
 
   it('displays totals for order quantity and amounts in the status grid', () => {
