@@ -14,6 +14,10 @@ public class ItemPartnerPriceSearchCondition {
     private String tradeType;
     @Schema(description = "해당 일자에 유효한 단가 조회(YYYY-MM-DD)")
     private String effectiveOn;
+    @Schema(description = "true면 종료된 과거 단가도 조회. 기본 false(현재 적용·예정만)")
+    private boolean includeHistory;
+    @Schema(description = "거래처 내부 ID. 지정하면 그 거래처의 단가만(기본단가 제외)")
+    private Long customerId;
     @Schema(description = "사용여부 Y/N")
     private String useAt;
 }

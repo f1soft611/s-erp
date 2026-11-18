@@ -6,7 +6,14 @@ export type ItemPartnerPriceFilters = {
   tradeType?: ItemPartnerPriceTradeType | '';
   effectiveOn?: string;
   useAt?: ItemPartnerPriceUseAt | '';
+  /** true면 종료된 과거 단가도 조회한다. 기본은 현재 적용·예정 단가만. */
+  includeHistory?: boolean;
+  /** 지정하면 그 거래처의 단가만(기본단가 제외) 조회한다. */
+  customerId?: number;
 };
+
+/** 현재(적용 중)·예정·과거(종료). 과거 행은 수정할 수 없다. */
+export type ItemPartnerPriceStatus = 'past' | 'current' | 'future';
 
 export type ItemPartnerPriceRow = {
   priceId: number | string;
@@ -14,12 +21,20 @@ export type ItemPartnerPriceRow = {
   materialId: number | null;
   materialCode: string;
   materialName: string;
+  /** null이면 품목 기본단가(거래처 공통). */
   customerId: number | null;
   customerCode: string;
   customerName: string;
   tradeType: ItemPartnerPriceTradeType | '';
   unitPrice: number | null;
+  taxType: string;
+  vatIncludedAt: 'Y' | 'N';
+  foreignUnitPrice: number | null;
+  /** 외화단가의 통화. 외화단가가 없으면 빈 값. */
   currency: string;
+  materialUnit?: string;
+  materialSpec?: string;
+  priceStatus?: ItemPartnerPriceStatus;
   startDt: string;
   endDt: string | null;
   moq: number | null;
@@ -33,14 +48,15 @@ export type ItemPartnerPriceRow = {
 export type ItemPartnerPricePayload = Pick<
   ItemPartnerPriceRow,
   'materialId' | 'customerId' | 'tradeType' | 'unitPrice' | 'currency'
-  | 'startDt' | 'endDt' | 'moq' | 'useAt'
+  | 'taxType' | 'vatIncludedAt' | 'foreignUnitPrice' | 'startDt' | 'endDt' | 'moq' | 'useAt'
 >;
 
 export type ItemPartnerPriceBatchPayload = {
   prices: {
     insertedRows: (ItemPartnerPricePayload & { priceId: string })[];
     updatedRows: (ItemPartnerPricePayload & { priceId: string })[];
-    deletedRows: (ItemPartnerPricePayload & { priceId: string })[];
+    /** 삭제할 단가 ID. 적용 중·예정 단가만 서버가 삭제한다. */
+    deletedRows: { priceId: string }[];
   };
 };
 
@@ -50,6 +66,9 @@ export type ItemPartnerPriceImportRow = {
   materialCode: string;
   customerCode: string;
   unitPrice: string;
+  taxType: string;
+  vatIncludedAt: string;
+  foreignUnitPrice: string;
   currency: string;
   startDt: string;
   endDt: string | null;
@@ -90,6 +109,9 @@ export const itemPartnerPriceHeaders = [
   '품목코드',
   '거래처코드',
   '단가',
+  '부가세구분',
+  '부가세포함',
+  '외화단가',
   '통화',
   '적용시작일',
   '적용종료일',
@@ -103,7 +125,10 @@ export function emptyItemPartnerPricePayload(): ItemPartnerPricePayload {
     customerId: null,
     tradeType: '',
     unitPrice: null,
-    currency: 'KRW',
+    taxType: 'TAXABLE',
+    vatIncludedAt: 'N',
+    foreignUnitPrice: null,
+    currency: '',
     startDt: '',
     endDt: null,
     moq: null,

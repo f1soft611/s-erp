@@ -14,6 +14,6 @@ public class ItemPartnerPriceBatchChangeSetVO {
     private List<ItemPartnerPriceChangeVO> insertedRows = new ArrayList<>();
     @Schema(description = "수정 단가")
     private List<ItemPartnerPriceChangeVO> updatedRows = new ArrayList<>();
-    @Schema(description = "삭제 요청. 삭제는 허용되지 않음")
+    @Schema(description = "삭제 요청(priceId만 사용). 적용 중·예정 단가만 삭제할 수 있고 직전 단가의 종료일이 다시 열린다")
     private List<ItemPartnerPriceChangeVO> deletedRows = new ArrayList<>();
 }

@@ -19,6 +19,7 @@ import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import {
   parseItemPartnerPriceWorkbook,
   validateItemPartnerPriceImportRows,
+  type ItemPartnerPriceExcelOptions,
 } from '../services/itemPartnerPriceExcel.service';
 import { validateItemPartnerPriceImport } from '../services/itemPartnerPrice.service';
 import type {
@@ -33,13 +34,20 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onStage: (rows: ItemPartnerPriceRow[]) => void;
+  /** 엑셀의 부가세구분·통화 이름을 공통코드로 바꾸는 데 쓴다. */
+  codeOptions?: ItemPartnerPriceExcelOptions;
+  /** 검증 후 실행 버튼 이름. 기본은 그리드에 추가. */
+  stageLabel?: string;
 };
 
 const editableColumns = [
   ['tradeType', '거래구분'],
   ['materialCode', '품목코드'],
   ['customerCode', '거래처코드'],
-  ['unitPrice', '단가'],
+  ['unitPrice', '원화단가'],
+  ['taxType', '부가세구분'],
+  ['vatIncludedAt', '부가세포함'],
+  ['foreignUnitPrice', '외화단가'],
   ['currency', '통화'],
   ['startDt', '적용 시작일'],
   ['endDt', '적용 종료일'],
@@ -54,6 +62,9 @@ function requestRows(rows: ItemPartnerPriceImportRow[]): ItemPartnerPriceImportR
     materialCode: row.materialCode,
     customerCode: row.customerCode,
     unitPrice: row.unitPrice,
+    taxType: row.taxType,
+    vatIncludedAt: row.vatIncludedAt,
+    foreignUnitPrice: row.foreignUnitPrice,
     currency: row.currency,
     startDt: row.startDt,
     endDt: row.endDt,
@@ -62,14 +73,23 @@ function requestRows(rows: ItemPartnerPriceImportRow[]): ItemPartnerPriceImportR
   }));
 }
 
-export function ItemPartnerPriceImportDialog({ open, onClose, onStage }: Props) {
+export function ItemPartnerPriceImportDialog({ open, onClose, onStage, codeOptions, stageLabel }: Props) {
   if (!open) return null;
-  return <OpenItemPartnerPriceImportDialog onClose={onClose} onStage={onStage} />;
+  return (
+    <OpenItemPartnerPriceImportDialog
+      onClose={onClose}
+      onStage={onStage}
+      codeOptions={codeOptions}
+      stageLabel={stageLabel}
+    />
+  );
 }
 
 function OpenItemPartnerPriceImportDialog({
   onClose,
   onStage,
+  codeOptions,
+  stageLabel = '그리드에 추가',
 }: Omit<Props, 'open'>) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<ItemPartnerPriceImportRow[]>([]);
@@ -95,7 +115,7 @@ function OpenItemPartnerPriceImportDialog({
     setServerRows(null);
     setError('');
     try {
-      setRows(await parseItemPartnerPriceWorkbook(file));
+      setRows(await parseItemPartnerPriceWorkbook(file, codeOptions));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '엑셀 파일을 읽지 못했습니다.');
     } finally {
@@ -147,12 +167,15 @@ function OpenItemPartnerPriceImportDialog({
         materialId: verified.materialId!,
         materialCode: verified.materialCode!,
         materialName: verified.materialName!,
-        customerId: verified.customerId!,
-        customerCode: verified.customerCode!,
-        customerName: verified.customerName!,
+        customerId: verified.customerId ?? null,
+        customerCode: verified.customerCode ?? '',
+        customerName: verified.customerName ?? '',
         tradeType: row.tradeType as ItemPartnerPriceRow['tradeType'],
-        unitPrice: Number(row.unitPrice),
-        currency: row.currency.trim() || 'KRW',
+        unitPrice: row.unitPrice ? Number(row.unitPrice) : null,
+        taxType: row.taxType.trim() || 'TAXABLE',
+        vatIncludedAt: (row.vatIncludedAt.trim() || 'N') as ItemPartnerPriceRow['vatIncludedAt'],
+        foreignUnitPrice: row.foreignUnitPrice ? Number(row.foreignUnitPrice) : null,
+        currency: row.foreignUnitPrice ? row.currency.trim() : '',
         startDt: row.startDt,
         endDt: row.endDt,
         moq: row.moq ? Number(row.moq) : null,
@@ -184,7 +207,7 @@ function OpenItemPartnerPriceImportDialog({
             {validating ? <CircularProgress size={18} /> : '검증'}
           </Button>
           <Button variant="contained" onClick={stage} disabled={!canStage}>
-            그리드에 추가
+            {stageLabel}
           </Button>
         </Stack>
       }

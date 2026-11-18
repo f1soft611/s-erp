@@ -1,46 +1,36 @@
-import { useMemo, useRef, useState } from 'react';
-import AddIcon from '@mui/icons-material/Add';
-import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
+import { useState, type ReactNode } from 'react';
 import SearchIcon from '@mui/icons-material/Search';
-import SaveIcon from '@mui/icons-material/Save';
-import UploadFileOutlined from '@mui/icons-material/UploadFileOutlined';
 import { Box, IconButton, TextField } from '@mui/material';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
-import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
-import type { F1GridRef } from '../../../../shared/components/f1-grid';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
-import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import { usePageSessionState } from '../../../../shared/hooks/usePageSessionState';
 import {
   isPageSearchValues,
-  toPageSearchFields,
   type PageSearchFieldValue,
 } from '../../../../shared/components/page-search/searchFields';
 import type { MenuPermission, ModuleItem, PageContent } from '../../../dashboard/types/dashboard';
 import { ItemPartnerPriceGrid } from './components/ItemPartnerPriceGrid';
-import { createItemPartnerPriceColumns } from './components/itemPartnerPriceGridModel';
-import { ItemPartnerPriceImportDialog } from './components/ItemPartnerPriceImportDialog';
-import { downloadItemPartnerPriceTemplate } from './services/itemPartnerPriceExcel.service';
+import {
+  PRICE_HISTORY_FIELD,
+  PRICE_TRADE_TYPE_FIELD,
+  PRICE_USE_AT_FIELD,
+  searchText,
+} from './data/priceSearchFields';
+import { useItemPartnerPriceCodes } from './hooks/useItemPartnerPriceCodes';
 import { useItemPartnerPriceManagement } from './hooks/useItemPartnerPriceManagement';
-import type {
-  ItemPartnerPriceFilters,
-  ItemPartnerPriceRow,
-} from './types/itemPartnerPrice.types';
+import type { ItemPartnerPriceFilters } from './types/itemPartnerPrice.types';
 
 const SESSION_KEY = 's-erp:page:item-partner-prices';
-const SESSION_VERSION = 1;
+const SESSION_VERSION = 2;
+const DETAIL_FIELDS = [PRICE_TRADE_TYPE_FIELD, PRICE_USE_AT_FIELD, PRICE_HISTORY_FIELD];
+const DEFAULT_DETAIL_VALUES: Record<string, PageSearchFieldValue> = { includeHistory: 'Y' };
 
 type SearchSession = {
   keyword: string;
   detailValues: Record<string, PageSearchFieldValue>;
-};
-
-type PendingSearch = {
-  filters: ItemPartnerPriceFilters;
-  session: SearchSession;
 };
 
 function isSearchSession(value: unknown): value is SearchSession {
@@ -53,18 +43,12 @@ function toFilters(session: SearchSession): ItemPartnerPriceFilters {
   const filters: ItemPartnerPriceFilters = {
     keyword: session.keyword.trim() || undefined,
   };
-  const tradeType = session.detailValues.tradeType;
-  const effectiveOn = session.detailValues.startDt;
-  const useAt = session.detailValues.useAt;
-  if (typeof tradeType === 'string' && tradeType.trim()) {
-    filters.tradeType = tradeType.trim() as ItemPartnerPriceFilters['tradeType'];
-  }
-  if (typeof effectiveOn === 'string' && effectiveOn.trim()) {
-    filters.effectiveOn = effectiveOn.trim();
-  }
-  if (typeof useAt === 'string' && useAt.trim()) {
-    filters.useAt = useAt.trim() as ItemPartnerPriceFilters['useAt'];
-  }
+  const tradeType = searchText(session.detailValues, 'tradeType');
+  const useAt = searchText(session.detailValues, 'useAt');
+  // 이력 목록이므로 기본은 종료된 과거 단가까지 보여 준다. "현재·예정만"을 고르면 과거를 숨긴다.
+  if (session.detailValues.includeHistory !== 'N') filters.includeHistory = true;
+  if (tradeType) filters.tradeType = tradeType as ItemPartnerPriceFilters['tradeType'];
+  if (useAt) filters.useAt = useAt as ItemPartnerPriceFilters['useAt'];
   return filters;
 }
 
@@ -74,16 +58,21 @@ type Props = {
   content: PageContent;
   breadcrumbItems?: string[];
   selectedMenuPermissions?: MenuPermission;
-  isTenantAdmin?: boolean;
+  /** 탭 호스트가 넘기는 탭 막대. 헤더 아래에 그린다. */
+  tabs?: ReactNode;
 };
 
-export function ItemPartnerPriceManagementPage({
+/**
+ * 단가 이력 조회 화면(조회 전용). 단가 입력·정정은 "품목 기준" 탭에서 하고,
+ * 여기서는 종료된 과거 단가를 포함해 기간별 단가를 조회·엑셀로 내보내기만 한다.
+ */
+export function ItemPartnerPriceListPage({
   selectedModule,
   currentMenuName,
   content,
   breadcrumbItems,
   selectedMenuPermissions,
-  isTenantAdmin = false,
+  tabs,
 }: Props) {
   const { state: searchSession, setState: setSearchSession } =
     usePageSessionState<SearchSession | null>(SESSION_KEY, null, {
@@ -91,112 +80,34 @@ export function ItemPartnerPriceManagementPage({
       validate: (value): value is SearchSession | null =>
         value === null || isSearchSession(value),
     });
+  const codeOptions = useItemPartnerPriceCodes();
   const management = useItemPartnerPriceManagement(
-    searchSession ? toFilters(searchSession) : {},
+    toFilters(searchSession ?? { keyword: '', detailValues: DEFAULT_DETAIL_VALUES }),
   );
-  useUnsavedChangesBeforeUnload(management.hasChanges);
-  const gridRef = useRef<F1GridRef<ItemPartnerPriceRow>>(null);
   const [keyword, setKeyword] = useState(searchSession?.keyword ?? '');
   const [detailValues, setDetailValues] = useState<Record<string, PageSearchFieldValue>>(
-    searchSession?.detailValues ?? {},
+    searchSession?.detailValues ?? DEFAULT_DETAIL_VALUES,
   );
-  const [pendingSearch, setPendingSearch] = useState<PendingSearch | null>(null);
-  const [importOpen, setImportOpen] = useState(false);
-  const canCreate = Boolean(isTenantAdmin && selectedMenuPermissions?.create);
-  const canUpdate = Boolean(isTenantAdmin && selectedMenuPermissions?.update);
-  const canWrite = canCreate || canUpdate;
-  const detailFields = useMemo(
-    () => toPageSearchFields(createItemPartnerPriceColumns(false))
-      .filter((field) => ['tradeType', 'startDt', 'useAt'].includes(field.field)),
-    [],
-  );
+  const detailFields = DETAIL_FIELDS;
 
-  const search = (filters: ItemPartnerPriceFilters, session: SearchSession) => {
-    if (management.saving) return;
-    if (management.hasChanges) {
-      setPendingSearch({ filters, session });
-      return;
-    }
-    management.applyFilters(filters);
+  const search = (session: SearchSession) => {
+    management.applyFilters(toFilters(session));
     setSearchSession(session);
     setDetailValues(session.detailValues);
   };
-  const searchDefault = () => {
-    const session = {
-      keyword: keyword.trim(),
-      detailValues: searchSession?.detailValues ?? {},
-    };
-    search(toFilters(session), session);
-  };
-  const searchDetails = (values: Record<string, PageSearchFieldValue>) => {
-    const session = { keyword: keyword.trim(), detailValues: values };
-    search(toFilters(session), session);
-  };
-  const addImportedRows = (rows: ItemPartnerPriceRow[]) => {
-    const grid = gridRef.current;
-    if (!grid) {
-      management.setError('단가 그리드를 준비하지 못했습니다.');
-      return;
-    }
-    rows.forEach((row) => grid.addRow(row));
-    setImportOpen(false);
-  };
+  const searchDefault = () => search({
+    keyword: keyword.trim(),
+    detailValues: searchSession?.detailValues ?? DEFAULT_DETAIL_VALUES,
+  });
+  const searchDetails = (values: Record<string, PageSearchFieldValue>) =>
+    search({ keyword: keyword.trim(), detailValues: values });
 
   const actions: PermissionActionGroupDefinition[] = [
-    { key: 'write', actions: [
-      {
-        label: '엑셀 양식 다운로드',
-        icon: DownloadOutlined,
-        visible: canCreate,
-        disabled: management.loading || management.saving,
-        onClick: () => {
-          void downloadItemPartnerPriceTemplate().catch((cause) =>
-            management.setError(cause instanceof Error
-              ? cause.message : '엑셀 양식을 다운로드하지 못했습니다.'),
-          );
-        },
-      },
-      {
-        label: '엑셀 업로드',
-        icon: UploadFileOutlined,
-        visible: canCreate,
-        disabled: management.loading || management.saving,
-        onClick: () => setImportOpen(true),
-      },
-      {
-        label: '단가 추가',
-        icon: AddIcon,
-        visible: canCreate,
-        disabled: management.loading || management.saving,
-        onClick: () => gridRef.current?.addRow(),
-      },
-    ] },
     { key: 'read', actions: [{
       label: '조회',
       icon: SearchIcon,
       visible: Boolean(selectedMenuPermissions?.read),
-      disabled: management.saving,
       onClick: searchDefault,
-    }] },
-    { key: 'write', actions: [{
-      label: '저장',
-      icon: SaveIcon,
-      saving: management.saving,
-      savingAriaLabel: '단가 저장 중',
-      visible: canWrite,
-      disabled: !management.hasChanges || management.saving || management.loading,
-      onClick: () => {
-        const grid = gridRef.current;
-        if (!grid) return;
-        if (!grid.validate()) {
-          management.setError('필수 입력 항목과 단가 조건을 확인해 주세요.');
-          return;
-        }
-        void management.saveChanges(
-          grid.getChanges(),
-          (savedRows) => grid.acceptSavedRows(savedRows),
-        );
-      },
     }] },
   ];
 
@@ -211,6 +122,7 @@ export function ItemPartnerPriceManagementPage({
         description={content.description}
         actionGroups={actions}
       />
+      {tabs}
       <PageLoadBoundary
         {...management.initialLoad}
         label="단가 목록"
@@ -248,7 +160,7 @@ export function ItemPartnerPriceManagementPage({
           onDefaultSearch={searchDefault}
           detailFields={detailFields}
           detailValues={detailValues}
-          appliedDetailValues={searchSession?.detailValues ?? {}}
+          appliedDetailValues={searchSession?.detailValues ?? DEFAULT_DETAIL_VALUES}
           onDetailValuesChange={setDetailValues}
           onDetailSearch={searchDetails}
           detailLoading={management.loading}
@@ -261,40 +173,16 @@ export function ItemPartnerPriceManagementPage({
           <ItemPartnerPriceGrid
             rows={management.rows}
             highlightKeyword={management.appliedFilters.keyword}
-            canCreate={canCreate && !management.loading && !management.saving}
-            canUpdate={canUpdate && !management.loading && !management.saving}
+            canCreate={false}
+            canUpdate={false}
             canExportExcel={Boolean(selectedMenuPermissions?.excel)}
             loading={management.loading}
             gridKey={management.gridKey}
-            gridRef={gridRef}
+            gridRef={undefined}
+            codeOptions={codeOptions}
             onChangesChange={management.handleChangesChange}
           />
         </Box>
-        <ItemPartnerPriceImportDialog
-          open={importOpen}
-          onClose={() => setImportOpen(false)}
-          onStage={addImportedRows}
-        />
-        <UnsavedChangesConfirmDialog
-          open={pendingSearch !== null}
-          title="저장하지 않은 변경사항"
-          description="변경사항을 버리고 단가 목록을 다시 불러오시겠습니까?"
-          cancelLabel="취소"
-          continueLabel="계속"
-          onCancel={() => {
-            setPendingSearch(null);
-            setDetailValues(searchSession?.detailValues ?? {});
-          }}
-          onContinue={() => {
-            if (pendingSearch) {
-              management.discardChanges();
-              management.applyFilters(pendingSearch.filters);
-              setSearchSession(pendingSearch.session);
-              setDetailValues(pendingSearch.session.detailValues);
-            }
-            setPendingSearch(null);
-          }}
-        />
       </PageLoadBoundary>
     </Box>
   );
