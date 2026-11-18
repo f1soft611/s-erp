@@ -4,7 +4,6 @@ import {
   render,
   screen,
   waitFor,
-  within,
 } from '@testing-library/react';
 import { createRef, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -307,7 +306,7 @@ describe('typed form field', () => {
   it('renders text with margin none and uses getValue for the displayed value', () => {
     const onPatch = vi.fn();
 
-    const { rerender } = render(
+    render(
       <GridFormField
         column={{
           field: 'name',

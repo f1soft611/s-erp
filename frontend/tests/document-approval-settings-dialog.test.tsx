@@ -870,7 +870,7 @@ describe('DocumentApprovalSettingsDialog', () => {
     const { onApply } = renderSettings();
 
     fireEvent.click(screen.getByRole('button', { name: '설정' }));
-    const grid = await screen.findByRole('grid', {
+    await screen.findByRole('grid', {
       name: '자주 쓰는 결재선 목록',
     });
     await screen.findByRole('gridcell', { name: '기본 결재선' });

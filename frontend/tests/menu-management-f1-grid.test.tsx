@@ -13,7 +13,6 @@ import {
   fetchActivePermissions,
   fetchMenuRows,
   fetchModules,
-  replaceMenuPermissions,
   saveMenuChanges,
   saveRoleMenuPermissions,
 } from '../src/pages/settings/system/menus/services/menuManagement.service';

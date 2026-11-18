@@ -54,11 +54,6 @@ const __dirname = path.dirname(__filename);
   const rowCount = await rows.count();
   console.log('row count:', rowCount);
 
-  // 편집 가능한 텍스트 셀 후보들 중 두 번째, 세 번째 셀을 더블클릭해서 비교
-  const editableCandidates = page.locator(
-    'div[role="gridcell"][tabindex="0"], div[role="gridcell"]',
-  );
-
   for (let i = 0; i < Math.min(cellCount, 40); i += 1) {
     const cell = gridCells.nth(i);
     const text = await cell.innerText().catch(() => '');

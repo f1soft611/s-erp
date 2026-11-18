@@ -324,7 +324,7 @@ const itemColumns = (
     align: 'center',
     headerAlign: 'center',
     onValueChange: (_row, value) => ({
-      useAt: Boolean(value) ? 'Y' : 'N',
+      useAt: value ? 'Y' : 'N',
     }),
   },
   {
@@ -616,7 +616,7 @@ export const CommonCodeManagementPanel = forwardRef<
           ),
         );
         setParentPickerOpen(true);
-      } catch (error) {
+      } catch {
         onError?.('상위 그룹의 상세코드를 불러오지 못했습니다.');
       }
     },

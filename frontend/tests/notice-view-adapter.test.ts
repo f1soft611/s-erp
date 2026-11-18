@@ -11,7 +11,6 @@ const item: NoticeFeedItem = {
   body: '점검 안내 본문',
   createdAt: '2026-09-21T10:30:00+09:00',
   isPinned: 'Y',
-  isPinned: 'Y',
   commentCount: 2,
 };
 

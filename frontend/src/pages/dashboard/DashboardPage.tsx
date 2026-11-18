@@ -119,7 +119,7 @@ const getMenuRoutePath = (module: ModuleItem, menuId: string): string => {
     return normalizeRoutePath(directMatch);
   }
 
-  return `${modulePath === '/' ? '' : modulePath}/${menuId}` || '/';
+  return `${modulePath === '/' ? '' : modulePath}/${menuId}`;
 };
 
 function findMenuPath(

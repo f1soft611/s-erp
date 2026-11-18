@@ -187,7 +187,6 @@ try {
     await page.setViewportSize({ width, height: 900 });
     await page.waitForTimeout(100);
     const measurement = await composerDialog.evaluate((dialog) => {
-      const paper = dialog.getBoundingClientRect();
       const footer = dialog.querySelector('.MuiDialogActions-root');
       const header = dialog.querySelector('.MuiDialogTitle-root')?.parentElement
         ?.parentElement;
