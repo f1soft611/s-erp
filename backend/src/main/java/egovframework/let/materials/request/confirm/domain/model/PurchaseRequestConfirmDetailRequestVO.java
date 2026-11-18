@@ -46,6 +46,12 @@ public class PurchaseRequestConfirmDetailRequestVO implements Serializable {
     @Schema(description = "통화 코드", example = "KRW")
     private String currencyCode;
 
+    @Schema(description = "부가세구분 공통코드(PURCHASE_TAX_TYPE). 비우면 TAXABLE", example = "TAXABLE")
+    private String taxType;
+
+    @Schema(description = "부가세 포함 여부 Y/N. 비우면 N. 과세일 때만 Y 허용", example = "N")
+    private String vatIncludedAt;
+
     @Schema(description = "확정 비고")
     private String confirmRemark;
 }

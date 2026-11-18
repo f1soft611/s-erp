@@ -38,6 +38,7 @@ import {
   validateArrivalInput,
 } from './services/materialArrival.service';
 import type { MaterialArrivalCandidate, MaterialArrivalItem } from './types/materialArrival.types';
+import { usePageMessages } from '../../../../shared/hooks/usePageMessages';
 import { useServerDateDefault } from '../../../../shared/hooks/useServerDateDefault';
 import { FormDateField, normalizeFormDate } from '../../../../shared/components/FormDateField';
 
@@ -116,9 +117,9 @@ export function MaterialArrivalCreatePage({
   const [taxTypeOptions, setTaxTypeOptions] = useState<PurchaseOrderSelectOption[]>(DEFAULT_TAX_OPTIONS);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [validationMessages, setValidationMessages] = useState<string[]>([]);
-  const [notice, setNotice] = useState('');
-  const [error, setError] = useState('');
+  const {
+    validationMessages, setValidationMessages, notice, setNotice, error, setError, clearMessages,
+  } = usePageMessages();
   /** 열린 저장 가입고. null이면 신규 등록 */
   const [loaded, setLoaded] = useState<MaterialArrivalItem | null>(null);
   const [isLoading, setIsLoading] = useState(materialArrivalId != null);
@@ -157,7 +158,7 @@ export function MaterialArrivalCreatePage({
       .then((options) => { if (active && options.length > 0) setTaxTypeOptions(options); })
       .catch(() => { /* 공통코드가 없으면 기본 3종을 쓴다 */ });
     return () => { active = false; };
-  }, []);
+  }, [setError]);
 
   const resetGrid = useCallback((rows: MaterialArrivalRow[]) => {
     setBaselineRows(rows);
@@ -166,7 +167,7 @@ export function MaterialArrivalCreatePage({
     setValidationMessages([]);
     gridValidationActiveRef.current = false;
     setGridKey((key) => key + 1);
-  }, []);
+  }, [setValidationMessages]);
 
   /** 그리드에 입력 중인 값을 포함한 현재 행. */
   const currentRows = useCallback(
@@ -199,7 +200,7 @@ export function MaterialArrivalCreatePage({
       })
       .finally(() => { if (active) setIsLoading(false); });
     return () => { active = false; };
-  }, [applyLoaded, materialArrivalId]);
+  }, [applyLoaded, materialArrivalId, setError]);
 
   const { markTouched: markDateTouched, reload: reloadServerDate } = useServerDateDefault({
     enabled: materialArrivalId == null,
@@ -224,8 +225,7 @@ export function MaterialArrivalCreatePage({
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
-    setNotice('');
-    setError('');
+    clearMessages();
     try {
       await work();
     } catch (workError) {
@@ -234,7 +234,7 @@ export function MaterialArrivalCreatePage({
       busyRef.current = false;
       setBusy(false);
     }
-  }, []);
+  }, [clearMessages, setError]);
 
   const handleNew = useCallback(async () => {
     if (busyRef.current) return;
@@ -244,12 +244,12 @@ export function MaterialArrivalCreatePage({
       return;
     }
     resetToNew();
-    setNotice('');
-    setError('');
-  }, [confirm, hasUnsavedChanges, resetToNew]);
+    clearMessages();
+  }, [clearMessages, confirm, hasUnsavedChanges, resetToNew]);
 
   /** 발주 품목을 담는다. 같은 구매처·같은 통화만 한 가입고에 누적한다. 첫 품목의 발주 부가세 설정을 기본값으로 쓴다. */
   const loadOrderRows = useCallback((candidates: MaterialArrivalCandidate[]) => {
+    clearMessages();
     setPickerOpen(false);
     const first = candidates[0];
     if (!first || first.supplierId === null) {
@@ -280,12 +280,12 @@ export function MaterialArrivalCreatePage({
     setTaxType(nextTax);
     setVatIncluded(nextIncluded);
     resetGrid([...existing, ...added]);
-    setNotice('');
-    setError('');
-  }, [currencyCode, currentRows, hasRows, resetGrid, supplier, taxType, vatIncluded]);
+    clearMessages();
+  }, [clearMessages, currencyCode, currentRows, hasRows, resetGrid, setError, supplier, taxType, vatIncluded]);
 
   /** 체크한 품목 행만 뺀다. 입력한 값은 남은 행에 그대로 유지한다. */
   const removeSelectedRows = useCallback(() => {
+    clearMessages();
     const selected = new Set(selectedRowIds.map(String));
     if (selected.size === 0) return;
     const rows = currentRows();
@@ -300,31 +300,35 @@ export function MaterialArrivalCreatePage({
     if (removable.size === 0) return;
     setDirty(true);
     resetGrid(rows.filter((row) => !removable.has(row.rowId)));
-  }, [currentRows, resetGrid, selectedRowIds]);
+  }, [clearMessages, currentRows, resetGrid, selectedRowIds, setError]);
 
   const handleChangesChange = useCallback((changes: F1GridChanges<MaterialArrivalRow>) => {
     const updated = new Map(changes.updatedRows.map((row) => [row.rowId, row]));
     if (updated.size > 0) setDirty(true);
     setActiveRows(baselineRows.map((row) => updated.get(row.rowId) ?? row));
-    setValidationMessages([]);
+    // 실제로 값을 고쳤을 때만 이전 메시지를 모두 비운다(그리드 재구성 직후의 빈 변경 콜백은 성공 안내를 지우지 않는다).
+    if (updated.size > 0) clearMessages();
+    else setValidationMessages([]);
     if (gridValidationActiveRef.current) {
       gridValidationActiveRef.current = !(gridRef.current?.validate() ?? true);
     }
-  }, [baselineRows]);
+  }, [baselineRows, clearMessages, setValidationMessages]);
 
   const changeTaxType = useCallback((next: PurchaseOrderTaxType) => {
+    clearMessages();
     const nextIncluded = isTaxable(next) ? vatIncluded : false;
     setDirty(true);
     setTaxType(next);
     setVatIncluded(nextIncluded);
     resetGrid(currentRows().map((row) => recalculateRow(row, next, nextIncluded)));
-  }, [currentRows, resetGrid, vatIncluded]);
+  }, [clearMessages, currentRows, resetGrid, vatIncluded]);
 
   const changeVatIncluded = useCallback((next: boolean) => {
+    clearMessages();
     setDirty(true);
     setVatIncluded(next);
     resetGrid(currentRows().map((row) => recalculateRow(row, taxType, next)));
-  }, [currentRows, resetGrid, taxType]);
+  }, [clearMessages, currentRows, resetGrid, taxType]);
 
   const handleSave = useCallback(async () => {
     if (!editable) return;
@@ -338,6 +342,7 @@ export function MaterialArrivalCreatePage({
         : validateArrivalInput({ arrivalDt: dateCheck.date, supplierId: supplier?.id ?? null, taxType }, rows);
     const isGridValid = gridRef.current?.validate() ?? true;
     gridValidationActiveRef.current = !isGridValid;
+    clearMessages();
     setValidationMessages(messages);
     if (messages.length > 0 || !isGridValid || !supplier) return;
     const overCount = countRowsOverRemaining(rows);
@@ -361,8 +366,7 @@ export function MaterialArrivalCreatePage({
       setNotice(`가입고를 등록했습니다. 가입고번호: ${saved.arrivalNo}${autoReceipt}`);
       onSaved?.(saved);
     });
-  }, [applyLoaded, arrivalDt, confirm, currentRows, editable, loaded, onSaved, remark, resetToNew, runBusy, supplier, taxType,
-    vatIncluded]);
+  }, [applyLoaded, arrivalDt, clearMessages, confirm, currentRows, editable, loaded, onSaved, remark, resetToNew, runBusy, setNotice, setValidationMessages, supplier, taxType, vatIncluded]);
 
   /** 가입고 전체를 취소한다. 취소하면 발주 잔량이 복원되어 다시 가입고할 수 있다. */
   const handleCancelArrival = useCallback(async () => {
@@ -376,7 +380,7 @@ export function MaterialArrivalCreatePage({
       setNotice(`가입고를 취소했습니다. 가입고번호: ${loaded.arrivalNo}`);
       onCanceled?.();
     });
-  }, [confirm, editable, loaded, onCanceled, runBusy]);
+  }, [confirm, editable, loaded, onCanceled, runBusy, setNotice]);
 
   const isEditing = loaded !== null;
   const saveDisabled = !editable || (isEditing ? !dirty : !hasRows);
@@ -513,7 +517,7 @@ export function MaterialArrivalCreatePage({
               label="가입고일"
               value={arrivalDt}
               disabled={!editable || headerLocked}
-              onChange={(value) => { markDateTouched(); setArrivalDt(value); setDirty(true); setValidationMessages([]); }}
+              onChange={(value) => { markDateTouched(); setArrivalDt(value); setDirty(true); clearMessages(); }}
             />
             <TextField
               label="구매처"
@@ -559,7 +563,7 @@ export function MaterialArrivalCreatePage({
               label="비고"
               size="small"
               value={remark}
-              onChange={(event) => { setRemark(event.target.value); setDirty(true); }}
+              onChange={(event) => { setRemark(event.target.value); setDirty(true); clearMessages(); }}
               disabled={!editable}
               slotProps={{ inputLabel: { shrink: true }, htmlInput: { maxLength: 500 } }}
             />

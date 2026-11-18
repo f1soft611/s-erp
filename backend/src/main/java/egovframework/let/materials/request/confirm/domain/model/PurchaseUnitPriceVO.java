@@ -24,6 +24,18 @@ public class PurchaseUnitPriceVO implements Serializable {
     @Schema(description = "단가", example = "1250")
     private BigDecimal unitPrice;
 
-    @Schema(description = "통화 코드", example = "KRW")
+    @Schema(description = "통화 코드. 원화단가가 있으면 KRW, 외화단가만 있으면 그 외화통화", example = "KRW")
     private String currency;
+
+    @Schema(description = "부가세구분 공통코드(PURCHASE_TAX_TYPE)", example = "TAXABLE")
+    private String taxType;
+
+    @Schema(description = "부가세 포함 여부 Y/N", example = "N")
+    private String vatIncludedAt;
+
+    @Schema(description = "외화단가(있는 경우). 통화를 foreignCurrency로 바꿀 때 단가로 쓴다", example = "9.50")
+    private BigDecimal foreignUnitPrice;
+
+    @Schema(description = "외화단가의 통화", example = "USD")
+    private String foreignCurrency;
 }

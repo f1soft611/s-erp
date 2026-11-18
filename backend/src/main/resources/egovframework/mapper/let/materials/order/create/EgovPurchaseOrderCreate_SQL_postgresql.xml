@@ -41,6 +41,8 @@
                w.warehouse_name AS warehouseName,
                d.unit_price AS unitPrice,
                d.currency_code AS currencyCode,
+               COALESCE(d.tax_type, 'TAXABLE') AS taxType,
+               COALESCE(d.vat_included_at, 'N') AS vatIncludedAt,
                d.order_type AS orderType,
                oci.item_nm AS orderTypeName,
                d.use_type AS useType,
@@ -220,6 +222,7 @@
             resultType="egovframework.let.materials.order.create.domain.model.PurchaseOrderVO">
         SELECT oh.purchase_order_id AS purchaseOrderId,
                oh.order_no AS orderNo,
+               oh.order_dt AS orderDt,
                oh.supplier_id AS supplierId,
                oh.currency_code AS currencyCode,
                oh.source_type AS sourceType,

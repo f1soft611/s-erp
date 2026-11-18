@@ -3,6 +3,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import { Alert, Box, Button, Chip, TextField } from '@mui/material';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { PageMessageArea } from '../../../../../shared/components/PageMessageArea';
+import { PickerDateRangeFields } from '../../../../../shared/components/PickerDateRangeFields';
+import { usePickerDateRange } from '../../../../../shared/hooks/usePickerDateRange';
 import { F1Grid, type F1GridColumn, type F1GridRef } from '../../../../../shared/components/f1-grid';
 import {
   distinctReceiptCandidateCurrencies,
@@ -29,8 +31,7 @@ export function MaterialReceiptInspectionPicker({ open, onClose, onSelect, exclu
   const request = useRef(0);
   const programmaticSelection = useRef(false);
   const [keyword, setKeyword] = useState('');
-  const [fromDt, setFromDt] = useState('');
-  const [toDt, setToDt] = useState('');
+  const { fromDt, toDt, setFromDt, setToDt, ready: rangeReady } = usePickerDateRange(open);
   const [rows, setRows] = useState<MaterialReceiptCandidate[]>([]);
   const [selectedIds, setSelectedIds] = useState<RowId[]>([]);
   const [lockedSupplier, setLockedSupplier] = useState<{ id: number; name: string } | null>(null);
@@ -72,10 +73,10 @@ export function MaterialReceiptInspectionPicker({ open, onClose, onSelect, exclu
   }, [fromDt, keyword, toDt]);
 
   useEffect(() => {
-    if (open) void search();
+    if (open && rangeReady) void search();
     // 열릴 때 현재 검색 조건으로 한 번 조회한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, rangeReady]);
 
   useEffect(() => () => {
     request.current += 1;
@@ -127,9 +128,9 @@ export function MaterialReceiptInspectionPicker({ open, onClose, onSelect, exclu
     { field: 'materialName', headerName: '품목명', width: 170 },
     { field: 'materialSpec', headerName: '규격', width: 110 },
     { field: 'unit', headerName: '단위', width: 64, align: 'center' },
-    { field: 'passQty', headerName: '합격수량', type: 'decimal', decimalPlaces: 2, width: 96, align: 'right' },
-    { field: 'receivedQty', headerName: '기입고', type: 'decimal', decimalPlaces: 2, width: 90, align: 'right' },
-    { field: 'receivableQty', headerName: '입고 가능량', type: 'decimal', decimalPlaces: 2, width: 104, align: 'right' },
+    { field: 'passQty', headerName: '합격수량', type: 'decimal', width: 96, align: 'right' },
+    { field: 'receivedQty', headerName: '기입고', type: 'decimal', width: 90, align: 'right' },
+    { field: 'receivableQty', headerName: '입고 가능량', type: 'decimal', width: 104, align: 'right' },
   ], []);
 
   const confirmSelection = () => {
@@ -171,25 +172,12 @@ export function MaterialReceiptInspectionPicker({ open, onClose, onSelect, exclu
           }}
           sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, minWidth: 0, flexShrink: 0 }}
         >
-          <TextField
-            size="small"
-            margin="none"
-            type="date"
-            label="검사일 시작"
-            value={fromDt}
-            onChange={(event) => setFromDt(event.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: 160, '& .MuiOutlinedInput-root': { height: SEARCH_CONTROL_HEIGHT } }}
-          />
-          <TextField
-            size="small"
-            margin="none"
-            type="date"
-            label="검사일 종료"
-            value={toDt}
-            onChange={(event) => setToDt(event.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: 160, '& .MuiOutlinedInput-root': { height: SEARCH_CONTROL_HEIGHT } }}
+          <PickerDateRangeFields
+            label="검사일"
+            fromDt={fromDt}
+            toDt={toDt}
+            onFromChange={setFromDt}
+            onToChange={setToDt}
           />
           <TextField
             size="small"

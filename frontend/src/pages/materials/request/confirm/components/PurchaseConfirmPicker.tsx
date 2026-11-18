@@ -3,6 +3,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import { Box, Button, MenuItem, TextField } from '@mui/material';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { PageMessageArea } from '../../../../../shared/components/PageMessageArea';
+import { PickerDateRangeFields } from '../../../../../shared/components/PickerDateRangeFields';
+import { usePickerDateRange } from '../../../../../shared/hooks/usePickerDateRange';
 import { F1Grid, type F1GridColumn } from '../../../../../shared/components/f1-grid';
 import { searchPurchaseConfirms } from '../services/purchaseRequestConfirm.service';
 import type { PurchaseConfirmListItem, PurchaseConfirmStatusFilter } from '../types/purchaseRequestConfirm.types';
@@ -25,6 +27,7 @@ export function PurchaseConfirmPicker({ open, onClose, onSelect }: {
   onSelect: (confirm: PurchaseConfirmListItem) => void;
 }) {
   const [keyword, setKeyword] = useState('');
+  const { fromDt, toDt, setFromDt, setToDt, ready: rangeReady } = usePickerDateRange(open);
   const [status, setStatus] = useState<PurchaseConfirmStatusFilter>('ACTIVE');
   const [rows, setRows] = useState<PurchaseConfirmListItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,24 +35,28 @@ export function PurchaseConfirmPicker({ open, onClose, onSelect }: {
   const request = useRef(0);
 
   const search = useCallback(async (nextStatus: PurchaseConfirmStatusFilter, nextKeyword: string) => {
+    if (fromDt && toDt && fromDt > toDt) {
+      setError('확정일 시작일은 종료일보다 늦을 수 없습니다.');
+      return;
+    }
     const token = ++request.current;
     setLoading(true);
     setError('');
     try {
-      const result = await searchPurchaseConfirms(nextKeyword, nextStatus);
+      const result = await searchPurchaseConfirms(nextKeyword, nextStatus, { fromDt, toDt });
       if (token === request.current) setRows(result);
     } catch (cause) {
       if (token === request.current) setError(cause instanceof Error ? cause.message : '구매요청확정 조회에 실패했습니다.');
     } finally {
       if (token === request.current) setLoading(false);
     }
-  }, []);
+  }, [fromDt, toDt]);
 
   useEffect(() => {
-    if (open) void search(status, keyword);
+    if (open && rangeReady) void search(status, keyword);
     // 열릴 때 현재 조건으로 한 번 조회한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, rangeReady]);
 
   useEffect(() => () => {
     request.current += 1;
@@ -119,6 +126,7 @@ export function PurchaseConfirmPicker({ open, onClose, onSelect }: {
               <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
             ))}
           </TextField>
+          <PickerDateRangeFields label="확정일" fromDt={fromDt} toDt={toDt} onFromChange={setFromDt} onToChange={setToDt} />
           <TextField
             size="small"
             margin="none"

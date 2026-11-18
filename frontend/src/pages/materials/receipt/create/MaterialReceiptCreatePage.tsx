@@ -41,6 +41,7 @@ import {
   validateReceiptInput,
 } from './services/materialReceipt.service';
 import type { MaterialReceiptCandidate, MaterialReceiptItem } from './types/materialReceipt.types';
+import { usePageMessages } from '../../../../shared/hooks/usePageMessages';
 import { useServerDateDefault } from '../../../../shared/hooks/useServerDateDefault';
 import { FormDateField, normalizeFormDate } from '../../../../shared/components/FormDateField';
 
@@ -122,9 +123,9 @@ export function MaterialReceiptCreatePage({
   const [taxTypeOptions, setTaxTypeOptions] = useState<PurchaseOrderSelectOption[]>(DEFAULT_TAX_OPTIONS);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [validationMessages, setValidationMessages] = useState<string[]>([]);
-  const [notice, setNotice] = useState('');
-  const [error, setError] = useState('');
+  const {
+    validationMessages, setValidationMessages, notice, setNotice, error, setError, clearMessages,
+  } = usePageMessages();
   /** 열린 저장 입고. null이면 신규 등록(수입검사 합격분 불러오기) */
   const [loaded, setLoaded] = useState<MaterialReceiptItem | null>(null);
   /** 조회 조건과 무관한 입고 가능 수입검사 합격분 건수. 신규 등록 화면의 안내에 쓴다(null이면 아직 모름). */
@@ -174,7 +175,7 @@ export function MaterialReceiptCreatePage({
       .then((options) => { if (active && options.length > 0) setTaxTypeOptions(options); })
       .catch(() => { /* 공통코드가 없으면 기본 3종을 쓴다 */ });
     return () => { active = false; };
-  }, []);
+  }, [setError]);
 
   const resetGrid = useCallback((rows: MaterialReceiptRow[]) => {
     setBaselineRows(rows);
@@ -183,7 +184,7 @@ export function MaterialReceiptCreatePage({
     setValidationMessages([]);
     gridValidationActiveRef.current = false;
     setGridKey((key) => key + 1);
-  }, []);
+  }, [setValidationMessages]);
 
   /** 그리드에 입력 중인 값을 포함한 현재 행. */
   const currentRows = useCallback(
@@ -216,14 +217,13 @@ export function MaterialReceiptCreatePage({
       })
       .finally(() => { if (active) setIsLoading(false); });
     return () => { active = false; };
-  }, [applyLoaded, materialReceiptId]);
+  }, [applyLoaded, materialReceiptId, setError]);
 
   const runBusy = useCallback(async (work: () => Promise<void>) => {
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
-    setNotice('');
-    setError('');
+    clearMessages();
     try {
       await work();
     } catch (workError) {
@@ -232,7 +232,7 @@ export function MaterialReceiptCreatePage({
       busyRef.current = false;
       setBusy(false);
     }
-  }, []);
+  }, [clearMessages, setError]);
 
   const { markTouched: markDateTouched, reload: reloadServerDate } = useServerDateDefault({
     enabled: materialReceiptId == null,
@@ -261,15 +261,15 @@ export function MaterialReceiptCreatePage({
       return;
     }
     resetToNew();
-    setNotice('');
-    setError('');
-  }, [confirm, hasUnsavedChanges, resetToNew]);
+    clearMessages();
+  }, [clearMessages, confirm, hasUnsavedChanges, resetToNew]);
 
   /**
    * 수입검사 합격분을 담는다. 같은 구매처·같은 통화만 한 입고에 누적하고, 이미 담긴 행은 건너뛴다.
    * 첫 행의 가입고 부가세 설정을 기본값으로 쓰며 입고수량은 입고 가능량이다.
    */
   const loadCandidates = useCallback((candidates: MaterialReceiptCandidate[]) => {
+    clearMessages();
     setPickerOpen(false);
     const first = candidates[0];
     if (!first) return;
@@ -297,41 +297,45 @@ export function MaterialReceiptCreatePage({
     setTaxType(nextTax);
     setVatIncluded(nextIncluded);
     resetGrid([...existing, ...added]);
-    setNotice('');
-    setError('');
-  }, [currencyCode, currentRows, hasRows, resetGrid, supplier, taxType, vatIncluded]);
+    clearMessages();
+  }, [clearMessages, currencyCode, currentRows, hasRows, resetGrid, setError, supplier, taxType, vatIncluded]);
 
   /** 체크한 품목 행만 뺀다. 입력한 값은 남은 행에 그대로 유지한다. */
   const removeSelectedRows = useCallback(() => {
+    clearMessages();
     const selected = new Set(selectedRowIds.map(String));
     if (selected.size === 0) return;
     setDirty(true);
     resetGrid(currentRows().filter((row) => !selected.has(row.rowId)));
-  }, [currentRows, resetGrid, selectedRowIds]);
+  }, [clearMessages, currentRows, resetGrid, selectedRowIds]);
 
   const handleChangesChange = useCallback((changes: F1GridChanges<MaterialReceiptRow>) => {
     const updated = new Map(changes.updatedRows.map((row) => [row.rowId, row]));
     if (updated.size > 0) setDirty(true);
     setActiveRows(baselineRows.map((row) => updated.get(row.rowId) ?? row));
-    setValidationMessages([]);
+    // 실제로 값을 고쳤을 때만 이전 메시지를 모두 비운다(그리드 재구성 직후의 빈 변경 콜백은 성공 안내를 지우지 않는다).
+    if (updated.size > 0) clearMessages();
+    else setValidationMessages([]);
     if (gridValidationActiveRef.current) {
       gridValidationActiveRef.current = !(gridRef.current?.validate() ?? true);
     }
-  }, [baselineRows]);
+  }, [baselineRows, clearMessages, setValidationMessages]);
 
   const changeTaxType = useCallback((next: PurchaseOrderTaxType) => {
+    clearMessages();
     const nextIncluded = isTaxable(next) ? vatIncluded : false;
     setDirty(true);
     setTaxType(next);
     setVatIncluded(nextIncluded);
     resetGrid(currentRows().map((row) => recalculateRow(row, next, nextIncluded)));
-  }, [currentRows, resetGrid, vatIncluded]);
+  }, [clearMessages, currentRows, resetGrid, vatIncluded]);
 
   const changeVatIncluded = useCallback((next: boolean) => {
+    clearMessages();
     setDirty(true);
     setVatIncluded(next);
     resetGrid(currentRows().map((row) => recalculateRow(row, taxType, next)));
-  }, [currentRows, resetGrid, taxType]);
+  }, [clearMessages, currentRows, resetGrid, taxType]);
 
   const handleSave = useCallback(async () => {
     if (!editable) return;
@@ -343,6 +347,7 @@ export function MaterialReceiptCreatePage({
       : validateReceiptInput({ receiptDt: dateCheck.date, taxType }, rows, loaded === null);
     const isGridValid = gridRef.current?.validate() ?? true;
     gridValidationActiveRef.current = !isGridValid;
+    clearMessages();
     setValidationMessages(messages);
     if (messages.length > 0 || !isGridValid) return;
     if (!loaded) {
@@ -371,8 +376,7 @@ export function MaterialReceiptCreatePage({
       setNotice(`입고를 수정했습니다. 입고번호: ${saved.receiptNo}`);
       onSaved?.(saved);
     });
-  }, [applyLoaded, confirm, currentRows, editable, loaded, onSaved, receiptDt, refreshWaitingTotal, remark,
-    resetToNew, runBusy, taxType, vatIncluded]);
+  }, [applyLoaded, clearMessages, confirm, currentRows, editable, loaded, onSaved, receiptDt, refreshWaitingTotal, remark, resetToNew, runBusy, setNotice, setValidationMessages, taxType, vatIncluded]);
 
   /** 입고 전체를 취소한다. 무검사 품목은 가입고도 함께 정리되므로 확인창에서 먼저 알린다. */
   const handleCancelReceipt = useCallback(async () => {
@@ -387,7 +391,7 @@ export function MaterialReceiptCreatePage({
       setNotice(`입고를 취소했습니다. 입고번호: ${loaded.receiptNo}`);
       onCanceled?.();
     });
-  }, [confirm, editable, loaded, onCanceled, runBusy]);
+  }, [confirm, editable, loaded, onCanceled, runBusy, setNotice]);
 
   const isEditing = loaded !== null;
   const saveDisabled = !editable || (isEditing ? !dirty : !hasRows);
@@ -524,7 +528,7 @@ export function MaterialReceiptCreatePage({
               label="입고일"
               value={receiptDt}
               disabled={!editable}
-              onChange={(value) => { markDateTouched(); setReceiptDt(value); setDirty(true); setValidationMessages([]); }}
+              onChange={(value) => { markDateTouched(); setReceiptDt(value); setDirty(true); clearMessages(); }}
             />
             <TextField
               label="구매처"
@@ -564,7 +568,7 @@ export function MaterialReceiptCreatePage({
               label="비고"
               size="small"
               value={remark}
-              onChange={(event) => { setRemark(event.target.value); setDirty(true); }}
+              onChange={(event) => { setRemark(event.target.value); setDirty(true); clearMessages(); }}
               disabled={!editable}
               slotProps={{ inputLabel: { shrink: true }, htmlInput: { maxLength: 500 } }}
             />

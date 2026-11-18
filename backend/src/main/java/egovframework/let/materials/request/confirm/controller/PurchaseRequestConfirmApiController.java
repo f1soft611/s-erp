@@ -53,13 +53,15 @@ public class PurchaseRequestConfirmApiController {
     private final ResultVoHelper resultVoHelper;
     private final PurchaseRequestConfirmService confirmService;
 
-    @Operation(summary = "확정 대상 품목 목록", description = "요청·부분확정 상태 구매요청의 확정 안 된 품목 행을 검색어로 조회한다",
+    @Operation(summary = "확정 대상 품목 목록", description = "요청·부분확정 상태 구매요청의 확정 안 된 품목 행을 검색어와 요청일 기간(fromDt, toDt, 선택)으로 조회한다",
             security = { @SecurityRequirement(name = "Authorization") }, tags = { TAG })
     @GetMapping("/candidates")
     public ResultVO listCandidates(@RequestParam(required = false) String keyword,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDt,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDt,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
-        return result("resultList", confirmService.listCandidates(user.getTenantId(), keyword), null);
+        return result("resultList", confirmService.listCandidates(user.getTenantId(), keyword, fromDt, toDt), null);
     }
 
     @Operation(summary = "선택한 구매요청 품목 조회", description = "확정할 품목 행을 상세 행 ID로 조회한다. 확정됐거나 삭제된 요청의 행이 있으면 409",
@@ -87,14 +89,16 @@ public class PurchaseRequestConfirmApiController {
                 null);
     }
 
-    @Operation(summary = "구매요청확정 목록", description = "확정번호 목록을 조회한다. status: ACTIVE(기본), CANCELED, ALL",
+    @Operation(summary = "구매요청확정 목록", description = "확정번호 목록을 조회한다. status: ACTIVE(기본), CANCELED, ALL. 확정일 기간(fromDt, toDt)은 선택",
             security = { @SecurityRequirement(name = "Authorization") }, tags = { TAG })
     @GetMapping
     public ResultVO listConfirms(@RequestParam(required = false) String keyword,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDt,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDt,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
-        return result("resultList", confirmService.listConfirms(user.getTenantId(), keyword, status), null);
+        return result("resultList", confirmService.listConfirms(user.getTenantId(), keyword, status, fromDt, toDt), null);
     }
 
     @Operation(summary = "구매요청확정 조회", description = "확정번호 헤더와 묶인 구매요청 상세 행을 조회한다",

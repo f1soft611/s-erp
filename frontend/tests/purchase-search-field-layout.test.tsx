@@ -36,7 +36,7 @@ describe('purchase status search fields follow the sales order status layout', (
     expect(layoutOf(createPurchaseOrderStatusColumns())).toEqual([
       ['발주일', 2, '발주일'],
       ['발주번호', 1, '텍스트'], ['구매처', 1, '텍스트'], ['품목', 1, '텍스트'],
-      ['상태', 1, '선택'], ['출처', 1, '선택'],
+      ['상태', 1, '선택'], ['출처', 1, '선택'], ['입고대기마감', 1, '선택'],
       ['납기일', 2, '부가날짜'],
     ]);
   });

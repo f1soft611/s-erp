@@ -36,6 +36,7 @@ import {
   validatePurchaseRequestInput,
 } from './services/purchaseRequest.service';
 import type { PurchaseRequestItem, PurchaseRequestUseTypeOption } from './types/purchaseRequest.types';
+import { usePageMessages } from '../../../../shared/hooks/usePageMessages';
 import { useServerDateDefault } from '../../../../shared/hooks/useServerDateDefault';
 import { FormDateField, normalizeFormDate } from '../../../../shared/components/FormDateField';
 
@@ -108,9 +109,9 @@ export function PurchaseRequestCreatePage({
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(purchaseRequestId != null);
   const [isLocked, setIsLocked] = useState(false);
-  const [validationMessages, setValidationMessages] = useState<string[]>([]);
-  const [notice, setNotice] = useState('');
-  const [error, setError] = useState('');
+  const {
+    validationMessages, setValidationMessages, notice, setNotice, error, setError, clearMessages,
+  } = usePageMessages();
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const canCreate = Boolean(selectedMenuPermissions?.create);
@@ -149,7 +150,7 @@ export function PurchaseRequestCreatePage({
     return () => {
       active = false;
     };
-  }, []);
+  }, [setError]);
 
   const applyForm = useCallback((header: { requestDt: string; remark: string }, rows: PurchaseRequestDetailRow[]) => {
     setRequestDt(header.requestDt);
@@ -165,7 +166,7 @@ export function PurchaseRequestCreatePage({
     selectedMaterialRowIdRef.current = null;
     materialApplyPatchRef.current = null;
     setPickerOpen(false);
-  }, []);
+  }, [setValidationMessages]);
 
   const applyLoaded = useCallback((item: PurchaseRequestItem) => {
     setLoaded(item);
@@ -189,7 +190,7 @@ export function PurchaseRequestCreatePage({
     setError('');
     applyForm({ requestDt: '', remark: '' }, []);
     void reloadServerDate();
-  }, [applyForm, reloadServerDate]);
+  }, [applyForm, reloadServerDate, setError]);
 
   useEffect(() => {
     if (purchaseRequestId == null) return;
@@ -210,7 +211,7 @@ export function PurchaseRequestCreatePage({
     return () => {
       active = false;
     };
-  }, [applyLoaded, purchaseRequestId]);
+  }, [applyLoaded, purchaseRequestId, setError]);
 
   const handleChangesChange = useCallback((changes: F1GridChanges<PurchaseRequestDetailRow>) => {
     const deleted = new Set(changes.deletedRows.map((row) => row.rowId));
@@ -223,11 +224,13 @@ export function PurchaseRequestCreatePage({
     setHasDetailChanges(
       changes.insertedRows.length > 0 || changes.updatedRows.length > 0 || changes.deletedRows.length > 0,
     );
-    setValidationMessages([]);
+    // 실제로 값을 고쳤을 때만 이전 메시지를 모두 비운다.
+    if (changes.insertedRows.length > 0 || changes.updatedRows.length > 0 || changes.deletedRows.length > 0) clearMessages();
+    else setValidationMessages([]);
     if (gridValidationActiveRef.current) {
       gridValidationActiveRef.current = !(gridRef.current?.validate() ?? true);
     }
-  }, [gridRows]);
+  }, [clearMessages, gridRows, setValidationMessages]);
 
   const openMaterialPicker = useCallback((applyPatch: (changes: Partial<PurchaseRequestDetailRow>) => void) => {
     selectedMaterialRowIdRef.current = null;
@@ -256,8 +259,8 @@ export function PurchaseRequestCreatePage({
       materialApplyPatchRef.current?.(materialPatch(option as PurchaseMaterialOption));
     }
     closeMaterialPicker();
-    setValidationMessages([]);
-  }, [closeMaterialPicker]);
+    clearMessages();
+  }, [clearMessages, closeMaterialPicker]);
 
   const handleSave = useCallback(async () => {
     if (savingRef.current || !isEditable) return;
@@ -271,6 +274,7 @@ export function PurchaseRequestCreatePage({
     const messages = dateCheck.invalid ? ['올바른 요청일을 입력해 주세요.'] : inputMessages;
     const isGridValid = gridRef.current?.validate() ?? true;
     gridValidationActiveRef.current = !isGridValid;
+    clearMessages();
     setValidationMessages(messages);
     setError('');
     if (messages.length > 0 || !isGridValid) return;
@@ -292,7 +296,7 @@ export function PurchaseRequestCreatePage({
       savingRef.current = false;
       setIsSaving(false);
     }
-  }, [applyLoaded, hasUnsavedChanges, isEditable, loaded, onSaved, remark, requestDt]);
+  }, [applyLoaded, clearMessages, hasUnsavedChanges, isEditable, loaded, onSaved, remark, requestDt, setError, setNotice, setValidationMessages]);
 
   const handleDelete = useCallback(() => {
     if (savingRef.current || !loaded || !isDeletable) return;
@@ -304,8 +308,7 @@ export function PurchaseRequestCreatePage({
     if (savingRef.current || !loaded || !isDeletable) return;
     savingRef.current = true;
     setIsSaving(true);
-    setNotice('');
-    setError('');
+    clearMessages();
     try {
       await deletePurchaseRequest(loaded.purchaseRequestId);
       resetToNew();
@@ -317,7 +320,7 @@ export function PurchaseRequestCreatePage({
       savingRef.current = false;
       setIsSaving(false);
     }
-  }, [isDeletable, loaded, onDeleted, resetToNew]);
+  }, [clearMessages, isDeletable, loaded, onDeleted, resetToNew, setError, setNotice]);
 
   const handleNew = useCallback(async () => {
     if (savingRef.current) return;
@@ -331,7 +334,7 @@ export function PurchaseRequestCreatePage({
     }
     resetToNew();
     setNotice('');
-  }, [confirm, hasUnsavedChanges, resetToNew]);
+  }, [confirm, hasUnsavedChanges, resetToNew, setNotice]);
 
   const saveDisabled = isSaving || !isEditable || (loaded !== null && !hasUnsavedChanges);
   const deleteDisabled = isSaving || !isDeletable;
@@ -458,7 +461,7 @@ export function PurchaseRequestCreatePage({
               label="요청일"
               value={requestDt}
               disabled={!isEditable}
-              onChange={(value) => { markDateTouched(); setRequestDt(value); setValidationMessages([]); }}
+              onChange={(value) => { markDateTouched(); setRequestDt(value); clearMessages(); }}
             />
             <TextField
               label="요청자"
@@ -486,7 +489,7 @@ export function PurchaseRequestCreatePage({
               value={remark}
               onChange={(event) => {
                 setRemark(event.target.value);
-                setValidationMessages([]);
+                clearMessages();
               }}
               disabled={!isEditable}
               slotProps={{ htmlInput: { maxLength: 500 } }}

@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
@@ -199,7 +200,18 @@ public class PurchaseOrderServiceImpl extends EgovAbstractServiceImpl implements
         if (order == null) {
             throw notFound();
         }
-        order.setDetails(orderDAO.selectOrderDetails(params));
+        List<PurchaseOrderDetailVO> details = orderDAO.selectOrderDetails(params);
+        List<Long> detailIds = new ArrayList<Long>();
+        for (PurchaseOrderDetailVO detail : details) {
+            detailIds.add(detail.getPurchaseOrderDetailId());
+        }
+        // 화면이 가입고가 있는 행(수정 불가)을 알 수 있도록 행별 가입고수량을 채운다.
+        Map<Long, BigDecimal> arrivedById = selectArrivedQtys(tenantId, detailIds);
+        for (PurchaseOrderDetailVO detail : details) {
+            BigDecimal arrived = arrivedById.get(detail.getPurchaseOrderDetailId());
+            detail.setArrivedQty(arrived == null ? BigDecimal.ZERO : arrived);
+        }
+        order.setDetails(details);
         return order;
     }
 
@@ -257,6 +269,14 @@ public class PurchaseOrderServiceImpl extends EgovAbstractServiceImpl implements
             }
         }
 
+        // 가입고가 하나라도 있으면 발주일·부가세 설정(잠긴 행의 금액에 영향)을 바꿀 수 없고 비고만 수정할 수 있다.
+        if (!arrivedById.isEmpty()
+                && (!payload.getOrderDt().equals(locked.getOrderDt())
+                        || !taxType.equals(locked.getTaxType())
+                        || !vatIncludedAt.equals(locked.getVatIncludedAt() == null ? "N" : locked.getVatIncludedAt()))) {
+            throw arrivalConflict("가입고가 있는 발주는 발주일·부가세 설정을 바꿀 수 없습니다. 비고만 수정할 수 있습니다.");
+        }
+
         boolean direct = SOURCE_DIRECT.equals(locked.getSourceType());
         List<Long> requestDetailIds = new ArrayList<Long>();
         for (PurchaseOrderDetailVO existing : existingById.values()) {
@@ -296,13 +316,9 @@ public class PurchaseOrderServiceImpl extends EgovAbstractServiceImpl implements
                     inspectAt == null ? existing.getInspectAt() : inspectAt,
                     existing.getWarehouseId(), existing.getDeliveryDt());
             BigDecimal arrived = arrivedById.get(existing.getPurchaseOrderDetailId());
-            if (arrived != null) {
-                if (preparedRow.orderQty.compareTo(arrived) < 0) {
-                    throw arrivalConflict("가입고 수량보다 작게 수정할 수 없습니다.");
-                }
-                if (!preparedRow.inspectAt.equals(existing.getInspectAt())) {
-                    throw arrivalConflict("가입고가 있는 행은 검사대상을 바꿀 수 없습니다.");
-                }
+            if (arrived != null && changesLockedRow(existing, preparedRow)) {
+                throw arrivalConflict("가입고가 있는 행(" + existing.getLineNo()
+                        + "행)은 수량·단가·납기·창고·검사대상을 바꿀 수 없습니다. 가입고를 먼저 취소해 주세요.");
             }
             prepared.add(preparedRow);
             keptExisting.add(existing);
@@ -582,6 +598,27 @@ public class PurchaseOrderServiceImpl extends EgovAbstractServiceImpl implements
 
     private ResponseStatusException arrivalConflict(String message) {
         return new ResponseStatusException(HttpStatus.CONFLICT, message);
+    }
+
+    /** 가입고가 있는 행의 값(수량·단가·납기·창고·검사대상·금액)이 저장된 값과 달라지는지 확인한다. 행 비고는 제외한다. */
+    private boolean changesLockedRow(PurchaseOrderDetailVO existing, PreparedRow row) {
+        if (!sameNumber(existing.getOrderQty(), row.orderQty)
+                || !sameNumber(existing.getUnitPrice(), row.unitPrice)
+                || !Objects.equals(existing.getDeliveryDt(), row.deliveryDt)
+                || !Objects.equals(existing.getWarehouseId(), row.warehouseId)
+                || !Objects.equals(existing.getInspectAt(), row.inspectAt)) {
+            return true;
+        }
+        return (existing.getSupplyAmt() != null && !sameNumber(existing.getSupplyAmt(), row.amounts.getSupplyAmt()))
+                || (existing.getVatAmt() != null && !sameNumber(existing.getVatAmt(), row.amounts.getVatAmt()))
+                || (existing.getTotalAmt() != null && !sameNumber(existing.getTotalAmt(), row.amounts.getTotalAmt()));
+    }
+
+    private boolean sameNumber(BigDecimal stored, BigDecimal requested) {
+        if (stored == null || requested == null) {
+            return stored == requested;
+        }
+        return stored.compareTo(requested) == 0;
     }
 
     private ResponseStatusException concurrentChange() {

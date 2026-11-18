@@ -24,6 +24,7 @@ type ItemResult = { item?: PurchaseConfirmItem | null };
 const CONFIRM_PATH = '/api/v1/materials/purchase-request-confirms';
 const ORDER_TYPE_GROUP_CODE = 'PURCHASE_ORDER_TYPE';
 export const DEFAULT_CURRENCY = 'KRW';
+export const DEFAULT_TAX_TYPE = 'TAXABLE';
 
 function requireItem(result: ItemResult): PurchaseConfirmItem {
   if (!result.item) throw new Error('구매요청확정 응답에 확정 정보가 없습니다.');
@@ -31,9 +32,18 @@ function requireItem(result: ItemResult): PurchaseConfirmItem {
 }
 
 /** 확정 대상 품목 행 목록(요청·부분확정 요청의 확정 안 된 행) */
-export async function searchConfirmCandidates(keyword: string): Promise<PurchaseRequestConfirmCandidate[]> {
+type DateRange = { fromDt?: string; toDt?: string };
+
+function setDateRange(query: URLSearchParams, range?: DateRange) {
+  if (range?.fromDt) query.set('fromDt', range.fromDt);
+  if (range?.toDt) query.set('toDt', range.toDt);
+}
+
+/** 요청일 기간(선택)과 검색어로 확정 대상 구매요청 품목을 조회한다. */
+export async function searchConfirmCandidates(keyword: string, range?: DateRange): Promise<PurchaseRequestConfirmCandidate[]> {
   const query = new URLSearchParams();
   if (keyword.trim()) query.set('keyword', keyword.trim());
+  setDateRange(query, range);
   const suffix = query.toString() ? `?${query}` : '';
   const result = await apiGet<{ resultList?: PurchaseRequestConfirmCandidate[] }>(`${CONFIRM_PATH}/candidates${suffix}`);
   return Array.isArray(result.resultList) ? result.resultList : [];
@@ -49,10 +59,12 @@ export async function fetchRequestDetails(purchaseRequestDetailIds: number[]): P
 export async function searchPurchaseConfirms(
   keyword: string,
   status: PurchaseConfirmStatusFilter,
+  range?: DateRange,
 ): Promise<PurchaseConfirmListItem[]> {
   const query = new URLSearchParams();
   if (keyword.trim()) query.set('keyword', keyword.trim());
   query.set('status', status);
+  setDateRange(query, range);
   const result = await apiGet<{ resultList?: PurchaseConfirmListItem[] }>(`${CONFIRM_PATH}?${query}`);
   return Array.isArray(result.resultList) ? result.resultList : [];
 }
@@ -99,15 +111,25 @@ export async function fetchWarehouseOptions(): Promise<ConfirmSelectOption[]> {
   }));
 }
 
-export async function fetchOrderTypeOptions(): Promise<ConfirmSelectOption[]> {
+async function fetchCodeOptions(groupCode: string): Promise<ConfirmSelectOption[]> {
   const groups = await fetchCommonCodeGroups();
-  const group = groups.find((candidate) => candidate.groupCode === ORDER_TYPE_GROUP_CODE);
+  const group = groups.find((candidate) => candidate.groupCode === groupCode);
   if (!group) return [];
   const items = await fetchCommonCodeItems(group.id);
   return items
     .filter((codeItem) => codeItem.useAt === 'Y')
     .sort((left, right) => left.sortOrder - right.sortOrder)
     .map((codeItem) => ({ value: codeItem.itemCode, label: codeItem.itemNm }));
+}
+
+export const fetchOrderTypeOptions = () => fetchCodeOptions(ORDER_TYPE_GROUP_CODE);
+export const fetchTaxTypeOptions = () => fetchCodeOptions('PURCHASE_TAX_TYPE');
+export async function fetchCurrencyOptions(): Promise<ConfirmSelectOption[]> {
+  const options = await fetchCodeOptions('CURRENCY');
+  // 기본 통화(KRW)가 공통코드에 없어도 선택 목록에서 사라지지 않게 한다.
+  return options.some((option) => option.value === DEFAULT_CURRENCY)
+    ? options
+    : [{ value: DEFAULT_CURRENCY, label: DEFAULT_CURRENCY }, ...options];
 }
 
 export const searchSuppliers: MasterPickerSearch = async (keyword) => {
@@ -157,6 +179,11 @@ export function toConfirmRows(details: PurchaseRequestConfirmDetail[], draft: bo
       supplierName: detail.supplierName ?? '',
       unitPrice,
       currencyCode: detail.currencyCode ?? DEFAULT_CURRENCY,
+      taxType: detail.taxType || DEFAULT_TAX_TYPE,
+      vatIncludedAt: detail.vatIncludedAt === 'Y' ? 'Y' : 'N',
+      wonUnitPrice: null,
+      foreignUnitPrice: null,
+      foreignCurrency: '',
       amount: detail.amount == null ? 0 : Number(detail.amount),
       confirmRemark: detail.confirmRemark ?? '',
       orderClosed: detail.orderCloseAt === 'Y',
@@ -187,6 +214,7 @@ export function validateConfirmInput(confirmDt: string, rows: PurchaseRequestCon
     if (!row.orderType) add('발주구분을 선택해 주세요.');
     if (!row.supplierId) add('구매처를 선택해 주세요.');
     if (row.unitPrice != null && Number(row.unitPrice) < 0) add('단가는 0 이상이어야 합니다.');
+    if (row.vatIncludedAt === 'Y' && row.taxType !== DEFAULT_TAX_TYPE) add('부가세 포함은 과세일 때만 선택할 수 있습니다.');
     if (row.confirmRemark.trim().length > 500) add('확정비고는 500자 이내로 입력해 주세요.');
   }
   return messages;
@@ -209,6 +237,8 @@ export function buildConfirmPayload(
       supplierId: Number(row.supplierId),
       unitPrice: row.unitPrice == null ? null : Number(row.unitPrice),
       currencyCode: row.currencyCode || DEFAULT_CURRENCY,
+      taxType: row.taxType || DEFAULT_TAX_TYPE,
+      vatIncludedAt: row.vatIncludedAt === 'Y' ? 'Y' : 'N',
       confirmRemark: row.confirmRemark.trim() ? row.confirmRemark.trim() : null,
     })),
   };

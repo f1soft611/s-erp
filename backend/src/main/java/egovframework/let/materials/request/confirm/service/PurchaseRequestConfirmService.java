@@ -20,12 +20,14 @@ import egovframework.let.materials.request.confirm.domain.model.PurchaseUnitPric
  */
 public interface PurchaseRequestConfirmService {
 
-    List<PurchaseRequestConfirmCandidateVO> listCandidates(Long tenantId, String keyword) throws Exception;
+    List<PurchaseRequestConfirmCandidateVO> listCandidates(Long tenantId, String keyword, LocalDate fromDt, LocalDate toDt)
+            throws Exception;
 
     List<PurchaseRequestConfirmDetailVO> loadRequestDetails(Long tenantId, List<Long> purchaseRequestDetailIds)
             throws Exception;
 
-    List<PurchaseConfirmListItemVO> listConfirms(Long tenantId, String keyword, String status) throws Exception;
+    List<PurchaseConfirmListItemVO> listConfirms(Long tenantId, String keyword, String status, LocalDate fromDt,
+            LocalDate toDt) throws Exception;
 
     PurchaseConfirmVO getConfirm(Long tenantId, Long purchaseConfirmId) throws Exception;
 

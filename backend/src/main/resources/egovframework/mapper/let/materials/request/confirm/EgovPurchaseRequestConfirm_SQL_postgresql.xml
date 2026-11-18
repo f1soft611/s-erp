@@ -31,6 +31,8 @@
         c.customer_name AS supplierName,
         d.unit_price AS unitPrice,
         d.currency_code AS currencyCode,
+        d.tax_type AS taxType,
+        d.vat_included_at AS vatIncludedAt,
         d.amount AS amount,
         d.confirm_remark AS confirmRemark,
         d.order_close_at AS orderCloseAt
@@ -103,6 +105,12 @@
           AND h.use_at = 'Y'
           AND h.status IN ('REQUESTED', 'PARTIALLY_CONFIRMED')
           AND d.purchase_confirm_id IS NULL
+        <if test="fromDt != null">
+          AND h.request_dt &gt;= CAST(#{fromDt} AS date)
+        </if>
+        <if test="toDt != null">
+          AND h.request_dt &lt;= CAST(#{toDt} AS date)
+        </if>
         <if test="keyword != null and keyword != ''">
           AND (h.request_no ILIKE '%' || #{keyword} || '%'
                OR ru.user_nm ILIKE '%' || #{keyword} || '%'
@@ -185,6 +193,12 @@
         WHERE pc.tenant_id = #{tenantId, jdbcType=BIGINT}
         <if test="useAt != null and useAt != ''">
           AND pc.use_at = #{useAt}
+        </if>
+        <if test="fromDt != null">
+          AND pc.confirm_dt &gt;= CAST(#{fromDt} AS date)
+        </if>
+        <if test="toDt != null">
+          AND pc.confirm_dt &lt;= CAST(#{toDt} AS date)
         </if>
         <if test="keyword != null and keyword != ''">
           AND (pc.confirm_no ILIKE '%' || #{keyword} || '%'
@@ -272,6 +286,20 @@
         )
     </select>
 
+    <select id="existsTaxType" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM tb_common_code_item i
+            JOIN tb_common_code_group g
+              ON g.common_code_group_id = i.group_id
+            WHERE g.tenant_id = #{tenantId, jdbcType=BIGINT}
+              AND g.group_code = 'PURCHASE_TAX_TYPE'
+              AND g.use_at = 'Y'
+              AND i.item_code = #{code}
+              AND i.use_at = 'Y'
+        )
+    </select>
+
     <select id="existsOrderType" parameterType="map" resultType="boolean">
         SELECT EXISTS (
             SELECT 1
@@ -314,6 +342,8 @@
             supplier_id = #{supplierId, jdbcType=BIGINT},
             unit_price = #{unitPrice, jdbcType=NUMERIC},
             currency_code = #{currencyCode},
+            tax_type = #{taxType},
+            vat_included_at = #{vatIncludedAt},
             amount = #{amount, jdbcType=NUMERIC},
             confirm_remark = #{confirmRemark},
             order_close_at = 'N',
@@ -379,6 +409,8 @@
             order_type = NULL,
             unit_price = NULL,
             currency_code = NULL,
+            tax_type = NULL,
+            vat_included_at = NULL,
             amount = 0,
             confirm_remark = NULL,
             order_close_at = 'N',
@@ -400,20 +432,25 @@
           AND use_at = 'Y'
     </update>
 
-    <!-- 거래구분 매입 단가만 쓴다. trade_type은 단가관리 화면이 저장하는 값('매입')을 그대로 쓴다. -->
+    <!-- 거래구분 매입 단가만 쓴다. trade_type은 단가관리 화면이 저장하는 값('매입')을 그대로 쓴다.
+         거래처 일치 단가를 우선하고, 없으면 거래처가 비어 있는 품목 기본단가를 쓴다.
+         unit_price(원화단가)와 외화단가·통화·부가세 정보를 함께 돌려주고, 기본 통화·단가 선택은 서비스가 한다. -->
     <select id="selectDefaultUnitPrice" parameterType="map"
             resultType="egovframework.let.materials.request.confirm.domain.model.PurchaseUnitPriceVO">
         SELECT p.unit_price AS unitPrice,
-               p.currency AS currency
+               p.tax_type AS taxType,
+               p.vat_included_at AS vatIncludedAt,
+               p.foreign_unit_price AS foreignUnitPrice,
+               p.currency AS foreignCurrency
         FROM tb_item_partner_price p
         WHERE p.tenant_id = #{tenantId, jdbcType=BIGINT}
           AND p.material_id = #{materialId, jdbcType=BIGINT}
-          AND p.customer_id = #{supplierId, jdbcType=BIGINT}
+          AND (p.customer_id = #{supplierId, jdbcType=BIGINT} OR p.customer_id IS NULL)
           AND p.trade_type = '매입'
           AND p.use_at = 'Y'
           AND p.start_dt &lt;= CAST(#{baseDt} AS date)
           AND (p.end_dt IS NULL OR p.end_dt &gt;= CAST(#{baseDt} AS date))
-        ORDER BY p.start_dt DESC, p.price_id DESC
+        ORDER BY (p.customer_id IS NULL), p.start_dt DESC, p.price_id DESC
         LIMIT 1
     </select>
 </mapper>

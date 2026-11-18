@@ -3,6 +3,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import { Alert, Box, Button, Chip, TextField } from '@mui/material';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { PageMessageArea } from '../../../../../shared/components/PageMessageArea';
+import { PickerDateRangeFields } from '../../../../../shared/components/PickerDateRangeFields';
+import { usePickerDateRange } from '../../../../../shared/hooks/usePickerDateRange';
 import { F1Grid, type F1GridColumn, type F1GridRef } from '../../../../../shared/components/f1-grid';
 import { distinctCandidateCurrencies, searchArrivalCandidates } from '../services/materialArrival.service';
 import type { MaterialArrivalCandidate } from '../types/materialArrival.types';
@@ -24,8 +26,7 @@ export function MaterialArrivalOrderPicker({ open, onClose, onSelect }: {
   const request = useRef(0);
   const programmaticSelection = useRef(false);
   const [keyword, setKeyword] = useState('');
-  const [fromDt, setFromDt] = useState('');
-  const [toDt, setToDt] = useState('');
+  const { fromDt, toDt, setFromDt, setToDt, ready: rangeReady } = usePickerDateRange(open);
   const [rows, setRows] = useState<MaterialArrivalCandidate[]>([]);
   const [selectedIds, setSelectedIds] = useState<RowId[]>([]);
   const [lockedSupplier, setLockedSupplier] = useState<{ id: number; name: string } | null>(null);
@@ -59,10 +60,10 @@ export function MaterialArrivalOrderPicker({ open, onClose, onSelect }: {
   }, [fromDt, keyword, toDt]);
 
   useEffect(() => {
-    if (open) void search();
+    if (open && rangeReady) void search();
     // 열릴 때 현재 검색 조건으로 한 번 조회한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, rangeReady]);
 
   useEffect(() => () => {
     request.current += 1;
@@ -118,9 +119,9 @@ export function MaterialArrivalOrderPicker({ open, onClose, onSelect }: {
     { field: 'materialName', headerName: '품목명', width: 180 },
     { field: 'materialSpec', headerName: '규격', width: 110 },
     { field: 'unit', headerName: '단위', width: 64, align: 'center' },
-    { field: 'orderQty', headerName: '발주수량', type: 'decimal', decimalPlaces: 2, width: 96, align: 'right' },
-    { field: 'arrivedQty', headerName: '기가입고', type: 'decimal', decimalPlaces: 2, width: 90, align: 'right' },
-    { field: 'remainQty', headerName: '잔량', type: 'decimal', decimalPlaces: 2, width: 90, align: 'right' },
+    { field: 'orderQty', headerName: '발주수량', type: 'decimal', width: 96, align: 'right' },
+    { field: 'arrivedQty', headerName: '기가입고', type: 'decimal', width: 90, align: 'right' },
+    { field: 'remainQty', headerName: '잔량', type: 'decimal', width: 90, align: 'right' },
     { field: 'deliveryDt', headerName: '납기일', type: 'date', width: 104, align: 'center' },
     { field: 'warehouseName', headerName: '입고창고', width: 110, align: 'center' },
     {
@@ -173,25 +174,12 @@ export function MaterialArrivalOrderPicker({ open, onClose, onSelect }: {
           }}
           sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, minWidth: 0, flexShrink: 0 }}
         >
-          <TextField
-            size="small"
-            margin="none"
-            type="date"
-            label="발주일 시작"
-            value={fromDt}
-            onChange={(event) => setFromDt(event.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: 160, '& .MuiOutlinedInput-root': { height: SEARCH_CONTROL_HEIGHT } }}
-          />
-          <TextField
-            size="small"
-            margin="none"
-            type="date"
-            label="발주일 종료"
-            value={toDt}
-            onChange={(event) => setToDt(event.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: 160, '& .MuiOutlinedInput-root': { height: SEARCH_CONTROL_HEIGHT } }}
+          <PickerDateRangeFields
+            label="발주일"
+            fromDt={fromDt}
+            toDt={toDt}
+            onFromChange={setFromDt}
+            onToChange={setToDt}
           />
           <TextField
             size="small"

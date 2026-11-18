@@ -73,6 +73,10 @@ public class PurchaseRequestConfirmDAO extends EgovAbstractMapper {
         return Boolean.TRUE.equals(selectOne(NS + "existsWarehouse", params));
     }
 
+    public boolean existsTaxType(Map<String, Object> params) throws Exception {
+        return Boolean.TRUE.equals(selectOne(NS + "existsTaxType", params));
+    }
+
     public boolean existsOrderType(Map<String, Object> params) throws Exception {
         return Boolean.TRUE.equals(selectOne(NS + "existsOrderType", params));
     }

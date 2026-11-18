@@ -3,6 +3,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import { Box, Button, TextField } from '@mui/material';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { PageMessageArea } from '../../../../../shared/components/PageMessageArea';
+import { PickerDateRangeFields } from '../../../../../shared/components/PickerDateRangeFields';
+import { usePickerDateRange } from '../../../../../shared/hooks/usePickerDateRange';
 import { F1Grid, type F1GridColumn, type F1GridRef } from '../../../../../shared/components/f1-grid';
 import { searchInspectionCandidates } from '../services/materialInspection.service';
 import type { MaterialInspectionCandidate } from '../types/materialInspection.types';
@@ -23,8 +25,7 @@ export function MaterialInspectionArrivalPicker({ open, onClose, onSelect, exclu
   const gridRef = useRef<F1GridRef<MaterialInspectionCandidate>>(null);
   const request = useRef(0);
   const [keyword, setKeyword] = useState('');
-  const [fromDt, setFromDt] = useState('');
-  const [toDt, setToDt] = useState('');
+  const { fromDt, toDt, setFromDt, setToDt, ready: rangeReady } = usePickerDateRange(open);
   const [rows, setRows] = useState<MaterialInspectionCandidate[]>([]);
   const [selectedCount, setSelectedCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -58,10 +59,10 @@ export function MaterialInspectionArrivalPicker({ open, onClose, onSelect, exclu
   }, [fromDt, keyword, toDt]);
 
   useEffect(() => {
-    if (open) void search();
+    if (open && rangeReady) void search();
     // 열릴 때 현재 검색 조건으로 한 번 조회한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, rangeReady]);
 
   useEffect(() => () => {
     request.current += 1;
@@ -76,9 +77,9 @@ export function MaterialInspectionArrivalPicker({ open, onClose, onSelect, exclu
     { field: 'materialName', headerName: '품목명', width: 170 },
     { field: 'materialSpec', headerName: '규격', width: 110 },
     { field: 'unit', headerName: '단위', width: 64, align: 'center' },
-    { field: 'arrivalQty', headerName: '가입고량', type: 'decimal', decimalPlaces: 2, width: 96, align: 'right' },
-    { field: 'inspectedQty', headerName: '기검사량', type: 'decimal', decimalPlaces: 2, width: 96, align: 'right' },
-    { field: 'waitQty', headerName: '검사 대기량', type: 'decimal', decimalPlaces: 2, width: 104, align: 'right' },
+    { field: 'arrivalQty', headerName: '가입고량', type: 'decimal', width: 96, align: 'right' },
+    { field: 'inspectedQty', headerName: '기검사량', type: 'decimal', width: 96, align: 'right' },
+    { field: 'waitQty', headerName: '검사 대기량', type: 'decimal', width: 104, align: 'right' },
   ], []);
 
   const confirmSelection = () => {
@@ -115,25 +116,12 @@ export function MaterialInspectionArrivalPicker({ open, onClose, onSelect, exclu
           }}
           sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, minWidth: 0, flexShrink: 0 }}
         >
-          <TextField
-            size="small"
-            margin="none"
-            type="date"
-            label="가입고일 시작"
-            value={fromDt}
-            onChange={(event) => setFromDt(event.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: 160, '& .MuiOutlinedInput-root': { height: SEARCH_CONTROL_HEIGHT } }}
-          />
-          <TextField
-            size="small"
-            margin="none"
-            type="date"
-            label="가입고일 종료"
-            value={toDt}
-            onChange={(event) => setToDt(event.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: 160, '& .MuiOutlinedInput-root': { height: SEARCH_CONTROL_HEIGHT } }}
+          <PickerDateRangeFields
+            label="가입고일"
+            fromDt={fromDt}
+            toDt={toDt}
+            onFromChange={setFromDt}
+            onToChange={setToDt}
           />
           <TextField
             size="small"

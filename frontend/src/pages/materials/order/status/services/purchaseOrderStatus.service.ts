@@ -23,6 +23,12 @@ export const PURCHASE_ORDER_SOURCE_OPTIONS = [
   { value: 'DIRECT', label: '직접' },
 ];
 
+/** 입고대기마감 검색 선택지. 비우면 전체. */
+export const PURCHASE_ORDER_RECEIPT_CLOSE_OPTIONS = [
+  { value: 'OPEN', label: '미마감' },
+  { value: 'CLOSED', label: '마감' },
+];
+
 export function purchaseOrderStatusLabel(status: string | null | undefined): string {
   return PURCHASE_ORDER_STATUS_OPTIONS.find((option) => option.value === status)?.label ?? String(status ?? '');
 }
@@ -89,6 +95,7 @@ export function toPurchaseOrderStatusFilters(
     // 상태를 비우면 서버도 정상만 조회하므로 같은 값을 명시해 둔다(예전에 저장된 검색 세션 복원 포함).
     status: readText(values, 'status') ?? PURCHASE_ORDER_STATUS_DEFAULT,
     sourceType: readText(values, 'sourceType'),
+    receiptCloseType: readText(values, 'receiptCloseType'),
     materialKeyword: readText(values, 'materialCode'),
     deliveryDtFrom: deliveryDt.from,
     deliveryDtTo: deliveryDt.to,

@@ -33,10 +33,13 @@ import {
   createPurchaseConfirm,
   currencyMixMessage,
   DEFAULT_CURRENCY,
+  DEFAULT_TAX_TYPE,
   distinctCurrencies,
   fetchDefaultUnitPrice,
+  fetchCurrencyOptions,
   fetchOrderTypeOptions,
   fetchRequestDetails,
+  fetchTaxTypeOptions,
   fetchWarehouseOptions,
   getPurchaseConfirm,
   savePurchaseConfirmOrderClose,
@@ -50,6 +53,7 @@ import type {
   PurchaseConfirmListItem,
   PurchaseRequestConfirmCandidate,
 } from './types/purchaseRequestConfirm.types';
+import { usePageMessages } from '../../../../shared/hooks/usePageMessages';
 import { useServerDateDefault } from '../../../../shared/hooks/useServerDateDefault';
 import { FormDateField, normalizeFormDate } from '../../../../shared/components/FormDateField';
 
@@ -92,13 +96,15 @@ export function PurchaseRequestConfirmPage({
   const [remark, setRemark] = useState('');
   const [warehouseOptions, setWarehouseOptions] = useState<ConfirmSelectOption[]>([]);
   const [orderTypeOptions, setOrderTypeOptions] = useState<ConfirmSelectOption[]>([]);
+  const [taxTypeOptions, setTaxTypeOptions] = useState<ConfirmSelectOption[]>([]);
+  const [currencyOptions, setCurrencyOptions] = useState<ConfirmSelectOption[]>([]);
   const [sourceOpen, setSourceOpen] = useState(false);
   const [confirmPickerOpen, setConfirmPickerOpen] = useState(false);
   const [supplierTarget, setSupplierTarget] = useState<SupplierTarget | null>(null);
   const [busy, setBusy] = useState(false);
-  const [validationMessages, setValidationMessages] = useState<string[]>([]);
-  const [notice, setNotice] = useState('');
-  const [error, setError] = useState('');
+  const {
+    validationMessages, setValidationMessages, notice, setNotice, error, setError, clearMessages,
+  } = usePageMessages();
 
   const canUpdate = Boolean(selectedMenuPermissions?.update);
   const isDraft = loaded === null && baselineRows.length > 0;
@@ -126,8 +132,14 @@ export function PurchaseRequestConfirmPage({
     fetchOrderTypeOptions()
       .then((options) => { if (active) setOrderTypeOptions(options); })
       .catch(() => { if (active) setError('발주구분 공통코드를 불러오지 못했습니다.'); });
+    fetchTaxTypeOptions()
+      .then((options) => { if (active) setTaxTypeOptions(options); })
+      .catch(() => { if (active) setError('부가세구분 공통코드를 불러오지 못했습니다.'); });
+    fetchCurrencyOptions()
+      .then((options) => { if (active) setCurrencyOptions(options); })
+      .catch(() => { if (active) setError('통화 공통코드를 불러오지 못했습니다.'); });
     return () => { active = false; };
-  }, []);
+  }, [setError]);
 
   const resetGrid = useCallback((rows: PurchaseRequestConfirmRow[]) => {
     setBaselineRows(rows);
@@ -136,7 +148,7 @@ export function PurchaseRequestConfirmPage({
     setValidationMessages([]);
     gridValidationActiveRef.current = false;
     setGridKey((key) => key + 1);
-  }, []);
+  }, [setValidationMessages]);
 
   const applyLoaded = useCallback((item: PurchaseConfirmItem) => {
     setLoaded(item);
@@ -164,8 +176,7 @@ export function PurchaseRequestConfirmPage({
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
-    setNotice('');
-    setError('');
+    clearMessages();
     try {
       await work();
     } catch (workError) {
@@ -174,7 +185,7 @@ export function PurchaseRequestConfirmPage({
       busyRef.current = false;
       setBusy(false);
     }
-  }, []);
+  }, [clearMessages, setError]);
 
   const confirmDiscard = useCallback(async (description: string) => (
     !hasUnsavedChanges || confirm({ description })
@@ -188,6 +199,7 @@ export function PurchaseRequestConfirmPage({
 
   /** 요청 불러오기는 누적하지 않는다. 그리드를 비우고 이번에 고른 품목 행만 신규 확정으로 표시한다. */
   const loadRequests = useCallback((candidates: PurchaseRequestConfirmCandidate[]) => {
+    clearMessages();
     setSourceOpen(false);
     void runBusy(async () => {
       const details = await fetchRequestDetails(candidates.map((candidate) => candidate.purchaseRequestDetailId));
@@ -197,15 +209,16 @@ export function PurchaseRequestConfirmPage({
       resetGrid(toConfirmRows(details, true));
       await reloadServerDate();
     });
-  }, [reloadServerDate, resetGrid, runBusy]);
+  }, [clearMessages, reloadServerDate, resetGrid, runBusy]);
 
   /** 체크한 품목 행만 뺀다. 입력한 값은 남은 행에 그대로 유지한다. */
   const removeSelectedRows = useCallback(() => {
+    clearMessages();
     const current = gridRef.current?.getRows() ?? activeRows;
     const selected = new Set(selectedRowIds.map(String));
     if (selected.size === 0) return;
     resetGrid(current.filter((row) => !selected.has(row.rowId)));
-  }, [activeRows, resetGrid, selectedRowIds]);
+  }, [activeRows, clearMessages, resetGrid, selectedRowIds]);
 
   const openConfirmPicker = useCallback(async () => {
     if (busyRef.current) return;
@@ -224,18 +237,19 @@ export function PurchaseRequestConfirmPage({
     if (busyRef.current) return;
     if (!(await confirmDiscard('저장하지 않은 내용이 있습니다. 신규로 초기화하면 입력 내용이 사라집니다. 계속하시겠습니까?'))) return;
     resetToNew();
-    setNotice('');
-    setError('');
-  }, [confirmDiscard, resetToNew]);
+    clearMessages();
+  }, [clearMessages, confirmDiscard, resetToNew]);
 
   const handleChangesChange = useCallback((changes: F1GridChanges<PurchaseRequestConfirmRow>) => {
     const updated = new Map(changes.updatedRows.map((row) => [row.rowId, row]));
     setActiveRows(baselineRows.map((row) => updated.get(row.rowId) ?? row));
-    setValidationMessages([]);
+    // 실제로 값을 고쳤을 때만 이전 메시지를 모두 비운다(그리드 재구성 직후의 빈 변경 콜백은 성공 안내를 지우지 않는다).
+    if (updated.size > 0) clearMessages();
+    else setValidationMessages([]);
     if (gridValidationActiveRef.current) {
       gridValidationActiveRef.current = !(gridRef.current?.validate() ?? true);
     }
-  }, [baselineRows]);
+  }, [baselineRows, clearMessages, setValidationMessages]);
 
   const openSupplierPicker = useCallback((
     row: PurchaseRequestConfirmRow,
@@ -245,6 +259,7 @@ export function PurchaseRequestConfirmPage({
   }, []);
 
   const selectSupplier = useCallback(async (option: MasterPickerOption) => {
+    clearMessages();
     const target = supplierTarget;
     setSupplierTarget(null);
     if (!target) return;
@@ -252,15 +267,24 @@ export function PurchaseRequestConfirmPage({
     try {
       const price = await fetchDefaultUnitPrice(target.row.materialId, option.id, confirmDt);
       const unitPrice = price ? Number(price.unitPrice) : null;
+      const currencyCode = price?.currency || DEFAULT_CURRENCY;
+      // 단가를 처음 참고하는 지점에서 단가·통화·부가세구분·부가세포함을 함께 설정한다(이후 단계는 이 값을 따른다).
       target.applyPatch({
         unitPrice,
-        currencyCode: price?.currency || DEFAULT_CURRENCY,
+        currencyCode,
+        ...(price ? {
+          taxType: price.taxType || DEFAULT_TAX_TYPE,
+          vatIncludedAt: price.vatIncludedAt === 'Y' ? 'Y' as const : 'N' as const,
+        } : {}),
+        wonUnitPrice: price && currencyCode === DEFAULT_CURRENCY ? unitPrice : null,
+        foreignUnitPrice: price?.foreignUnitPrice == null ? null : Number(price.foreignUnitPrice),
+        foreignCurrency: price?.foreignCurrency ?? '',
         amount: calculateAmount(target.row.confirmQty, unitPrice),
       });
     } catch (priceError) {
       setError(priceError instanceof Error ? priceError.message : '기본 단가를 불러오지 못했습니다.');
     }
-  }, [confirmDt, supplierTarget]);
+  }, [clearMessages, confirmDt, setError, supplierTarget]);
 
   const handleConfirm = useCallback(async () => {
     if (!confirmEditable) return;
@@ -272,6 +296,7 @@ export function PurchaseRequestConfirmPage({
       : validateConfirmInput(dateCheck.date, rows);
     const isGridValid = gridRef.current?.validate() ?? true;
     gridValidationActiveRef.current = !isGridValid;
+    clearMessages();
     setValidationMessages(messages);
     if (messages.length > 0 || !isGridValid) return;
     const rowCurrencies = distinctCurrencies(rows);
@@ -285,7 +310,7 @@ export function PurchaseRequestConfirmPage({
       applyLoaded(saved);
       setNotice(`구매요청을 확정했습니다. 확정번호: ${saved.confirmNo}`);
     });
-  }, [activeRows, applyLoaded, confirm, confirmDt, confirmEditable, remark, runBusy]);
+  }, [activeRows, applyLoaded, clearMessages, confirm, confirmDt, confirmEditable, remark, runBusy, setNotice, setValidationMessages]);
 
   const handleSaveOrderClose = useCallback(() => {
     if (!loaded || !closeEditable) return;
@@ -296,7 +321,7 @@ export function PurchaseRequestConfirmPage({
       applyLoaded(await savePurchaseConfirmOrderClose(loaded.purchaseConfirmId, payload));
       setNotice('발주대기 마감을 저장했습니다.');
     });
-  }, [activeRows, applyLoaded, baselineRows, closeEditable, loaded, runBusy]);
+  }, [activeRows, applyLoaded, baselineRows, closeEditable, loaded, runBusy, setNotice]);
 
   const handleCancelConfirm = useCallback(async () => {
     if (!loaded || !closeEditable) return;
@@ -309,7 +334,7 @@ export function PurchaseRequestConfirmPage({
       applyLoaded(await cancelPurchaseConfirm(loaded.purchaseConfirmId));
       setNotice('구매요청 확정을 취소했습니다. 이 확정의 품목은 다시 확정할 수 있습니다.');
     });
-  }, [applyLoaded, closeEditable, confirm, loaded, requestCount, runBusy]);
+  }, [applyLoaded, closeEditable, confirm, loaded, requestCount, runBusy, setNotice]);
 
   const actions = useMemo<PermissionActionGroupDefinition[]>(() => [
     {
@@ -356,8 +381,10 @@ export function PurchaseRequestConfirmPage({
     closeEditable,
     warehouseOptions,
     orderTypeOptions,
+    taxTypeOptions,
+    currencyOptions,
     onOpenSupplierPicker: openSupplierPicker,
-  }), [closeEditable, confirmEditable, openSupplierPicker, orderTypeOptions, warehouseOptions]);
+  }), [closeEditable, confirmEditable, currencyOptions, openSupplierPicker, orderTypeOptions, taxTypeOptions, warehouseOptions]);
 
   const readOnlyField = { input: { readOnly: true }, inputLabel: { shrink: true } };
   const statusLabel = loaded ? (isCanceled ? '확정 취소' : '확정') : isDraft ? '신규 작성' : '';
@@ -437,7 +464,7 @@ export function PurchaseRequestConfirmPage({
               label="확정일"
               value={confirmDt}
               disabled={!confirmEditable}
-              onChange={(value) => { markDateTouched(); setConfirmDt(value); setValidationMessages([]); }}
+              onChange={(value) => { markDateTouched(); setConfirmDt(value); clearMessages(); }}
             />
             <TextField label="확정자" size="small" value={loaded?.confirmerName ?? ''} slotProps={readOnlyField} />
             <TextField label="상태" size="small" value={statusLabel} slotProps={readOnlyField} />
@@ -458,7 +485,7 @@ export function PurchaseRequestConfirmPage({
               label="확정 비고"
               size="small"
               value={remark}
-              onChange={(event) => setRemark(event.target.value)}
+              onChange={(event) => { setRemark(event.target.value); clearMessages(); }}
               disabled={!confirmEditable}
               slotProps={{ inputLabel: { shrink: true }, htmlInput: { maxLength: 500 } }}
             />

@@ -65,6 +65,9 @@ class PurchaseOrderMapperTest {
     void updateAndCancelStatementsKeepHistoryAndGuardActiveOrders() throws Exception {
         Configuration configuration = parse(RESOURCE);
         assertThat(sql(configuration, "PurchaseOrderDAO.selectOrderForUpdate", null)).contains("FOR UPDATE OF oh");
+        // 가입고가 있는 발주의 헤더 잠금 검증이 저장된 값과 비교할 수 있도록 발주일·부가세 설정을 함께 읽는다.
+        assertThat(sql(configuration, "PurchaseOrderDAO.selectOrderForUpdate", null))
+                .contains("oh.order_dt AS orderDt", "oh.tax_type AS taxType", "oh.vat_included_at AS vatIncludedAt");
         assertThat(sql(configuration, "PurchaseOrderDAO.updateOrderHeader", null))
                 .contains("tb_purchase_order_hd", "use_at = 'Y'", "updated_by = ?", "total_amt = ?");
         assertThat(sql(configuration, "PurchaseOrderDAO.cancelOrderHeader", null))

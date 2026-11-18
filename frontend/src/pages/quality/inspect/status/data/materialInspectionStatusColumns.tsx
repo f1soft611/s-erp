@@ -18,7 +18,6 @@ const qtyColumn = (
   field,
   headerName,
   type: 'decimal',
-  decimalPlaces: 2,
   width,
   align: 'right',
   editable: false,

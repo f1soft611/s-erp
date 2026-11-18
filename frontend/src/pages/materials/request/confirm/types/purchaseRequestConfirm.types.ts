@@ -48,6 +48,8 @@ export type PurchaseRequestConfirmDetail = {
   supplierName: string | null;
   unitPrice: number | null;
   currencyCode: string | null;
+  taxType?: string | null;
+  vatIncludedAt?: string | null;
   amount: number | null;
   confirmRemark: string | null;
   orderCloseAt: string | null;
@@ -91,6 +93,8 @@ export type PurchaseRequestConfirmPayload = {
     supplierId: number;
     unitPrice: number | null;
     currencyCode: string;
+    taxType: string;
+    vatIncludedAt: 'Y' | 'N';
     confirmRemark: string | null;
   }[];
 };
@@ -99,6 +103,14 @@ export type PurchaseRequestOrderClosePayload = {
   details: { purchaseRequestDetailId: number; orderCloseAt: 'Y' | 'N' }[];
 };
 
-export type PurchaseUnitPrice = { unitPrice: number; currency: string };
+/** 단가관리에서 가져온 구매 단가. currency·unitPrice는 서버가 기본 설정(원화 우선, 외화단가만 있으면 외화)을 정해 내려준다. */
+export type PurchaseUnitPrice = {
+  unitPrice: number;
+  currency: string;
+  taxType?: string | null;
+  vatIncludedAt?: string | null;
+  foreignUnitPrice?: number | null;
+  foreignCurrency?: string | null;
+};
 
 export type ConfirmSelectOption = { value: string; label: string };

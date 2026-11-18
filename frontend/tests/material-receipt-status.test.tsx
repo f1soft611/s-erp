@@ -184,6 +184,23 @@ describe('MaterialReceiptStatusPage', () => {
     expect(within(dialog).queryByRole('button', { name: '입고 취소' })).not.toBeInTheDocument();
   });
 
+  it('clears the previous error when the user edits a value again in the edit dialog', async () => {
+    await openDetail();
+    fireEvent.click(screen.getByRole('button', { name: '입고 더보기' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+    const dialog = await screen.findByRole('dialog', { name: '입고 수정' });
+    await waitFor(() => expect(within(dialog).getByLabelText('입고번호')).toHaveValue('MI-20261117-0001'));
+    await within(dialog).findByRole('grid', { name: '입고 상세 목록' });
+    const remark = within(dialog).getByRole('textbox', { name: /^비고/ });
+    fireEvent.change(remark, { target: { value: '첫 수정' } });
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: '저장' })).toBeEnabled());
+    apiPutMock.mockRejectedValueOnce(new Error('저장 실패: 서버 오류'));
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    expect(await within(dialog).findByText('저장 실패: 서버 오류')).toBeInTheDocument();
+    fireEvent.change(remark, { target: { value: '다시 입력' } });
+    await waitFor(() => expect(within(dialog).queryByText('저장 실패: 서버 오류')).not.toBeInTheDocument());
+  });
+
   it('cancels the whole receipt after a confirmation that explains the arrival is canceled too', async () => {
     await openDetail();
     fireEvent.click(screen.getByRole('button', { name: '입고 더보기' }));

@@ -91,6 +91,12 @@ public class PurchaseOrderCandidateVO implements Serializable {
     @Schema(description = "통화 코드", example = "KRW")
     private String currencyCode;
 
+    @Schema(description = "확정 시 설정한 부가세구분(없으면 TAXABLE로 취급)", example = "TAXABLE")
+    private String taxType;
+
+    @Schema(description = "확정 시 설정한 부가세 포함 여부(없으면 N으로 취급)", example = "N")
+    private String vatIncludedAt;
+
     @Schema(description = "발주구분 코드(공통코드 PURCHASE_ORDER_TYPE)", example = "RAW_MATERIAL")
     private String orderType;
 

@@ -29,6 +29,9 @@ export type PurchaseOrderCandidate = {
   warehouseName: string | null;
   unitPrice: number | null;
   currencyCode: string | null;
+  /** 확정 시 설정한 부가세구분·포함. 없으면(기존 확정) 과세·미포함으로 본다. */
+  taxType?: string | null;
+  vatIncludedAt?: string | null;
   orderType: string | null;
   orderTypeName: string | null;
   useType: string | null;
@@ -95,6 +98,8 @@ export type PurchaseOrderDetailItem = {
   vatAmt: number;
   totalAmt: number;
   receiptCloseAt: 'Y' | 'N';
+  /** 가입고수량(불합격 제외). 0보다 크면 이 행은 수정할 수 없다. 상세 조회에서만 채워진다. */
+  arrivedQty?: number | null;
   remark: string | null;
   confirmQty: number | null;
   remainQty: number | null;

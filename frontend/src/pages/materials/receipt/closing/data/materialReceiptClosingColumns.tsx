@@ -92,12 +92,12 @@ export function createClosingRowColumns({
     { field: 'materialName', highlightSearch: true, headerName: '품목명', type: 'text', width: 170, editable: false },
     { field: 'materialSpec', headerName: '규격', type: 'text', width: 110, editable: false },
     { field: 'unit', headerName: '단위', type: 'text', width: 60, align: 'center', editable: false },
-    amount('receiptQty', '입고수량', 100, { summaryType: 'sum' }),
+    // 수량은 자릿수를 고정하지 않고 정책 관리의 모듈 소수점 정책을 따른다.
+    amount('receiptQty', '입고수량', 100, { summaryType: 'sum', decimalPlaces: undefined }),
     {
       field: 'unitPrice',
       headerName: '단가',
       type: 'decimal',
-      decimalPlaces: 2,
       width: 110,
       align: 'right',
       editable: editableOpen,

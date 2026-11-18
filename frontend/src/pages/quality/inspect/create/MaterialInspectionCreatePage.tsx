@@ -32,6 +32,7 @@ import {
   validateInspectionInput,
 } from './services/materialInspection.service';
 import type { MaterialInspectionCandidate, MaterialInspectionItem } from './types/materialInspection.types';
+import { usePageMessages } from '../../../../shared/hooks/usePageMessages';
 import { useServerDateDefault } from '../../../../shared/hooks/useServerDateDefault';
 import { FormDateField, normalizeFormDate } from '../../../../shared/components/FormDateField';
 
@@ -96,9 +97,9 @@ export function MaterialInspectionCreatePage({
   const [remark, setRemark] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [validationMessages, setValidationMessages] = useState<string[]>([]);
-  const [notice, setNotice] = useState('');
-  const [error, setError] = useState('');
+  const {
+    validationMessages, setValidationMessages, notice, setNotice, error, setError, clearMessages,
+  } = usePageMessages();
   /** 열린 저장 검사. null이면 신규 등록 */
   const [loaded, setLoaded] = useState<MaterialInspectionItem | null>(null);
   const [isLoading, setIsLoading] = useState(materialInspectionId != null);
@@ -144,7 +145,7 @@ export function MaterialInspectionCreatePage({
     setValidationMessages([]);
     gridValidationActiveRef.current = false;
     setGridKey((key) => key + 1);
-  }, []);
+  }, [setValidationMessages]);
 
   /** 그리드에 입력 중인 값을 포함한 현재 행. */
   const currentRows = useCallback(
@@ -172,7 +173,7 @@ export function MaterialInspectionCreatePage({
       })
       .finally(() => { if (active) setIsLoading(false); });
     return () => { active = false; };
-  }, [applyLoaded, materialInspectionId]);
+  }, [applyLoaded, materialInspectionId, setError]);
 
   const { markTouched: markDateTouched, reload: reloadServerDate } = useServerDateDefault({
     enabled: materialInspectionId == null,
@@ -193,8 +194,7 @@ export function MaterialInspectionCreatePage({
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
-    setNotice('');
-    setError('');
+    clearMessages();
     try {
       await work();
     } catch (workError) {
@@ -203,7 +203,7 @@ export function MaterialInspectionCreatePage({
       busyRef.current = false;
       setBusy(false);
     }
-  }, []);
+  }, [clearMessages, setError]);
 
   const handleNew = useCallback(async () => {
     if (busyRef.current) return;
@@ -213,12 +213,12 @@ export function MaterialInspectionCreatePage({
       return;
     }
     resetToNew();
-    setNotice('');
-    setError('');
-  }, [confirm, hasUnsavedChanges, resetToNew]);
+    clearMessages();
+  }, [clearMessages, confirm, hasUnsavedChanges, resetToNew]);
 
   /** 검사 대기 가입고 행을 담는다. 이미 담긴 행은 건너뛰고, 합격량은 검사 대기량(전량 합격)을 기본값으로 쓴다. */
   const loadCandidates = useCallback((candidates: MaterialInspectionCandidate[]) => {
+    clearMessages();
     setPickerOpen(false);
     const existing = currentRows();
     const existingIds = new Set(existing.map((row) => row.materialArrivalDetailId));
@@ -226,9 +226,8 @@ export function MaterialInspectionCreatePage({
       .filter((candidate) => !existingIds.has(candidate.materialArrivalDetailId))
       .map(candidateToRow);
     resetGrid([...existing, ...added]);
-    setNotice('');
-    setError('');
-  }, [currentRows, resetGrid]);
+    clearMessages();
+  }, [clearMessages, currentRows, resetGrid]);
 
   /** 합격분이 입고된 행(있으면 입고번호). 검사에서 빼거나 합격량을 줄이거나 검사를 취소할 수 없다. */
   const receivedNos = useMemo(
@@ -239,6 +238,7 @@ export function MaterialInspectionCreatePage({
 
   /** 체크한 품목 행만 뺀다. 입력한 값은 남은 행에 그대로 유지하고, 합격분이 입고된 행은 뺄 수 없다. */
   const removeSelectedRows = useCallback(() => {
+    clearMessages();
     const selected = new Set(selectedRowIds.map(String));
     if (selected.size === 0) return;
     const rows = currentRows();
@@ -251,17 +251,19 @@ export function MaterialInspectionCreatePage({
     if (removable.size === 0) return;
     setDirty(true);
     resetGrid(rows.filter((row) => !removable.has(row.rowId)));
-  }, [currentRows, resetGrid, selectedRowIds]);
+  }, [clearMessages, currentRows, resetGrid, selectedRowIds, setError]);
 
   const handleChangesChange = useCallback((changes: F1GridChanges<MaterialInspectionRow>) => {
     const updated = new Map(changes.updatedRows.map((row) => [row.rowId, row]));
     if (updated.size > 0) setDirty(true);
     setActiveRows(baselineRows.map((row) => updated.get(row.rowId) ?? row));
-    setValidationMessages([]);
+    // 실제로 값을 고쳤을 때만 이전 메시지를 모두 비운다(그리드 재구성 직후의 빈 변경 콜백은 성공 안내를 지우지 않는다).
+    if (updated.size > 0) clearMessages();
+    else setValidationMessages([]);
     if (gridValidationActiveRef.current) {
       gridValidationActiveRef.current = !(gridRef.current?.validate() ?? true);
     }
-  }, [baselineRows]);
+  }, [baselineRows, clearMessages, setValidationMessages]);
 
   const handleSave = useCallback(async () => {
     if (!editable) return;
@@ -275,6 +277,7 @@ export function MaterialInspectionCreatePage({
         : validateInspectionInput({ inspectionDt: dateCheck.date }, rows);
     const isGridValid = gridRef.current?.validate() ?? true;
     gridValidationActiveRef.current = !isGridValid;
+    clearMessages();
     setValidationMessages(messages);
     if (messages.length > 0 || !isGridValid) return;
     if (loaded) {
@@ -301,8 +304,7 @@ export function MaterialInspectionCreatePage({
       setNotice(`검사를 등록했습니다. 검사번호: ${saved.inspectionNo}`);
       onSaved?.(saved);
     });
-  }, [applyLoaded, confirm, currentRows, editable, inspectionDt, loaded, onSaved, refreshWaitingTotal, remark,
-    resetToNew, runBusy]);
+  }, [applyLoaded, clearMessages, confirm, currentRows, editable, inspectionDt, loaded, onSaved, refreshWaitingTotal, remark, resetToNew, runBusy, setNotice, setValidationMessages]);
 
   /** 검사 전체를 취소한다. 취소하면 가입고 행의 잠금과 검사 대기량이 복구된다. */
   const handleCancelInspection = useCallback(async () => {
@@ -316,7 +318,7 @@ export function MaterialInspectionCreatePage({
       setNotice(`검사를 취소했습니다. 검사번호: ${loaded.inspectionNo}`);
       onCanceled?.();
     });
-  }, [confirm, editable, loaded, onCanceled, runBusy]);
+  }, [confirm, editable, loaded, onCanceled, runBusy, setNotice]);
 
   const isEditing = loaded !== null;
   const saveDisabled = !editable || (isEditing ? !dirty : !hasRows);
@@ -450,7 +452,7 @@ export function MaterialInspectionCreatePage({
               label="검사일"
               value={inspectionDt}
               disabled={!editable}
-              onChange={(value) => { markDateTouched(); setInspectionDt(value); setDirty(true); setValidationMessages([]); }}
+              onChange={(value) => { markDateTouched(); setInspectionDt(value); setDirty(true); clearMessages(); }}
             />
             <TextField
               label="검사자"
@@ -462,7 +464,7 @@ export function MaterialInspectionCreatePage({
               label="비고"
               size="small"
               value={remark}
-              onChange={(event) => { setRemark(event.target.value); setDirty(true); }}
+              onChange={(event) => { setRemark(event.target.value); setDirty(true); clearMessages(); }}
               disabled={!editable}
               slotProps={{ inputLabel: { shrink: true }, htmlInput: { maxLength: 500 } }}
             />

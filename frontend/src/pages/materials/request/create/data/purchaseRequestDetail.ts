@@ -112,7 +112,6 @@ export function createPurchaseRequestDetailColumns(
       field: 'requestQty',
       headerName: '요청수량',
       type: 'decimal',
-      decimalPlaces: 2,
       width: 110,
       align: 'right',
       editable: !disabled,

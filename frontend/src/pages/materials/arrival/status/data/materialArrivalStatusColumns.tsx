@@ -8,6 +8,22 @@ export type MaterialArrivalStatusColumnOptions = {
   onOpenArrival?: (row: MaterialArrivalStatusRow) => void;
 };
 
+/** 수량·단가: 자릿수를 고정하지 않고 정책 관리의 모듈 소수점 정책을 따른다. */
+const quantityColumn = (
+  field: keyof MaterialArrivalStatusRow,
+  headerName: string,
+  width = 110,
+): F1GridColumn<MaterialArrivalStatusRow> => ({
+  field,
+  headerName,
+  type: 'decimal',
+  width,
+  align: 'right',
+  editable: false,
+  search: { hidden: true },
+});
+
+/** 금액: 컬럼에서 2자리로 고정한다(정책 대상은 수량·단가). */
 const amountColumn = (
   field: keyof MaterialArrivalStatusRow,
   headerName: string,
@@ -151,9 +167,9 @@ export function createMaterialArrivalStatusColumns({
     { field: 'materialName', highlightSearch: true, headerName: '품목명', type: 'text', width: 180, editable: false, search: { hidden: true } },
     { field: 'materialSpec', headerName: '규격', type: 'text', width: 110, editable: false, search: { hidden: true } },
     { field: 'unit', headerName: '단위', type: 'text', width: 60, align: 'center', editable: false, search: { hidden: true } },
-    amountColumn('orderQty', '발주수량', 100),
-    amountColumn('arrivalQty', '가입고수량', 100),
-    amountColumn('unitPrice', '가입고단가'),
+    quantityColumn('orderQty', '발주수량', 100),
+    quantityColumn('arrivalQty', '가입고수량', 100),
+    quantityColumn('unitPrice', '가입고단가'),
     amountColumn('supplyAmt', '공급가', 120),
     amountColumn('vatAmt', '세액'),
     amountColumn('totalAmt', '합계', 120),

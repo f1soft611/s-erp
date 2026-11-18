@@ -47,6 +47,7 @@ import {
   emptyRowDefaults,
   fetchMaterialDefault,
   fetchTaxTypeOptions,
+  distinctCandidateTaxSettings,
   getPurchaseOrder,
   savePurchaseOrderReceiptClose,
   updatePurchaseOrder,
@@ -59,6 +60,7 @@ import type {
   PurchaseOrderSourceType,
   PurchaseOrderTaxType,
 } from './types/purchaseOrder.types';
+import { usePageMessages } from '../../../../shared/hooks/usePageMessages';
 import { useServerDateDefault } from '../../../../shared/hooks/useServerDateDefault';
 import { FormDateField, normalizeFormDate } from '../../../../shared/components/FormDateField';
 
@@ -144,10 +146,9 @@ export function PurchaseOrderCreatePage({
   const [supplierPickerOpen, setSupplierPickerOpen] = useState(false);
   const [materialPickerOpen, setMaterialPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [validationMessages, setValidationMessages] = useState<string[]>([]);
-  const [notice, setNotice] = useState('');
-  const [warning, setWarning] = useState('');
-  const [error, setError] = useState('');
+  const {
+    validationMessages, setValidationMessages, notice, setNotice, warning, setWarning, error, setError, clearMessages,
+  } = usePageMessages();
   /** 열린 저장 발주. null이면 신규 등록 */
   const [loaded, setLoaded] = useState<PurchaseOrderItem | null>(null);
   const [isLoading, setIsLoading] = useState(purchaseOrderId != null);
@@ -175,6 +176,9 @@ export function PurchaseOrderCreatePage({
 
   const totals = useMemo(() => sumOrderAmounts(activeRows), [activeRows]);
   const diffCount = useMemo(() => activeRows.filter((row) => row.diffNote).length, [activeRows]);
+  /** 가입고가 있는 행 수. 있으면 그 행과 헤더(발주일·부가세 설정)는 수정할 수 없고 비고만 고칠 수 있다. */
+  const arrivedRowCount = useMemo(() => activeRows.filter((row) => row.arrivedQty > 0).length, [activeRows]);
+  const headerLocked = loaded !== null && arrivedRowCount > 0;
 
   useEffect(() => {
     let active = true;
@@ -191,7 +195,7 @@ export function PurchaseOrderCreatePage({
       .then((options) => { if (active && options.length > 0) setTaxTypeOptions(options); })
       .catch(() => { /* 공통코드가 없으면 기본 3종을 쓴다 */ });
     return () => { active = false; };
-  }, []);
+  }, [setError]);
 
   const resetGrid = useCallback((rows: PurchaseOrderRow[]) => {
     setBaselineRows(rows);
@@ -200,7 +204,7 @@ export function PurchaseOrderCreatePage({
     setValidationMessages([]);
     gridValidationActiveRef.current = false;
     setGridKey((key) => key + 1);
-  }, []);
+  }, [setValidationMessages]);
 
   /** 그리드에 입력 중인 값을 포함한 현재 행. */
   const currentRows = useCallback(
@@ -234,7 +238,7 @@ export function PurchaseOrderCreatePage({
       })
       .finally(() => { if (active) setIsLoading(false); });
     return () => { active = false; };
-  }, [applyLoaded, purchaseOrderId]);
+  }, [applyLoaded, purchaseOrderId, setError]);
 
   const { markTouched: markDateTouched, reload: reloadServerDate } = useServerDateDefault({
     enabled: purchaseOrderId == null,
@@ -257,14 +261,13 @@ export function PurchaseOrderCreatePage({
     setUseType('');
     setWarning('');
     resetGrid([]);
-  }, [resetGrid, reloadServerDate]);
+  }, [reloadServerDate, resetGrid, setWarning]);
 
   const runBusy = useCallback(async (work: () => Promise<void>) => {
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
-    setNotice('');
-    setError('');
+    clearMessages();
     try {
       await work();
     } catch (workError) {
@@ -273,7 +276,7 @@ export function PurchaseOrderCreatePage({
       busyRef.current = false;
       setBusy(false);
     }
-  }, []);
+  }, [clearMessages, setError]);
 
   const handleNew = useCallback(async () => {
     if (busyRef.current) return;
@@ -283,13 +286,13 @@ export function PurchaseOrderCreatePage({
       return;
     }
     resetToNew();
-    setNotice('');
-    setError('');
-  }, [confirm, hasUnsavedChanges, resetToNew]);
+    clearMessages();
+  }, [clearMessages, confirm, hasUnsavedChanges, resetToNew]);
 
   /** 확정 품목을 담는다. 같은 구매처·같은 통화만 한 발주서에 누적한다. */
   const loadConfirmRows = useCallback((candidates: PurchaseOrderCandidate[]) => {
     setConfirmPickerOpen(false);
+    clearMessages();
     if (sourceType === 'DIRECT') {
       setError('직접 선택한 품목이 있는 발주서에는 확정 품목을 담을 수 없습니다. 신규로 시작해 주세요.');
       return;
@@ -308,6 +311,18 @@ export function PurchaseOrderCreatePage({
       setError(`통화가 다른 확정 품목은 한 발주서에 담을 수 없습니다(${currencyCode} / ${nextCurrency}).`);
       return;
     }
+    // 부가세구분·부가세포함은 확정 시 설정된 값을 발주 헤더가 따른다. 서로 다른 값이 섞이면 담을 수 없다.
+    const taxSettings = distinctCandidateTaxSettings(candidates);
+    if (taxSettings.length > 1) {
+      setError('부가세구분·부가세포함이 다른 확정 품목은 한 발주서에 담을 수 없습니다. 같은 설정의 품목끼리 선택해 주세요.');
+      return;
+    }
+    const nextTaxType = taxSettings[0]?.taxType ?? 'TAXABLE';
+    const nextVatIncluded = taxSettings[0]?.vatIncluded ?? false;
+    if (hasRows && (nextTaxType !== taxType || nextVatIncluded !== vatIncluded)) {
+      setError('부가세구분·부가세포함이 현재 발주서와 다른 확정 품목은 한 발주서에 담을 수 없습니다.');
+      return;
+    }
     const nextSupplier: Supplier = supplier && hasRows
       ? supplier
       : { id: first.supplierId, code: first.supplierCode ?? '', name: first.supplierName ?? '' };
@@ -315,57 +330,70 @@ export function PurchaseOrderCreatePage({
     const existingIds = new Set(existing.map((row) => row.purchaseRequestDetailId));
     const added = candidates
       .filter((candidate) => !existingIds.has(candidate.purchaseRequestDetailId))
-      .map((candidate) => candidateToRow(candidate, taxType, vatIncluded, nextSupplier.id));
+      .map((candidate) => candidateToRow(candidate, nextTaxType, nextVatIncluded, nextSupplier.id));
     setSupplier(nextSupplier);
     setCurrencyCode(nextCurrency);
+    setTaxType(nextTaxType);
+    setVatIncluded(nextVatIncluded);
     resetGrid([...existing, ...added]);
-    setNotice('');
-    setError('');
-  }, [currencyCode, currentRows, hasRows, resetGrid, sourceType, supplier, taxType, vatIncluded]);
+  }, [clearMessages, currencyCode, currentRows, hasRows, resetGrid, setError, sourceType, supplier, taxType, vatIncluded]);
 
   /** 체크한 품목 행만 뺀다. 입력한 값은 남은 행에 그대로 유지한다. */
   const removeSelectedRows = useCallback(() => {
     const selected = new Set(selectedRowIds.map(String));
     if (selected.size === 0) return;
+    const rows = currentRows();
+    // 가입고가 있는 행은 뺄 수 없다(서버도 거부한다). 나머지 선택 행만 뺀다.
+    const lockedRows = rows.filter((row) => selected.has(row.rowId) && row.arrivedQty > 0);
+    const removable = new Set(rows.filter((row) => selected.has(row.rowId) && !(row.arrivedQty > 0)).map((row) => row.rowId));
+    clearMessages();
+    if (lockedRows.length > 0) setError('가입고가 있는 행은 뺄 수 없습니다. 가입고를 먼저 취소해 주세요.');
+    if (removable.size === 0) return;
     setDirty(true);
-    resetGrid(currentRows().filter((row) => !selected.has(row.rowId)));
-  }, [currentRows, resetGrid, selectedRowIds]);
+    resetGrid(rows.filter((row) => !removable.has(row.rowId)));
+  }, [clearMessages, currentRows, resetGrid, selectedRowIds, setError]);
 
   const handleChangesChange = useCallback((changes: F1GridChanges<PurchaseOrderRow>) => {
     const updated = new Map(changes.updatedRows.map((row) => [row.rowId, row]));
     if (updated.size > 0) setDirty(true);
     setActiveRows(baselineRows.map((row) => updated.get(row.rowId) ?? row));
-    setValidationMessages([]);
+    // 실제로 값을 고쳤을 때만 이전 메시지를 모두 비운다(그리드 재구성 직후의 빈 변경 콜백은 성공 안내를 지우지 않는다).
+    if (updated.size > 0) clearMessages();
+    else setValidationMessages([]);
     if (gridValidationActiveRef.current) {
       gridValidationActiveRef.current = !(gridRef.current?.validate() ?? true);
     }
-  }, [baselineRows]);
+  }, [baselineRows, clearMessages, setValidationMessages]);
 
   const changeTaxType = useCallback((next: PurchaseOrderTaxType) => {
     const nextIncluded = isTaxable(next) ? vatIncluded : false;
+    clearMessages();
     setDirty(true);
     setTaxType(next);
     setVatIncluded(nextIncluded);
     resetGrid(currentRows().map((row) => recalculateRow(row, next, nextIncluded, supplier?.id ?? null)));
-  }, [currentRows, resetGrid, supplier, vatIncluded]);
+  }, [clearMessages, currentRows, resetGrid, supplier, vatIncluded]);
 
   const changeVatIncluded = useCallback((next: boolean) => {
+    clearMessages();
     setDirty(true);
     setVatIncluded(next);
     resetGrid(currentRows().map((row) => recalculateRow(row, taxType, next, supplier?.id ?? null)));
-  }, [currentRows, resetGrid, supplier, taxType]);
+  }, [clearMessages, currentRows, resetGrid, supplier, taxType]);
 
   const changeWarehouse = useCallback((next: string) => {
+    clearMessages();
     setWarehouseId(next);
     if (!next) return;
     const rows = currentRows();
     if (rows.some((row) => !row.warehouseId)) {
       resetGrid(rows.map((row) => (row.warehouseId ? row : { ...row, warehouseId: next })));
     }
-  }, [currentRows, resetGrid]);
+  }, [clearMessages, currentRows, resetGrid]);
 
   const selectSupplier = useCallback((option: MasterPickerOption) => {
     setSupplierPickerOpen(false);
+    clearMessages();
     const next: Supplier = { id: option.id, code: option.code, name: option.name };
     const rows = currentRows();
     setSupplier(next);
@@ -382,9 +410,10 @@ export function PurchaseOrderCreatePage({
       }));
       resetGrid(nextRows);
     });
-  }, [currentRows, orderDt, resetGrid, runBusy, taxType, vatIncluded]);
+  }, [clearMessages, currentRows, orderDt, resetGrid, runBusy, taxType, vatIncluded]);
 
   const openMaterialPicker = useCallback(() => {
+    clearMessages();
     if (sourceType === 'CONFIRM') {
       setError('확정 품목이 있는 발주서에는 품목을 직접 추가할 수 없습니다. 신규로 시작해 주세요.');
       return;
@@ -394,7 +423,7 @@ export function PurchaseOrderCreatePage({
       return;
     }
     setMaterialPickerOpen(true);
-  }, [sourceType, supplier]);
+  }, [clearMessages, setError, sourceType, supplier]);
 
   /** 직접 발주 품목 추가: 검사대상 기본값과 단가관리의 매입 단가를 채운다. */
   const addMaterial = useCallback((option: MasterPickerOption) => {
@@ -426,16 +455,32 @@ export function PurchaseOrderCreatePage({
         warehouseId,
         inspectAt: defaults.inspectAt === 'Y',
         receiptClosed: false,
+        arrivedQty: 0,
         supplyAmt: 0,
         vatAmt: 0,
         totalAmt: 0,
         remark: '',
       };
-      const amounts = calculateOrderAmounts(base.orderQty, base.unitPrice, taxType, vatIncluded);
+      // 단가를 처음 참고하는 첫 품목이 발주 헤더의 부가세구분·부가세포함·통화를 정한다. 이후 품목은 헤더를 따른다.
+      let rowTaxType = taxType;
+      let rowVatIncluded = vatIncluded;
+      if (price && !hasRows) {
+        rowTaxType = (price.taxType as PurchaseOrderTaxType | null | undefined) || 'TAXABLE';
+        rowVatIncluded = rowTaxType === 'TAXABLE' && price.vatIncludedAt === 'Y';
+        setTaxType(rowTaxType);
+        setVatIncluded(rowVatIncluded);
+      } else if (price && hasRows) {
+        const priceTax = (price.taxType as PurchaseOrderTaxType | null | undefined) || 'TAXABLE';
+        const priceVat = priceTax === 'TAXABLE' && price.vatIncludedAt === 'Y';
+        if (priceTax !== taxType || priceVat !== vatIncluded) {
+          setWarning('단가 정보(부가세구분·부가세포함)가 발주서 설정과 다릅니다. 단가를 직접 확인해 주세요.');
+        }
+      }
+      const amounts = calculateOrderAmounts(base.orderQty, base.unitPrice, rowTaxType, rowVatIncluded);
       if (!hasRows && price?.currency) setCurrencyCode(price.currency);
       resetGrid([...currentRows(), { ...base, ...amounts }]);
     });
-  }, [currencyCode, currentRows, hasRows, orderDt, resetGrid, runBusy, supplier, taxType, vatIncluded, warehouseId]);
+  }, [currencyCode, currentRows, hasRows, orderDt, resetGrid, runBusy, setError, setWarning, supplier, taxType, vatIncluded, warehouseId]);
 
   const handleSave = useCallback(async () => {
     if (closeEditable && loaded) {
@@ -464,12 +509,19 @@ export function PurchaseOrderCreatePage({
         );
     const isGridValid = gridRef.current?.validate() ?? true;
     gridValidationActiveRef.current = !isGridValid;
+    clearMessages();
     setValidationMessages(messages);
     if (messages.length > 0 || !isGridValid || !supplier) return;
     const payload = buildOrderPayload({
       sourceType, orderDt: dateCheck.date, supplierId: supplier.id, currencyCode, warehouseId, taxType, vatIncluded,
       remark, orderType, useType,
     }, rows);
+    // 이미 출력한 발주서는 막지 않고 한 번 더 확인한다(출력본과 내용이 달라지므로).
+    if (loaded?.printAt === 'Y' && !(await confirm({
+      description: '이미 출력된 발주서입니다. 저장하면 출력본과 내용이 달라집니다. 저장하시겠습니까?',
+    }))) {
+      return;
+    }
     void runBusy(async () => {
       const over = (saved: PurchaseOrderItem) => {
         const lines = saved.overOrderedLineNos ?? [];
@@ -489,8 +541,7 @@ export function PurchaseOrderCreatePage({
       over(saved);
       onSaved?.(saved);
     });
-  }, [applyLoaded, baselineRows, closeEditable, currencyCode, currentRows, editable, loaded, onSaved, orderDt, orderType, remark, resetToNew,
-    runBusy, sourceType, supplier, taxType, useType, vatIncluded, warehouseId]);
+  }, [applyLoaded, baselineRows, clearMessages, closeEditable, confirm, currencyCode, currentRows, editable, loaded, onSaved, orderDt, orderType, remark, resetToNew, runBusy, setNotice, setValidationMessages, setWarning, sourceType, supplier, taxType, useType, vatIncluded, warehouseId]);
 
   /** 발주서 전체를 취소한다. 확정 불러오기 발주는 확정 잔량이 복원되고, 직접 발주는 자동 생성된 확정·구매요청도 정리된다. */
   const handleCancelOrder = useCallback(async () => {
@@ -505,7 +556,7 @@ export function PurchaseOrderCreatePage({
       setNotice(`발주를 취소했습니다. 발주번호: ${loaded.orderNo}`);
       onCanceled?.();
     });
-  }, [confirm, editable, loaded, onCanceled, runBusy]);
+  }, [confirm, editable, loaded, onCanceled, runBusy, setNotice]);
 
   const isEditing = loaded !== null;
   const saveDisabled = isCloseMode ? (!closeEditable || closeChangeCount === 0) : (!editable || (isEditing ? !dirty : !hasRows));
@@ -618,6 +669,14 @@ export function PurchaseOrderCreatePage({
         {loaded?.useAt === 'N' ? (
           <Alert severity="info">취소된 발주입니다. 조회만 할 수 있습니다.</Alert>
         ) : null}
+        {loaded?.printAt === 'Y' && editable ? (
+          <Alert severity="warning">이미 출력된 발주서입니다. 내용을 바꾸면 출력본과 달라집니다. 저장은 가능합니다.</Alert>
+        ) : null}
+        {headerLocked && editable ? (
+          <Alert severity="info">
+            가입고가 있는 행 {arrivedRowCount}건은 수량·단가·납기·창고·검사대상을 바꿀 수 없습니다. 발주일·부가세 설정도 바꿀 수 없고 비고만 수정할 수 있습니다. 가입고를 취소하면 수정할 수 있습니다.
+          </Alert>
+        ) : null}
         {diffCount > 0 ? (
           <Alert severity="warning">확정과 다른 행이 {diffCount}건 있습니다. 저장은 가능합니다.</Alert>
         ) : null}
@@ -645,8 +704,8 @@ export function PurchaseOrderCreatePage({
             <FormDateField
               label="발주일"
               value={orderDt}
-              disabled={!editable}
-              onChange={(value) => { markDateTouched(); setOrderDt(value); setDirty(true); setValidationMessages([]); }}
+              disabled={!editable || headerLocked}
+              onChange={(value) => { markDateTouched(); setOrderDt(value); setDirty(true); clearMessages(); }}
             />
             <TextField
               label="구매처"
@@ -683,7 +742,7 @@ export function PurchaseOrderCreatePage({
                 </Select>
               </FormControl>
             )}
-            <FormControl size="small" required disabled={!editable}>
+            <FormControl size="small" required disabled={!editable || headerLocked}>
               <InputLabel shrink id="order-tax-label">부가세구분</InputLabel>
               <Select
                 labelId="order-tax-label"
@@ -702,7 +761,7 @@ export function PurchaseOrderCreatePage({
               control={(
                 <Switch
                   checked={taxable && vatIncluded}
-                  disabled={!editable || !taxable}
+                  disabled={!editable || !taxable || headerLocked}
                   onChange={(event) => changeVatIncluded(event.target.checked)}
                   slotProps={{ input: { 'aria-label': '부가세 포함' } }}
                 />
@@ -719,7 +778,7 @@ export function PurchaseOrderCreatePage({
                     notched
                     displayEmpty
                     value={orderType}
-                    onChange={(event) => { setOrderType(String(event.target.value)); setValidationMessages([]); }}
+                    onChange={(event) => { setOrderType(String(event.target.value)); clearMessages(); }}
                   >
                     <MenuItem value=""><em>선택</em></MenuItem>
                     {orderTypeOptions.map((option) => (
@@ -735,7 +794,7 @@ export function PurchaseOrderCreatePage({
                     notched
                     displayEmpty
                     value={useType}
-                    onChange={(event) => { setUseType(String(event.target.value)); setValidationMessages([]); }}
+                    onChange={(event) => { setUseType(String(event.target.value)); clearMessages(); }}
                   >
                     <MenuItem value=""><em>선택</em></MenuItem>
                     {useTypeOptions.map((option) => (
@@ -755,7 +814,7 @@ export function PurchaseOrderCreatePage({
               label="비고"
               size="small"
               value={remark}
-              onChange={(event) => { setRemark(event.target.value); setDirty(true); }}
+              onChange={(event) => { setRemark(event.target.value); setDirty(true); clearMessages(); }}
               disabled={!editable}
               slotProps={{ inputLabel: { shrink: true }, htmlInput: { maxLength: 500 } }}
             />
