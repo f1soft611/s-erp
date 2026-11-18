@@ -26,6 +26,8 @@ JSX·스타일·props·기존 state/ref 초기값·helper/이벤트/검증 콜�
 
 대상은 `f1-grid-form-modal`, `f1-tree`, `material-management`, `f1-grid-unique-validation`, `f1-grid-docs`, `f1-grid`다. raw 증거는 세션의 `lint037-red.json`, `lint037-related.json`, `lint037-oxlint.json`, `lint037-typecheck.log`, `lint037-build.log`에 있다. 저장소에는 [scope audit](screenshots/row-form-state-sync/scope-audit.json)과 [실제 화면·콜백 검증](screenshots/row-form-state-sync/verification.json)을 보관했다. 이전 036의 전체 226파일/2,655개 CI는 이번 행 폼 소스의 전체 검증으로 재사용하지 않는다.
 
+후속 확인: 이 단위의 정확한 SHA `fb1a89d5bf7b158fdb7ee6b330535af65fc96969`를 실행한 [Frontend CI 44301235011](https://github.com/f1soft611/s-erp/actions/runs/44301235011)에서 전체 **226파일/2,657개**가 통과했다. build/lint/tests/required 네 job 모두 success이며 마지막 aggregate raw log와 source SHA를 함께 대조했다([CI 요약](screenshots/row-form-state-sync/remote-ci.json)).
+
 ## 실제 브라우저
 
 실제 F1GridFormModal/CommonDialog/GridFormField와 앱 light 테마를 합성 행 A/B로 mount했다. 각 draft 변경 콜백이 부모를 다시 렌더하고 새 columns 배열을 전달하므로 metadata-only 재렌더에서도 입력이 보존되는 실제 흐름이다. 업무 API·테넌트 데이터는 사용하지 않았다. 공유 4173 서버를 변경하지 않았고 검증 후 소유 탭만 닫았다.

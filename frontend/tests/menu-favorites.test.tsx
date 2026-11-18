@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Profiler, type ComponentProps } from 'react';
 
 const api = vi.hoisted(() => ({
   apiDelete: vi.fn(),
@@ -21,10 +22,133 @@ import {
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { DashboardMenuTree } from '../src/pages/dashboard/components/DashboardMenuTree';
 import { MenuFavoritesTree } from '../src/pages/dashboard/components/MenuFavoritesTree';
+import { MenuFavoriteEditDialog } from '../src/pages/dashboard/components/MenuFavoriteEditDialog';
+import type { FavoriteMenu } from '../src/pages/dashboard/types/menuFavorite.types';
 
 describe('menu favorites service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe('favorite edit dialog draft synchronization', () => {
+    const favorite: FavoriteMenu = {
+      favoriteId: 1,
+      menuId: 10,
+      favoriteName: '  Stored name  ',
+      folderId: 12,
+    };
+    const folders = [{ folderId: 12, folderName: 'Folder A' }];
+    type DraftSnapshot = { name: string; folder: string; error: string };
+    const editor = (
+      props: ComponentProps<typeof MenuFavoriteEditDialog>,
+      commits: DraftSnapshot[],
+    ) => (
+      <Profiler
+        id="favorite-draft"
+        onRender={() => {
+          const dialog = screen.queryByRole('dialog', { name: '즐겨찾기 편집' });
+          if (!dialog) return;
+          const fields = within(dialog);
+          commits.push({
+            name: fields.getByRole<HTMLInputElement>('textbox', { name: '이름' }).value,
+            folder: fields.getByRole('combobox', { name: '폴더' }).textContent?.trim() ?? '',
+            error: fields.queryByRole('alert')?.textContent ?? '',
+          });
+        }}
+      >
+        <MenuFavoriteEditDialog {...props} />
+      </Profiler>
+    );
+    const createProps = () => ({
+      open: true,
+      menuName: 'Menu A',
+      menuUrl: '/fixture/a',
+      favorite,
+      folders,
+      onClose: vi.fn(),
+      onMore: vi.fn(),
+      onSave: vi.fn().mockResolvedValue(undefined),
+      onRemove: vi.fn().mockResolvedValue(undefined),
+    });
+
+    it('commits the saved display name and folder on the first open mount', () => {
+      const commits: DraftSnapshot[] = [];
+      render(editor(createProps(), commits));
+
+      expect(commits[0]).toEqual({
+        name: 'Stored name',
+        folder: 'Folder A',
+        error: '',
+      });
+    });
+
+    it.each(['favoriteId', 'favoriteName', 'folderId', 'menuName'] as const)(
+      'resets the draft and error in the first commit when %s changes, not when metadata is recreated',
+      async (key) => {
+        const props = createProps();
+        props.onSave.mockRejectedValueOnce(new Error('Save failed'));
+        const commits: DraftSnapshot[] = [];
+        const { rerender } = render(editor(props, commits));
+        fireEvent.change(screen.getByRole('textbox', { name: '이름' }), {
+          target: { value: 'Edited name' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: '완료' }));
+        await screen.findByText('Save failed');
+
+        rerender(editor({
+          ...props,
+          favorite: { ...favorite, menuId: 99 },
+          folders: [...folders],
+          menuUrl: '/fixture/metadata',
+        }, commits));
+        expect(screen.getByRole('textbox', { name: '이름' })).toHaveValue('Edited name');
+        expect(screen.getByRole('alert')).toHaveTextContent('Save failed');
+
+        const nextFavorite = { ...favorite };
+        if (key === 'favoriteId') nextFavorite.favoriteId = 2;
+        if (key === 'favoriteName') nextFavorite.favoriteName = '  Next name  ';
+        if (key === 'folderId') nextFavorite.folderId = null;
+        commits.length = 0;
+        rerender(editor({
+          ...props,
+          favorite: nextFavorite,
+          menuName: key === 'menuName' ? 'Menu B' : props.menuName,
+        }, commits));
+
+        expect(commits[0]).toEqual({
+          name: key === 'favoriteName' ? 'Next name' : 'Stored name',
+          folder: key === 'folderId' ? '즐겨찾기 루트' : 'Folder A',
+          error: '',
+        });
+        expect(props.onSave).toHaveBeenCalledOnce();
+        expect(props.onClose).not.toHaveBeenCalled();
+      },
+    );
+
+    it('reopens with the current fallback name and root folder in its first commit after closed target changes', async () => {
+      const props = createProps();
+      const commits: DraftSnapshot[] = [];
+      const { rerender } = render(editor(props, commits));
+      fireEvent.change(screen.getByRole('textbox', { name: '이름' }), {
+        target: { value: 'Unsubmitted draft' },
+      });
+      rerender(editor({ ...props, open: false }, commits));
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: '즐겨찾기 편집' })).not.toBeInTheDocument();
+      });
+      const nextProps = {
+        ...props,
+        menuName: 'Menu B',
+        favorite: { ...favorite, favoriteId: 2, favoriteName: '   ', folderId: null },
+      };
+      rerender(editor({ ...nextProps, open: false }, commits));
+      commits.length = 0;
+      rerender(editor(nextProps, commits));
+
+      expect(commits[0]).toEqual({ name: 'Menu B', folder: '즐겨찾기 루트', error: '' });
+      expect(props.onSave).not.toHaveBeenCalled();
+      expect(props.onRemove).not.toHaveBeenCalled();
+    });
   });
 
   it('uses the favorites list endpoint and propagates errors', async () => {
