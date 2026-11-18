@@ -1,0 +1,48 @@
+{
+  "actualNoticeFeedAndExistingImageViewer": true,
+  "transport": "Synthetic common file blob responses only; unknown fetch blocked",
+  "storage": "Tab-only memory replacement with synthetic session prerequisite; no persistent reads or writes",
+  "widths": [
+    {
+      "width": 375,
+      "documentWidth": 375,
+      "metadataAndThemeRequests": 0,
+      "objectUrlReplacements": 0,
+      "actualPreviewAndViewer": true
+    },
+    {
+      "width": 768,
+      "documentWidth": 768,
+      "metadataAndThemeRequests": 0,
+      "objectUrlReplacements": 0,
+      "actualPreviewAndViewer": true
+    },
+    {
+      "width": 1280,
+      "documentWidth": 1280,
+      "metadataAndThemeRequests": 0,
+      "objectUrlReplacements": 0,
+      "actualPreviewAndViewer": true
+    }
+  ],
+  "orderedSyntheticRequestCount": 7,
+  "specialAttachmentIdPreserved": true,
+  "changedImageIdReplacesAndRevokesPreviousUrl": true,
+  "lateResponseIgnoredWithoutObjectUrlCreation": true,
+  "currentFailureMessageAndDownloadCallbackPreserved": true,
+  "recoveryAndCloseReopen": true,
+  "objectUrlsCreated": 5,
+  "objectUrlsRevoked": 5,
+  "unknownRequests": 0,
+  "ownedFeedUnmounted": true,
+  "images": [
+    "comment050-preview375.png",
+    "comment050-viewer375.png",
+    "comment050-preview768.png",
+    "comment050-viewer768.png",
+    "comment050-preview1280.png",
+    "comment050-viewer1280.png",
+    "comment050-late1280.png",
+    "comment050-error1280.png"
+  ]
+}

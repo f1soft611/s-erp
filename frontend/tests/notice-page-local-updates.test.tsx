@@ -1267,7 +1267,7 @@ describe('CommunityNoticePage local updates', () => {
       hasPreviousComments: true,
     };
 
-    const { unmount } = render(
+    const { unmount, rerender } = render(
       <NoticeFeedList
         items={[item]}
         isDark={false}
@@ -1295,6 +1295,25 @@ describe('CommunityNoticePage local updates', () => {
       31,
       '91',
     );
+    expect(commentServiceMocks.fetchCommonFileBlob).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <NoticeFeedList
+        items={[{
+          ...item,
+          comments: item.comments.map((comment) => ({
+            ...comment,
+            content: 'Updated comment metadata',
+          })),
+        }]}
+        isDark={true}
+        expandedNoticeId={item.id}
+        onLoadPreviousComments={vi.fn()}
+      />,
+    );
+    expect(await screen.findByText('Updated comment metadata')).toBeInTheDocument();
+    expect(commentServiceMocks.fetchCommonFileBlob).toHaveBeenCalledTimes(1);
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
 
     fireEvent.click(
       screen.getByRole('button', {

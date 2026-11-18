@@ -584,18 +584,22 @@ export function NoticeFeedList({
   >({});
 
   useEffect(() => {
+    // Decode the owned key so metadata-only array changes do not refetch images.
+    const commentImageRequests = (
+      JSON.parse(commentImageRequestKey) as [number, number, string][]
+    ).map(([, commentId, attachmentId]) => ({ commentId, attachmentId }));
     let active = true;
     const objectUrls: string[] = [];
     setCommentImagePreviews({});
 
-    if (expandedNoticeId == null || expandedCommentImages.length === 0) {
+    if (expandedNoticeId == null || commentImageRequests.length === 0) {
       return () => {
         active = false;
       };
     }
 
     void Promise.allSettled(
-      expandedCommentImages.map(async ({ commentId, attachmentId }) => ({
+      commentImageRequests.map(async ({ commentId, attachmentId }) => ({
         commentId,
         attachmentId,
         blob: await fetchCommonFileBlob(
@@ -619,7 +623,7 @@ export function NoticeFeedList({
           return;
         }
 
-        const attachment = expandedCommentImages[index];
+        const attachment = commentImageRequests[index];
         if (!attachment) return;
         previews[
           getNoticeCommentImageKey(
