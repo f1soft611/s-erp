@@ -1,0 +1,34 @@
+{
+  "baseline": "7eedc6a2b81392a01d3fe080de4d74ae5103b1a0",
+  "jsxAndPublicPropsAndExportsPreserved": true,
+  "allOriginalVariablesAndHelpersPreservedExceptCallbackPropBinding": true,
+  "projectionCachesPendingInsertAndRefApisPreserved": true,
+  "originalExpansionSetUnionAndInitialStatePreserved": true,
+  "exactOriginalReferenceAndFlagKeys": true,
+  "checkboxEffectPreserved": true,
+  "existingTestDeclarationsPreserved": 29,
+  "addedTestDeclarations": 3,
+  "addedRuntimeTests": 4,
+  "sourceFiles": 890,
+  "mismatches": [],
+  "changed": [
+    "frontend/src/pages/f1-grid-docs/F1-GRID.md",
+    "frontend/src/shared/components/f1-grid/tree/F1Tree.tsx",
+    "frontend/tests/f1-tree.test.tsx"
+  ],
+  "lint": {
+    "before": 103,
+    "after": 101,
+    "removed": 2,
+    "added": 0
+  },
+  "red": {
+    "passed": 31,
+    "failed": 2,
+    "originalTestsPassed": 29
+  },
+  "tests": {
+    "files": 6,
+    "passed": 173
+  }
+}

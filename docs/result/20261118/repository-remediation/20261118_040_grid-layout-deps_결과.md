@@ -30,6 +30,8 @@ updateRangeOverlay는 본문 그대로 useCallback으로 감싸고 두 effect에
 
 세션의 lint040-red/related/oxlint JSON과 typecheck/build 로그, [scope audit](screenshots/grid-layout-deps/scope-audit.json), [브라우저 수치](screenshots/grid-layout-deps/verification.json)를 보관했다. 이전 039의 정확한 SHA 전체 CI **226파일/2,667개**는 039 결과에 별도로 기록했고 이 040 소스의 전체 CI로 재사용하지 않는다.
 
+후속 확인: 이 변경의 정확한 SHA `7eedc6a2b81392a01d3fe080de4d74ae5103b1a0`에 대한 [CI 44308920658](https://github.com/f1soft611/s-erp/actions/runs/44308920658)는 frontend-tests/build/lint/required 네 job 모두 성공했다. raw 전체 로그의 최종 aggregate는 **226파일/2,669개 통과**다. [원격 CI 증거](screenshots/grid-layout-deps/remote-ci.json)를 보관했으며 후속 041 소스의 전체 결과와 구분한다.
+
 ## 실제 브라우저
 
 실제 F1Grid/앱 light 테마를 합성 행 80개와 고정 Code 컬럼으로 mount했다. native mouse/keypress/wheel로 조작했다. fixture의 Alt+C/M은 부모 컬럼 수/metadata만 바꾸며 내부 선택·높이·스크롤 state를 직접 조작하지 않는다. API/운영 데이터/서버 저장은 사용하지 않았다.
