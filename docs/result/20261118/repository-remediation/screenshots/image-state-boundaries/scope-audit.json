@@ -1,0 +1,37 @@
+{
+  "preserved": [
+    {
+      "file": "frontend/src/shared/components/ProfileAvatar.tsx",
+      "jsxPreservedExceptViewerSrc": true,
+      "publicPropsPreserved": true
+    },
+    {
+      "file": "frontend/src/shared/components/ImageViewerDialog.tsx",
+      "jsxPreservedExceptViewerSrc": true,
+      "publicPropsPreserved": true
+    }
+  ],
+  "existingTestsPreserved": true,
+  "testsAdded": 2,
+  "sourceFiles": 890,
+  "mismatches": [],
+  "changed": [
+    "frontend/src/shared/components/ImageViewerDialog.tsx",
+    "frontend/src/shared/components/ProfileAvatar.tsx",
+    "frontend/tests/image-viewer-dialog.test.tsx",
+    "frontend/tests/profile-avatar.test.tsx"
+  ],
+  "lint": {
+    "before": 115,
+    "after": 113,
+    "removed": [
+      "src/shared/components/ImageViewerDialog.tsx",
+      "src/shared/components/ProfileAvatar.tsx"
+    ],
+    "added": 0
+  },
+  "tests": {
+    "files": 6,
+    "passed": 126
+  }
+}

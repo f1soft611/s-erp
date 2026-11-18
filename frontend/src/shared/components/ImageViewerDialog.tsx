@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Box } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { CommonDialog } from './CommonDialog';
@@ -18,17 +17,11 @@ export function ImageViewerDialog({
   onClose,
   title = '이미지 보기',
 }: ImageViewerDialogProps) {
-  const [displaySrc, setDisplaySrc] = useState(src);
   const theme = useTheme();
   const checkerColor = alpha(
     theme.palette.text.primary,
     theme.palette.mode === 'dark' ? 0.12 : 0.08,
   );
-
-  useEffect(() => {
-    setDisplaySrc(src);
-    return undefined;
-  }, [src]);
 
   if (!open || !src) {
     return null;
@@ -75,7 +68,7 @@ export function ImageViewerDialog({
         >
           <Box
             component="img"
-            src={displaySrc}
+            src={src}
             alt={alt}
             role="img"
             aria-label={alt}
