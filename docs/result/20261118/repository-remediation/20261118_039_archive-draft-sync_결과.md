@@ -27,6 +27,8 @@
 
 raw 증거는 세션의 `lint039-red.json`, `lint039-related.json`, `lint039-oxlint.json`, `lint039-typecheck.log`, `lint039-build.log`다. [scope audit](screenshots/archive-draft-sync/scope-audit.json)과 [실제 브라우저 수치·콜백](screenshots/archive-draft-sync/verification.json)을 보관했다. 이전 038 정확한 SHA의 전체 CI **226파일/2,663개**는 038 결과에 구분했으며 이번 039 소스의 전체 CI로 재사용하지 않는다.
 
+후속 확인: 이 변경의 정확한 SHA `91ccac018015cac04e375097eb276f514180d531`에 대한 [CI 44305189155](https://github.com/f1soft611/s-erp/actions/runs/44305189155)는 frontend-tests/build/lint/required 네 job 모두 성공했다. raw 전체 로그의 최종 aggregate는 **226파일/2,667개 통과**다. [원격 CI 증거](screenshots/archive-draft-sync/remote-ci.json)를 보관했으며 후속 040 변경의 전체 결과와는 구분한다.
+
 ## 실제 브라우저
 
 실제 ArchiveFileEditDialog/CommonDialog/AppSaveButton과 앱 light 테마를 합성 파일 A/B로 mount했다. native fill/click/keypress로 조작하고 fixture의 키는 metadata/참조 교체/합성 비동기 콜백의 성공·실패와 완료 시점만 제어한다. 실제 API/테넌트 데이터/서버 저장은 사용하지 않았다.

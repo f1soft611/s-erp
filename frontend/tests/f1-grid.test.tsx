@@ -939,6 +939,81 @@ describe('F1-GRID loading overlay', () => {
     });
   });
 
+  it.each(['column growth', 'same-count metadata'] as const)(
+    'uses current border hit-testing and preserves pending range frames during %s',
+    (change) => {
+      const sampleRows = [{ id: 'range-row', code: 'RANGE-CODE', name: 'RANGE-NAME' }];
+      const grid = (expanded: boolean) => (
+        <F1Grid
+          rows={sampleRows}
+          columns={expanded
+            ? [
+                { field: 'code', headerName: 'Code', width: 120 },
+                { field: 'name', headerName: 'Name', width: 120 },
+              ]
+            : [{ field: 'code', headerName: 'Code', width: 120 }]}
+          rowKey="id"
+          height={180}
+          disableFiltering
+          disableSorting
+        />
+      );
+      const { rerender } = render(grid(change === 'same-count metadata'));
+      const bodyScroll = screen.getByTestId('f1-grid-body-scroll');
+      let startCell = screen.getByRole('gridcell', { name: 'RANGE-CODE' });
+      let nextCell = screen.queryByRole('gridcell', { name: 'RANGE-NAME' });
+      const measurement = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockImplementation(function () {
+          if (this === startCell) return new DOMRect(10, 90, 120, 30);
+          if (this === nextCell) return new DOMRect(130, 90, 120, 30);
+          if (this === bodyScroll) return new DOMRect(0, 0, 260, 180);
+          return new DOMRect();
+        });
+      const originalHitTest = Object.getOwnPropertyDescriptor(document, 'elementsFromPoint');
+      Object.defineProperty(document, 'elementsFromPoint', {
+        configurable: true,
+        value: () => [bodyScroll],
+      });
+      fireEvent.mouseDown(startCell, { clientX: 20, clientY: 100 });
+      const frames = new Map<number, FrameRequestCallback>();
+      let frameId = 1_000_000;
+      const schedule = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+        frames.set(++frameId, callback);
+        return frameId;
+      });
+      const cancel = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => {
+        frames.delete(id);
+      });
+
+      try {
+        if (change === 'column growth') {
+          rerender(grid(true));
+          startCell = screen.getByRole('gridcell', { name: 'RANGE-CODE' });
+          nextCell = screen.getByRole('gridcell', { name: 'RANGE-NAME' });
+        }
+        fireEvent.pointerMove(window, { clientX: 125, clientY: 105 });
+        if (change === 'same-count metadata') rerender(grid(true));
+
+        expect(frames.size).toBe(1);
+        act(() => {
+          const pending = [...frames.values()];
+          frames.clear();
+          pending.forEach((callback) => callback(0));
+        });
+        const overlay = document.querySelector<HTMLElement>('[data-range-overlay="drag"]');
+        expect(overlay).toBeInTheDocument();
+        expect(Number.parseFloat(getComputedStyle(overlay!).width)).toBeGreaterThan(120);
+      } finally {
+        fireEvent.pointerUp(window);
+        schedule.mockRestore();
+        cancel.mockRestore();
+        measurement.mockRestore();
+        if (originalHitTest) Object.defineProperty(document, 'elementsFromPoint', originalHitTest);
+        else Reflect.deleteProperty(document, 'elementsFromPoint');
+      }
+    },
+  );
+
   it('renders only viewport columns while keeping pinned columns mounted', () => {
     type WideRow = { id: string } & Record<string, string>;
     const wideRows: WideRow[] = [

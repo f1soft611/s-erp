@@ -943,6 +943,7 @@ function F1GridInner<T extends object>(
     bodyScrollMetrics.viewportHeight,
     defaultRowHeight,
     fixedRowHeightThreshold,
+    rowHeights,
     rowHeightsById,
     rowKey,
     rowOverscan,
@@ -1397,11 +1398,18 @@ function F1GridInner<T extends object>(
     clearCellSelectionRange();
   }, [isGridLoading]);
 
+  const resolveDraggedCell = useCallback(resolvePointerCell, [
+    rowIndexById,
+    rowKey,
+    visibleColumns.length,
+    visibleRows,
+  ]);
+
   useEffect(() => {
     if (!isCellSelectionDragging) return;
 
     function handlePointerMove(event: PointerEvent) {
-      const nextCell = resolvePointerCell(event.clientX, event.clientY);
+      const nextCell = resolveDraggedCell(event.clientX, event.clientY);
       if (!nextCell) return;
 
       const previousCell = dragSelectionStateRef.current.previousCell;
@@ -1440,7 +1448,7 @@ function F1GridInner<T extends object>(
         pendingCellSelectionFrameRef.current = undefined;
       }
     };
-  }, [isCellSelectionDragging, rowIndexById, rowKey, visibleRows]);
+  }, [isCellSelectionDragging, resolveDraggedCell, rowIndexById, rowKey, visibleRows]);
 
   function getCell(
     rowId: F1GridRowId,
@@ -2838,7 +2846,7 @@ function F1GridInner<T extends object>(
     typeof minHeight === 'number' ? `${minHeight}px` : (minHeight ?? '0');
   const resolvedMaxHeight =
     typeof maxHeight === 'number' ? `${maxHeight}px` : (maxHeight ?? 'none');
-  function updateRangeOverlay() {
+  const updateRangeOverlay = useCallback(() => {
     const range = copiedCellRange ?? cellSelection;
     if (!range || !bodyScrollRef.current) {
       setRangeOverlay((current) => (current ? null : current));
@@ -2913,7 +2921,7 @@ function F1GridInner<T extends object>(
       }
       return next;
     });
-  }
+  }, [cellSelection, copiedCellRange, rowIndexById, rowKey, visibleRows]);
 
   useEffect(() => {
     if (!copiedCellRange && !cellSelection) {
@@ -2921,7 +2929,7 @@ function F1GridInner<T extends object>(
       return;
     }
     updateRangeOverlay();
-  }, [copiedCellRange, cellSelection, rowIndexById, rowKey]);
+  }, [copiedCellRange, cellSelection, rowIndexById, rowKey, updateRangeOverlay]);
 
   useEffect(() => {
     const bodyScroll = bodyScrollRef.current;
@@ -2937,7 +2945,7 @@ function F1GridInner<T extends object>(
       bodyScroll.removeEventListener('scroll', handleScrollOrResize);
       window.removeEventListener('resize', handleScrollOrResize);
     };
-  }, [copiedCellRange, cellSelection, rowIndexById, rowKey]);
+  }, [copiedCellRange, cellSelection, rowIndexById, rowKey, updateRangeOverlay]);
 
   const summaryDock = features?.find((feature) => feature.ftype === 'summary')?.dock;
 
