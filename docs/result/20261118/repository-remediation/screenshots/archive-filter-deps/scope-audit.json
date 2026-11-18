@@ -1,0 +1,31 @@
+{
+  "baseline": "20203f3c8a63f55d894fdacce8d07f54623c4608",
+  "changed": [
+    "frontend/src/pages/groupware/community/archive/ArchiveBoardPage.tsx"
+  ],
+  "onlyThreeBindingSitesChanged": true,
+  "unchangedEffectBodiesAfterEquivalentBindingNormalization": 1,
+  "rawUseStateSetterAndHookPreserved": true,
+  "allOtherGuardsArgumentsHandlersPublicPropsMarkupAndStylesPreserved": true,
+  "sourceFiles": 890,
+  "byteMismatches": 0,
+  "red": {
+    "expectedTargetWarnings": 0,
+    "actualBefore": 1
+  },
+  "baselineTests": {
+    "files": 2,
+    "passed": 35
+  },
+  "relatedTests": {
+    "files": 2,
+    "passed": 35
+  },
+  "lint": {
+    "before": 98,
+    "after": 97,
+    "added": 0,
+    "removed": 1
+  },
+  "scopeLimit": "Dependency binding only; archive defaults effect-state warning remains separate"
+}

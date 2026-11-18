@@ -39,6 +39,10 @@ UTC/threads/worker 2로 실행했다. 기존의 비결정적 테스트 통과만
 
 브라우저의 일반 native 흐름은 로딩/병합/메타데이터/완료의 보존 검증이다. effect 이전의 첫 commit 시점은 자동 Profiler 회귀로 검증했으며 두 근거를 같은 시점 검증이라고 확대하지 않는다.
 
+## 정확한 SHA 전체 CI
+
+커밋 `20203f3c8a63f55d894fdacce8d07f54623c4608`의 [Frontend CI 44320472725](https://github.com/f1soft611/s-erp/actions/runs/44320472725)이 완료됐다. build/tests/lint/required 네 job 모두 success이며 원본 로그의 마지막 집계는 **226파일·2,678개 전부 통과**다. [정확한 SHA 근거](screenshots/notice-initial-cursor/remote-ci.json)를 후속 045 기록에 함께 반영했다. 043 집계와 구분하며 후속 045 소스의 전체 결과로 재사용하지 않는다.
+
 ## 잔여와 커밋
 
 이번 단위는 발견한 초기 상호작용 버그 복구이며 lint 수를 줄이는 변경이 아니다. **98개 경고**와 다른 댓글/이미지 effect 동기화는 후속 처리한다. 공식 호환 수정 경로가 없는 의존성 권고 2건은 [027 결과](20261118_027_dependency-remediation-boundary_결과.md)의 BLOCKED 상태로 유지한다. API/DB 변경이 없어 DB MCP·SQL 대상이 아니다.

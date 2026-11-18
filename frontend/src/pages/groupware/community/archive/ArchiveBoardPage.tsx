@@ -268,6 +268,7 @@ export function ArchiveBoardPage({
 
   const categories = useArchiveCategories();
   const archiveList = useArchiveList(defaultsInitialized);
+  const { setFilters: setArchiveFilters } = archiveList;
   const isQueryLoading =
     categories.isLoading ||
     archiveList.isLoading ||
@@ -286,7 +287,7 @@ export function ArchiveBoardPage({
     setDetailValues(restoredValues);
     setSearchDraft(initialSession.keyword);
     setCurrentFolderCode(initialSession.folderCode);
-    archiveList.setFilters({
+    setArchiveFilters({
       keyword: initialSession.keyword,
       folderCode: initialSession.folderCode,
       uploadedFrom: dateRange.from,
@@ -296,7 +297,7 @@ export function ArchiveBoardPage({
     if (!searchSession) setSearchSession(initialSession);
     setDefaultsInitialized(true);
   }, [
-    archiveList.setFilters,
+    setArchiveFilters,
     defaultValues,
     defaultsInitialized,
     searchSession,

@@ -48,6 +48,10 @@ native mouse로 분류를 바꾸면 일반/고정 목록을 각각 한 번 조�
 
 후속 [044 결과](20261118_044_notice-initial-cursor_결과.md)에서 이 초기 상호작용만 결정적 RED/GREEN과 관련 83개로 복구했다. 이는 043의 선언 수정과 별도이며 전체 댓글 effect 재구성은 아니다.
 
+## 정확한 SHA 전체 CI
+
+커밋 `328e03c3ad8b0098f6a506b3e97912de56e4aed9`의 [Frontend CI 44318265951](https://github.com/f1soft611/s-erp/actions/runs/44318265951)이 완료됐다. build/tests/lint/required 네 job 모두 success이며 원본 로그의 마지막 집계는 **226파일·2,676개 전부 통과**다. [정확한 SHA 근거](screenshots/notice-list-deps/remote-ci.json)를 후속 045 기록에 함께 반영했다.
+
 ## 잔여와 커밋
 
 최초 lint 206개 중 108개를 제거했고 **98개는 순차 처리 중**이다. 공식 호환 수정 경로가 없는 의존성 권고 2건은 [027 결과](20261118_027_dependency-remediation-boundary_결과.md)의 BLOCKED 상태로 유지한다. API/DB 변경이 없어 DB MCP·SQL 대상이 아니다.
