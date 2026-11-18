@@ -31,4 +31,4 @@ if (previousRequest.id !== selectedOrderId || previousRequest.token !== refreshT
 
 - [x] `vitest run --pool=threads --maxWorkers=2 tests/sales-order-status-page.test.tsx tests/quotation-status-page.test.tsx` 2파일 26개, `tsc -b`, `vite build`, `oxlint --format=json`을 격리 검증 workspace에서 확인했다. Oxc 77 → 75, 제거2/추가0이며 제거 소스 token은 모두 setLoading이다. 다른 진단은 전체 label까지 동일하다. 기존 테스트 byte 보존/source891파일 byte parity를 확인했다.
 - [x] 실제 두 훅/layout observer의 375/768/1280px 합성 probe에서 native 열기/실패/재조회/닫기/재열기·늦은 응답 무시를 확인했다. 실제 현황 전체 화면은 기존 통합 테스트가 검증하며 probe 검증을 전체 화면으로 확대 표현하지 않는다. GET 경계와 메모리 저장소만 합성하고 모든 쓰기/기타 transport를 차단했다. 오류/이탈/문서 넘침0, PNG6, 소유 탭을 닫았다.
-- [ ] 결과/스크린샷·작은 전체 diff 리뷰·정확한 065 CI를 보관한다. allowlist 커밋·비강제 푸시·원격 일치와 정확한 066 CI를 확인한다.
+- [x] 결과/스크린샷·작은 전체 diff 리뷰·정확한 065 CI를 보관했다. allowlist19파일 커밋 `c57e80e57771c322e8847db3c00eec29d0fef376`를 비강제 푸시하고 원격 일치를 확인했다. 정확한 CI44378959885는 마지막 집계227파일2,706개와 네 job 모두 성공했다.

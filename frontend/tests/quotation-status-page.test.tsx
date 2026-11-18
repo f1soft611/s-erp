@@ -5,7 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiGet } from '../src/shared/services/apiClient';
 import { QuotationStatusPage } from '../src/pages/sales/quotation/status/QuotationStatusPage';
 import { useQuotationStatusDetail } from '../src/pages/sales/quotation/status/hooks/useQuotationStatusDetail';
-import type { QuotationStatusRow } from '../src/pages/sales/quotation/status/types/quotationStatus.types';
+import { useQuotationStatusList } from '../src/pages/sales/quotation/status/hooks/useQuotationStatusList';
+import type { QuotationStatusFilters, QuotationStatusRow } from '../src/pages/sales/quotation/status/types/quotationStatus.types';
 import type { QuotationItem } from '../src/pages/sales/quotation/create/types/quotation.types';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
 
@@ -159,6 +160,72 @@ describe('quotation status page', () => {
     expect(requests).toHaveLength(5);
     expect(result.current.selectedQuotationId).toBeNull();
     expect(result.current.loading).toBe(false);
+  });
+
+  it.each([false, true])('publishes quotation list-start commits while preserving quiet reloads and paused request versions (initially ready: %s)', async (initiallyReady) => {
+    const requests: Array<{
+      resolve: (value: { resultList: QuotationStatusRow[] }) => void;
+      reject: (error: Error) => void;
+    }> = [];
+    apiGetMock.mockImplementation(() => new Promise<{ resultList: QuotationStatusRow[] }>((resolve, reject) => {
+      requests.push({ resolve, reject });
+    }));
+    const filters: QuotationStatusFilters = { quotationDtFrom: '2026-11-01', quotationDtTo: '2026-11-30' };
+    const initialProps: { filters: QuotationStatusFilters | null } = { filters: initiallyReady ? filters : null };
+    const commits: Array<{ loading: boolean; hasLoaded: boolean; error: string; initialLoading: boolean }> = [];
+    const { result, rerender } = renderHook(({ filters: current }) => {
+      const list = useQuotationStatusList(current);
+      useLayoutEffect(() => {
+        commits.push({ loading: list.loading, hasLoaded: list.hasLoaded, error: list.error, initialLoading: list.initialLoad.loading });
+      });
+      return list;
+    }, { initialProps });
+    if (!initiallyReady) {
+      expect(requests).toHaveLength(0);
+      commits.length = 0;
+      rerender({ filters });
+    }
+    const normalStart = { loading: true, hasLoaded: false, error: '', initialLoading: true };
+    const quietStart = { ...normalStart, loading: false };
+    expect(commits[0]).toEqual(normalStart);
+    await act(async () => requests[0].reject(new Error('Owned quotation list failure')));
+    expect(result.current.error).toBe('Owned quotation list failure');
+    commits.length = 0;
+    act(() => result.current.retry());
+    expect(commits[0]).toEqual(normalStart);
+    await act(async () => requests[1].resolve({ resultList: [statusRow] }));
+    expect(result.current.hasLoaded).toBe(true);
+
+    commits.length = 0;
+    act(() => result.current.refreshQuietly());
+    expect(commits[0]).toEqual(quietStart);
+    expect(result.current.rows).toEqual([statusRow]);
+    await act(async () => requests[2].resolve({ resultList: [statusRow] }));
+    commits.length = 0;
+    rerender({ filters: { ...filters, keyword: 'Owned changed' } });
+    expect(commits[0]).toEqual(normalStart);
+    rerender({ filters: { ...filters, keyword: 'Owned latest' } });
+    expect(requests).toHaveLength(5);
+    await act(async () => requests[3].resolve({ resultList: [{ ...statusRow, quotationId: 22 }] }));
+    expect(result.current.rows).toEqual([statusRow]);
+    expect(result.current.loading).toBe(true);
+    await act(async () => requests[4].resolve({ resultList: [statusRow] }));
+    expect(result.current.loading).toBe(false);
+    expect(result.current.hasLoaded).toBe(true);
+
+    rerender({ filters: null });
+    act(() => result.current.refreshQuietly());
+    expect(requests).toHaveLength(5);
+    expect(result.current.loading).toBe(false);
+    commits.length = 0;
+    rerender({ filters });
+    expect(commits[0]).toEqual(quietStart);
+    expect(result.current.rows).toEqual([statusRow]);
+    await act(async () => requests[5].resolve({ resultList: [statusRow] }));
+    rerender({ filters });
+    expect(requests).toHaveLength(6);
+    expect(result.current.loading).toBe(false);
+    expect(result.current.hasLoaded).toBe(true);
   });
 
   it('requires a date range, lists detail-based results, and opens quotation detail', async () => {

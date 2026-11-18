@@ -1,0 +1,79 @@
+{
+  "actualHooksLayoutObserver": true,
+  "notFullBusinessScreen": true,
+  "syntheticDeferredListGetOnly": true,
+  "allWritesAndUnownedTransportBlocked": true,
+  "memoryStorageOnly": true,
+  "widths": [
+    375,
+    768,
+    1280
+  ],
+  "firstNormalRetryQuietFilterChangeAndPausedResumeCommitCorrect": true,
+  "quietReloadRetainsRowsAndDoesNotShowGridLoading": true,
+  "quietThenFilterChangeUsesNormalLoading": true,
+  "lastActuallyStartedVersionPreservedWhilePaused": true,
+  "cancelledOldResponseIgnored": true,
+  "sameFilterReferenceDoesNotRequest": true,
+  "unknownRequests": 0,
+  "errors": 0,
+  "documentOverflow": 0,
+  "syntheticGetsPerHookPerWidth": 6,
+  "images": [
+    {
+      "file": "list067-retry-375.png",
+      "width": 375,
+      "height": 984,
+      "bytes": 31286
+    },
+    {
+      "file": "list067-quiet-375.png",
+      "width": 375,
+      "height": 984,
+      "bytes": 31643
+    },
+    {
+      "file": "list067-retry-768.png",
+      "width": 768,
+      "height": 984,
+      "bytes": 30186
+    },
+    {
+      "file": "list067-quiet-768.png",
+      "width": 768,
+      "height": 984,
+      "bytes": 30462
+    },
+    {
+      "file": "list067-retry-1280.png",
+      "width": 1280,
+      "height": 984,
+      "bytes": 30669
+    },
+    {
+      "file": "list067-quiet-1280.png",
+      "width": 1280,
+      "height": 984,
+      "bytes": 30871
+    }
+  ],
+  "relatedTests": {
+    "files": 2,
+    "passed": 30
+  },
+  "typecheck": "passed",
+  "build": "passed",
+  "lint": {
+    "before": 75,
+    "after": 73,
+    "removed": 2,
+    "added": 0,
+    "removedTokens": [
+      "setHasLoaded",
+      "setHasLoaded"
+    ],
+    "otherDiagnosticsUnchangedIncludingLabels": true
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0
+}

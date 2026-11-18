@@ -35,7 +35,9 @@
 
 ## 원격과 잔여
 
-선행 065 commit `6bb5fa134fcce82c9a07675710df9ef1950c27b4`의 정확한 CI44376512911은 마지막 집계 227파일 2,704개와 네 job 모두 성공했다. 해당 최종 근거를 이 작업과 함께 보관한다. 066은 별도 커밋/푸시 후 정확한 SHA 전체 CI를 확인한다.
+선행 065 commit `6bb5fa134fcce82c9a07675710df9ef1950c27b4`의 정확한 CI44376512911은 마지막 집계 227파일 2,704개와 네 job 모두 성공했다. 해당 최종 근거를 이 작업과 함께 보관했다.
+
+066 commit `c57e80e57771c322e8847db3c00eec29d0fef376`를 별도 비강제 푸시하고 원격 일치를 확인했다. 정확한 [CI44378959885](https://github.com/f1soft611/s-erp/actions/runs/44378959885)의 마지막 전체 집계는 **227파일 2,706개 통과**이며 build/tests/lint/required 네 job 모두 성공했다. [원격 근거](screenshots/sales-detail-request-state/remote-ci.json)를 보관했다.
 
 backend/API/DB/의존성 변경 없음. DB MCP·스키마 스크립트 대상이 아니다. 잔여 state-in-effect75개와 기존 의존성 권고2건이 있어 전체 요청은 아직 완료로 표시하지 않는다.
 
