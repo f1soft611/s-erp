@@ -44,6 +44,8 @@ native click/Escape와 viewport만 사용했다. 문서 폭은 세 뷰포트와 
 
 ## 이전 CI와 잔여
 
+이번 046의 정확한 SHA `02fe4825b90bf35c46713bd86f39a2d380f139e4`에 대한 [전체 CI 44326824974](https://github.com/f1soft611/s-erp/actions/runs/44326824974)를 별도로 확인했다. **226파일·2,678개 통과**, frontend-build/tests/lint/required 네 job 모두 success이며 status와 원본 로그의 마지막 집계를 대조했다. [원격 CI 근거](screenshots/recent-breadcrumb-deps/remote-ci.json)를 보관했고 이 실행 완료 뒤에만 다음 단위를 push한다.
+
 [045의 정확한 SHA 전체 CI](20261118_045_archive-filter-deps_결과.md) **226파일·2,678개**를 네 job success와 원본 로그로 확인해 별도 기록했다. 이를 이번 046 소스의 전체 결과로 재사용하지 않으며 045 완료 뒤에만 다음 push를 진행한다.
 
 최초 206개 중 110개를 제거했고 **96개 경고는 순차 처리 중**이다. 나머지 DashboardPage state-effect 2개는 별도 검토 대상으로 남겼다. 공식 호환 수정 경로가 없는 의존성 권고 2건은 [027 결과](20261118_027_dependency-remediation-boundary_결과.md)의 BLOCKED 상태로 유지한다. 기존 TreeProjection 3단계 및 자료실 모바일 보조정보 관찰도 이 단위에서 수정하지 않았다.

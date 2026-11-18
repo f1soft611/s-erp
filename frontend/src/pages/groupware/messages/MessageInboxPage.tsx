@@ -105,11 +105,11 @@ export function MessageInboxPage() {
     [threads, selectedThreadId],
   );
 
-  const applyDayPage = (page: MessageDayPage) => {
+  const applyDayPage = useCallback((page: MessageDayPage) => {
     setMessages(page.resultList);
     setOldestMessageDate(page.messageDate);
     setHasPreviousMessages(page.hasPrevious);
-  };
+  }, []);
 
   const loadThreads = useCallback(async (options?: { silent?: boolean }) => {
     const request = ++listRequestRef.current;
@@ -129,7 +129,7 @@ export function MessageInboxPage() {
     void loadThreads();
   }, [loadThreads]);
 
-  const openThread = async (threadId: number) => {
+  const openThread = useCallback(async (threadId: number) => {
     const request = ++threadRequestRef.current;
     selectedThreadIdRef.current = threadId;
     setSelectedThreadId(threadId);
@@ -158,7 +158,7 @@ export function MessageInboxPage() {
     } finally {
       if (mountedRef.current && request === threadRequestRef.current) setLoadingMessages(false);
     }
-  };
+  }, [applyDayPage, showError]);
 
   const mergeLatestThreadDay = async (threadId: number) => {
     if (selectedThreadIdRef.current !== threadId) return;
@@ -280,7 +280,7 @@ export function MessageInboxPage() {
         if (active) showError('쪽지를 찾을 수 없거나 접근 권한이 없습니다.');
       });
     return () => { active = false; };
-  }, [loadingThreads, messageSourceId, showError]);
+  }, [loadingThreads, messageSourceId, openThread, showError]);
 
   const openCompose = async () => {
     setComposeError('');
