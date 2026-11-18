@@ -117,8 +117,8 @@ export function useDraftFormManagement(initialFilters: DraftFormFilters = {}) {
   useEffect(() => {
     void Promise.all([loadRows(initialFiltersRef.current), loadOptions()]);
     return () => {
-      ++loadVersion.current;
-      ++optionsVersion.current;
+      loadVersion.current += 1;
+      optionsVersion.current += 1;
     };
   }, [loadOptions, loadRows]);
 

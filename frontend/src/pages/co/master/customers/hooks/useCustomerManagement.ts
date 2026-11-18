@@ -91,7 +91,7 @@ export function useCustomerManagement(initialFilters: CustomerFilters = {}) {
 
   useEffect(() => {
     void loadRows(initialFiltersRef.current);
-    return () => { ++loadVersion.current; };
+    return () => { loadVersion.current += 1; };
   }, [loadRows]);
 
   const applyFilters = useCallback(

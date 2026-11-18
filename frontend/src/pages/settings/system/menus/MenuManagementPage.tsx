@@ -327,7 +327,7 @@ export function MenuManagementPage({
     void initialize();
     return () => {
       active = false;
-      ++menuLoadRequestIdRef.current;
+      menuLoadRequestIdRef.current += 1;
     };
   // Initialization uses the session snapshot; selection changes load menus separately.
   // eslint-disable-next-line react-hooks/exhaustive-deps
