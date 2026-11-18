@@ -47,6 +47,8 @@
 
 [050의 정확한 SHA 전체 CI](20261118_050_comment-image-deps_결과.md) **226파일·2,680개**를 원본 집계·네 job success로 확인했다. 그 실행 완료 뒤에만 다음 push를 진행한다. 이번 051 소스의 정확한 SHA 전체 CI는 별도로 확인하며 선행 결과를 재사용하지 않는다.
 
+051 커밋 `47ff1d874331e400262b8d89638e49758829d84d`의 [정확한 SHA CI 실행](https://github.com/f1soft611/s-erp/actions/runs/44340290746)을 별도로 확인했다. 원본 마지막 집계 **226파일·2,680개**, tests/build/lint/required 네 job 모두 success이며 [확인 근거](screenshots/comment-sync-deps/remote-ci.json)를 보관했다. 이 실행이 완료된 뒤에만 다음 단위를 푸시한다.
+
 최초 206개 중 116개를 제거했고 **90개 경고는 순차 처리 중**이다. exhaustive-deps는 0이며 state-in-effect 82개/ref 8개가 남았다. 공식 호환 경로 없는 권고 2건은 [027](20261118_027_dependency-remediation-boundary_결과.md)의 BLOCKED 상태로 유지한다. 기존 TreeProjection 3단계 및 자료실 모바일 보조정보 관찰은 이 단위에서 수정하지 않았다.
 
 ```text

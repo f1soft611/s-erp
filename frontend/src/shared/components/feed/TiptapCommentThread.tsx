@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Box,
   Button,
@@ -231,9 +231,11 @@ function CommentEditor({
       // Keep the editor content and selected files when the API rejects.
     }
   };
-  submitRef.current = () => {
-    void submit();
-  };
+  useLayoutEffect(() => {
+    submitRef.current = () => {
+      void submit();
+    };
+  });
   const mentionCandidates = enableMentions && mentionQuery !== null
     ? filterMentionCandidates(mentionOptions, mentionQuery)
     : [];
@@ -442,10 +444,8 @@ function CommentEditor({
           hidden
           aria-label={fileInputLabel}
           onChange={(event) => {
-            setFiles((current) => [
-              ...current,
-              ...Array.from(event.target.files ?? []),
-            ]);
+            const selectedFiles = Array.from(event.target.files ?? []);
+            setFiles((current) => [...current, ...selectedFiles]);
             event.target.value = '';
           }}
         />
