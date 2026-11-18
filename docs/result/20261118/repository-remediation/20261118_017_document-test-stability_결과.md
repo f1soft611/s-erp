@@ -2,7 +2,7 @@
 
 - [계획서](../../../plan/20261118/20261118_017_document-test-stability_계획서.md)
 - [상세사양](../../../spec/20261118/20261118_017_document-test-stability_상세사양서.md)
-- 현재 상태: **후속 관련 223개 및 원격 문서작성 전체 통과. 저장소 전체는 별도 router 단언 1개 실패로 후속 처리 중**. 관련 파일 결과를 저장소 전체 통과로 바꾸어 표현하지 않는다.
+- 이 단계의 경계·초기화 복구는 **관련 223개와 당시 원격 문서작성 160개 통과**로 확인했다. 이후 전체에서 발견된 별도 준비 경합과 **최신 전체 상태는 [결과 021](20261118_021_document-detail-readiness_결과.md)**을 따른다. 아래 당시 수치를 최신 저장소 전체 통과로 바꾸어 표현하지 않는다.
 
 ## 원인 계측과 최소 수정
 
@@ -67,4 +67,4 @@ test(documents): bound composer scenarios and refresh feed queries
 
 후속 커밋 문구: `test(documents): isolate composer reset lifecycle without remounting`
 
-최종 전체 상태와 원격 검사 결과는 후속 검증이 끝난 뒤 추가한다.
+최종 8937faec/run 44253972552는 226파일·2,641개 전체 및 lint/typecheck/build/required가 모두 통과했다. 원본 로그와 정확한 입력은 최신 결과 021에 기록했다. 위 표의 과거 실패·중단은 당시 이력으로 유지한다.

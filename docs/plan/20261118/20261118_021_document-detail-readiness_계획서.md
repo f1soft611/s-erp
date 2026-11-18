@@ -30,6 +30,6 @@ fireEvent.click(await screen.findByRole('menuitem', { name: '참조자 추가하
 ### Task 3: 검증과 동기화
 
 - [x] 해당 참조 추가 세 사례를 원래 제한 시간으로 검증해 3/3 통과했다. 다른 153개는 이름 선택으로 미실행이며 전체 통과로 표현하지 않는다. lint exit 0이다.
-- [ ] lint·공백·기존 case/expect 개수 보존을 확인한다.
-- [ ] 작업별 커밋·non-force push하고 정확한 새 코드의 원격 전체 CI를 확인한다.
-- [ ] 결과 021과 최종 동기화 기록에 실제 전체 상태·잔여 제약을 기록한다.
+- [x] lint·공백·기존 case/expect 개수 보존을 확인했다.
+- [x] 8937faec을 작업별 커밋·non-force push하고 정확한 전체 run 44253972552의 226파일·2,641개 및 lint/typecheck/build/required 성공을 확인했다.
+- [x] 결과 021과 최종 동기화 기록에 실제 전체 상태·잔여 제약을 기록했다.

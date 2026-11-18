@@ -31,6 +31,6 @@ const input = await screen.findByRole('textbox', { name: '댓글 입력' });
 ### Task 3: 검증과 동기화
 
 - [x] 공지 39개와 summary·수주현황·router를 합친 네 파일 71개 전체를 UTC/2 workers에서 실행해 71/71 통과했다. lint exit 0이다.
-- [ ] lint·공백·기존 case/expect 개수 보존을 확인한다.
-- [ ] 작업별 커밋·non-force push하고 정확한 새 코드의 원격 전체를 확인한다.
-- [ ] 결과 020에 실제 전체 상태와 기존 잔여 위험을 기록하고 최종 문서까지 동기화한다.
+- [x] lint·공백·기존 case/expect 개수 보존을 확인했다.
+- [x] 03ff2be3을 작업별 커밋·non-force push했다. 당시 전체의 별도 상세 준비 1개 실패를 보존했고 최종 8937faec/run 44253972552는 2,641/2,641 통과했다.
+- [x] 결과 020에 당시 전체 상태와 잔여 위험을 기록하고 최신 전체 결과 021과 최종 문서 동기화로 연결했다.

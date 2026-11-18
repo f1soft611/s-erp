@@ -61,3 +61,6 @@
 - 기존 전체 검사 실패와 advisory·PR 충돌은 해결된 것으로 표시하지 않는다. 커밋·push는 병합 승인과 다르며 원격 PR merge·강제 push·보호 정책 변경은 하지 않는다.
 - 별도 작업의 종합현황 문서·OverviewPage·수주현황 컬럼 수정은 커밋에서 제외한다. 원격이 앞서면 강제 덮어쓰지 않는다.
 - 동기화 다음 단계는 문서작성 테스트의 대기·분리 DOM 및 접근성 조회 비용 계측과 최소 테스트 수정이다. 운영 화면을 재설계하거나 시간 제한을 상향하지 않는다.
+- 후속 소유 작업은 [문서작성 017](../../result/20261118/repository-remediation/20261118_017_document-test-stability_결과.md), [CI 플랫폼 계약 018](../../result/20261118/repository-remediation/20261118_018_ci-contract-stability_결과.md), [router 현재 DOM 019](../../result/20261118/repository-remediation/20261118_019_router-dom-stability_결과.md)로 이어진다. 모두 테스트·문서 전용이며 이전 운영 변경 다섯 묶음의 범위를 넓히지 않았다. 이전 실패·중단 기록은 보존하고 가장 최신 전체 결과를 별도로 기록한다.
+- 같은 공지 테스트 파일에 남아 있던 입력 전제조건은 canonical Tiptap의 지연 생성을 확인해 [후속 020](../../result/20261118/repository-remediation/20261118_020_comment-editor-readiness_결과.md)에서 일관되게 맞춘다. 상세 wrapper와 실제 메뉴 준비는 [후속 021](../../result/20261118/repository-remediation/20261118_021_document-detail-readiness_결과.md)에서 구분한다. 최신 전체 gate와 최종 동기화 상태는 021을 따른다.
+- 최종 코드 8937faec의 원격 run 44253972552에서 frontend 226파일·2,641개 전체와 lint/typecheck/build/required가 모두 통과했다. backend 비공개 설정 의존 오류 2개와 잔여 advisory·검증 한계는 별도 보류로 기록하며 저장소 전체 무위험·자동 병합 승인으로 표현하지 않는다.
