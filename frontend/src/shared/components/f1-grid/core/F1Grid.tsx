@@ -573,7 +573,7 @@ function F1GridInner<T extends object>(
     () => rowProjection?.(activeRows).rows ?? activeRows,
     [activeRows, rowProjection],
   );
-  async function loadDataSourcePage(offset: number, append: boolean) {
+  const loadDataSourcePage = useCallback(async (offset: number, append: boolean) => {
     if (!dataSource || dataSourceLoadingRef.current) return;
 
     const requestId = ++dataSourceRequestRef.current;
@@ -603,7 +603,7 @@ function F1GridInner<T extends object>(
         setDataSourceLoading(false);
       }
     }
-  }
+  }, [dataSource, filterState, onDataSourceError, sortState]);
 
   useEffect(() => {
     if (!dataSource) return;
@@ -611,7 +611,7 @@ function F1GridInner<T extends object>(
     dataSourceLoadingRef.current = false;
     setServerRows([]);
     void loadDataSourcePage(0, false);
-  }, [dataSource, filterState, onDataSourceError, sortState]);
+  }, [dataSource, filterState, loadDataSourcePage, onDataSourceError, sortState]);
 
   useEffect(() => () => dataSourceControllerRef.current.dispose(), []);
   const queryWorkerEligible =

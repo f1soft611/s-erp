@@ -42,7 +42,9 @@ UTC/threads/worker 2로 실행했다. 기존 동작을 보존하는 binding 정�
 
 ## CI와 잔여
 
-[046의 정확한 SHA 전체 CI](20261118_046_recent-breadcrumb-deps_결과.md) **226파일·2,678개**를 원본 집계와 네 job success로 확인해 기록했다. 이를 이번 047 소스의 전체 결과로 재사용하지 않는다. 이번 정확한 SHA의 CI는 별도 후속 진행표로 확인한다.
+이번 047의 정확한 SHA `bcaedbdf9949f44f5b3c1eea0874552734e1ea3b`에 대한 [전체 CI 44329338863](https://github.com/f1soft611/s-erp/actions/runs/44329338863)를 별도로 확인했다. **226파일·2,678개 통과**, frontend-build/tests/lint/required 네 job 모두 success이며 status와 원본 마지막 집계를 대조했다. [원격 CI 근거](screenshots/message-open-deps/remote-ci.json)를 보관했고 실행 완료 뒤에만 다음 단위를 push한다.
+
+[046의 정확한 SHA 전체 CI](20261118_046_recent-breadcrumb-deps_결과.md) **226파일·2,678개**도 원본 집계와 네 job success로 확인했다. 그 선행 결과를 이번 047의 전체 결과로 재사용하지 않고 위 실행으로 별도 확인했다.
 
 최초 206개 중 111개를 제거했고 **95개 경고는 순차 처리 중**이다. 나머지 MessageInboxPage의 effect-state는 별도 검토 대상으로 남겼다. 공식 호환 경로 없는 권고 2건은 [027](20261118_027_dependency-remediation-boundary_결과.md)의 BLOCKED 상태로 유지한다. 기존 TreeProjection 3단계 및 자료실 모바일 보조정보 관찰은 이 단위에서 수정하지 않았다.
 
