@@ -19,7 +19,7 @@ import { useInitialLoadState } from '../../../../shared/hooks/useInitialLoadStat
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
-import { useNotification } from '../../../../shared/context/NotificationContext';
+import { useNotification } from '../../../../shared/context/notification';
 import { usePageSessionState } from '../../../../shared/hooks/usePageSessionState';
 import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import type {

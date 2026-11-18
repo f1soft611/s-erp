@@ -26,7 +26,6 @@ import Placeholder from '@tiptap/extension-placeholder';
 import StarterKit from '@tiptap/starter-kit';
 import { AttachmentList } from './AttachmentList';
 import { ProfileAvatar } from '../ProfileAvatar';
-import { sanitizeHtml } from '../../utils/sanitizeHtml';
 import {
   commentMentionSx,
   filterMentionCandidates,
@@ -35,6 +34,7 @@ import {
   MentionHighlight,
   type MentionCandidate,
 } from './commentMentions';
+import { isCommentSubmitKey, sanitizeCommentHtml } from './commentThreadUtils';
 
 function getFileBadgeMeta(fileName: string) {
   const extension = fileName.split('.').pop()?.toLowerCase() ?? '';
@@ -129,15 +129,6 @@ export type CommentThreadProps = {
   mentionOptions?: CommentMentionOption[];
   enableMentions?: boolean;
 };
-
-export const sanitizeCommentHtml = sanitizeHtml;
-export function isCommentSubmitKey(event: {
-  key: string;
-  shiftKey: boolean;
-  isComposing: boolean;
-}): boolean {
-  return event.key === 'Enter' && !event.shiftKey && !event.isComposing;
-}
 
 function hasCommentText(html: string): boolean {
   if (typeof DOMParser === 'undefined')

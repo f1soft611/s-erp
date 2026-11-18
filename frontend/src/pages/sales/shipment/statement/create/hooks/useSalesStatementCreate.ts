@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBlocker } from 'react-router-dom';
 import { useCommonConfirmDialog } from '../../../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../../../shared/hooks/useUnsavedChangesBeforeUnload';
-import { normalizeDateInput } from '../../../../../../shared/components/f1-grid/editing/DateEditor';
+import { normalizeDateInput } from '../../../../../../shared/components/f1-grid/editing/dateInput';
 import { getSystemDate } from '../../../../../../shared/services/systemDateService';
 import { getDelivery } from '../../../delivery/create/services/salesDelivery.service';
 import { createStatement, deleteStatement, getStatement, updateStatement } from '../../services/salesStatement.service';

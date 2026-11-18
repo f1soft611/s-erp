@@ -10,7 +10,7 @@ import { createDeliveryPlan, getDeliveryPlan, getDeliveryPlanByOrder, getDeliver
 import type { DeliveryPlanItem, DeliveryPlanStatusRow, PlanSourceOrderRow } from '../src/pages/sales/shipment/deliveryplan/types/salesDeliveryPlan.types';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
 import type { F1GridRef } from '../src/shared/components/f1-grid';
-import { AppSettingsContext } from '../src/shared/context/AppSettingsContext';
+import { AppSettingsContext } from '../src/shared/context/appSettings';
 
 vi.mock('../src/pages/sales/shipment/deliveryplan/services/salesDeliveryPlan.service', async (original) => ({
   ...await original<object>(),

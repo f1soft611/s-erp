@@ -22,6 +22,7 @@ import {
   isGridCheckboxChecked,
 } from '../utils/grid.utils';
 import { F1GridHighlightText } from './GridHighlightText';
+import { getGridCellBottomBorder } from './gridCellUtils';
 
 type GridCellProps<T extends object> = {
   row: T;
@@ -71,19 +72,6 @@ function toJustifyContent(align: 'left' | 'center' | 'right') {
   if (align === 'right') return 'flex-end';
   if (align === 'center') return 'center';
   return 'flex-start';
-}
-
-export function getGridCellBottomBorder(
-  isLastRow: boolean | undefined,
-  merged: boolean,
-  isMergeStart: boolean | undefined,
-  mergeSpan?: number,
-  mergeEndsAtLastRow = false,
-) {
-  if (merged && !isMergeStart) return 0;
-  if (isLastRow || mergeEndsAtLastRow) return 1;
-  if (isMergeStart && mergeSpan && mergeSpan > 1) return 0;
-  return undefined;
 }
 
 const areGridCellPropsEqual = <T extends object>(

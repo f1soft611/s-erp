@@ -16,7 +16,7 @@ import {
   DEFAULT_PERMISSION_GROUPS,
   hasPermissionGroup,
   togglePermissionGroup,
-} from '../../../../../shared/components/PermissionGroup';
+} from '../../../../../shared/components/permissionGroupData';
 import {
   createMenuSaveCheckpoint,
   replaceMenuPermissions,

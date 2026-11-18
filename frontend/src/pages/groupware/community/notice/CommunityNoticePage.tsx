@@ -20,16 +20,14 @@ import { PostDetailPanel } from '../../../../shared/components/feed/PostDetailPa
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import type { CommonViewMode } from '../../../../shared/components/view-mode/commonViewTypes';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
-import { useNotification } from '../../../../shared/context/NotificationContext';
+import { useNotification } from '../../../../shared/context/notification';
 import type {
   ModuleItem,
   PageContent,
 } from '../../../dashboard/types/dashboard';
 import { NoticeComposerDialog } from './components/NoticeComposerDialog';
-import {
-  NoticeFeedList,
-  normalizeNoticeEmbeddedImageSources,
-} from './components/NoticeFeedList';
+import { NoticeFeedList } from './components/NoticeFeedList';
+import { normalizeNoticeEmbeddedImageSources } from './components/noticeFeedUtils';
 import { NoticeEmptyState } from './components/NoticeEmptyState';
 import { NoticeFilterMenu } from './components/NoticeFilterMenu';
 import { NoticeLoginPopupBadge } from './components/NoticeLoginPopupBadge';

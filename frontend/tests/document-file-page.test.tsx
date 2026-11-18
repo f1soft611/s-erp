@@ -7,7 +7,7 @@ const api = vi.hoisted(() => ({
   showError: vi.fn(),
 }));
 vi.mock('../src/pages/groupware/documents/write/services/documentApproval.service', () => api);
-vi.mock('../src/shared/context/NotificationContext', () => ({ useNotification: () => ({ showError: api.showError }) }));
+vi.mock('../src/shared/context/notification', () => ({ useNotification: () => ({ showError: api.showError }) }));
 vi.mock('../src/pages/groupware/documents/write/components/DocumentComposerDialog', () => ({
   DocumentComposerDialog: () => null,
 }));

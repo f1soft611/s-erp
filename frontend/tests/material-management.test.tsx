@@ -3,7 +3,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PropsWithChildren } from 'react';
 import type { F1GridSavedRow } from '../src/shared/components/f1-grid';
-import { createMaterialColumns, createMaterialRow } from '../src/pages/co/master/materials/components/MaterialGrid';
+import { createMaterialColumns, createMaterialRow } from '../src/pages/co/master/materials/data/materialGridData';
 import { fetchMaterials, normalizeMaterialRow, toMaterialPayload } from '../src/pages/co/master/materials/services/materialManagement.service';
 import { useMaterialManagement } from '../src/pages/co/master/materials/hooks/useMaterialManagement';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';

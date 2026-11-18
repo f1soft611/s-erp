@@ -7,7 +7,7 @@ import { Box, Button, Paper, TextField, Typography } from '@mui/material';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
-import { useNotification } from '../../../../shared/context/NotificationContext';
+import { useNotification } from '../../../../shared/context/notification';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { useInitialLoadState } from '../../../../shared/hooks/useInitialLoadState';
 import type {

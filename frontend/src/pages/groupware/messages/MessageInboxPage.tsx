@@ -17,7 +17,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEv
 import { useSearchParams } from 'react-router-dom';
 import { CommonDialog } from '../../../shared/components/CommonDialog';
 import { fetchDraftFormUsers } from '../../co/workflow/form/services/draftFormManagement.service';
-import { useNotification } from '../../../shared/context/NotificationContext';
+import { useNotification } from '../../../shared/context/notification';
 import { useRealtimeRefresh } from '../../../shared/hooks/useRealtimeRefresh';
 import {
   InboxEmptyState,

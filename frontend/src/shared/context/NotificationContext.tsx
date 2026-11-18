@@ -1,22 +1,9 @@
 import { Alert, Snackbar } from '@mui/material';
 import {
-  createContext,
-  useContext,
   useState,
   type PropsWithChildren,
 } from 'react';
-
-type NotificationContextValue = {
-  showSuccess: (message: string) => void;
-  showWarning: (message: string) => void;
-  showError: (message: string) => void;
-};
-
-const NotificationContext = createContext<NotificationContextValue>({
-  showSuccess: () => undefined,
-  showWarning: () => undefined,
-  showError: () => undefined,
-});
+import { NotificationContext } from './notification';
 
 export function NotificationProvider({ children }: PropsWithChildren) {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -76,8 +63,4 @@ export function NotificationProvider({ children }: PropsWithChildren) {
       </Snackbar>
     </NotificationContext.Provider>
   );
-}
-
-export function useNotification(): NotificationContextValue {
-  return useContext(NotificationContext);
 }

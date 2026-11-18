@@ -16,8 +16,8 @@ import type { Editor } from '@tiptap/react';
 import {
   RichTextEditor,
   RichTextEditorToolbar,
-  richTextEditorIconButtonSx,
 } from '../../../../../shared/components/rich-text-editor/RichTextEditor';
+import { richTextEditorIconButtonSx } from '../../../../../shared/components/rich-text-editor/richTextEditorToolbarStyles';
 import { useRichTextEditorSaveLifecycle } from '../../../../../shared/components/rich-text-editor/useRichTextEditorSaveLifecycle';
 import { AppSaveButton } from '../../../../../shared/components/AppSaveButton';
 import { apiGetBlob } from '../../../../../shared/services/apiClient';
@@ -30,21 +30,13 @@ import {
   getAttachmentIconMeta,
 } from '../../../../../shared/components/feed/attachmentIconMeta';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
-import { DateEditor, normalizeDateInput } from '../../../../../shared/components/f1-grid/editing/DateEditor';
+import { DateEditor } from '../../../../../shared/components/f1-grid/editing/DateEditor';
+import { normalizeDateInput } from '../../../../../shared/components/f1-grid/editing/dateInput';
 import type {
   NoticeComposerDialogProps,
   NoticeComposerDraftAttachment,
 } from '../types/community.types';
 import { parseClipboardTextGrid } from '../../../../../shared/components/rich-text-editor/clipboard';
-export {
-  hasSpreadsheetClipboardContent,
-  normalizeClipboardHtmlForEditor,
-  normalizeClipboardTextForEditor,
-} from '../../../../../shared/components/rich-text-editor/clipboard';
-export {
-  calculateImageResize as calculateNoticeImageResize,
-  calculateImageResizeWidth as calculateNoticeImageResizeWidth,
-} from '../../../../../shared/components/rich-text-editor/imageResize';
 
 export type {
   NoticeComposerDraftAttachment,
@@ -52,12 +44,6 @@ export type {
 } from '../types/community.types';
 
 const emptyNoticeContent = '<p></p>';
-
-export function serializeNoticeEditorJson(
-  editor: { getJSON: () => unknown } | null | undefined,
-): string | undefined {
-  return editor ? JSON.stringify(editor.getJSON()) : undefined;
-}
 
 function summarizeClipboardTables(html: string) {
   if (!html || typeof DOMParser === 'undefined') return [];

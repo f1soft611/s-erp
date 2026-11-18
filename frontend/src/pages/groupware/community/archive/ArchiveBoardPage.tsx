@@ -15,7 +15,7 @@ import { CommonDialog } from '../../../../shared/components/CommonDialog';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
-import { useNotification } from '../../../../shared/context/NotificationContext';
+import { useNotification } from '../../../../shared/context/notification';
 import { usePageSearchDefaults } from '../../../../shared/hooks/usePageSearchDefaults';
 import { usePageSessionState } from '../../../../shared/hooks/usePageSessionState';
 import {

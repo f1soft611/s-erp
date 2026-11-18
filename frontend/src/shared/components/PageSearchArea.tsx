@@ -26,8 +26,13 @@ import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import KeyboardArrowUpRoundedIcon from '@mui/icons-material/KeyboardArrowUpRounded';
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
-import { DateEditor, normalizeDateInput } from './f1-grid/editing/DateEditor';
-import { formatMonthValue, MonthEditor, normalizeMonthInput } from './f1-grid/editing/MonthEditor';
+import { DateEditor } from './f1-grid/editing/DateEditor';
+import { normalizeDateInput } from './f1-grid/editing/dateInput';
+import { MonthEditor } from './f1-grid/editing/MonthEditor';
+import {
+  formatMonthValue,
+  normalizeMonthInput,
+} from './f1-grid/editing/monthInput';
 import { useF1GridFormattedInput } from './f1-grid/editing/useF1GridFormattedInput';
 import { QUICK_DATE_PRESETS, resolveQuickDate } from './page-search/quickDates';
 import { getSystemDate } from '../services/systemDateService';

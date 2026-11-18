@@ -17,9 +17,9 @@ import {
 import { Box, Divider, Menu, MenuItem, useMediaQuery } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { AppLoadingSpinner } from '../../AppLoadingSpinner';
-import { useOptionalDisplayScale } from '../../../context/AppSettingsContext';
+import { useOptionalDisplayScale } from '../../../context/appSettings';
 import { GridHeader } from './GridHeader';
-import { usePolicyDecimalRule } from './GridDecimalPolicy';
+import { usePolicyDecimalRule } from './gridDecimalPolicyContext';
 import { GridBody } from './GridBody';
 import { GridSummary } from './GridSummary';
 import { F1GridFormModal } from '../form/F1GridFormModal';
@@ -95,7 +95,7 @@ import {
 } from '../columns/GridColumnManagement';
 import { toggleGridSort, sortGridRows } from '../sorting/GridSort';
 import { applyGridFilters } from '../filter/GridFilter';
-import { normalizeDateInput } from '../editing/DateEditor';
+import { normalizeDateInput } from '../editing/dateInput';
 import { normalizeF1GridInput } from '../editing/inputFormat';
 import {
   getGridColumnPinOffsets,

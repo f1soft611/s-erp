@@ -1,7 +1,7 @@
 import { Alert, useTheme } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { PostDetailPanel } from '../../../../../shared/components/feed/PostDetailPanel';
-import { useNotification } from '../../../../../shared/context/NotificationContext';
+import { useNotification } from '../../../../../shared/context/notification';
 import { mapNoticePost } from '../data/noticePostAdapter';
 import { useNoticeComments } from '../hooks/useNoticeComments';
 import { useNoticeInteractions } from '../hooks/useNoticeInteractions';

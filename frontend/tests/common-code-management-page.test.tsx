@@ -12,11 +12,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import {
   CommonCodeManagementPanel,
+} from '../src/pages/co/master/common-code/components/CommonCodeManagementPanel';
+import {
   getItemCodeValidationMessage,
   getGroupDeleteBlockedMessage,
   resolveCreatedGroupId,
   resolveCreatedGroupIdMap,
-} from '../src/pages/co/master/common-code/components/CommonCodeManagementPanel';
+} from '../src/pages/co/master/common-code/data/commonCodeManagementGrid';
 import { saveCommonCodeBatch } from '../src/pages/co/master/common-code/services/commonCodeManagement.service';
 import { RoleManagementPanel } from '../src/pages/settings/system/roles/components/RoleManagementPanel';
 import { Splitter } from '../src/shared/components/Splitter';

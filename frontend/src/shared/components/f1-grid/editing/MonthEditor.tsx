@@ -2,6 +2,7 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { IconButton, InputAdornment, Popover, TextField } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { MonthPanel } from '../../calendar/MonthPanel';
+import { formatMonthValue, normalizeMonthInput } from './monthInput';
 
 type MonthEditorProps = {
   /** `YYYYMM` 여섯 자리(입력 중에는 일부만 있을 수 있다). */
@@ -14,19 +15,6 @@ type MonthEditorProps = {
   error?: boolean;
   helperText?: string;
 };
-
-/** 숫자 6자리(YYYYMM)이고 월이 01~12이면 그 값을, 아니면 빈 문자열을 돌려준다. `YYYY-MM` 입력도 받는다. */
-export function normalizeMonthInput(input: string): string {
-  const digits = input.trim().replace(/[^\d]/g, '');
-  if (!/^\d{6}$/.test(digits)) return '';
-  const month = Number(digits.slice(4));
-  return month >= 1 && month <= 12 ? digits : '';
-}
-
-/** `YYYYMM` → `YYYY-MM`. 여섯 자리가 아니면 그대로 돌려준다. */
-export function formatMonthValue(value: string): string {
-  return /^\d{6}$/.test(value) ? `${value.slice(0, 4)}-${value.slice(4)}` : value;
-}
 
 /** 달력(연·월 선택)으로 월을 고르는 입력. 날짜 입력 `DateEditor`와 같은 모양이며 값은 `YYYYMM`이다. */
 export function MonthEditor({ value, onChange, label, onBlur, required, error, helperText }: MonthEditorProps) {

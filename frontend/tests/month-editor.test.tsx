@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { PageSearchArea } from '../src/shared/components/PageSearchArea';
 import {
   formatMonthValue,
-  MonthEditor,
   normalizeMonthInput,
-} from '../src/shared/components/f1-grid/editing/MonthEditor';
+} from '../src/shared/components/f1-grid/editing/monthInput';
+import { MonthEditor } from '../src/shared/components/f1-grid/editing/MonthEditor';
 import { toPageSearchFields, type PageSearchField } from '../src/shared/components/page-search/searchFields';
 
 describe('month helpers', () => {

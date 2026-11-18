@@ -51,7 +51,8 @@ import type {
   PurchaseRequestConfirmCandidate,
 } from './types/purchaseRequestConfirm.types';
 import { useServerDateDefault } from '../../../../shared/hooks/useServerDateDefault';
-import { FormDateField, normalizeFormDate } from '../../../../shared/components/FormDateField';
+import { FormDateField } from '../../../../shared/components/FormDateField';
+import { normalizeFormDate } from '../../../../shared/components/formDateUtils';
 
 type Props = {
   selectedModule: ModuleItem;

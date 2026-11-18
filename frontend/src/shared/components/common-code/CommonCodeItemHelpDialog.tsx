@@ -4,7 +4,7 @@ import { Alert, Box, Button, Stack } from '@mui/material';
 import { AppSaveButton } from '../AppSaveButton';
 import { UnsavedChangesConfirmDialog } from '../UnsavedChangesConfirmDialog';
 import { CommonDialog } from '../CommonDialog';
-import { useNotification } from '../../context/NotificationContext';
+import { useNotification } from '../../context/notification';
 import { useUnsavedChangesBeforeUnload } from '../../hooks/useUnsavedChangesBeforeUnload';
 import {
   F1Grid,

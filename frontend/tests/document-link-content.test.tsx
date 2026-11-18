@@ -9,7 +9,7 @@ import type { DocumentApprovalFeedRecord } from '../src/pages/groupware/document
 import { createDocumentShareToken, getExternalLinkPreview, listDocumentApprovals } from '../src/pages/groupware/documents/write/services/documentApproval.service';
 
 const notices = vi.hoisted(() => ({ showSuccess: vi.fn(), showError: vi.fn() }));
-vi.mock('../src/shared/context/NotificationContext', () => ({ useNotification: () => notices }));
+vi.mock('../src/shared/context/notification', () => ({ useNotification: () => notices }));
 vi.mock('../src/pages/groupware/documents/write/services/documentApproval.service', async (importOriginal) => ({
   ...await importOriginal<object>(), listDocumentApprovals: vi.fn(), createDocumentShareToken: vi.fn(), getExternalLinkPreview: vi.fn(),
 }));

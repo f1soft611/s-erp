@@ -38,6 +38,10 @@ React + TypeScript 기반의 ERP 시스템에서 공통으로 사용할 수 있�
 - CSS 또는 프로젝트의 공통 Styling System
 - React Hooks
 
+## 소스 모듈 경계
+
+F1-Grid의 렌더링 컴포넌트는 TSX 모듈에서 관리하고, 순수 행·셀 계산은 `core/gridRowUtils.ts`와 `core/gridCellUtils.ts`, 편집기 입력 정규화는 `editing/dateInput.ts`와 `editing/monthInput.ts`, decimal 정책 Context와 hook은 `core/gridDecimalPolicyContext.ts`에서 관리한다. Provider는 기존 `core/GridDecimalPolicy.tsx`에 둔다. 이 분리는 모듈 갱신 경계를 명확히 할 뿐 컴포넌트 동작이나 공개 API를 변경하지 않는다. 기존 `shared/components/f1-grid/index.ts` 공개 barrel은 그대로 유지한다.
+
 ## 금지
 
 다음 Grid 라이브러리를 사용하지 않는다.

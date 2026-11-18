@@ -53,12 +53,12 @@ import {
   type F1GridRef,
   type F1GridSort,
 } from '../src/shared/components/f1-grid';
-import { normalizeDateInput } from '../src/shared/components/f1-grid/editing/DateEditor';
-import { getGridCellBottomBorder } from '../src/shared/components/f1-grid/core/GridCell';
+import { normalizeDateInput } from '../src/shared/components/f1-grid/editing/dateInput';
+import { getGridCellBottomBorder } from '../src/shared/components/f1-grid/core/gridCellUtils';
 import {
   getActiveMergeGroupStartKeys,
   getMergeGroupStartIndex,
-} from '../src/shared/components/f1-grid/core/GridRow';
+} from '../src/shared/components/f1-grid/core/gridRowUtils';
 import { NumberEditor } from '../src/shared/components/f1-grid/editing/NumberEditor';
 import { normalizeGridNumberInput } from '../src/shared/components/f1-grid/utils/grid.utils';
 import { SelectEditor } from '../src/shared/components/f1-grid/editing/SelectEditor';

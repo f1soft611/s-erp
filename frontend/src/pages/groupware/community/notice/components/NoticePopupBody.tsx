@@ -3,7 +3,7 @@ import { Alert, Button } from '@mui/material';
 import { FeedBodyContent } from '../../../../../shared/components/feed/FeedBodyContent';
 import { apiGetBlob } from '../../../../../shared/services/apiClient';
 import { resolveApiBaseUrl } from '../../../../../shared/services/authService';
-import { normalizeNoticeEmbeddedImageSources } from './NoticeFeedList';
+import { normalizeNoticeEmbeddedImageSources } from './noticeFeedUtils';
 import { prepareNoticeFeedHtml } from '../utils/noticeHtml';
 import type { NoticeBoardPostApi } from '../types/community.types';
 

@@ -14,9 +14,9 @@ import {
   CommunityNoticePage,
 } from '../src/pages/groupware/community/notice/CommunityNoticePage';
 import {
-  mergeCommentTrees,
   NoticeFeedList,
 } from '../src/pages/groupware/community/notice/components/NoticeFeedList';
+import { mergeCommentTrees } from '../src/pages/groupware/community/notice/components/noticeFeedUtils';
 import {
   appendCommentToTree,
   insertNoticeReplyAfter,

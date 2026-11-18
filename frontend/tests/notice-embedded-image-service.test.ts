@@ -4,11 +4,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { normalizeNoticeEmbeddedImage } from '../src/pages/groupware/community/notice/services/noticeBoardService';
 import {
   AuthenticatedNoticeImage,
+  NoticeFeedList,
+} from '../src/pages/groupware/community/notice/components/NoticeFeedList';
+import {
   extractNoticeEmbeddedImagePreviews,
   normalizeNoticeEmbeddedImageSources,
-  NoticeFeedList,
   removeNoticeEmbeddedImages,
-} from '../src/pages/groupware/community/notice/components/NoticeFeedList';
+} from '../src/pages/groupware/community/notice/components/noticeFeedUtils';
 import { noticeFeed } from '../src/pages/groupware/community/notice/data/noticeData';
 
 const { apiGetBlob } = vi.hoisted(() => ({ apiGetBlob: vi.fn() }));

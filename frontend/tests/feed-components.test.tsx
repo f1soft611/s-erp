@@ -16,8 +16,8 @@ import { AttachmentList } from '../src/shared/components/feed/AttachmentList';
 import { getAttachmentIconMeta } from '../src/shared/components/feed/attachmentIconMeta';
 import {
   CommentThread,
-  isCommentSubmitKey,
 } from '../src/shared/components/feed/CommentThread';
+import { isCommentSubmitKey } from '../src/shared/components/feed/commentThreadUtils';
 import { PostDetailPanel } from '../src/shared/components/feed/PostDetailPanel';
 import { getApprovalSystemEventPresentation } from '../src/pages/groupware/documents/write/data/documentPresentation';
 

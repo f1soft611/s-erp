@@ -1,10 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Box } from '@mui/material';
-import {
-  NotificationProvider,
-  useNotification,
-} from '../src/shared/context/NotificationContext';
+import { NotificationProvider } from '../src/shared/context/NotificationContext';
+import { useNotification } from '../src/shared/context/notification';
 import { PageMessageArea } from '../src/shared/components/PageMessageArea';
 
 function SuccessNotificationButton() {

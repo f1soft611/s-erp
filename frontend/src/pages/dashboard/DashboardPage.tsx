@@ -31,7 +31,7 @@ import SecurityOutlined from '@mui/icons-material/SecurityOutlined';
 import LogoutOutlined from '@mui/icons-material/LogoutOutlined';
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useAppSettings } from '../../shared/context/AppSettingsContext';
+import { useAppSettings } from '../../shared/context/appSettings';
 import { logout } from '../../shared/services/authService';
 import {
   buildPageContent,
