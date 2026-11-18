@@ -282,6 +282,9 @@ function F1GridInner<T extends object>(
     setIsCellSelectionDragging(false);
     setRangeOverlay(null);
   }
+  if (!copiedCellRange && !cellSelection && rangeOverlay !== null) {
+    setRangeOverlay(null);
+  }
   const cellSelectionRef = useRef(cellSelection);
   const copiedCellRangeRef = useRef(copiedCellRange);
   const cellRangeDragRef = useRef<F1GridCellRange | null>(null);
@@ -2931,7 +2934,6 @@ function F1GridInner<T extends object>(
 
   useEffect(() => {
     if (!copiedCellRange && !cellSelection) {
-      setRangeOverlay(null);
       return;
     }
     updateRangeOverlay();

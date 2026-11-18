@@ -2117,6 +2117,46 @@ describe('F1-GRID column management', () => {
 });
 
 describe('F1-GRID cell range selection', () => {
+  it.each(['drag', 'copy'] as const)('removes a cleared %s overlay from the first Escape commit and preserves row state', (kind) => {
+    const rangeRows = [{ id: 'one', code: 'A' }, { id: 'two', code: 'B' }];
+    const rangeColumns: F1GridColumn<(typeof rangeRows)[number]>[] = [
+      { field: 'code', headerName: 'Code', editable: true },
+    ];
+    const gridRef = createRef<F1GridRef<(typeof rangeRows)[number]>>();
+    const commits: Array<string | null> = [];
+    render(
+      <Profiler id="range-escape" onRender={() => {
+        commits.push(document.querySelector('[data-range-overlay]')?.getAttribute('data-range-overlay') ?? null);
+      }}>
+        <F1Grid ref={gridRef} rows={rangeRows} columns={rangeColumns} rowKey="id" initialSelectedRowIds={['one']} />
+      </Profiler>,
+    );
+    act(() => { gridRef.current?.setCellValue('one', 'code', 'A-UPDATED'); });
+    const changes = gridRef.current?.getChanges();
+    expect(changes?.updatedRows).toEqual([{ id: 'one', code: 'A-UPDATED' }]);
+    const first = screen.getByRole('gridcell', { name: 'A-UPDATED' });
+    const last = screen.getByRole('gridcell', { name: 'B' });
+    fireEvent.mouseDown(first);
+    fireEvent.mouseEnter(last);
+    fireEvent.mouseUp(last);
+    if (kind === 'copy') {
+      fireEvent.copy(screen.getByRole('grid', { name: 'F1-GRID' }), {
+        clipboardData: { getData: vi.fn(() => 'A-UPDATED\nB'), setData: vi.fn() },
+      });
+    }
+    expect(document.querySelector(`[data-range-overlay="${kind}"]`)).toBeInTheDocument();
+    commits.length = 0;
+    fireEvent.keyDown(first, { key: 'Escape' });
+    expect(commits[0]).toBeNull();
+    expect(commits.every((value) => value === null)).toBe(true);
+    expect(gridRef.current?.getSelectedRowIds()).toEqual(['one']);
+    expect(gridRef.current?.getChanges()).toEqual(changes);
+    fireEvent.mouseDown(first);
+    fireEvent.mouseEnter(last);
+    fireEvent.mouseUp(last);
+    expect(document.querySelector('[data-range-overlay="drag"]')).toBeInTheDocument();
+  });
+
   it.each([true, false])('restores initial row ids before the first layout commit and keeps user clearing (multiSelect=%s)', (multiSelect) => {
     const selectionRows = [{ id: 'one', code: 'A' }, { id: 'two', code: 'B' }];
     const selectionColumns: F1GridColumn<(typeof selectionRows)[number]>[] = [

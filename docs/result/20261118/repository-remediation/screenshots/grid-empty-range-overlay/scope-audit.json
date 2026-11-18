@@ -1,0 +1,51 @@
+{
+  "baseline": "ed772baf936d9ed468794ec685ba5eebada3a9db",
+  "changed": [
+    "frontend\\src\\pages\\f1-grid-docs\\F1-GRID.md",
+    "frontend\\src\\shared\\components\\f1-grid\\core\\F1Grid.tsx",
+    "frontend\\tests\\f1-grid.test.tsx"
+  ],
+  "onlyBoundedEmptyRangeResetAndEffectSetterRemoval": true,
+  "geometryMeasurementRefsEventsSubscriptionsFramesJsxCssAndPublicTypesUnchanged": true,
+  "originalTestsBytePreserved": true,
+  "addedTests": 2,
+  "runtimeRed": {
+    "failed": 2,
+    "cause": "Stale overlay in first actual cell Escape commit for drag/copy ranges"
+  },
+  "baselineTests": {
+    "files": 4,
+    "passed": 292
+  },
+  "relatedTests": {
+    "files": 4,
+    "passed": 294
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 79,
+    "after": 79,
+    "removed": [
+      [
+        "src/shared/components/f1-grid/core/F1Grid.tsx",
+        "react(set-state-in-effect)",
+        "warning",
+        "Calling setState synchronously within an effect can trigger cascading renders",
+        "setRangeOverlay"
+      ]
+    ],
+    "added": [
+      [
+        "src/shared/components/f1-grid/core/F1Grid.tsx",
+        "react(set-state-in-effect)",
+        "warning",
+        "Calling setState synchronously within an effect can trigger cascading renders",
+        "updateRangeOverlay"
+      ]
+    ],
+    "explanation": "Existing measurement call diagnostic was masked by the removed no-range setter; no reduction claimed"
+  },
+  "remainingRefs": 0,
+  "remainingStateInEffect": 79
+}
