@@ -448,20 +448,22 @@ export const CommonCodeManagementPanel = forwardRef<
         ) ?? null)
       : null;
 
+  const parentGroupId = parentGroup ? String(parentGroup.id) : null;
+
   const openParentPicker = useCallback(
     async (
       row: CommonCodeItemRow,
       applyPatch: (changes: Partial<CommonCodeItemRow>) => void,
     ) => {
       if (saving || saveInFlightRef.current) return;
-      if (!parentGroup) {
+      if (parentGroupId === null) {
         setParentPickerOpen(false);
         return;
       }
 
       parentPickerApplyRef.current = applyPatch;
       try {
-        const parentItems = await fetchCommonCodeItems(String(parentGroup.id));
+        const parentItems = await fetchCommonCodeItems(parentGroupId);
         if (saveInFlightRef.current) return;
         setParentPickerOptions(
           parentItems.filter(
@@ -473,7 +475,7 @@ export const CommonCodeManagementPanel = forwardRef<
         onError?.('상위 그룹의 상세코드를 불러오지 못했습니다.');
       }
     },
-    [onError, parentGroup, saving],
+    [onError, parentGroupId, saving],
   );
 
   const itemGridColumns = itemColumns(
