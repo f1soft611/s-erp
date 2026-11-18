@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { Profiler } from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiGet, apiPost } from '../src/shared/services/apiClient';
@@ -132,6 +133,52 @@ describe('MaterialReceiptClosingPage', () => {
     await waitFor(() => expect(screen.getAllByText('MI-A-1').length).toBeGreaterThan(0));
   }
 
+  it('clears supplier, row selection and edits from the first reloaded data commit only', async () => {
+    const commits: Array<{ filtered: boolean; checked: number; text: string }> = [];
+    renderPage(true, () => {
+      if (!document.body.textContent?.includes('구매처A-REFRESH')) return;
+      const grid = document.querySelector('[aria-label="매입마감 입고 행"]');
+      commits.push({
+        filtered: document.querySelector('[aria-label="구매처 선택 해제"]') !== null,
+        checked: grid?.querySelectorAll('input[type="checkbox"]:checked').length ?? 0,
+        text: grid?.textContent ?? '',
+      });
+    });
+    await screen.findByText('MI-A-1');
+    const rowGrid = () => screen.getByRole('grid', { name: '매입마감 입고 행' });
+    fireEvent.click(within(screen.getByRole('grid', { name: '구매처별 매입마감 요약' })).getByText('구매처A'));
+    const row = within(rowGrid()).getByText('MI-A-1').closest('[role="row"]') as HTMLElement;
+    const body = within(rowGrid()).getByTestId('f1-grid-body-scroll');
+    body.scrollLeft = 1000;
+    fireEvent.scroll(body);
+    await waitFor(() => expect(within(row).getAllByRole('gridcell', { name: /^1,000(?:\.00)?$/ }).length).toBeGreaterThan(0));
+    fireEvent.doubleClick(within(row).getAllByRole('gridcell', { name: /^1,000(?:\.00)?$/ })[0]);
+    const editor = screen.getByRole('spinbutton');
+    fireEvent.change(editor, { target: { value: '1500' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    fireEvent.click(await screen.findByLabelText('101 행 선택'));
+    fireEvent.change(screen.getByRole('textbox', { name: '매입마감 빠른 검색' }), { target: { value: 'M-1' } });
+    expect(screen.getByLabelText('구매처 선택 해제')).toBeInTheDocument();
+    expect(within(rowGrid()).getAllByText(/^1,500(?:\.00)?$/).length).toBeGreaterThan(0);
+    expect(rowGrid().querySelectorAll('input[type="checkbox"]:checked')).toHaveLength(1);
+    expect(apiGetMock).toHaveBeenCalledTimes(2);
+    apiGetMock.mockImplementation(async (path: string) => ({
+      resultList: path.startsWith('/api/v1/materials/purchase-closings/suppliers')
+        ? suppliers().map((supplier) => ({ ...supplier, supplierName: `${supplier.supplierName}-REFRESH` }))
+        : rows().map((item) => ({ ...item, receiptNo: `${item.receiptNo}-REFRESH`, unitPrice: 2000 })),
+    }));
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    await screen.findByText('MI-B-1-REFRESH');
+    expect(commits.length).toBeGreaterThan(0);
+    expect(commits[0].filtered).toBe(false);
+    expect(commits[0].checked).toBe(0);
+    expect(commits[0].text).toContain('MI-A-1-REFRESH');
+    expect(commits[0].text).toContain('MI-B-1-REFRESH');
+    expect(commits.every((commit) => !commit.filtered && commit.checked === 0 && !commit.text.includes('1,500'))).toBe(true);
+    expect(apiGetMock).toHaveBeenCalledTimes(4);
+    expect(apiPostMock).not.toHaveBeenCalled();
+  });
+
   it('loads the supplier summary and the receipt rows for the applied conditions', async () => {
     await openPage();
     const paths = apiGetMock.mock.calls.map(([path]) => path as string);
@@ -216,7 +263,7 @@ describe('MaterialReceiptClosingPage', () => {
   });
 });
 
-function renderPage(update: boolean) {
+function renderPage(update: boolean, onCommit?: () => void) {
   const router = createMemoryRouter(
     [
       {
@@ -234,7 +281,8 @@ function renderPage(update: boolean) {
     ],
     { initialEntries: ['/'] },
   );
-  return render(<RouterProvider router={router} />);
+  const page = <RouterProvider router={router} />;
+  return render(onCommit ? <Profiler id="closing-reload" onRender={onCommit}>{page}</Profiler> : page);
 }
 
 function suppliers(): MaterialReceiptClosingSupplier[] {

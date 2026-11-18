@@ -36,7 +36,9 @@ Oxc의 filename/code/message만 비교하면 위 위치 교체를 놓친다. lab
 
 backend/API/DB/의존성 변경 없음. DB MCP·스키마 스크립트 대상이 아니다. 잔여 state-in-effect 79개와 기존 의존성 권고 2건이 있어 전체 요청은 아직 완료로 표시하지 않는다.
 
-정확한 062 CI 성공 근거를 포함해 별도 커밋·푸시하며 063 전체 CI는 해당 SHA로 확인한다.
+정확한 062 CI 성공 근거를 포함해 `f15bcd6c3cfd0ea32d0241ab17c44e506f95c2c9`로 별도 커밋·비강제 푸시했고 원격 SHA 일치를 확인했다.
+
+정확한 [063 CI 44372270943](https://github.com/f1soft611/s-erp/actions/runs/44372270943)는 위 SHA에서 네 job 모두 성공했다. 원본 로그의 마지막 전체 집계는 **227파일 2,700개 통과**다. [CI 판정](screenshots/grid-empty-range-overlay/remote-ci.json)에 보관한다.
 
 ## 복사 가능한 커밋
 

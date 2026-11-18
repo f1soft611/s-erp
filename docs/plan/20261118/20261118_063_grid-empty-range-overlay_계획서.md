@@ -16,4 +16,4 @@
 - [x] F1-GRID 문서에 범위 해제 commit 동작을 기록한다.
 - [x] 같은 4파일 294개·typecheck/build와 source 891파일 parity·기존 테스트 보존을 확인한다. Oxc는 79 → 79개다. 기존 setter 진단을 제거하자 동일 effect의 기존 `updateRangeOverlay()` 호출이 진단되어 당초 78개 예상은 달성하지 못했다. 위치/소스까지 대조했으며 DOM 측정 경로를 변경하지 않고 후속 대상으로 남긴다.
 - [x] 실제 Grid/Profiler 375/768/1280px native pointer 범위 → Escape → 새 범위를 확인한다. fetch/영구 저장소/OS clipboard를 사용하지 않는다. 첫 해제 commit부터 null이며 행 선택과 변경 데이터를 보존했다. 요청/문서 넘침 0, 소유 탭을 닫았다.
-- [ ] 결과/스크린샷·작은 전체 diff 리뷰·정확한 062 CI를 보관하고 allowlist 커밋·비강제 푸시·원격 일치와 정확한 063 CI를 확인한다.
+- [x] 결과/스크린샷·작은 전체 diff 리뷰·정확한 062 CI를 보관하고 allowlist 18파일을 `f15bcd6c3cfd0ea32d0241ab17c44e506f95c2c9`로 커밋·비강제 푸시·원격 일치를 확인했다. 정확한 063 CI 44372270943 네 job과 마지막 전체 집계 227파일 2,700개 통과를 확인했다.
