@@ -1,6 +1,6 @@
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { IconButton, InputAdornment, Popover, TextField } from '@mui/material';
-import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import { DatePanel } from '../../calendar/DatePanel';
 import { DATE_FORMAT, normalizeDateInput } from './dateInput';
 
@@ -42,11 +42,13 @@ export function DateEditor({
   const [draftValue, setDraftValue] = useState(value);
   const [calendarAnchor, setCalendarAnchor] =
     useState<HTMLButtonElement | null>(null);
+  const [previousInput, setPreviousInput] = useState({ value, disabled });
 
-  useEffect(() => {
+  if (previousInput.value !== value || previousInput.disabled !== disabled) {
+    setPreviousInput({ value, disabled });
     setDraftValue(value);
     if (disabled) setCalendarAnchor(null);
-  }, [value, disabled]);
+  }
 
   const closeCalendar = () => setCalendarAnchor(null);
   const normalizedValue = normalizeDateInput(value);

@@ -1,5 +1,5 @@
 import { Box } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { CalendarFooter } from './CalendarFooter';
 import { CalendarHeader } from './CalendarHeader';
 import { addMonths, parseIsoDate, todayIsoDate } from './calendarUtils';
@@ -25,10 +25,12 @@ function viewOf(value: string, today: string) {
 export function DatePanel({ value, onChange, onClear, todayValue }: DatePanelProps) {
   const today = todayValue ?? todayIsoDate();
   const [view, setView] = useState(() => viewOf(value, today));
+  const [previousInput, setPreviousInput] = useState({ value, today });
 
-  useEffect(() => {
+  if (previousInput.value !== value || previousInput.today !== today) {
+    setPreviousInput({ value, today });
     if (parseIsoDate(value)) setView(viewOf(value, today));
-  }, [value, today]);
+  }
 
   const move = (delta: number) => setView((current) => addMonths(current.year, current.month, delta));
   const select = (iso: string) => {

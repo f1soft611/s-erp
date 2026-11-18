@@ -1,0 +1,76 @@
+{
+  "preserved": [
+    {
+      "file": "frontend/src/shared/components/calendar/DatePanel.tsx",
+      "jsx": true,
+      "propTypes": true,
+      "initializers": true,
+      "helpers": true
+    },
+    {
+      "file": "frontend/src/shared/components/calendar/MonthPanel.tsx",
+      "jsx": true,
+      "propTypes": true,
+      "initializers": true,
+      "helpers": true
+    },
+    {
+      "file": "frontend/src/shared/components/f1-grid/editing/DateEditor.tsx",
+      "jsx": true,
+      "propTypes": true,
+      "initializers": true,
+      "helpers": true
+    },
+    {
+      "file": "frontend/src/shared/components/f1-grid/editing/MonthEditor.tsx",
+      "jsx": true,
+      "propTypes": true,
+      "initializers": true,
+      "helpers": true
+    }
+  ],
+  "preservedTests": [
+    {
+      "file": "calendar-panels.test.tsx",
+      "existing": 10,
+      "added": 2
+    },
+    {
+      "file": "date-editor-calendar.test.tsx",
+      "existing": 4,
+      "added": 1
+    },
+    {
+      "file": "month-editor.test.tsx",
+      "existing": 4,
+      "added": 1
+    }
+  ],
+  "snapshotFiles": 890,
+  "mismatches": [],
+  "changed": [
+    "frontend/src/pages/f1-grid-docs/F1-GRID.md",
+    "frontend/src/shared/components/calendar/DatePanel.tsx",
+    "frontend/src/shared/components/calendar/MonthPanel.tsx",
+    "frontend/src/shared/components/f1-grid/editing/DateEditor.tsx",
+    "frontend/src/shared/components/f1-grid/editing/MonthEditor.tsx",
+    "frontend/tests/calendar-panels.test.tsx",
+    "frontend/tests/date-editor-calendar.test.tsx",
+    "frontend/tests/month-editor.test.tsx"
+  ],
+  "lint": {
+    "before": 119,
+    "after": 115,
+    "removed": [
+      "src/shared/components/f1-grid/editing/MonthEditor.tsx",
+      "src/shared/components/f1-grid/editing/DateEditor.tsx",
+      "src/shared/components/calendar/MonthPanel.tsx",
+      "src/shared/components/calendar/DatePanel.tsx"
+    ],
+    "added": 0
+  },
+  "tests": {
+    "files": 9,
+    "passed": 158
+  }
+}

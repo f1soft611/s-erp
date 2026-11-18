@@ -1,6 +1,6 @@
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { IconButton, InputAdornment, Popover, TextField } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { MonthPanel } from '../../calendar/MonthPanel';
 import { formatMonthValue, normalizeMonthInput } from './monthInput';
 
@@ -20,10 +20,12 @@ type MonthEditorProps = {
 export function MonthEditor({ value, onChange, label, onBlur, required, error, helperText }: MonthEditorProps) {
   const [draft, setDraft] = useState(formatMonthValue(value));
   const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
+  const [previousValue, setPreviousValue] = useState(value);
 
-  useEffect(() => {
-    setDraft((current) => (current.replace(/[^\d]/g, '') === value ? current : formatMonthValue(value)));
-  }, [value]);
+  if (previousValue !== value) {
+    setPreviousValue(value);
+    if (draft.replace(/[^\d]/g, '') !== value) setDraft(formatMonthValue(value));
+  }
 
   const normalized = normalizeMonthInput(value);
 

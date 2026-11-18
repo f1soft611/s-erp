@@ -1,6 +1,6 @@
 import { Box, ButtonBase } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { CALENDAR_PANEL_WIDTH } from './DatePanel';
 import { CalendarFooter } from './CalendarFooter';
 import { CalendarHeader } from './CalendarHeader';
@@ -26,9 +26,12 @@ function yearOf(value: string, today: string): number {
 export function MonthPanel({ value, onChange, onClear, todayValue }: MonthPanelProps) {
   const today = todayValue ?? todayIsoDate();
   const [year, setYear] = useState(() => yearOf(value, today));
-  useEffect(() => {
+  const [previousInput, setPreviousInput] = useState({ value, today });
+
+  if (previousInput.value !== value || previousInput.today !== today) {
+    setPreviousInput({ value, today });
     if (/^\d{6}$/.test(value)) setYear(yearOf(value, today));
-  }, [value, today]);
+  }
 
   const thisMonth = today.slice(0, 7).replace('-', '');
   const pick = (month: number) => onChange(`${year}${String(month).padStart(2, '0')}`);

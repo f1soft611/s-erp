@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { useState } from 'react';
+import { Profiler, useState } from 'react';
 import { DateEditor } from '../src/shared/components/f1-grid/editing/DateEditor';
 
 function Harness({
@@ -23,6 +23,32 @@ function Harness({
 }
 
 describe('DateEditor calendar', () => {
+  it('commits external values immediately, preserves an unchanged draft and closes a disabled calendar', async () => {
+    const commits = vi.fn();
+    const view = (value: string, disabled = false) => (
+      <Profiler id="date-editor" onRender={() => commits((screen.getByLabelText('기준일') as HTMLInputElement).value)}>
+        <DateEditor label="기준일" variant="outlined" autoFocus={false} value={value} disabled={disabled} onChange={vi.fn()} />
+      </Profiler>
+    );
+    const { rerender } = render(view('2026-11-02'));
+    commits.mockClear();
+    rerender(view('2028-02-29'));
+    expect(commits).toHaveBeenNthCalledWith(1, '2028-02-29');
+
+    fireEvent.change(screen.getByRole('textbox', { name: '기준일' }), { target: { value: '202611' } });
+    rerender(view('2028-02-29'));
+    expect(screen.getByRole('textbox', { name: '기준일' })).toHaveValue('202611');
+    fireEvent.click(screen.getByRole('button', { name: '기준일 달력 열기' }));
+    expect(screen.getByRole('grid')).toBeInTheDocument();
+    commits.mockClear();
+    rerender(view('2028-02-29', true));
+    expect(commits).toHaveBeenNthCalledWith(1, '2028-02-29');
+    expect(screen.getByLabelText('기준일 달력 열기')).toBeDisabled();
+    await waitFor(() => expect(screen.queryByRole('grid')).not.toBeInTheDocument());
+    rerender(view('2028-02-29'));
+    expect(screen.queryByRole('grid')).not.toBeInTheDocument();
+  });
+
   it('opens the Korean calendar, selects a date and closes', () => {
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
