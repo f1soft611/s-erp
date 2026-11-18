@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MenuManagementPage } from '../src/pages/settings/system/menus/MenuManagementPage';
@@ -120,6 +120,57 @@ function renderPage() {
   );
 }
 
+function deferNextMenuRequest() {
+  const defaultGet = apiMocks.apiGet.getMockImplementation();
+  if (!defaultGet) throw new Error('Missing default menu API mock');
+  const response = Promise.withResolvers<{
+    resultList: {
+      menuId: number;
+      moduleId: number;
+      menuCode: string;
+      menuNm: string;
+      menuUrl: string;
+      useAt: string;
+    }[];
+  }>();
+  const path = '/api/v1/system/menus?moduleId=1&roleId=1';
+  apiMocks.apiGet.mockImplementation((requestPath: string) => {
+    if (requestPath === path) {
+      apiMocks.apiGet.mockImplementation(defaultGet);
+      return response.promise;
+    }
+    return defaultGet(requestPath);
+  });
+  return {
+    path,
+    resolve: (name: string) => response.resolve({
+      resultList: [
+        {
+          menuId: 1,
+          moduleId: 1,
+          menuCode: 'DASH',
+          menuNm: name,
+          menuUrl: '/dashboard',
+          useAt: 'Y',
+        },
+      ],
+    }),
+  };
+}
+
+async function selectAdministrator() {
+  const roleSelector = await screen.findByRole('combobox', { name: '권한 선택' });
+  await waitFor(() => {
+    expect(roleSelector).not.toHaveAttribute('aria-disabled', 'true');
+  });
+  fireEvent.mouseDown(roleSelector);
+  fireEvent.click(screen.getByRole('option', { name: '관리자' }));
+}
+
+function getMenuGrid() {
+  return screen.getByRole('grid', { name: 'F1-TREE 메뉴 관리' });
+}
+
 describe('MenuManagementPage required selection', () => {
   it('blocks the menu query until both module and role are selected', async () => {
     renderPage();
@@ -137,11 +188,9 @@ describe('MenuManagementPage required selection', () => {
       expect(screen.getByText('모듈과 권한을 모두 선택하세요.')).toBeVisible();
     });
 
-    expect(apiMocks.apiGet).not.toHaveBeenCalledWith(
-      '/api/v1/system/menus?moduleId=1',
-    );
-    expect(apiMocks.apiGet).not.toHaveBeenCalledWith(
-      '/api/v1/system/menus?moduleId=1&roleId=1',
+    const requests = apiMocks.apiGet.mock.calls.map(([path]) => path);
+    expect(requests).not.toContainEqual(
+      expect.stringMatching(/^\/api\/v1\/system\/menus(?:\?|$)/),
     );
 
     fireEvent.mouseDown(screen.getByRole('combobox', { name: '모듈 선택' }));
@@ -186,6 +235,42 @@ describe('MenuManagementPage required selection', () => {
       expect(apiMocks.apiGet).toHaveBeenCalledWith(
         '/api/v1/system/menus?moduleId=2&roleId=2',
       );
+    });
+  });
+
+  it('keeps the cleared search query empty on re-entry without changing the saved selection', async () => {
+    window.sessionStorage.setItem(
+      's-erp:page:menu-management',
+      JSON.stringify({
+        version: 1,
+        value: {
+          selectedModuleId: 2,
+          selectedRoleId: '2',
+          searchQuery: '사용자',
+        },
+      }),
+    );
+    const page = renderPage();
+    expect(await screen.findByRole('textbox', { name: '메뉴 검색' })).toHaveValue('사용자');
+
+    fireEvent.click(screen.getByRole('button', { name: '검색어 초기화' }));
+    expect(screen.getByRole('textbox', { name: '메뉴 검색' })).toHaveValue('');
+    await waitFor(() => {
+      expect(
+        JSON.parse(window.sessionStorage.getItem('s-erp:page:menu-management') ?? '{}').value,
+      ).toEqual({
+        selectedModuleId: 2,
+        selectedRoleId: '2',
+        searchQuery: '',
+      });
+    });
+
+    page.unmount();
+    renderPage();
+    expect(await screen.findByRole('textbox', { name: '메뉴 검색' })).toHaveValue('');
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: '모듈 선택' })).toHaveTextContent('환경설정');
+      expect(screen.getByRole('combobox', { name: '권한 선택' })).toHaveTextContent('운영자');
     });
   });
 
@@ -312,122 +397,44 @@ describe('MenuManagementPage required selection', () => {
     });
   });
 
-  it('shows the grid skeleton while the menu tree is loading on first entry', async () => {
-    let resolveMenuRows: ((value: { resultList: [] }) => void) | undefined;
-    apiMocks.apiGet.mockImplementation((path: string) => {
-      if (path === '/api/v1/system/modules') {
-        return Promise.resolve({
-          resultList: modules.map((module) => ({
-            ...module,
-            moduleNm: module.moduleName,
-            useAt: 'Y',
-          })),
-        });
-      }
-      if (path === '/api/v1/system/roles') {
-        return Promise.resolve({ resultList: roles });
-      }
-      if (path === '/api/v1/system/permissions') {
-        return Promise.resolve({ resultList: permissions });
-      }
-      if (path === '/api/v1/system/menus?moduleId=1&roleId=1') {
-        return new Promise((resolve) => {
-          resolveMenuRows = resolve;
-        });
-      }
-      return Promise.resolve({ resultList: [] });
-    });
-
+  it('shows the grid loading overlay until the first menu request completes', async () => {
+    const request = deferNextMenuRequest();
     renderPage();
+    await selectAdministrator();
 
-    const moduleSelector = await screen.findByRole('combobox', {
-      name: '모듈 선택',
-    });
-    const roleSelector = await screen.findByRole('combobox', {
-      name: '권한 선택',
-    });
+    expect(apiMocks.apiGet).toHaveBeenCalledWith(request.path);
+    expect(getMenuGrid()).toHaveAttribute('aria-busy', 'true');
+    expect(within(getMenuGrid()).getByRole('progressbar')).toBeVisible();
+    expect(within(getMenuGrid()).queryByRole('gridcell', { name: '대시보드' })).not.toBeInTheDocument();
 
-    await waitFor(() => {
-      expect(moduleSelector).not.toBeDisabled();
-      expect(roleSelector).not.toBeDisabled();
-    });
-
-    fireEvent.mouseDown(moduleSelector);
-    fireEvent.click(screen.getByRole('option', { name: '기본' }));
-    fireEvent.mouseDown(roleSelector);
-    fireEvent.click(screen.getByRole('option', { name: '관리자' }));
-
-    await waitFor(() => {
-      expect(
-        screen.getAllByTestId('grid-loading-row-skeleton').length,
-      ).toBeGreaterThan(0);
-    });
-
-    resolveMenuRows?.({ resultList: [] });
+    request.resolve('대시보드');
+    expect(await screen.findByRole('gridcell', { name: '대시보드' })).toBeVisible();
+    expect(getMenuGrid()).not.toHaveAttribute('aria-busy');
+    expect(within(getMenuGrid()).queryByRole('progressbar')).not.toBeInTheDocument();
   });
 
-  it('shows the grid skeleton when the read action is triggered', async () => {
-    let resolveMenuRows: ((value: { resultList: [] }) => void) | undefined;
-    apiMocks.apiGet.mockImplementation((path: string) => {
-      if (path === '/api/v1/system/modules') {
-        return Promise.resolve({
-          resultList: modules.map((module) => ({
-            ...module,
-            moduleNm: module.moduleName,
-            useAt: 'Y',
-          })),
-        });
-      }
-      if (path === '/api/v1/system/roles') {
-        return Promise.resolve({ resultList: roles });
-      }
-      if (path === '/api/v1/system/permissions') {
-        return Promise.resolve({ resultList: permissions });
-      }
-      if (path === '/api/v1/system/menus?moduleId=1&roleId=1') {
-        if (resolveMenuRows) {
-          return new Promise((resolve) => {
-            resolveMenuRows = resolve;
-          });
-        }
-        return new Promise((resolve) => {
-          resolveMenuRows = resolve;
-        });
-      }
-      return Promise.resolve({ resultList: [] });
-    });
-
+  it('shows the grid loading overlay until the read action completes', async () => {
+    const initialRequest = deferNextMenuRequest();
     renderPage();
+    await selectAdministrator();
 
-    const moduleSelector = await screen.findByRole('combobox', {
-      name: '모듈 선택',
-    });
-    const roleSelector = await screen.findByRole('combobox', {
-      name: '권한 선택',
-    });
+    initialRequest.resolve('대시보드');
+    expect(await screen.findByRole('gridcell', { name: '대시보드' })).toBeVisible();
+    expect(getMenuGrid()).not.toHaveAttribute('aria-busy');
+    expect(within(getMenuGrid()).queryByRole('progressbar')).not.toBeInTheDocument();
 
-    await waitFor(() => {
-      expect(moduleSelector).not.toBeDisabled();
-      expect(roleSelector).not.toBeDisabled();
-    });
-
-    fireEvent.mouseDown(moduleSelector);
-    fireEvent.click(screen.getByRole('option', { name: '기본' }));
-    fireEvent.mouseDown(roleSelector);
-    fireEvent.click(screen.getByRole('option', { name: '관리자' }));
-
-    resolveMenuRows?.({ resultList: [] });
-    await waitFor(() => {
-      expect(screen.queryAllByTestId('grid-loading-skeleton')).toHaveLength(0);
-    });
-
+    const request = deferNextMenuRequest();
+    const initialCallCount = apiMocks.apiGet.mock.calls.length;
     fireEvent.click(screen.getByRole('button', { name: '조회' }));
 
-    await waitFor(() => {
-      expect(
-        screen.getAllByTestId('grid-loading-row-skeleton').length,
-      ).toBeGreaterThan(0);
-    });
+    expect(apiMocks.apiGet).toHaveBeenNthCalledWith(initialCallCount + 1, request.path);
+    expect(getMenuGrid()).toHaveAttribute('aria-busy', 'true');
+    expect(within(getMenuGrid()).getByRole('progressbar')).toBeVisible();
+
+    request.resolve('새 대시보드');
+    expect(await screen.findByRole('gridcell', { name: '새 대시보드' })).toBeVisible();
+    expect(getMenuGrid()).not.toHaveAttribute('aria-busy');
+    expect(within(getMenuGrid()).queryByRole('progressbar')).not.toBeInTheDocument();
   });
 
   it('disables save while the module and role criteria are incomplete', async () => {

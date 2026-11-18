@@ -512,6 +512,10 @@ export function MenuManagementPage({
                     onClick={() => {
                       if (saving) return;
                       setSearchQuery('');
+                      setPageSession((current) => ({
+                        ...current,
+                        searchQuery: '',
+                      }));
                     }}
                     edge="end"
                     sx={{ mr: 0.5, color: 'text.secondary' }}
