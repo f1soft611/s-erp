@@ -4064,7 +4064,11 @@ describe('Document write page', () => {
     fireEvent.click(
       within(firstCard).getByRole('button', { name: '이전 댓글 보기 (3)' }),
     );
-    expect(await within(firstCard).findByText('이전 페이지 댓글')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('document-feed')).getByText('이전 페이지 댓글'),
+      ).toBeInTheDocument(),
+    );
     expect(composerApi.listApprovalComments).toHaveBeenCalledWith(1, {
       limit: 20,
       beforeCommentId: 1001,
@@ -5388,10 +5392,9 @@ describe('Document write page', () => {
     let unmount = () => {};
 
     try {
-      const rendered = render(<DashboardContent {...pageProps} />);
+      const rendered = render(<DocumentComposerDialog open onClose={vi.fn()} />);
       unmount = rendered.unmount;
 
-      fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
       await waitForComposerReady();
 
       const picker = screen.getByRole('combobox', {
@@ -5547,9 +5550,7 @@ describe('Document write page', () => {
   });
 
   it('adds selected approval users as ordered individual stages and removes them from candidates', async () => {
-    render(<DashboardContent {...pageProps} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
 
     const approvalPicker = screen.getByRole('combobox', {
@@ -5595,9 +5596,7 @@ describe('Document write page', () => {
   });
 
   it('applies edited stages and references only after confirming the settings dialog', async () => {
-    render(<DashboardContent {...pageProps} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
 
     const approvalPicker = screen.getByRole('combobox', {
@@ -5730,9 +5729,7 @@ describe('Document write page', () => {
   }, 15000);
 
   it('renders each selected agreement user as a wrapped chip and appends the next selector', async () => {
-    render(<DashboardContent {...pageProps} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
 
     const approvalPicker = screen.getByRole('combobox', {
@@ -6022,9 +6019,7 @@ describe('Document write page', () => {
           resolveTemplate = resolve;
         }),
     );
-    render(<DashboardContent {...pageProps} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
     fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
       target: { value: '로딩 중 보존할 제목' },
@@ -6237,10 +6232,10 @@ describe('Document write page', () => {
     });
     fireEvent.change(referencePicker, { target: { value: '박서준' } });
     fireEvent.click(await screen.findByRole('option', { name: /박서준/ }));
-    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+    fireEvent.change(screen.getByLabelText('제목'), {
       target: { value: '작성 중 제목' },
     });
-    expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue(
+    expect(screen.getByLabelText('제목')).toHaveValue(
       '작성 중 제목',
     );
 
@@ -6251,7 +6246,7 @@ describe('Document write page', () => {
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await waitForComposerReady();
 
-    expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue('');
+    expect(screen.getByLabelText('제목')).toHaveValue('');
     expect(screen.getByTestId('document-approval-person')).toHaveAttribute(
       'aria-label',
       '결재 1 홍길동',
@@ -6265,8 +6260,7 @@ describe('Document write page', () => {
   }, 10000);
 
   it('saves the document payload and reuses its ID on subsequent saves', async () => {
-    render(<DashboardContent {...pageProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
     fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
       target: { value: '초안 제목' },
@@ -6428,8 +6422,7 @@ describe('Document write page', () => {
         resolveUpload = resolve;
       }),
     );
-    render(<DashboardContent {...pageProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
     fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
       target: { value: '업로드 대기 초안' },
@@ -6530,8 +6523,7 @@ describe('Document write page', () => {
         fileName: 'evidence.txt',
         fileSize: 8,
       });
-    render(<DashboardContent {...pageProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
     fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
       target: { value: '첨부 포함 초안' },
@@ -6579,8 +6571,7 @@ describe('Document write page', () => {
     composerApi.uploadDocumentDraftAttachment
       .mockRejectedValueOnce(new Error('definite failure'))
       .mockRejectedValueOnce(new Error('definite failure'));
-    render(<DashboardContent {...pageProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
     fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
       target: { value: '첨부 재시도 실패 초안' },
@@ -6651,8 +6642,7 @@ describe('Document write page', () => {
         fileSize: 9,
       })
       .mockRejectedValueOnce(new Error('definite failure'));
-    render(<DashboardContent {...pageProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
     fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
       target: { value: '첨부 부분 실패 후 삭제 초안' },
@@ -6716,8 +6706,7 @@ describe('Document write page', () => {
     composerApi.uploadDocumentDraftAttachment.mockRejectedValueOnce(
       new Error('network disconnected'),
     );
-    render(<DashboardContent {...pageProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
     fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
       target: { value: '네트워크 확인 초안' },
