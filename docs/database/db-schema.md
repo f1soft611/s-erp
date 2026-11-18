@@ -1065,16 +1065,21 @@ PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 
 |---|---|---|---|
 | `price_id` | `bigserial` | NOT NULL, PK | 단가 내부 ID |
 | `tenant_id` | `bigint` | NOT NULL | 소유 tenant |
-| `material_id`, `customer_id` | `bigint` | NOT NULL | 기존 품목/거래처 내부 ID, tenant 복합 FK |
+| `material_id` | `bigint` | NOT NULL | 기존 품목 내부 ID, tenant 복합 FK |
+| `customer_id` | `bigint` | NULL | 기존 거래처 내부 ID, tenant 복합 FK. NULL이면 품목 기본단가(거래처 공통), `20261118_001` |
 | `trade_type` | `varchar(10)` | NOT NULL | 매입/매출 |
-| `unit_price` | `numeric(15,2)` | NOT NULL | 단가 |
-| `currency` | `varchar(10)` | NOT NULL, `KRW` | 통화 코드 |
+| `unit_price` | `numeric(15,2)` | NULL | 원화단가. 외화단가만 관리하면 NULL, `20261118_003`(원화·외화 중 하나 이상 CHECK `ck_tb_item_partner_price_any_price`) |
+| `currency` | `varchar(10)` | NULL | 외화단가의 통화(공통코드 `CURRENCY`). `20261118_001`에서 NOT NULL·기본 `KRW` 해제 |
+| `tax_type` | `varchar(30)` | NOT NULL, `TAXABLE` | 부가세구분(공통코드 `PURCHASE_TAX_TYPE`), `20261118_001` |
+| `vat_included_at` | `char(1)` | NOT NULL, `N` | 부가세 포함 여부 Y/N, `20261118_001` |
+| `foreign_unit_price` | `numeric(15,2)` | NULL | 외화단가(선택), `20261118_001` |
 | `start_dt`, `end_dt` | `date` | 시작일 NOT NULL, 종료일 NULL | 단가 적용기간 |
 | `moq` | `numeric(15,2)` | NULL | 최소주문수량 |
 | `use_at` | `char(1)` | NOT NULL, `Y` | 사용여부 |
 | audit columns | `varchar(10)`, `timestamp` | created_at은 current timestamp | S-ERP 등록/수정자 및 시각 |
 
 - tenant 업무키 `(tenant_id, material_id, customer_id, trade_type, start_dt)`는 unique다. 기존 동일키는 insert/update/import에서 충돌로 처리하고 업서트하지 않는다. 다른 시작일의 기간 중첩은 허용한다.
+- `20261118_001`: 거래처 NULL 기본단가 행은 부분 유니크 `uq_tb_item_partner_price_default_key (tenant_id, material_id, trade_type, start_dt) WHERE customer_id IS NULL`로 중복을 막는다. 같은 (품목, 거래처 또는 기본, 거래구분)의 기간 중첩은 서비스에서 막고 신규 적용일 등록 시 직전 행 종료일을 자동으로 닫는다.
 - trade type, 사용여부, 비음수 단가/MOQ, 종료일-시작일 관계를 CHECK로 보장한다. 물리 삭제는 제공하지 않는다.
 - [설계](../superpowers/specs/2026-10-29-item-partner-pricing-design.md), [상세사양](../spec/20261029/20261029_002_품목_거래처별_단가관리_상세사양서.md), [날짜별 DDL/이력](20261029/20261029_002_change_item_partner_price_schema.md) 및 [backend 사본](../../backend/DATABASE/20261029) 참고. DDL/rollback 모두 미적용.
 
@@ -1153,6 +1158,7 @@ PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 
 | | `warehouse_id` | `bigint` | NULL | 입고창고 FK (단일 FK, 테넌트는 서비스 검증) |
 | | `order_type` | `varchar(50)` | NULL | 발주구분 공통코드 `PURCHASE_ORDER_TYPE` |
 | | `unit_price`, `currency_code` | `numeric(15,2)`, `varchar(10)` | NULL | 단가(빈값 허용)·통화 |
+| | `tax_type`, `vat_included_at` | `varchar(30)`, `char(1)` | NULL, CHECK Y/N | 확정 시 설정한 부가세구분(공통코드 `PURCHASE_TAX_TYPE`)·포함 여부. NULL이면 과세·미포함 취급, `20261118_002` |
 | | `amount` | `numeric(15,2)` | NOT NULL, `0` | 확정수량 × 단가 |
 | | `confirm_remark` | `varchar(500)` | NULL | 비고(확정) |
 | | `order_close_at` | `char(1)` | NOT NULL, `N` | 발주대기 마감 |
@@ -1340,6 +1346,8 @@ PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 
 
 ## 변경 이력
 
+- 2026-11-18: 확정 상세 `tb_purchase_request_dt`에 `tax_type`·`vat_included_at`(NULL 허용, CHECK Y/N)을 추가하는 `20261118_002`, 단가 `tb_item_partner_price.unit_price` NOT NULL 해제와 원화·외화 단가 중 하나 이상 CHECK `20261118_003`을 정의했다. [docs/database/20261118](20261118) 및 [backend 사본](../../backend/DATABASE/20261118) 참고. 적용 전.
+- 2026-11-18: 단가 `tb_item_partner_price`에 기본단가(`customer_id` NULL 허용), `tax_type`·`vat_included_at`·`foreign_unit_price` 추가, `currency` 선택화(기존 KRW→NULL), 기본단가 부분 유니크 인덱스를 추가하는 `20261118_001`을 정의했다. [docs/database/20261118](20261118) 및 [backend 사본](../../backend/DATABASE/20261118) 참고. 적용 전.
 - 2026-11-17: 입고 상세 `tb_material_receipt_dt`에 매입마감 컬럼 9개(`closing_month`, `closed_at`, `closed_by`, `closing_unit_price`, `closing_tax_type`, `closing_vat_included_at`, `closing_supply_amt`, `closing_vat_amt`, `closing_total_amt`)와 CHECK 4개, 인덱스 `ix_material_receipt_dt_closing_month`를 추가하는 `20261117_007`, 매입마감처리 메뉴 `20261117_008`을 정의했다. 읽기 전용 MCP로 컬럼이 아직 없음을 확인했고 실제 DB에는 적용하지 않았다. [docs/database/20261117](20261117) 및 [backend 사본](../../backend/DATABASE/20261117) 참고.
 - 2026-11-17: 입고 상세 `tb_material_receipt_dt`에 수입검사 연결 컬럼 `material_inspection_detail_id`(FK `ON DELETE SET NULL`)·`inspection_no`와 인덱스를 추가하는 `20261117_006`을 정의했다. 읽기 전용 MCP로 두 컬럼이 아직 없음을 확인했고 실제 DB에는 적용하지 않았다. [docs/database/20261117](20261117) 및 [backend 사본](../../backend/DATABASE/20261117) 참고.
 
