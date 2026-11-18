@@ -202,7 +202,6 @@ const GridRowInner = <T extends object>({
   editingCell,
   selectedCellRange,
   selectedCellRangeBounds,
-  isCellSelectionDragging = false,
   dragSelectionStateRef,
   copiedCellRange,
   draftValue,
@@ -319,8 +318,6 @@ const GridRowInner = <T extends object>({
       onSetFocusedCell,
       rowId,
       selectionMode,
-      selectedCellRange,
-      latestPropsRef,
     ],
   );
 
@@ -348,9 +345,7 @@ const GridRowInner = <T extends object>({
     },
     [
       dragSelectionStateRef,
-      isCellSelectionDragging,
       onCellSelectionDrag,
-      selectedCellRange,
       latestPropsRef,
       selectionMode,
     ],

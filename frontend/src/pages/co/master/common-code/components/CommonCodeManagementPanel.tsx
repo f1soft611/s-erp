@@ -209,7 +209,6 @@ export const CommonCodeManagementPanel = forwardRef<
   {
     groups,
     moduleOptions = EMPTY_MODULE_OPTIONS,
-    searchQuery = '',
     highlightKeyword,
     canExportExcel = false,
     onGroupsSaved,
@@ -280,7 +279,7 @@ export const CommonCodeManagementPanel = forwardRef<
     return savedGroupBaseline?.source === groups
       ? savedGroupBaseline.rows
       : groups;
-  }, [groups, savedGroupBaseline, searchQuery]);
+  }, [groups, savedGroupBaseline]);
 
   useEffect(() => {
     if (!groupSelectionRestoredRef.current) {

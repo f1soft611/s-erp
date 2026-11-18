@@ -17,6 +17,10 @@
 
 세션 근거: `lint031-red.json`, `lint031-oxlint.json`, `lint031-related.json`, `lint031-typecheck.log`, `lint031-parent-audit.json`. 이번 단위는 관련 161개 실행이며 이전 전체 실행과 구분한다.
 
+## 추가 원격 전체 검증
+
+커밋 `f1fd47a9`의 Frontend CI 실행 `44284824168`도 success다. 실제 로그에서 226/226파일과 2,643/2,643테스트 통과를 확인했으며 build/lint/required job도 모두 success다. 이 수치는 새 concurrent 회귀 두 개를 포함한 031까지의 정확한 소스 기준이고 이후 032 소스의 전체 실행으로 표현하지 않는다. 근거는 세션의 `lint031-remote-summary.json`, `lint031-remote-jobs.json`, `lint031-remote-full.log`다.
+
 잔여 lint 127개: set-state-in-effect 97, exhaustive-deps 22, refs 8. 의존성 두 권고는 027 차단 근거가 유지된다. 전체 요청은 계속 진행한다.
 
 ## 복사할 커밋
