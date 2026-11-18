@@ -160,23 +160,26 @@ export function NoticeComposerDialog({
   const [attachments, setAttachments] =
     useState<NoticeComposerDraftAttachment[]>(defaultAttachments);
 
-  useEffect(() => {
-    if (!open) {
-      return;
+  const [resetSource, setResetSource] = useState({ open, pasteDebugEnabled });
+  if (
+    resetSource.open !== open ||
+    resetSource.pasteDebugEnabled !== pasteDebugEnabled
+  ) {
+    setResetSource({ open, pasteDebugEnabled });
+    if (open) {
+      setTitle(defaultTitle);
+      setNoticeGubunCode(defaultNoticeGubunCode);
+      setNoticeGubunError(false);
+      setLoginPopup(defaultLoginPopupYn === 'Y');
+      setPopupEndDate(defaultPopupEndDate ?? '');
+      setPopupDateError(false);
+      setAttachments(defaultAttachments);
+      setImageUploadError(null);
+      setPasteDebugLog(
+        pasteDebugEnabled ? ['[notice-paste] 진단 모드가 활성화되었습니다.'] : [],
+      );
     }
-
-    setTitle(defaultTitle);
-    setNoticeGubunCode(defaultNoticeGubunCode);
-    setNoticeGubunError(false);
-    setLoginPopup(defaultLoginPopupYn === 'Y');
-    setPopupEndDate(defaultPopupEndDate ?? '');
-    setPopupDateError(false);
-    setAttachments(defaultAttachments);
-    setImageUploadError(null);
-    setPasteDebugLog(
-      pasteDebugEnabled ? ['[notice-paste] 진단 모드가 활성화되었습니다.'] : [],
-    );
-  }, [open, pasteDebugEnabled]);
+  }
 
   useEffect(() => {
     if (!editor || !open) {
