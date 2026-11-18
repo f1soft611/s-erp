@@ -11,9 +11,10 @@ export function usePolicyDecimalRule(): GridDecimalRule | undefined {
   const moduleCode = useContext(GridDecimalModuleContext);
   const [rule, setRule] = useState<GridDecimalRule | undefined>();
 
+  if (!moduleCode && rule !== undefined) setRule(undefined);
+
   useEffect(() => {
     if (!moduleCode) {
-      setRule(undefined);
       return undefined;
     }
     let active = true;

@@ -1,7 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import { useLayoutEffect } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { F1Grid } from '../src/shared/components/f1-grid';
 import { GridDecimalModuleProvider } from '../src/shared/components/f1-grid/core/GridDecimalPolicy';
+import { usePolicyDecimalRule } from '../src/shared/components/f1-grid/core/gridDecimalPolicyContext';
 import { resetGridDecimalPolicyCache } from '../src/shared/services/gridDecimalPolicy.service';
 import type { F1GridColumn } from '../src/shared/components/f1-grid/types/grid.types';
 
@@ -29,6 +31,40 @@ describe('F1Grid module decimal policy', () => {
   beforeEach(() => {
     apiGet.mockReset();
     resetGridDecimalPolicyCache();
+  });
+
+  it('clears the rule before the context-free commit and ignores a late response after reentry', async () => {
+    apiGet.mockResolvedValue({ item: { SALES: rule(3, 'FIXED', 'HALF_UP') } });
+    const commits: Array<{ phase: string; places: number | undefined }> = [];
+    function Probe({ phase }: { phase: string }) {
+      const policy = usePolicyDecimalRule();
+      useLayoutEffect(() => {
+        commits.push({ phase, places: policy?.places });
+      }, [phase, policy]);
+      return <output aria-label="정책 자리수">{policy?.places ?? 'default'}</output>;
+    }
+    const view = (moduleCode: string) => (
+      <GridDecimalModuleProvider moduleCode={moduleCode}><Probe phase={moduleCode} /></GridDecimalModuleProvider>
+    );
+    const { rerender } = render(view('SALES'));
+    await waitFor(() => expect(screen.getByLabelText('정책 자리수')).toHaveTextContent('3'));
+    commits.length = 0;
+    rerender(view(' '));
+    expect(commits.map((value) => value.places)).toEqual([undefined]);
+    expect(apiGet).toHaveBeenCalledTimes(1);
+    let resolvePolicy!: (value: { item: Record<string, ReturnType<typeof rule>> }) => void;
+    const pending = new Promise<{ item: Record<string, ReturnType<typeof rule>> }>((resolve) => {
+      resolvePolicy = resolve;
+    });
+    resetGridDecimalPolicyCache();
+    apiGet.mockReturnValueOnce(pending);
+    rerender(view('SALES'));
+    expect(screen.getByLabelText('정책 자리수')).toHaveTextContent('default');
+    expect(apiGet).toHaveBeenCalledTimes(2);
+    rerender(view(''));
+    await act(async () => { resolvePolicy({ item: { SALES: rule(4, 'FIXED', 'UP') } }); });
+    expect(screen.getByLabelText('정책 자리수')).toHaveTextContent('default');
+    expect(commits.every((value) => value.places === undefined)).toBe(true);
   });
 
   it('applies the module policy only to columns without decimalPlaces', async () => {

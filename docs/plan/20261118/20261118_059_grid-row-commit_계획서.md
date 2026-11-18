@@ -50,4 +50,4 @@ useLayoutEffect(() => {
 - [x] 같은 3파일 278개·typecheck/build/Oxc에서 새 진단 0, refs 1 → 0, 전체 83 → 82를 확인한다.
 - [x] 단순 layout 이동만으로는 새 등록 보존 회귀가 실패함을 검증 workspace에서 확인한 뒤 올바른 소스로 복원한다. 모든 기존 테스트 byte와 frontend source 891파일 parity를 확인한다.
 - [x] 새 탭의 실제 GridRow에서 375/768/1280px pending/commit 행 선택·checkbox 변경과 등록 cache/편집 ref, unmount cleanup을 native 흐름으로 확인한다. 모든 fetch/영구 저장소 접근은 차단한다. callback 12회·요청 0.
-- [ ] 결과/스크린샷·정확한 058 CI 근거를 보관하고 allowlist 커밋·비강제 푸시·원격 일치와 정확한 059 CI를 확인한다.
+- [x] 결과/스크린샷·정확한 058 CI 근거를 보관하고 allowlist 커밋·비강제 푸시·원격 일치와 정확한 059 CI를 확인한다. `44e054cf219923692ca5527ae1a275512ebbbd46`, run `44364157785`: 227파일 2,693개와 네 job 성공.

@@ -36,7 +36,9 @@ callback 총 12회, 요청 0, fallback 노출 0, 문서 넘침 0이다. 실제 R
 
 백엔드/API/DB/의존성 변경 없음. DB MCP·스키마 스크립트 대상이 아니다. 잔여 state-in-effect 82개와 기존 의존성 권고 2건이 있어 전체 요청은 아직 완료로 표시하지 않는다.
 
-커밋·푸시는 정확한 058 CI 완료 후 수행하며 059 자체 전체 CI도 정확한 SHA로 별도 확인한다.
+## 원격 CI
+
+커밋 `44e054cf219923692ca5527ae1a275512ebbbd46`을 비강제 푸시하고 원격 일치를 확인했다. [전체 CI 44364157785](https://github.com/f1soft611/s-erp/actions/runs/44364157785)의 정확한 SHA·완료 상태·마지막 원본 집계는 **227파일 2,693개**, build/tests/lint/required 네 job 모두 성공이다. [원격 근거](screenshots/grid-row-commit/remote-ci.json)를 보관했다.
 
 ## 복사 가능한 커밋
 
