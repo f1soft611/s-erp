@@ -1,0 +1,81 @@
+{
+  "actualPageGridDetailPanelProfiler": true,
+  "syntheticDeferredGetsOnly": true,
+  "allWritesAndUnownedTransportBlocked": true,
+  "memoryStorageOnly": true,
+  "widths": [
+    375,
+    768,
+    1280
+  ],
+  "firstEligibleListRetryAndPermissionCommitCorrect": true,
+  "firstDetailAndReopenLoadingErrorCommitCorrect": true,
+  "editingKeywordDoesNotRequest": true,
+  "permissionCancelledListResponseIgnored": true,
+  "closedDetailResponseIgnored": true,
+  "actualDetailTableAndCloseRetained": true,
+  "unknownRequests": 0,
+  "errors": 0,
+  "documentOverflow": 0,
+  "syntheticGetsPerWidth": {
+    "list": 4,
+    "detail": 3
+  },
+  "images": [
+    {
+      "file": "statement068-list-375.png",
+      "width": 375,
+      "height": 1100,
+      "bytes": 27620
+    },
+    {
+      "file": "statement068-detail-375.png",
+      "width": 375,
+      "height": 1100,
+      "bytes": 14950
+    },
+    {
+      "file": "statement068-list-768.png",
+      "width": 768,
+      "height": 1100,
+      "bytes": 30613
+    },
+    {
+      "file": "statement068-detail-768.png",
+      "width": 768,
+      "height": 1100,
+      "bytes": 28771
+    },
+    {
+      "file": "statement068-list-1280.png",
+      "width": 1280,
+      "height": 1100,
+      "bytes": 32780
+    },
+    {
+      "file": "statement068-detail-1280.png",
+      "width": 1280,
+      "height": 1100,
+      "bytes": 31539
+    }
+  ],
+  "relatedTests": {
+    "files": 1,
+    "passed": 12
+  },
+  "typecheck": "passed",
+  "build": "passed",
+  "lint": {
+    "before": 73,
+    "after": 71,
+    "removed": 2,
+    "added": 0,
+    "removedTokens": [
+      "setDetailLoading",
+      "setLoading"
+    ],
+    "otherDiagnosticsUnchangedIncludingLabels": true
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0
+}

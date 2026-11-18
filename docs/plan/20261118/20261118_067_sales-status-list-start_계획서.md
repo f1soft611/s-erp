@@ -42,4 +42,4 @@ if (previousRequest.filters !== filters || previousRequest.retryRequest !== retr
 
 - [x] 같은 실제 현황2파일30개·tsc -b·Vite build를 확인했다. Oxc75→73 제거2/추가0이며 제거 소스 token은 setHasLoaded 두 개, 다른 진단은 전체 label까지 동일하다. 기존 테스트 본문 보존·source891파일 byte parity를 확인했다.
 - [x] 375/768/1280px 실제 두 목록 훅/layout observer의 합성 probe에서 native 첫 조회/실패/retry/quiet/조건 변경/취소/중단·재개를 확인했다. 일반/quiet/재개 첫 commit이 일치하며 quiet 행 유지·조건 변경 일반 로딩·이전 응답 무시를 확인했다. 전체 업무 화면 검증이 아니다. GET만 합성하고 영구 저장소·쓰기/기타 transport를 차단했다. 오류/이탈/문서 넘침0, PNG6, 소유 탭을 닫았다.
-- [ ] 결과/PNG6·직접 작은 diff 리뷰·선행 066 정확 CI를 보관한다. allowlist 별도 커밋/비강제 푸시와 정확한 067 CI를 확인한다.
+- [x] 결과/PNG6·직접 작은 diff 리뷰·선행066 정확 CI를 보관했다. allowlist19파일 커밋 `a4e36534c2b7728d58498d3fcd80401e48f8f6c4`를 비강제 푸시하고 원격 일치를 확인했다. 정확한 CI44380976188의 마지막 전체 집계는227파일2,710개이며 네 job 모두 성공했다.
