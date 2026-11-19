@@ -1,0 +1,33 @@
+{
+  "baseline": "7b38be1ba748a8555d2b49d02767e92a28882dbc",
+  "changed": [
+    "frontend\\src\\pages\\co\\master\\common-code\\components\\CommonCodeManagementPanel.tsx",
+    "frontend\\tests\\common-code-management-page.test.tsx"
+  ],
+  "onlyBooleanColumnFactoryAndExplicitDeferredEventBindingChanged": true,
+  "asyncParentPickerBodyAndRefConsumersAndSaveGuardsIdentical": true,
+  "deleteGuardAndAllOtherMarkupStylesEffectsContractsIdentical": true,
+  "originalTestsBytePreserved": true,
+  "addedPreservationTest": 1,
+  "runtimeDefectClaim": false,
+  "baselineTests": {
+    "files": 3,
+    "passed": 42
+  },
+  "focusedPreservationBeforeChange": {
+    "passed": 1
+  },
+  "relatedTests": {
+    "files": 3,
+    "passed": 43
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 88,
+    "after": 87,
+    "removed": 1,
+    "added": 0
+  },
+  "separateRenderDeleteRefDiagnosticRemaining": 1
+}

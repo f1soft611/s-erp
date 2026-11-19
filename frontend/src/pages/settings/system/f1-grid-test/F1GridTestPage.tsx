@@ -22,7 +22,7 @@ import {
   type F1GridRef,
 } from '../../../../shared/components/f1-grid';
 import { DateEditor } from '../../../../shared/components/f1-grid/editing/DateEditor';
-import { normalizeDateInput } from '../../../../shared/components/f1-grid/editing/DateEditor';
+import { normalizeDateInput } from '../../../../shared/components/f1-grid/editing/dateInput';
 import { CommonDialog } from '../../../../shared/components/CommonDialog';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import type {

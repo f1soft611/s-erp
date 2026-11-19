@@ -27,7 +27,8 @@ import type {
   ModuleItem,
   PageContent,
 } from '../../../dashboard/types/dashboard';
-import { CustomerGrid, createCustomerColumns } from './components/CustomerGrid';
+import { CustomerGrid } from './components/CustomerGrid';
+import { createCustomerColumns } from './data/customerGridData';
 import { useCustomerManagement } from './hooks/useCustomerManagement';
 import { ClassificationSettingsDialog } from '../classification/components/ClassificationSettingsDialog';
 import { ClassificationPickerDialog } from '../classification/components/ClassificationPickerDialog';

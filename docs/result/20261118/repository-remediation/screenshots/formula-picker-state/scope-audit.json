@@ -1,0 +1,34 @@
+{
+  "baseline": "6b1ddea406921c9d00f5608da930c0a9f4b87a7b",
+  "changed": [
+    "frontend\\src\\pages\\co\\work-standard\\recipe\\components\\WorkStandardFormulaTab.tsx"
+  ],
+  "addedTest": "frontend\\tests\\work-standard-formula-picker.test.tsx",
+  "onlyNullablePickerTargetStorageAndOpenPredicateChanged": true,
+  "gridRefAndEventTimeRowSetterAndPatchConverterPreserved": true,
+  "allOtherMarkupStylesColumnsCalculationsAndContractsUnchanged": true,
+  "noEffectsIntroduced": true,
+  "baselineTests": {
+    "files": 1,
+    "passed": 5
+  },
+  "preservationBeforeAndAfter": {
+    "files": 2,
+    "passed": 8,
+    "realGridAndDialog": true,
+    "onlySearchServiceMocked": true
+  },
+  "runtimeDefectClaim": false,
+  "lintRed": {
+    "expectedTargetRefs": 0,
+    "actualTargetRefs": 1
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 89,
+    "after": 88,
+    "removed": 1,
+    "added": 0
+  }
+}

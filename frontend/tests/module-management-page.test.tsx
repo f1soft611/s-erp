@@ -4,7 +4,7 @@ import { ModuleManagementPage } from '../src/pages/settings/system/modules/Modul
 import {
   MODULE_ICON_OPTIONS,
   canEditModuleCode,
-} from '../src/pages/settings/system/modules/components/ModuleManagementPanel';
+} from '../src/pages/settings/system/modules/data/moduleManagementData';
 import {
   fetchModuleRows,
   updateModule,

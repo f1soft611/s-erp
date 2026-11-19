@@ -1,0 +1,45 @@
+{
+  "baseline": "c57e80e57771c322e8847db3c00eec29d0fef376",
+  "changed": [
+    "frontend\\src\\pages\\sales\\order\\status\\hooks\\useSalesOrderStatusList.ts",
+    "frontend\\src\\pages\\sales\\quotation\\status\\hooks\\useQuotationStatusList.ts",
+    "frontend\\tests\\quotation-status-page.test.tsx",
+    "frontend\\tests\\sales-order-status-page.test.tsx"
+  ],
+  "onlyBoundedRequestIdentityAndExistingStartStateChanged": true,
+  "lastActuallyStartedRetryVersionPreservedWhileFiltersNull": true,
+  "quietThenFilterChangeUsesNormalLoading": true,
+  "renderRefReadsOrWritesAdded": false,
+  "servicesApiTypesUiJsxCssActiveCancellationEventHandlersAndSharedInitialLoadUnchanged": true,
+  "originalTestsBytePreserved": true,
+  "addedTests": 4,
+  "runtimeRed": {
+    "initialDelayedFailed": 2,
+    "immediateAndDelayedFailed": 4,
+    "cause": "First list commit exposed loading=false and initialLoading=false"
+  },
+  "baselineTests": {
+    "files": 2,
+    "passed": 26,
+    "reusedExactBaselineSourceFrom066": true
+  },
+  "relatedTests": {
+    "files": 2,
+    "passed": 30
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 75,
+    "after": 73,
+    "removed": 2,
+    "added": 0,
+    "removedTokens": [
+      "setHasLoaded",
+      "setHasLoaded"
+    ],
+    "otherDiagnosticsUnchangedIncludingLabels": true
+  },
+  "remainingRefs": 0,
+  "remainingStateInEffect": 73
+}

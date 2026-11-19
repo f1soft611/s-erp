@@ -1,10 +1,13 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { Profiler, type ComponentProps } from 'react';
 import { createTheme } from '@mui/material/styles';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAttachmentIconMeta } from '../src/shared/components/feed/attachmentIconMeta';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import type { MenuPermission, ModuleItem } from '../src/pages/dashboard/types/dashboard';
 import { pageContentMap } from '../src/pages/dashboard/services/dashboardData';
+import { ArchiveFileEditDialog } from '../src/pages/groupware/community/archive/components/ArchiveFileEditDialog';
+import type { ArchiveFileRow } from '../src/pages/groupware/community/archive/types/archive.types';
 
 const archiveServices = vi.hoisted(() => ({
   getSystemDate: vi.fn(),
@@ -92,6 +95,103 @@ function renderArchive(
     />,
   );
 }
+
+describe('Archive file edit draft synchronization', () => {
+  const file: ArchiveFileRow = {
+    boardFileId: 1,
+    postId: 11,
+    fileName: 'alpha.pdf',
+    categoryCode: 'A',
+  };
+  const categories = [
+    { code: 'A', name: 'Folder A', active: true },
+    { code: 'B', name: 'Folder B', active: true },
+  ];
+  type DraftSnapshot = { name: string; folderCode: string; error: string };
+  const editor = (
+    props: ComponentProps<typeof ArchiveFileEditDialog>,
+    commits: DraftSnapshot[],
+  ) => (
+    <Profiler
+      id="archive-draft"
+      onRender={() => {
+        const dialog = screen.queryByRole('dialog', { name: '파일 정보 수정' });
+        if (!dialog) return;
+        const fields = within(dialog);
+        commits.push({
+          name: fields.getByRole<HTMLInputElement>('textbox', { name: '파일명' }).value,
+          folderCode: fields.getByRole('combobox', { name: '저장 폴더' })
+            .parentElement?.querySelector('input')?.value ?? '',
+          error: fields.queryByRole('alert')?.textContent ?? '',
+        });
+      }}
+    >
+      <ArchiveFileEditDialog {...props} />
+    </Profiler>
+  );
+  const createProps = () => ({
+    file,
+    categories,
+    saving: false,
+    onClose: vi.fn(),
+    onSave: vi.fn().mockResolvedValue(null),
+  });
+
+  it.each(['same-field clone', 'different file', 'null folder'] as const)(
+    'resets the draft and error in the first commit for a %s, not for category or saving metadata',
+    async (kind) => {
+      const props = createProps();
+      const commits: DraftSnapshot[] = [];
+      const { rerender } = render(editor(props, commits));
+      fireEvent.change(screen.getByRole('textbox', { name: '파일명' }), {
+        target: { value: 'edited.pdf' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+      await screen.findByText('파일 정보를 저장하지 못했습니다. 다시 시도해 주세요.');
+
+      rerender(editor({ ...props, categories: [...categories], saving: true }, commits));
+      expect(screen.getByRole('textbox', { name: '파일명' })).toHaveValue('edited.pdf');
+      expect(screen.getByRole('textbox', { name: '파일명' })).toBeDisabled();
+      expect(screen.getByRole('alert')).toHaveTextContent('파일 정보를 저장하지 못했습니다.');
+      rerender(editor(props, commits));
+      expect(screen.getByRole('textbox', { name: '파일명' })).toHaveValue('edited.pdf');
+      expect(screen.getByRole('alert')).toHaveTextContent('파일 정보를 저장하지 못했습니다.');
+
+      const nextFile: ArchiveFileRow = kind === 'same-field clone'
+        ? { ...file }
+        : { boardFileId: 2, postId: 12, fileName: 'beta.pdf', categoryCode: kind === 'different file' ? 'B' : null };
+      commits.length = 0;
+      rerender(editor({ ...props, file: nextFile }, commits));
+
+      expect(commits[0]).toEqual({
+        name: kind === 'same-field clone' ? 'alpha.pdf' : 'beta.pdf',
+        folderCode: kind === 'same-field clone' ? 'A' : kind === 'different file' ? 'B' : '',
+        error: '',
+      });
+      expect(props.onSave).toHaveBeenCalledOnce();
+      expect(props.onClose).not.toHaveBeenCalled();
+    },
+  );
+
+  it('reopens after a null file with the current name and root folder without saving the abandoned draft', async () => {
+    const props = createProps();
+    const commits: DraftSnapshot[] = [];
+    const { rerender } = render(editor(props, commits));
+    fireEvent.change(screen.getByRole('textbox', { name: '파일명' }), {
+      target: { value: 'abandoned.pdf' },
+    });
+    rerender(editor({ ...props, file: null }, commits));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: '파일 정보 수정' })).not.toBeInTheDocument();
+    });
+    commits.length = 0;
+    rerender(editor({ ...props, file: { ...file, fileName: 'next.pdf', categoryCode: null } }, commits));
+
+    expect(commits[0]).toEqual({ name: 'next.pdf', folderCode: '', error: '' });
+    expect(props.onSave).not.toHaveBeenCalled();
+    expect(props.onClose).not.toHaveBeenCalled();
+  });
+});
 
 describe('Archive dashboard page', () => {
   beforeEach(() => {

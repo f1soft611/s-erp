@@ -6,7 +6,7 @@ import {
   within,
   waitFor,
 } from '@testing-library/react';
-import { useState } from 'react';
+import { Profiler, useState } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
@@ -14,9 +14,9 @@ import {
   CommunityNoticePage,
 } from '../src/pages/groupware/community/notice/CommunityNoticePage';
 import {
-  mergeCommentTrees,
   NoticeFeedList,
 } from '../src/pages/groupware/community/notice/components/NoticeFeedList';
+import { mergeCommentTrees } from '../src/pages/groupware/community/notice/components/noticeFeedUtils';
 import {
   appendCommentToTree,
   insertNoticeReplyAfter,
@@ -1267,7 +1267,7 @@ describe('CommunityNoticePage local updates', () => {
       hasPreviousComments: true,
     };
 
-    const { unmount } = render(
+    const { unmount, rerender } = render(
       <NoticeFeedList
         items={[item]}
         isDark={false}
@@ -1295,6 +1295,25 @@ describe('CommunityNoticePage local updates', () => {
       31,
       '91',
     );
+    expect(commentServiceMocks.fetchCommonFileBlob).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <NoticeFeedList
+        items={[{
+          ...item,
+          comments: item.comments.map((comment) => ({
+            ...comment,
+            content: 'Updated comment metadata',
+          })),
+        }]}
+        isDark={true}
+        expandedNoticeId={item.id}
+        onLoadPreviousComments={vi.fn()}
+      />,
+    );
+    expect(await screen.findByText('Updated comment metadata')).toBeInTheDocument();
+    expect(commentServiceMocks.fetchCommonFileBlob).toHaveBeenCalledTimes(1);
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
 
     fireEvent.click(
       screen.getByRole('button', {
@@ -1368,6 +1387,59 @@ describe('CommunityNoticePage local updates', () => {
       '92',
       'failed.png',
     );
+  });
+
+  it('uses the server cursor for an older-comment interaction in the first commit', async () => {
+    const load = vi.fn().mockResolvedValue({ comments: [], hasPrevious: false });
+    const item: NoticeFeedItem = {
+      id: 1, title: '초기 댓글 커서', meta: 'Fixture', state: '공지',
+      summary: 'Synthetic', body: 'Synthetic', isPinned: 'N',
+      comments: [{ id: 10, author: 'Fixture', time: '', content: 'Current' }],
+      commentCount: 2, hasPreviousComments: true, nextBeforeCommentId: 7,
+    };
+    let clicked = false;
+    render(
+      <Profiler id="initial-comment-cursor" onRender={() => {
+        const button = screen.queryByRole('button', { name: /^이전 댓글 보기/ });
+        if (!clicked && button) {
+          clicked = true;
+          button.click();
+        }
+      }}>
+        <NoticeFeedList items={[item]} isDark={false} onLoadPreviousComments={load} />
+      </Profiler>,
+    );
+
+    await act(async () => { await Promise.resolve(); });
+
+    expect(load).toHaveBeenCalledWith(1, 7);
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves an initialized fallback when only the server cursor metadata changes', async () => {
+    const load = vi.fn().mockResolvedValue({ comments: [], hasPrevious: false });
+    const item: NoticeFeedItem = {
+      id: 1, title: '기존 댓글 커서', meta: 'Fixture', state: '공지',
+      summary: 'Synthetic', body: 'Synthetic', isPinned: 'N',
+      comments: [{ id: 10, author: 'Fixture', time: '', content: 'Current' }],
+      commentCount: 2, hasPreviousComments: true, nextBeforeCommentId: undefined,
+    };
+    const { rerender } = render(
+      <NoticeFeedList items={[item]} isDark={false} onLoadPreviousComments={load} />,
+    );
+    rerender(
+      <NoticeFeedList
+        items={[{ ...item, nextBeforeCommentId: 7 }]}
+        isDark={false}
+        onLoadPreviousComments={load}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^이전 댓글 보기/ }));
+    await act(async () => { await Promise.resolve(); });
+
+    expect(load).toHaveBeenCalledWith(1, 10);
+    expect(load).toHaveBeenCalledTimes(1);
   });
 
   it('loads the remaining older comments in one larger batch when expanding the thread', async () => {

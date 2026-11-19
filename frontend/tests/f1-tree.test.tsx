@@ -1,4 +1,4 @@
-import { createRef } from 'react';
+import { createRef, Profiler } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { F1Tree, type F1TreeRef } from '../src/shared/components/f1-grid';
@@ -299,6 +299,84 @@ describe('F1Tree interaction', () => {
     expect(screen.getByRole('gridcell', { name: 'Child' })).toBeVisible();
     expect(screen.getByRole('gridcell', { name: 'Grand child' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Root 접기' })).toBeVisible();
+  });
+
+  it.each(['flag enabled', 'new rows reference'] as const)(
+    'commits the current parent expansion when %s',
+    (change) => {
+      const commits: boolean[] = [];
+      let observing = false;
+      const tree = (nextRows: TreeRow[], expandAll: boolean) => (
+        <Profiler id="tree-expansion" onRender={() => {
+          if (observing) commits.push(screen.queryByText('Child') !== null);
+        }}>
+          <F1Tree rows={nextRows} columns={columns} rowKey="id" parentKey="parentId"
+            treeColumn="name" defaultExpanded={[]} defaultExpandAll={expandAll} />
+        </Profiler>
+      );
+      const { rerender } = render(tree(rows, change === 'new rows reference'));
+      if (change === 'new rows reference') {
+        fireEvent.click(screen.getByRole('button', { name: 'Root 접기' }));
+      }
+      expect(screen.queryByText('Child')).not.toBeInTheDocument();
+
+      observing = true;
+      rerender(tree(change === 'new rows reference' ? [...rows] : rows, true));
+
+      expect(commits[0]).toBe(true);
+      expect(screen.getByText('Child')).toBeInTheDocument();
+    },
+  );
+
+  it('preserves a user collapse on metadata rerenders and forwards edits to the latest callback', () => {
+    const ref = createRef<F1TreeRef<TreeRow>>();
+    const first = vi.fn();
+    const latest = vi.fn();
+    const tree = (callback: typeof first, version: number) => (
+      <F1Tree ref={ref} rows={rows}
+        columns={[{ ...columns[0], headerName: `Name ${version}` }]}
+        rowKey="id" parentKey="parentId" treeColumn="name"
+        defaultExpandAll onChangesChange={callback} />
+    );
+    const { rerender } = render(tree(first, 0));
+    fireEvent.click(screen.getByRole('button', { name: 'Root 접기' }));
+    const calls = first.mock.calls.length;
+
+    rerender(tree(first, 1));
+    expect(screen.queryByText('Child')).not.toBeInTheDocument();
+    expect(first).toHaveBeenCalledTimes(calls);
+
+    rerender(tree(latest, 2));
+    first.mockClear();
+    latest.mockClear();
+    act(() => ref.current?.setCellValue('root', 'name', 'Updated root'));
+
+    expect(first).not.toHaveBeenCalled();
+    expect(latest).toHaveBeenLastCalledWith(expect.objectContaining({
+      updatedRows: [expect.objectContaining({ id: 'root', name: 'Updated root' })],
+    }));
+    expect(screen.queryByText('Child')).not.toBeInTheDocument();
+  });
+
+  it('retains the expansion set for empty parents, a disabled flag and initial-only options', () => {
+    const ref = createRef<F1TreeRef<TreeRow>>();
+    const tree = (nextRows: TreeRow[], expandAll: boolean, initial: 'all' | []) => (
+      <F1Tree ref={ref} rows={nextRows} columns={columns}
+        rowKey="id" parentKey="parentId" treeColumn="name"
+        defaultExpanded={initial} defaultExpandAll={expandAll} />
+    );
+    const { rerender } = render(tree(rows, false, []));
+    act(() => ref.current?.expandRow('root'));
+
+    rerender(tree([], true, []));
+    expect(ref.current?.isExpanded('root')).toBe(true);
+    rerender(tree(rows, false, []));
+    expect(screen.getByText('Child')).toBeInTheDocument();
+    act(() => ref.current?.collapseRow('root'));
+
+    rerender(tree(rows, false, 'all'));
+    expect(ref.current?.isExpanded('root')).toBe(false);
+    expect(screen.queryByText('Child')).not.toBeInTheDocument();
   });
 
   it('expands every parent when rows load after the first render', () => {

@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import { FileView } from '../../../../../shared/components/view-mode/FileView';
-import { useNotification } from '../../../../../shared/context/NotificationContext';
+import { useNotification } from '../../../../../shared/context/notification';
 import { downloadApprovalCommentAttachment, downloadDocumentApprovalAttachment } from '../services/documentApproval.service';
 import type { useDocumentFiles } from '../hooks/useDocumentFiles';
 

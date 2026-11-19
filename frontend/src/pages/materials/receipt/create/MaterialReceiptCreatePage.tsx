@@ -42,7 +42,8 @@ import {
 } from './services/materialReceipt.service';
 import type { MaterialReceiptCandidate, MaterialReceiptItem } from './types/materialReceipt.types';
 import { useServerDateDefault } from '../../../../shared/hooks/useServerDateDefault';
-import { FormDateField, normalizeFormDate } from '../../../../shared/components/FormDateField';
+import { FormDateField } from '../../../../shared/components/FormDateField';
+import { normalizeFormDate } from '../../../../shared/components/formDateUtils';
 
 export type MaterialReceiptPageMode = 'create' | 'edit' | 'view';
 

@@ -5,6 +5,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
+import { Profiler } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { getF1GridDoc } from '../src/pages/f1-grid-docs/data/f1GridDocs';
 import { F1GridDocsPage } from '../src/pages/f1-grid-docs/F1GridDocsPage';
@@ -125,6 +126,61 @@ const expectedPublicApiByContract: Record<string, string[]> = {
 };
 
 describe('F1-Grid docs portal', () => {
+  it('commits the first matching document when a search excludes the current document', () => {
+    const commits: boolean[] = [];
+    let observing = false;
+    render(
+      <Profiler id="docs-search" onRender={() => {
+        if (observing) commits.push(screen.queryByRole('heading', {
+          name: getF1GridDoc('api-reference').title,
+        }) !== null);
+      }}>
+        <F1GridDocsPage />
+      </Profiler>,
+    );
+    observing = true;
+
+    fireEvent.change(screen.getByRole('textbox', { name: '문서 검색' }), {
+      target: { value: 'F1GridUserOption.positionName' },
+    });
+
+    expect(commits[0]).toBe(true);
+    expect(screen.getByRole('heading', {
+      name: getF1GridDoc('api-reference').title,
+    })).toBeInTheDocument();
+  });
+
+  it('preserves the current matching document instead of always selecting the first result', () => {
+    render(<F1GridDocsPage initialDocumentId="api-reference" />);
+
+    fireEvent.change(screen.getByRole('textbox', { name: '문서 검색' }), {
+      target: { value: 'rowHeight' },
+    });
+
+    expect(screen.getByRole('heading', {
+      name: getF1GridDoc('api-reference').title,
+    })).toBeInTheDocument();
+  });
+
+  it('retains the document and playground changes through zero results and search clearing', () => {
+    render(<F1GridDocsPage initialDocumentId="row-height" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Increase row height' }));
+    const search = screen.getByRole('textbox', { name: '문서 검색' });
+
+    fireEvent.change(search, { target: { value: '_no-doc-match-042_' } });
+    expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', {
+      name: getF1GridDoc('row-height').title,
+    })).toBeInTheDocument();
+    expect(screen.getByText('48px')).toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: '' } });
+    expect(screen.getByRole('heading', {
+      name: getF1GridDoc('row-height').title,
+    })).toBeInTheDocument();
+    expect(screen.getByText('48px')).toBeInTheDocument();
+  });
+
   it('renders the overview document and navigation items', () => {
     render(<F1GridDocsPage />);
 

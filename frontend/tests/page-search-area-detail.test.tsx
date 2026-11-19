@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import dayjs from 'dayjs';
-import { useState } from 'react';
+import { Profiler, startTransition, Suspense, useState } from 'react';
 
 const { getSystemDateMock } = vi.hoisted(() => ({
   getSystemDateMock: vi.fn(),
@@ -37,6 +37,89 @@ describe('PageSearchArea 상세 검색', () => {
       options: [{ value: 'Y', label: '사용' }],
     },
   ];
+
+  it('commits external drafts without a stale value and preserves edits when only field metadata changes', () => {
+    const commits = vi.fn();
+    const defaults = { status: 'Y' };
+    const initial = { name: 'first' };
+    const observe = () => commits((screen.queryByRole('textbox', { name: '이름' }) as HTMLInputElement | null)?.value ?? null);
+    const view = (detailValues: Record<string, PageSearchFieldValue>, detailFields = fields) => (
+      <Profiler id="search-draft" onRender={observe}>
+        <PageSearchArea detailFields={detailFields} detailValues={detailValues} defaultValues={defaults} />
+      </Profiler>
+    );
+    const { rerender } = render(view(initial));
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    fireEvent.change(screen.getByRole('textbox', { name: '이름' }), { target: { value: 'partial' } });
+    rerender(view(initial, [...fields]));
+    expect(screen.getByRole('textbox', { name: '이름' })).toHaveValue('partial');
+
+    commits.mockClear();
+    rerender(view({ name: 'second' }));
+    expect(commits).toHaveBeenNthCalledWith(1, 'second');
+    rerender(<Profiler id="search-draft" onRender={observe}><PageSearchArea /></Profiler>);
+    expect(screen.queryByRole('button', { name: '상세 검색 열기' })).not.toBeInTheDocument();
+  });
+
+  it('clears obsolete removal notices before commit and restores a previously removed chip', () => {
+    const commits = vi.fn();
+    const initial = { name: 'Applied' };
+    const view = (appliedDetailValues: Record<string, PageSearchFieldValue>) => (
+      <Profiler id="search-removal" onRender={() => commits(screen.queryByRole('status')?.textContent ?? null)}>
+        <PageSearchArea detailFields={fields} detailValues={initial} appliedDetailValues={appliedDetailValues} />
+      </Profiler>
+    );
+    const { rerender } = render(view(initial));
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    fireEvent.click(screen.getByRole('button', { name: '이름 검색 조건 제거' }));
+    expect(screen.getByRole('status')).toHaveTextContent('조건 변경 내용은 조회 버튼을 눌러 적용하세요.');
+
+    commits.mockClear();
+    rerender(view({}));
+    expect(commits).toHaveBeenNthCalledWith(1, null);
+    rerender(view(initial));
+    expect(screen.getByText('이름: Applied')).toBeVisible();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '이름' })).toHaveValue('');
+  });
+
+  it('keeps the committed quick-date request alive while a different draft transition is suspended', async () => {
+    const request = deferredDate();
+    getSystemDateMock.mockReset().mockReturnValueOnce(request.promise);
+    const onChange = vi.fn();
+    const attempted = vi.fn();
+    const pending = new Promise<void>(() => undefined);
+    const dateFields: PageSearchField[] = [{ field: 'period', label: '기간', type: 'date', required: true }];
+    const initial = { period: { from: '2026-10-01', to: '2026-10-31' } };
+    function SuspendUpdate({ blocked }: { blocked: boolean }) {
+      if (blocked) {
+        attempted();
+        throw pending;
+      }
+      return null;
+    }
+    const view = (detailValues: Record<string, PageSearchFieldValue>, blocked = false) => (
+      <Suspense fallback={<span>Updating search</span>}>
+        <PageSearchArea detailFields={dateFields} detailValues={detailValues} onDetailValuesChange={onChange}>
+          <SuspendUpdate blocked={blocked} />
+        </PageSearchArea>
+      </Suspense>
+    );
+    const { rerender } = render(view(initial));
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    fireEvent.click(within(screen.getByRole('group', { name: '기간 빠른 날짜 세팅' })).getByRole('button', { name: '오늘', exact: true }));
+    await act(async () => {
+      startTransition(() => rerender(view({ period: { from: '2030-01-01', to: '2030-01-31' } }, true)));
+    });
+    expect(attempted).toHaveBeenCalled();
+    expect(screen.queryByText('Updating search')).not.toBeInTheDocument();
+
+    await act(async () => request.resolve('2026-11-18'));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith({ period: { from: '2026-11-18', to: '2026-11-18' } });
+    rerender(view(initial));
+    expect(screen.getByLabelText('기간 시작일')).toHaveValue('2026-11-18');
+  });
 
   it('shows the blank 전체 option on a select field unless allowEmpty is false', () => {
     const statusOptions = [{ value: 'ACTIVE', label: '정상' }, { value: 'CANCELED', label: '취소' }, { value: 'ALL', label: '전체' }];

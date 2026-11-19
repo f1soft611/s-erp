@@ -3,7 +3,7 @@ import LockIcon from '@mui/icons-material/Lock';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import SearchIcon from '@mui/icons-material/Search';
 import { Box, Chip, IconButton, Paper, TextField, Typography } from '@mui/material';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { F1Grid } from '../../../../shared/components/f1-grid';
 import type { F1GridChanges, F1GridRef, F1GridRowId } from '../../../../shared/components/f1-grid';
 import { PageHeader } from '../../../../shared/components/PageHeader';
@@ -61,18 +61,27 @@ export function MaterialReceiptClosingPage({
   const [rowsEpoch, setRowsEpoch] = useState(0);
   const [notice, setNotice] = useState('');
   const [working, setWorking] = useState(false);
+  const [previousData, setPreviousData] = useState<{
+    rows: typeof list.rows;
+    suppliers: typeof list.suppliers;
+  } | null>(null);
 
   const canEdit = selectedMenuPermissions?.update ?? false;
   const closingMonth = search.appliedFilters?.closingMonth ?? '';
 
   // 새로 조회하면 편집·선택·구매처 선택을 초기화한다.
-  useEffect(() => {
+  if (
+    previousData === null ||
+    previousData.rows !== list.rows ||
+    previousData.suppliers !== list.suppliers
+  ) {
+    setPreviousData({ rows: list.rows, suppliers: list.suppliers });
     setEdits({});
     setSelectedRowIds([]);
     setSelectedSupplierId(null);
     setSupplierGridKey((key) => key + 1);
     setRowsEpoch((epoch) => epoch + 1);
-  }, [list.rows, list.suppliers]);
+  }
 
   const visibleRows = useMemo(() => {
     const base = selectedSupplierId === null

@@ -26,7 +26,6 @@ import type {
   NoticeFeedItem,
 } from '../types/community.types';
 import { prepareNoticeFeedHtml } from '../utils/noticeHtml';
-import { resolveApiBaseUrl } from '../../../../../shared/services/authService';
 import { apiGetBlob } from '../../../../../shared/services/apiClient';
 import { fetchCommonFileBlob } from '../../../../../shared/services/commonContentApi';
 import type { DocumentShareReference } from '../../../documents/write/data/documentShareLink';
@@ -38,6 +37,12 @@ import {
 import { resolveNoticeLinkPreview } from '../services/noticeLinkPreview.service';
 import { NoticeLoginPopupBadge } from './NoticeLoginPopupBadge';
 import { NoticeCategoryBadge } from './NoticeCategoryBadge';
+import {
+  extractNoticeEmbeddedImagePreviews,
+  mergeCommentTrees,
+  normalizeNoticeEmbeddedImageSources,
+  removeNoticeEmbeddedImages,
+} from './noticeFeedUtils';
 
 type NoticeFeedListProps = {
   items: NoticeFeedItem[];
@@ -242,40 +247,6 @@ function insertNoticeReplyAfter(
   return nextComments;
 }
 
-export function mergeCommentTrees(
-  current: NoticeCommentItem[],
-  incoming: NoticeCommentItem[],
-  incomingFirst = true,
-): NoticeCommentItem[] {
-  const primary = incomingFirst ? incoming : current;
-  const secondary = incomingFirst ? current : incoming;
-  const result = primary.map((comment) => ({
-    ...comment,
-    replies: mergeCommentTrees([], comment.replies ?? []),
-  }));
-  const byId = new Map(result.map((comment) => [String(comment.id), comment]));
-
-  secondary.forEach((comment) => {
-    const existing = byId.get(String(comment.id));
-    if (!existing) {
-      const copy = {
-        ...comment,
-        replies: mergeCommentTrees([], comment.replies ?? []),
-      };
-      byId.set(String(copy.id), copy);
-      result.push(copy);
-      return;
-    }
-
-    existing.replies = mergeCommentTrees(
-      existing.replies ?? [],
-      comment.replies ?? [],
-    );
-  });
-
-  return result;
-}
-
 function collectCommentIds(comments: NoticeCommentItem[]): Set<string> {
   const ids = new Set<string>();
   const visit = (items: NoticeCommentItem[]) => {
@@ -288,55 +259,8 @@ function collectCommentIds(comments: NoticeCommentItem[]): Set<string> {
   return ids;
 }
 
-export type NoticeEmbeddedImagePreview = {
-  src: string;
-  alt: string;
-};
-
 const NOTICE_IMAGE_PREVIEW_WIDTH = 112;
 const NOTICE_IMAGE_PREVIEW_HEIGHT = 76;
-
-export function extractNoticeEmbeddedImagePreviews(
-  html: string,
-): NoticeEmbeddedImagePreview[] {
-  if (typeof DOMParser === 'undefined') {
-    return Array.from(
-      html.matchAll(/<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi),
-    ).map((match) => ({ src: match[1], alt: '본문 이미지' }));
-  }
-
-  const document = new DOMParser().parseFromString(html, 'text/html');
-  return Array.from(document.querySelectorAll('img'))
-    .map((image) => ({
-      src: image.getAttribute('src') ?? '',
-      alt: image.getAttribute('alt') || '본문 이미지',
-    }))
-    .filter((image) => image.src);
-}
-
-export function normalizeNoticeEmbeddedImageSources(
-  html: string,
-  postId: number,
-): string {
-  if (!html || typeof DOMParser === 'undefined') {
-    return html;
-  }
-
-  const document = new DOMParser().parseFromString(html, 'text/html');
-  document.querySelectorAll('img').forEach((image) => {
-    image.removeAttribute('data-upload-token');
-    image.removeAttribute('data-upload-state');
-    const objectKey = image.getAttribute('data-object-key');
-    if (!objectKey) {
-      return;
-    }
-    image.setAttribute(
-      'src',
-      `${resolveApiBaseUrl()}/api/v1/groupware/boards/notice/posts/${postId}/embedded-images?objectKey=${encodeURIComponent(objectKey)}`,
-    );
-  });
-  return document.body.innerHTML;
-}
 
 function deferNoticeEmbeddedImageSources(html: string): string {
   if (!html || typeof DOMParser === 'undefined') {
@@ -411,16 +335,6 @@ export function AuthenticatedNoticeImage({
       sx={sx}
     />
   );
-}
-
-export function removeNoticeEmbeddedImages(html: string): string {
-  if (typeof DOMParser === 'undefined') {
-    return html.replace(/<img\b[^>]*>/gi, '');
-  }
-
-  const document = new DOMParser().parseFromString(html, 'text/html');
-  document.querySelectorAll('img').forEach((image) => image.remove());
-  return document.body.innerHTML;
 }
 
 function prepareNoticeBodyHtml(item: NoticeFeedItem): string {
@@ -670,18 +584,22 @@ export function NoticeFeedList({
   >({});
 
   useEffect(() => {
+    // Decode the owned key so metadata-only array changes do not refetch images.
+    const commentImageRequests = (
+      JSON.parse(commentImageRequestKey) as [number, number, string][]
+    ).map(([, commentId, attachmentId]) => ({ commentId, attachmentId }));
     let active = true;
     const objectUrls: string[] = [];
     setCommentImagePreviews({});
 
-    if (expandedNoticeId == null || expandedCommentImages.length === 0) {
+    if (expandedNoticeId == null || commentImageRequests.length === 0) {
       return () => {
         active = false;
       };
     }
 
     void Promise.allSettled(
-      expandedCommentImages.map(async ({ commentId, attachmentId }) => ({
+      commentImageRequests.map(async ({ commentId, attachmentId }) => ({
         commentId,
         attachmentId,
         blob: await fetchCommonFileBlob(
@@ -705,7 +623,7 @@ export function NoticeFeedList({
           return;
         }
 
-        const attachment = expandedCommentImages[index];
+        const attachment = commentImageRequests[index];
         if (!attachment) return;
         previews[
           getNoticeCommentImageKey(
@@ -897,6 +815,13 @@ export function NoticeFeedList({
       }
     });
 
+    if (
+      !isServerReset &&
+      !items.some((item) => changedByNoticeId.get(item.id))
+    ) {
+      return;
+    }
+
     setLocalCommentsByNoticeId((current) => {
       const next = { ...current };
       items.forEach((item) => {
@@ -965,7 +890,7 @@ export function NoticeFeedList({
       );
     });
     serverItemRevisionRef.current = serverItemRevision;
-  }, [items, serverItemRevision]);
+  }, [items, serverItemRevision, localCommentsByNoticeId]);
 
   const handleLocalCommentAdd = async (
     noticeId: number,
@@ -1426,8 +1351,15 @@ export function NoticeFeedList({
                 }
                 onLoadPrevious={async () => {
                   if (loadingPreviousByNoticeId[item.id]) return;
+                  const hasInitializedCursor =
+                    Object.prototype.hasOwnProperty.call(
+                      previousCursorByNoticeId,
+                      item.id,
+                    );
                   const cursor =
-                    previousCursorByNoticeId[item.id] ?? visibleComments[0]?.id;
+                    (hasInitializedCursor
+                      ? previousCursorByNoticeId[item.id]
+                      : item.nextBeforeCommentId) ?? visibleComments[0]?.id;
                   if (!cursor || !onLoadPreviousComments) return;
 
                   setLoadingPreviousByNoticeId((current) => ({

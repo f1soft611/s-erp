@@ -1,0 +1,94 @@
+{
+  "actualPanelTreeGridProfiler": true,
+  "onlyDetailGetsSynthetic": true,
+  "memoryStorageOnly": true,
+  "allWritesBlocked": true,
+  "syntheticRowsOnly": true,
+  "unsavedGroupGuardCoveredByUnitRegression": true,
+  "widths": [
+    {
+      "width": 375,
+      "firstReadyCommit": {
+        "label": "선택 그룹: Owned first",
+        "phase": "ready"
+      },
+      "nativeSecondChoicePreservedOnSameIdRender": true,
+      "firstReplacementCommit": {
+        "label": "선택 그룹: Owned first",
+        "phase": "replaced"
+      },
+      "loadingHoldsSelectedId": true,
+      "emptyReadyClearsSelectedId": true,
+      "unknownRequests": 0,
+      "documentOverflow": 0,
+      "screenshots": [
+        {
+          "stage": "ready",
+          "file": "ready-375.png",
+          "sha256": "567069343ceee6b7c243bd7e5853b5d5031b7a26462501114cb4e1cee722c58c"
+        },
+        {
+          "stage": "replaced",
+          "file": "replaced-375.png",
+          "sha256": "e8ba948dbaf544c8af03c6b7e0723051157ba59e830956ede16c3b06eb1a6580"
+        }
+      ]
+    },
+    {
+      "width": 768,
+      "firstReadyCommit": {
+        "label": "선택 그룹: Owned first",
+        "phase": "ready"
+      },
+      "nativeSecondChoicePreservedOnSameIdRender": true,
+      "firstReplacementCommit": {
+        "label": "선택 그룹: Owned first",
+        "phase": "replaced"
+      },
+      "loadingHoldsSelectedId": true,
+      "emptyReadyClearsSelectedId": true,
+      "unknownRequests": 0,
+      "documentOverflow": 0,
+      "screenshots": [
+        {
+          "stage": "ready",
+          "file": "ready-768.png",
+          "sha256": "19630458fcc3fcd710960dd553e634e75a4bdab5e6306c962a697d6feb307a86"
+        },
+        {
+          "stage": "replaced",
+          "file": "replaced-768.png",
+          "sha256": "bfbbbbc912d3116f5a4d306bd305c1c2211cf46c112637f9ea402be9ce654b79"
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "firstReadyCommit": {
+        "label": "선택 그룹: Owned first",
+        "phase": "ready"
+      },
+      "nativeSecondChoicePreservedOnSameIdRender": true,
+      "firstReplacementCommit": {
+        "label": "선택 그룹: Owned first",
+        "phase": "replaced"
+      },
+      "loadingHoldsSelectedId": true,
+      "emptyReadyClearsSelectedId": true,
+      "unknownRequests": 0,
+      "documentOverflow": 0,
+      "screenshots": [
+        {
+          "stage": "ready",
+          "file": "ready-1280.png",
+          "sha256": "ac5a324daa3b09fac26528c0d586b8cc53920087a02a367442093fba69419d1e"
+        },
+        {
+          "stage": "replaced",
+          "file": "replaced-1280.png",
+          "sha256": "da9e54c3010d55bf5a15b0c2236d73f26aabaf55e7b5d49206fc8bd163e81b5a"
+        }
+      ]
+    }
+  ]
+}

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh';
 import { useNavigate } from 'react-router-dom';
 import { getMessageSummary } from '../../pages/groupware/messages/services/messageService';
-import { useNotification } from '../context/NotificationContext';
+import { useNotification } from '../context/notification';
 
 export function MessageCenter() {
   const theme = useTheme();

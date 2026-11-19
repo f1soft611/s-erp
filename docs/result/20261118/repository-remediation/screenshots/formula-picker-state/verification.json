@@ -1,0 +1,52 @@
+{
+  "actualFormulaTabGridAndMaterialDialog": true,
+  "transport": "Six local synthetic material-list replies; all other fetch blocked",
+  "storage": "Tab-only memory storage and synthetic expiry prerequisite; no persistent reads or writes",
+  "native": "Grid selection/F2, code picker, search, result choice, cancel, toolbar and basis radio",
+  "parentUpdate": "Disabled/enabled simulated by fixture parent state, not by interacting through the modal backdrop",
+  "widths": [
+    {
+      "width": 375,
+      "cellEditMode": "Existing mobile row form",
+      "cancelledCellTargetDoesNotMutateRows": true,
+      "toolbarUpdatesOnlySelectedSecondRow": true,
+      "disabledHidesPickerAndDisablesToolbar": true,
+      "enabledRestoresCommittedCellTarget": true,
+      "cellTargetUpdatesFirstRow": true,
+      "quantitiesAndBatchPerPlateTotalsPreserved": true,
+      "documentWidth": 375
+    },
+    {
+      "width": 768,
+      "cellEditMode": "Existing inline code editor",
+      "cancelledCellTargetDoesNotMutateRows": true,
+      "toolbarUpdatesOnlySelectedSecondRow": true,
+      "disabledHidesPickerAndDisablesToolbar": true,
+      "enabledRestoresCommittedCellTarget": true,
+      "cellTargetUpdatesFirstRow": true,
+      "quantitiesAndBatchPerPlateTotalsPreserved": true,
+      "documentWidth": 768
+    },
+    {
+      "width": 1280,
+      "cellEditMode": "Existing inline code editor",
+      "cancelledCellTargetDoesNotMutateRows": true,
+      "toolbarUpdatesOnlySelectedSecondRow": true,
+      "disabledHidesPickerAndDisablesToolbar": true,
+      "enabledRestoresCommittedCellTarget": true,
+      "cellTargetUpdatesFirstRow": true,
+      "quantitiesAndBatchPerPlateTotalsPreserved": true,
+      "documentWidth": 1280
+    }
+  ],
+  "syntheticRequests": 6,
+  "unknownRequests": 0,
+  "images": [
+    "dialog-375.png",
+    "selected-375.png",
+    "dialog-768.png",
+    "selected-768.png",
+    "dialog-1280.png",
+    "selected-1280.png"
+  ]
+}

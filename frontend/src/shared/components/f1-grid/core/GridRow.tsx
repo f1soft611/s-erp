@@ -2,6 +2,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   type KeyboardEvent,
@@ -21,6 +22,7 @@ import type {
   F1GridCellRange,
   F1GridCellRangeBounds,
 } from '../selection/GridSelection';
+import { getMergeGroupStartIndex } from './gridRowUtils';
 
 type GridRowProps<T extends object> = {
   row: T;
@@ -106,74 +108,6 @@ type GridRowProps<T extends object> = {
 
 function getStateKey(rowId: F1GridRowId): string {
   return String(rowId);
-}
-
-export function getMergeGroupStartIndex<T extends object>(
-  rows: T[],
-  rowIndex: number,
-  field: keyof T,
-): number {
-  let startIndex = rowIndex;
-
-  while (
-    startIndex > 0 &&
-    Object.is(rows[startIndex - 1][field], rows[rowIndex][field])
-  ) {
-    startIndex -= 1;
-  }
-
-  return startIndex;
-}
-
-export function getActiveMergeGroupStartKeys<T extends object>({
-  columns,
-  mergeInfoByColumn,
-  visibleRows,
-  rowKey,
-  selectedIds,
-  focusedCell,
-  editingCell,
-}: {
-  columns: F1GridColumn<T>[];
-  mergeInfoByColumn: Array<
-    Array<{ isStart: boolean; span: number } | undefined>
-  >;
-  visibleRows: T[];
-  rowKey: keyof T;
-  selectedIds: F1GridRowId[];
-  focusedCell?: { rowId: F1GridRowId; columnIndex: number };
-  editingCell?: { rowId: F1GridRowId; columnIndex: number };
-}): Set<string> {
-  const activeKeys = new Set<string>();
-  const rowIds = new Set<string>(
-    [editingCell?.rowId, focusedCell?.rowId, ...selectedIds]
-      .filter((rowId): rowId is F1GridRowId => rowId !== undefined)
-      .map(String),
-  );
-
-  rowIds.forEach((rowId) => {
-    const rowIndex = visibleRows.findIndex(
-      (item) => String(item[rowKey]) === rowId,
-    );
-    if (rowIndex < 0) return;
-
-    columns.forEach((column, columnIndex) => {
-      if (!column.mergeRows) return;
-
-      const groupStartIndex = getMergeGroupStartIndex(
-        visibleRows,
-        rowIndex,
-        column.field,
-      );
-      const groupStartInfo = mergeInfoByColumn[columnIndex]?.[groupStartIndex];
-
-      if (groupStartInfo && groupStartInfo.span > 1) {
-        activeKeys.add(`${columnIndex}:${groupStartIndex}`);
-      }
-    });
-  });
-
-  return activeKeys;
 }
 
 const areGridRowPropsEqual = <T extends object>(
@@ -269,7 +203,6 @@ const GridRowInner = <T extends object>({
   editingCell,
   selectedCellRange,
   selectedCellRangeBounds,
-  isCellSelectionDragging = false,
   dragSelectionStateRef,
   copiedCellRange,
   draftValue,
@@ -386,8 +319,6 @@ const GridRowInner = <T extends object>({
       onSetFocusedCell,
       rowId,
       selectionMode,
-      selectedCellRange,
-      latestPropsRef,
     ],
   );
 
@@ -415,9 +346,7 @@ const GridRowInner = <T extends object>({
     },
     [
       dragSelectionStateRef,
-      isCellSelectionDragging,
       onCellSelectionDrag,
-      selectedCellRange,
       latestPropsRef,
       selectionMode,
     ],
@@ -751,7 +680,9 @@ const MemoizedGridRow = memo(GridRowInner, areGridRowPropsEqual) as typeof GridR
 
 export function GridRow<T extends object>(props: GridRowProps<T>) {
   const latestProps = useRef(props);
-  latestProps.current = props;
+  useLayoutEffect(() => {
+    latestProps.current = props;
+  });
 
   const handlers = useMemo(() => ({
     onSelectRow: (...args: Parameters<GridRowProps<T>['onSelectRow']>) => latestProps.current.onSelectRow(...args),
@@ -767,8 +698,6 @@ export function GridRow<T extends object>(props: GridRowProps<T>) {
     onUpdateCell: (...args: Parameters<GridRowProps<T>['onUpdateCell']>) => latestProps.current.onUpdateCell(...args),
     onUpdateRow: (...args: Parameters<GridRowProps<T>['onUpdateRow']>) => latestProps.current.onUpdateRow(...args),
     onStopEdit: () => latestProps.current.onStopEdit(),
-    onCellRef: (...args: Parameters<GridRowProps<T>['onCellRef']>) => latestProps.current.onCellRef(...args),
-    onEditingCellRef: (...args: Parameters<GridRowProps<T>['onEditingCellRef']>) => latestProps.current.onEditingCellRef(...args),
     onUpdateRowHeight: (...args: Parameters<GridRowProps<T>['onUpdateRowHeight']>) => latestProps.current.onUpdateRowHeight(...args),
     onOpenRowForm: (row: T) => latestProps.current.onOpenRowForm?.(row),
   }), []);

@@ -1,0 +1,35 @@
+{
+  "run": 44291637719,
+  "sha": "a6ddbecfc945eb10dd61713fee75618cb8086020",
+  "conclusion": "success",
+  "files": {
+    "passed": 226,
+    "total": 226
+  },
+  "tests": {
+    "passed": 2647,
+    "total": 2647
+  },
+  "jobs": [
+    {
+      "name": "frontend-build",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "frontend-lint",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "frontend-tests",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "frontend-required",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ]
+}

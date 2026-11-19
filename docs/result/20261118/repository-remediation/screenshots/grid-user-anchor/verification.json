@@ -1,0 +1,55 @@
+{
+  "actualGridCell": true,
+  "actualUserSelectEditor": true,
+  "transport": "All fetch blocked; no transport attempted",
+  "storage": "Tab memory only; no persistent reads or writes",
+  "widths": [
+    {
+      "width": 375,
+      "initialCellLeft": 88,
+      "initialPopupLeft": 88,
+      "reopenedCellLeft": 88,
+      "reopenedPopupLeft": 88,
+      "nativeSelection": [
+        "analyst",
+        "planner"
+      ],
+      "documentWidth": 375
+    },
+    {
+      "width": 768,
+      "initialCellLeft": 88,
+      "initialPopupLeft": 88,
+      "reopenedCellLeft": 88,
+      "reopenedPopupLeft": 88,
+      "nativeSelection": [
+        "analyst",
+        "planner"
+      ],
+      "documentWidth": 768
+    },
+    {
+      "width": 1280,
+      "initialCellLeft": 138,
+      "initialPopupLeft": 138,
+      "reopenedCellLeft": 138,
+      "reopenedPopupLeft": 138,
+      "nativeSelection": [
+        "analyst",
+        "planner"
+      ],
+      "documentWidth": 1280
+    }
+  ],
+  "selectionCalls": 6,
+  "unknownRequests": 0,
+  "limitations": "Actual cell/editor with synthetic options and controlled fixture state; no live API or full-grid browser workflow. Actual popup position and viewport bounds verified, not a claim that MUI inline width equals requested sx width.",
+  "images": [
+    "initial-375.png",
+    "reopened-375.png",
+    "initial-768.png",
+    "reopened-768.png",
+    "initial-1280.png",
+    "reopened-1280.png"
+  ]
+}

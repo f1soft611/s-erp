@@ -1,0 +1,35 @@
+{
+  "baseline": "44e054cf219923692ca5527ae1a275512ebbbd46",
+  "changed": [
+    "frontend\\src\\pages\\f1-grid-docs\\F1-GRID.md",
+    "frontend\\src\\shared\\components\\f1-grid\\core\\gridDecimalPolicyContext.ts",
+    "frontend\\tests\\grid-decimal-policy.test.tsx"
+  ],
+  "onlyGuardedNullResetAndEffectNullSetterRemoval": true,
+  "providerServiceCacheApiAndAsyncCleanupUnchanged": true,
+  "nonemptyModuleTransitionsAndNumberEditorsUnchanged": true,
+  "originalTestsBytePreserved": true,
+  "addedTests": 1,
+  "runtimeRed": {
+    "failed": 1,
+    "cause": "Released-context layout commit observed previous places3 before undefined"
+  },
+  "baselineTests": {
+    "policy": 9,
+    "grid": 278
+  },
+  "relatedTests": {
+    "files": 4,
+    "passed": 288
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 82,
+    "after": 81,
+    "removed": 1,
+    "added": 0
+  },
+  "remainingRefs": 0,
+  "remainingStateInEffect": 81
+}

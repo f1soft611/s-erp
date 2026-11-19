@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { createDraftFormColumns } from '../src/pages/co/workflow/form/components/DraftFormGrid';
+import { createDraftFormColumns } from '../src/pages/co/workflow/form/data/draftFormGridData';
 import { F1Grid } from '../src/shared/components/f1-grid';
 import type { DraftFormRow } from '../src/pages/co/workflow/form/types/draftFormManagement.types';
 

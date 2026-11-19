@@ -1,0 +1,497 @@
+{
+  "behavior": {
+    "targetReset": {
+      "buttons": [
+        {
+          "disabled": false,
+          "name": "닫기"
+        },
+        {
+          "disabled": false,
+          "name": "저장"
+        },
+        {
+          "disabled": false,
+          "name": "취소"
+        }
+      ],
+      "dialog": true,
+      "error": "",
+      "folderCode": "",
+      "folderDisabled": false,
+      "folderDisplay": "",
+      "name": "beta.pdf",
+      "nameDisabled": false,
+      "savingProgress": false,
+      "state": {
+        "calls": [
+          {
+            "action": "save",
+            "fileId": 1,
+            "payload": {
+              "fileName": "edited.pdf",
+              "folderCode": null,
+              "postId": 11
+            }
+          }
+        ],
+        "failure": true,
+        "file": {
+          "boardFileId": 2,
+          "categoryCode": null,
+          "fileName": "beta.pdf",
+          "postId": 12
+        },
+        "metadata": 2,
+        "saving": false
+      }
+    },
+    "validation": {
+      "buttons": [
+        {
+          "disabled": false,
+          "name": "닫기"
+        },
+        {
+          "disabled": false,
+          "name": "저장"
+        },
+        {
+          "disabled": false,
+          "name": "취소"
+        }
+      ],
+      "dialog": true,
+      "error": "파일명을 1자 이상 200자 이하로 입력해 주세요.",
+      "folderCode": "A",
+      "folderDisabled": false,
+      "folderDisplay": "Folder A",
+      "name": "",
+      "nameDisabled": false,
+      "savingProgress": false,
+      "state": {
+        "calls": [],
+        "failure": true,
+        "file": {
+          "boardFileId": 1,
+          "categoryCode": "A",
+          "fileName": "alpha.pdf",
+          "postId": 11
+        },
+        "metadata": 0,
+        "saving": false
+      }
+    },
+    "reopened": {
+      "buttons": [
+        {
+          "disabled": false,
+          "name": "닫기"
+        },
+        {
+          "disabled": false,
+          "name": "저장"
+        },
+        {
+          "disabled": false,
+          "name": "취소"
+        }
+      ],
+      "dialog": true,
+      "error": "",
+      "folderCode": "",
+      "folderDisabled": false,
+      "folderDisplay": "",
+      "name": "beta.pdf",
+      "nameDisabled": false,
+      "savingProgress": false,
+      "state": {
+        "calls": [
+          {
+            "action": "save",
+            "fileId": 1,
+            "payload": {
+              "fileName": "edited.pdf",
+              "folderCode": null,
+              "postId": 11
+            }
+          },
+          {
+            "action": "save",
+            "fileId": 2,
+            "payload": {
+              "fileName": "saved-beta.pdf",
+              "folderCode": "A",
+              "postId": 12
+            }
+          },
+          {
+            "action": "close"
+          }
+        ],
+        "failure": false,
+        "file": {
+          "boardFileId": 2,
+          "categoryCode": null,
+          "fileName": "beta.pdf",
+          "postId": 12
+        },
+        "metadata": 2,
+        "saving": false
+      }
+    },
+    "metadataPreserved": {
+      "buttons": [
+        {
+          "disabled": false,
+          "name": "닫기"
+        },
+        {
+          "disabled": false,
+          "name": "저장"
+        },
+        {
+          "disabled": false,
+          "name": "취소"
+        }
+      ],
+      "dialog": true,
+      "error": "Fixture save failed",
+      "folderCode": "",
+      "folderDisabled": false,
+      "folderDisplay": "",
+      "name": "  edited.pdf  ",
+      "nameDisabled": false,
+      "savingProgress": false,
+      "state": {
+        "calls": [
+          {
+            "action": "save",
+            "fileId": 1,
+            "payload": {
+              "fileName": "edited.pdf",
+              "folderCode": null,
+              "postId": 11
+            }
+          }
+        ],
+        "failure": true,
+        "file": {
+          "boardFileId": 1,
+          "categoryCode": "A",
+          "fileName": "alpha.pdf",
+          "postId": 11
+        },
+        "metadata": 2,
+        "saving": false
+      }
+    },
+    "saved": {
+      "dialog": false,
+      "state": {
+        "calls": [
+          {
+            "action": "save",
+            "fileId": 1,
+            "payload": {
+              "fileName": "edited.pdf",
+              "folderCode": null,
+              "postId": 11
+            }
+          },
+          {
+            "action": "save",
+            "fileId": 2,
+            "payload": {
+              "fileName": "saved-beta.pdf",
+              "folderCode": "A",
+              "postId": 12
+            }
+          },
+          {
+            "action": "close"
+          }
+        ],
+        "failure": false,
+        "file": null,
+        "metadata": 2,
+        "saving": false
+      }
+    },
+    "heldRequest": {
+      "inactiveOptionExcluded": true,
+      "pending": {
+        "buttons": [
+          {
+            "disabled": false,
+            "name": "닫기"
+          },
+          {
+            "disabled": true,
+            "name": "저장"
+          },
+          {
+            "disabled": true,
+            "name": "취소"
+          }
+        ],
+        "dialog": true,
+        "error": "파일명을 1자 이상 200자 이하로 입력해 주세요.",
+        "folderCode": "",
+        "folderDisabled": true,
+        "folderDisplay": "",
+        "name": "  edited.pdf  ",
+        "nameDisabled": true,
+        "savingProgress": true,
+        "state": {
+          "calls": [
+            {
+              "action": "save",
+              "fileId": 1,
+              "payload": {
+                "fileName": "edited.pdf",
+                "folderCode": null,
+                "postId": 11
+              }
+            }
+          ],
+          "failure": true,
+          "file": {
+            "boardFileId": 1,
+            "categoryCode": "A",
+            "fileName": "alpha.pdf",
+            "postId": 11
+          },
+          "metadata": 0,
+          "saving": true
+        }
+      },
+      "closeBlockedAndMetadataPreserved": {
+        "buttons": [
+          {
+            "disabled": false,
+            "name": "닫기"
+          },
+          {
+            "disabled": true,
+            "name": "저장"
+          },
+          {
+            "disabled": true,
+            "name": "취소"
+          }
+        ],
+        "dialog": true,
+        "error": "파일명을 1자 이상 200자 이하로 입력해 주세요.",
+        "folderCode": "",
+        "folderDisabled": true,
+        "folderDisplay": "",
+        "name": "  edited.pdf  ",
+        "nameDisabled": true,
+        "savingProgress": true,
+        "state": {
+          "calls": [
+            {
+              "action": "save",
+              "fileId": 1,
+              "payload": {
+                "fileName": "edited.pdf",
+                "folderCode": null,
+                "postId": 11
+              }
+            }
+          ],
+          "failure": true,
+          "file": {
+            "boardFileId": 1,
+            "categoryCode": "A",
+            "fileName": "alpha.pdf",
+            "postId": 11
+          },
+          "metadata": 1,
+          "saving": true
+        }
+      }
+    },
+    "counts": {
+      "closes": 2,
+      "saves": 2
+    },
+    "nativeActionsOnly": true,
+    "failed": {
+      "buttons": [
+        {
+          "disabled": false,
+          "name": "닫기"
+        },
+        {
+          "disabled": false,
+          "name": "저장"
+        },
+        {
+          "disabled": false,
+          "name": "취소"
+        }
+      ],
+      "dialog": true,
+      "error": "Fixture save failed",
+      "folderCode": "",
+      "folderDisabled": false,
+      "folderDisplay": "",
+      "name": "  edited.pdf  ",
+      "nameDisabled": false,
+      "savingProgress": false,
+      "state": {
+        "calls": [
+          {
+            "action": "save",
+            "fileId": 1,
+            "payload": {
+              "fileName": "edited.pdf",
+              "folderCode": null,
+              "postId": 11
+            }
+          }
+        ],
+        "failure": true,
+        "file": {
+          "boardFileId": 1,
+          "categoryCode": "A",
+          "fileName": "alpha.pdf",
+          "postId": 11
+        },
+        "metadata": 1,
+        "saving": false
+      }
+    },
+    "final": {
+      "dialog": false,
+      "state": {
+        "calls": [
+          {
+            "action": "save",
+            "fileId": 1,
+            "payload": {
+              "fileName": "edited.pdf",
+              "folderCode": null,
+              "postId": 11
+            }
+          },
+          {
+            "action": "save",
+            "fileId": 2,
+            "payload": {
+              "fileName": "saved-beta.pdf",
+              "folderCode": "A",
+              "postId": 12
+            }
+          },
+          {
+            "action": "close"
+          },
+          {
+            "action": "close"
+          }
+        ],
+        "failure": false,
+        "file": null,
+        "metadata": 2,
+        "saving": false
+      }
+    },
+    "backendIntegrationClaimed": false,
+    "identicalCloneReset": {
+      "buttons": [
+        {
+          "disabled": false,
+          "name": "닫기"
+        },
+        {
+          "disabled": false,
+          "name": "저장"
+        },
+        {
+          "disabled": false,
+          "name": "취소"
+        }
+      ],
+      "dialog": true,
+      "error": "",
+      "folderCode": "A",
+      "folderDisabled": false,
+      "folderDisplay": "Folder A",
+      "name": "alpha.pdf",
+      "nameDisabled": false,
+      "savingProgress": false,
+      "state": {
+        "calls": [
+          {
+            "action": "save",
+            "fileId": 1,
+            "payload": {
+              "fileName": "edited.pdf",
+              "folderCode": null,
+              "postId": 11
+            }
+          }
+        ],
+        "failure": true,
+        "file": {
+          "boardFileId": 1,
+          "categoryCode": "A",
+          "fileName": "alpha.pdf",
+          "postId": 11
+        },
+        "metadata": 2,
+        "saving": false
+      }
+    }
+  },
+  "layout": [
+    {
+      "documentWidth": 375,
+      "folderCode": "A",
+      "name": "alpha.pdf",
+      "opacity": 1,
+      "paper": {
+        "clientWidth": 309,
+        "height": 308,
+        "scrollWidth": 309,
+        "width": 311,
+        "x": 32,
+        "y": 346
+      },
+      "viewport": 375
+    },
+    {
+      "documentWidth": 768,
+      "folderCode": "A",
+      "name": "edited.pdf",
+      "opacity": 1,
+      "paper": {
+        "clientWidth": 598,
+        "height": 308,
+        "scrollWidth": 598,
+        "width": 600,
+        "x": 84,
+        "y": 346
+      },
+      "viewport": 768
+    },
+    {
+      "documentWidth": 1280,
+      "folderCode": "A",
+      "name": "edited.pdf",
+      "opacity": 1,
+      "paper": {
+        "clientWidth": 598,
+        "height": 308,
+        "scrollWidth": 598,
+        "width": 600,
+        "x": 340,
+        "y": 346
+      },
+      "viewport": 1280
+    }
+  ]
+}

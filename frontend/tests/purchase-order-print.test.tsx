@@ -1,12 +1,12 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { amountInKorean } from '../src/shared/utils/amountInKorean';
+import { PurchaseOrderPrint } from '../src/pages/materials/order/print/PurchaseOrderPrint';
 import {
-  PurchaseOrderPrint,
   ROWS_PER_PAGE,
   paginateRows,
   rowLines,
-} from '../src/pages/materials/order/print/PurchaseOrderPrint';
+} from '../src/pages/materials/order/print/purchaseOrderPrintLayout';
 import { vatLabel } from '../src/pages/materials/order/print/services/purchaseOrderPrint.service';
 import type {
   PurchaseOrderPrintData,

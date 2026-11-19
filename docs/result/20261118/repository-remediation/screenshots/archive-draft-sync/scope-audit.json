@@ -1,0 +1,33 @@
+{
+  "baseline": "d41d9d2a460318b1103066690dbeb0ec16555377",
+  "jsxAndPublicPropsPreserved": true,
+  "entireSaveCallbackAndSavingCloseGuardPreserved": true,
+  "initialDraftUsesFileAndNullableFolder": true,
+  "exactFileReferenceDependencyPreserved": true,
+  "resetStatementsIncludingNullPreserved": true,
+  "renderGuardsWithoutRefAccess": 1,
+  "existingTestDeclarationsPreserved": 22,
+  "addedTestDeclarations": 2,
+  "addedRuntimeTests": 4,
+  "sourceFiles": 890,
+  "mismatches": [],
+  "changed": [
+    "frontend/src/pages/groupware/community/archive/components/ArchiveFileEditDialog.tsx",
+    "frontend/tests/archive-page.test.tsx"
+  ],
+  "lint": {
+    "before": 108,
+    "after": 107,
+    "removed": 1,
+    "added": 0
+  },
+  "red": {
+    "passed": 23,
+    "failed": 3,
+    "originalTestsPassed": 22
+  },
+  "tests": {
+    "files": 4,
+    "passed": 49
+  }
+}

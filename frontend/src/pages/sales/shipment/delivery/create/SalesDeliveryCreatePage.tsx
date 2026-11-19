@@ -12,12 +12,14 @@ import { PageLoadBoundary } from '../../../../../shared/components/PageLoadBound
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useCommonConfirmDialog } from '../../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../../shared/hooks/useUnsavedChangesBeforeUnload';
-import { DateEditor, normalizeDateInput } from '../../../../../shared/components/f1-grid/editing/DateEditor';
+import { DateEditor } from '../../../../../shared/components/f1-grid/editing/DateEditor';
+import { normalizeDateInput } from '../../../../../shared/components/f1-grid/editing/dateInput';
 import { getSystemDate } from '../../../../../shared/services/systemDateService';
 import { CustomerPicker, MaterialPickerDialog } from '../../../../../shared/components/master-picker/MasterPickers';
 import type { F1GridChanges, F1GridRef } from '../../../../../shared/components/f1-grid';
 import { searchOrderCustomers, searchOrderMaterials } from '../../../order/create/services/salesOrderMaster.service';
-import { activeDeliveryRows, DeliveryDetailGrid } from './components/DeliveryDetailGrid';
+import { DeliveryDetailGrid } from './components/DeliveryDetailGrid';
+import { activeDeliveryRows } from './data/deliveryDetailRows';
 import { SourceOrderPicker } from './components/SourceOrderPicker';
 import {
   buildDeliveryPayload, createDelivery, deleteDelivery, deliveryForm, emptyDelivery, getDelivery,

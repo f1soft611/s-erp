@@ -3,13 +3,6 @@ import { F1Grid, type F1GridChanges, type F1GridColumn, type F1GridRef } from '.
 import type { DeliveryRow } from '../types/salesDelivery.types';
 import type { MasterPickerOption } from '../../../../../../shared/components/master-picker/masterPicker.types';
 import { deliveryAmounts, newDeliveryRow } from '../services/salesDelivery.service';
-
-export function activeDeliveryRows(base: DeliveryRow[], changes: F1GridChanges<DeliveryRow>): DeliveryRow[] {
-  const deleted = new Set(changes.deletedRows.map((row) => row.rowId));
-  const updated = new Map(changes.updatedRows.map((row) => [row.rowId, row]));
-  return [...base.filter((row) => !deleted.has(row.rowId)).map((row) => updated.get(row.rowId) ?? row),
-    ...changes.insertedRows.filter((row) => !deleted.has(row.rowId))];
-}
 type Props = {
   rows: DeliveryRow[];
   gridRef: RefObject<F1GridRef<DeliveryRow> | null>;

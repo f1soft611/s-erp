@@ -1,0 +1,37 @@
+{
+  "baseline": "58a933bb11918d7374978ffa906a36db8a976403",
+  "changed": [
+    "frontend\\src\\pages\\f1-grid-docs\\F1-GRID.md",
+    "frontend\\src\\shared\\components\\f1-grid\\core\\GridCell.tsx",
+    "frontend\\tests\\f1-grid-render-performance.test.tsx"
+  ],
+  "onlyUserEditingAnchorStatePublicationChanged": true,
+  "outerEventRefsAndMemoUnchanged": true,
+  "userEditorAndCellEditorImplementationUnchanged": true,
+  "domRegistrationCallPreserved": true,
+  "ordinaryCellRefDoesNotPublishState": true,
+  "originalTestsBytePreserved": true,
+  "addedActualCellEditorRegression": 1,
+  "runtimeRed": {
+    "failed": 1,
+    "cause": "First editing mount popup x104 instead of attached cell x100",
+    "discardedProbe": "jsdom zero inline width, not used as runtime evidence"
+  },
+  "baselineTests": {
+    "files": 3,
+    "passed": 274
+  },
+  "relatedTests": {
+    "files": 3,
+    "passed": 275
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 85,
+    "after": 84,
+    "removed": 1,
+    "added": 0
+  },
+  "remainingRefs": 2
+}

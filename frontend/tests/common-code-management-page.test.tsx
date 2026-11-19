@@ -8,15 +8,18 @@ import {
   within,
 } from '@testing-library/react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { Profiler } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import {
   CommonCodeManagementPanel,
+} from '../src/pages/co/master/common-code/components/CommonCodeManagementPanel';
+import {
   getItemCodeValidationMessage,
   getGroupDeleteBlockedMessage,
   resolveCreatedGroupId,
   resolveCreatedGroupIdMap,
-} from '../src/pages/co/master/common-code/components/CommonCodeManagementPanel';
+} from '../src/pages/co/master/common-code/data/commonCodeManagementGrid';
 import { saveCommonCodeBatch } from '../src/pages/co/master/common-code/services/commonCodeManagement.service';
 import { RoleManagementPanel } from '../src/pages/settings/system/roles/components/RoleManagementPanel';
 import { Splitter } from '../src/shared/components/Splitter';
@@ -229,6 +232,160 @@ describe('CommonCode management page', () => {
       expect(screen.getByRole('button', { name: '저장' })).toBeEnabled(),
     );
   }
+
+  it.each([false, true])('selects a valid group from the first ready commit and preserves valid choices (loading=%s)', async (initialLoading) => {
+    const groups = [
+      { id: '1', groupCode: 'OWNED_FIRST', groupNm: 'Owned first', groupDc: '', moduleCd: '', parentGroupId: null, sortOrder: 1, useAt: 'Y' as const },
+      { id: '2', groupCode: 'OWNED_SECOND', groupNm: 'Owned second', groupDc: '', moduleCd: '', parentGroupId: null, sortOrder: 2, useAt: 'Y' as const },
+    ];
+    const commits: Array<string | null> = [];
+    const onSelectedGroupChange = vi.fn();
+    const view = (loading: boolean, source = groups) => (
+      <Profiler id="group-selection" onRender={() => {
+        commits.push(screen.queryByText(/^선택 그룹:/)?.textContent?.trim() ?? null);
+      }}>
+        <CommonCodeManagementPanel groups={source} groupsLoading={loading}
+          onSelectedGroupChange={onSelectedGroupChange} />
+      </Profiler>
+    );
+    const { rerender } = render(view(initialLoading));
+    if (initialLoading) {
+      expect(commits[0]).toBeNull();
+      expect(apiMocks.apiGet).not.toHaveBeenCalled();
+      commits.length = 0;
+      rerender(view(false));
+    }
+    expect(commits[0]).toBe('선택 그룹: Owned first');
+    await screen.findByRole('gridcell', { name: '거래명세서' });
+    fireEvent.click(screen.getByRole('gridcell', { name: 'Owned second' }));
+    await waitFor(() => expect(onSelectedGroupChange).toHaveBeenLastCalledWith('2'));
+    const requests = apiMocks.apiGet.mock.calls.length;
+    commits.length = 0;
+    rerender(view(false, [...groups]));
+    expect(commits[0]).toBe('선택 그룹: Owned second');
+    expect(apiMocks.apiGet).toHaveBeenCalledTimes(requests);
+    commits.length = 0;
+    rerender(view(false, [groups[0]]));
+    expect(commits[0]).toBe('선택 그룹: Owned first');
+    expect(onSelectedGroupChange).toHaveBeenLastCalledWith('1');
+    rerender(view(true, []));
+    expect(onSelectedGroupChange).toHaveBeenLastCalledWith('1');
+    rerender(view(false, []));
+    expect(onSelectedGroupChange).toHaveBeenLastCalledWith('');
+    expect(screen.getByText('선택 그룹이 없습니다')).toBeInTheDocument();
+    expect(apiMocks.apiPost).not.toHaveBeenCalled();
+  });
+
+  it('keeps an unsaved group id instead of replacing it with the first loaded group', () => {
+    const onSelectedGroupChange = vi.fn();
+    render(
+      <CommonCodeManagementPanel
+        groups={[{ id: '1', groupCode: 'OWNED_FIRST', groupNm: 'Owned first', groupDc: '', moduleCd: '', parentGroupId: null, sortOrder: 1, useAt: 'Y' }]}
+        initialSelectedGroupId="new-common-group-owned"
+        onSelectedGroupChange={onSelectedGroupChange}
+      />,
+    );
+    expect(onSelectedGroupChange).toHaveBeenCalledExactlyOnceWith('new-common-group-owned');
+    expect(apiMocks.apiGet).not.toHaveBeenCalled();
+    expect(screen.getByText('선택 그룹이 없습니다')).toBeInTheDocument();
+  });
+
+  it('enables group deletion after the last detail is removed from an already dirty batch', async () => {
+    const defaultGet = apiMocks.apiGet.getMockImplementation()!;
+    apiMocks.apiGet.mockImplementation((path: string) =>
+      path === '/api/v1/co/master/common-code/groups/1/items'
+        ? Promise.resolve({ resultList: commonCodeItems.map((row) => ({ ...row, itemDc: '' })) })
+        : defaultGet(path),
+    );
+    render(
+      <CommonCodeManagementPanel
+        groups={[
+          { id: '1', groupCode: 'OWNED_LEAF', groupNm: 'Owned leaf group', groupDc: '', moduleCd: '', parentGroupId: null, sortOrder: 1, useAt: 'Y' },
+        ]}
+        initialSelectedGroupId="1"
+        initialSelectedGroupRowIds={['1']}
+      />,
+    );
+    await screen.findByRole('gridcell', { name: '사업자등록증' });
+    const openGroupDelete = async () => {
+      fireEvent.contextMenu(screen.getByRole('gridcell', { name: 'Owned leaf group' }));
+      return screen.findByRole('menuitem', { name: '행 삭제' });
+    };
+    const closeMenu = async () => {
+      fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+    };
+    expect(await openGroupDelete()).toHaveAttribute('aria-disabled', 'true');
+    await closeMenu();
+    for (const name of ['거래명세서', '사업자등록증']) {
+      fireEvent.contextMenu(screen.getByRole('gridcell', { name }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: '행 삭제' }));
+      await waitFor(() => {
+        expect(screen.queryByRole('gridcell', { name })).not.toBeInTheDocument();
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+      });
+      const action = await openGroupDelete();
+      if (name === '거래명세서') {
+        expect(action).toHaveAttribute('aria-disabled', 'true');
+      } else {
+        expect(action).not.toHaveAttribute('aria-disabled', 'true');
+      }
+      await closeMenu();
+    }
+    expect(apiMocks.apiPost).not.toHaveBeenCalled();
+  });
+
+  it('binds the parent-code picker only to deferred edit events and preserves cancel/reopen selection', async () => {
+    const defaultGet = apiMocks.apiGet.getMockImplementation()!;
+    apiMocks.apiGet.mockImplementation((path: string) => {
+      if (path === '/api/v1/co/master/common-code/groups/2/items') {
+        return Promise.resolve({ resultList: [{
+          commonCodeItemId: 20,
+          groupId: 2,
+          itemCode: 'OWNED_CHILD',
+          itemNm: 'Owned child detail',
+          parentItemId: 10,
+          parentItemNm: 'Owned old parent',
+          sortOrder: 1,
+          useAt: 'Y',
+          itemDc: '',
+        }] });
+      }
+      return defaultGet(path);
+    });
+    render(
+      <CommonCodeManagementPanel
+        groups={[
+          { id: '1', groupCode: 'OWNED_PARENT', groupNm: 'Owned parent group', groupDc: '', moduleCd: '', parentGroupId: null, sortOrder: 1, useAt: 'Y' },
+          { id: '2', groupCode: 'OWNED_CHILD', groupNm: 'Owned child group', groupDc: '', moduleCd: '', parentGroupId: '1', sortOrder: 1, useAt: 'Y' },
+        ]}
+        initialSelectedGroupId="2"
+        initialSelectedGroupRowIds={['2']}
+      />,
+    );
+    await screen.findByRole('gridcell', { name: 'Owned old parent' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    const parentRequests = () => apiMocks.apiGet.mock.calls.filter(
+      ([path]) => path === '/api/v1/co/master/common-code/groups/1/items',
+    ).length;
+    const beforeOpen = parentRequests();
+    const openPicker = async () => {
+      fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'Owned old parent' }));
+      fireEvent.click(screen.getByRole('button', { name: '코드 선택' }));
+      return screen.findByRole('dialog', { name: '상위코드 선택' });
+    };
+    const first = await openPicker();
+    fireEvent.click(within(first).getByRole('button', { name: '닫기' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('gridcell', { name: 'Owned old parent' })).toBeInTheDocument();
+    const reopened = await openPicker();
+    fireEvent.click(within(reopened).getByText('사업자등록증'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('gridcell', { name: '사업자등록증' })).toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: 'Owned child detail' })).toBeInTheDocument();
+    expect(parentRequests()).toBe(beforeOpen + 2);
+    expect(apiMocks.apiPost).not.toHaveBeenCalled();
+  });
 
   it('locks common-code editing through save and quiet refresh without hiding current rows', async () => {
     let resolveSave!: (value: unknown) => void;
@@ -764,6 +921,87 @@ describe('CommonCode management page', () => {
     expect(separator).toHaveStyle({ display: 'flex' });
     expect(panes[0]).toHaveStyle({ flex: '3 1 0%' });
     expect(panes[2]).toHaveStyle({ flex: '2 1 0%' });
+  });
+
+  it('commits both external flex ratios without an old frame and preserves a drag on the same props', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 1200 });
+    const commits = vi.fn();
+    const view = (leftFlex: number, rightFlex: number) => (
+      <Profiler id="split-ratios" onRender={() => commits([
+        screen.getByText('ratio-left').parentElement?.style.flex,
+        screen.getByText('ratio-right').parentElement?.style.flex,
+      ])}>
+        <Splitter leftFlex={leftFlex} rightFlex={rightFlex} minSize={100}>
+          <div>ratio-left</div>
+          <div>ratio-right</div>
+        </Splitter>
+      </Profiler>
+    );
+    const { rerender } = render(view(1, 1));
+    const handle = screen.getByRole('separator');
+    Object.defineProperty(handle.parentElement, 'clientWidth', { configurable: true, value: 1000 });
+    fireEvent.pointerDown(handle, { clientX: 500 });
+    fireEvent.pointerMove(window, { clientX: 600 });
+    fireEvent.pointerUp(window);
+    rerender(view(1, 1));
+    expect(screen.getByText('ratio-left').parentElement).toHaveStyle({ flex: '1.2 1 0%' });
+    expect(screen.getByText('ratio-right').parentElement).toHaveStyle({ flex: '0.8 1 0%' });
+
+    commits.mockClear();
+    rerender(view(2, 1));
+    expect(commits).toHaveBeenNthCalledWith(1, ['2 1 0%', '1 1 0%']);
+  });
+
+  it('preserves an omitted ratio and the pixel size across flex mode changes', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 1200 });
+    const view = (leftFlex?: number, rightFlex?: number) => (
+      <Splitter leftFlex={leftFlex} rightFlex={rightFlex} initialSize={320} minSize={100}>
+        <div>ratio-left</div>
+        <div>ratio-right</div>
+      </Splitter>
+    );
+    const { rerender } = render(view(1, 1));
+    const handle = screen.getByRole('separator');
+    Object.defineProperty(handle.parentElement, 'clientWidth', { configurable: true, value: 1000 });
+    fireEvent.pointerDown(handle, { clientX: 500 });
+    fireEvent.pointerMove(window, { clientX: 600 });
+    fireEvent.pointerUp(window);
+
+    rerender(view(undefined, 3));
+    expect(screen.getByText('ratio-left').parentElement).toHaveStyle({ flex: '1.2 1 0%' });
+    expect(screen.getByText('ratio-right').parentElement).toHaveStyle({ flex: '3 1 0%' });
+    rerender(view());
+    expect(screen.getByText('ratio-left').parentElement).toHaveStyle({ flex: '0 0 320px' });
+    rerender(view(2));
+    expect(screen.getByText('ratio-left').parentElement).toHaveStyle({ flex: '2 1 0%' });
+    expect(screen.getByText('ratio-right').parentElement).toHaveStyle({ flex: '3 1 0%' });
+  });
+
+  it('keeps effect dependency equality for signed zero changes and repeated NaN ratios', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 1200 });
+    const commits = vi.fn();
+    const view = (leftFlex: number) => (
+      <Profiler id="split-equality" onRender={() => commits([
+        screen.getByText('ratio-left').parentElement?.style.flex,
+        screen.getByText('ratio-right').parentElement?.style.flex,
+      ])}>
+        <Splitter leftFlex={leftFlex} rightFlex={1} minSize={100}>
+          <div>ratio-left</div>
+          <div>ratio-right</div>
+        </Splitter>
+      </Profiler>
+    );
+    const { rerender } = render(view(0));
+    const handle = screen.getByRole('separator');
+    Object.defineProperty(handle.parentElement, 'clientWidth', { configurable: true, value: 1000 });
+    fireEvent.pointerDown(handle, { clientX: 0 });
+    fireEvent.pointerMove(window, { clientX: 200 });
+    fireEvent.pointerUp(window);
+    commits.mockClear();
+    rerender(view(-0));
+    expect(commits).toHaveBeenNthCalledWith(1, ['0 1 0%', '1 1 0%']);
+    expect(() => rerender(view(Number.NaN))).not.toThrow();
+    expect(() => rerender(view(Number.NaN))).not.toThrow();
   });
 
   it('stacks the role management panels vertically on mobile screens', () => {

@@ -15,7 +15,7 @@ import {
   calculateNoticeImageResize,
   calculateNoticeImageResizeWidth,
   serializeNoticeEditorJson,
-} from '../src/pages/groupware/community/notice/components/NoticeComposerDialog';
+} from '../src/pages/groupware/community/notice/components/noticeComposerUtils';
 import {
   deleteNoticeEmbeddedImage,
   uploadNoticeEmbeddedImage,

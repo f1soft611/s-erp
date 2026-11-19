@@ -1,0 +1,133 @@
+{
+  "fixture": "Real NoticeFeedList/theme with synthetic comments and manually resolved local callback promises",
+  "method": "Native mouse controls and product buttons; eval only for fixture setup and DOM/animation observation",
+  "isolation": "No network allowed and no persisted storage read/write; reset remounts only the test fixture between widths",
+  "firstCommitEvidence": "Automated Profiler RED40/1 then GREEN; normal browser interactions do not claim to reproduce the pre-passive-effect timing",
+  "scope": {
+    "baseline": "328e03c3ad8b0098f6a506b3e97912de56e4aed9",
+    "changed": [
+      "frontend/src/pages/groupware/community/notice/components/NoticeFeedList.tsx",
+      "frontend/tests/notice-page-local-updates.test.tsx"
+    ],
+    "onlyUninitializedEventCursorFallbackChanged": true,
+    "establishedOwnCursorIncludingUndefinedPreserved": true,
+    "allOtherSourceEffectsMergeExhaustionPublicPropsAndMarkupPreserved": true,
+    "unchangedEffects": 4,
+    "oldTestDeclarationsPreserved": 38,
+    "addedRuntimeTests": 2,
+    "sourceFiles": 890,
+    "byteMismatches": 0,
+    "red": {
+      "passed": 40,
+      "failed": 1,
+      "expectedCursor": 7,
+      "observedBefore": 10
+    },
+    "tests": {
+      "files": 5,
+      "passed": 83
+    },
+    "lint": {
+      "before": 98,
+      "after": 98,
+      "added": 0,
+      "removed": 0
+    },
+    "scopeLimit": "First interaction before a cursor entry exists, not a rewrite of existing comments/state synchronization"
+  },
+  "widths": [
+    {
+      "width": 375,
+      "documentWidth": 375,
+      "firstCursor": 7,
+      "disabledPendingButton": true,
+      "requestsAfterDuplicateClick": 1,
+      "commentsAfterFirstResponse": [
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "metadataPreservesCommentsAndLocalCursor": true,
+      "continuedCursor": 4,
+      "incomingMetadataCursor": 99,
+      "finalComments": [
+        3,
+        4,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "previousControlHiddenAtExhaustion": true,
+      "networkCalls": 0
+    },
+    {
+      "width": 768,
+      "documentWidth": 753,
+      "firstCursor": 7,
+      "disabledPendingButton": true,
+      "requestsAfterDuplicateClick": 1,
+      "commentsAfterFirstResponse": [
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "metadataPreservesCommentsAndLocalCursor": true,
+      "continuedCursor": 4,
+      "incomingMetadataCursor": 99,
+      "finalComments": [
+        3,
+        4,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "previousControlHiddenAtExhaustion": true,
+      "networkCalls": 0
+    },
+    {
+      "width": 1280,
+      "documentWidth": 1265,
+      "firstCursor": 7,
+      "disabledPendingButton": true,
+      "requestsAfterDuplicateClick": 1,
+      "commentsAfterFirstResponse": [
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "metadataPreservesCommentsAndLocalCursor": true,
+      "continuedCursor": 4,
+      "incomingMetadataCursor": 99,
+      "finalComments": [
+        3,
+        4,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "previousControlHiddenAtExhaustion": true,
+      "networkCalls": 0
+    }
+  ],
+  "screenshots": [
+    "loaded-375.png",
+    "complete-375.png",
+    "loaded-768.png",
+    "complete-768.png",
+    "loaded-1280.png",
+    "complete-1280.png",
+    "pending-375.png"
+  ]
+}

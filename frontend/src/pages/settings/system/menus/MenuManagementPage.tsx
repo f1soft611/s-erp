@@ -19,7 +19,7 @@ import { useInitialLoadState } from '../../../../shared/hooks/useInitialLoadStat
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
-import { useNotification } from '../../../../shared/context/NotificationContext';
+import { useNotification } from '../../../../shared/context/notification';
 import { usePageSessionState } from '../../../../shared/hooks/usePageSessionState';
 import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import type {
@@ -327,7 +327,7 @@ export function MenuManagementPage({
     void initialize();
     return () => {
       active = false;
-      ++menuLoadRequestIdRef.current;
+      menuLoadRequestIdRef.current += 1;
     };
   // Initialization uses the session snapshot; selection changes load menus separately.
   // eslint-disable-next-line react-hooks/exhaustive-deps

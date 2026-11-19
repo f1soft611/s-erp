@@ -1,5 +1,5 @@
 import type { F1GridColumn } from '../types/grid.types';
-import { normalizeDateInput } from '../editing/DateEditor';
+import { normalizeDateInput } from '../editing/dateInput';
 
 export function parseGridTsv(value: string): string[][] {
   return value

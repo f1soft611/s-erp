@@ -1,0 +1,180 @@
+{
+  "layout": [
+    {
+      "checker": "repeating-conic-gradient(rgba(15, 23, 42, 0.08) 0%, rgba(15, 23, 42, 0.08) 25%, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 50%)",
+      "dialog": {
+        "height": 730.796875,
+        "left": 32,
+        "right": 343,
+        "width": 311
+      },
+      "image": {
+        "filter": "none",
+        "height": 147.578125,
+        "naturalHeight": 280,
+        "naturalWidth": 480,
+        "objectFit": "contain",
+        "sourceMatches": true,
+        "width": 253
+      },
+      "scrollWidth": 375,
+      "surface": "rgb(255, 255, 255)",
+      "width": 375,
+      "mode": "light"
+    },
+    {
+      "checker": "repeating-conic-gradient(rgba(15, 23, 42, 0.08) 0%, rgba(15, 23, 42, 0.08) 25%, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 50%)",
+      "dialog": {
+        "height": 810,
+        "left": 32,
+        "right": 736,
+        "width": 704
+      },
+      "image": {
+        "filter": "none",
+        "height": 280,
+        "naturalHeight": 280,
+        "naturalWidth": 480,
+        "objectFit": "contain",
+        "sourceMatches": true,
+        "width": 480
+      },
+      "scrollWidth": 768,
+      "surface": "rgb(255, 255, 255)",
+      "width": 768,
+      "mode": "light"
+    },
+    {
+      "checker": "repeating-conic-gradient(rgba(15, 23, 42, 0.08) 0%, rgba(15, 23, 42, 0.08) 25%, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 50%)",
+      "dialog": {
+        "height": 810,
+        "left": 40,
+        "right": 1240,
+        "width": 1200
+      },
+      "image": {
+        "filter": "none",
+        "height": 280,
+        "naturalHeight": 280,
+        "naturalWidth": 480,
+        "objectFit": "contain",
+        "sourceMatches": true,
+        "width": 480
+      },
+      "scrollWidth": 1280,
+      "surface": "rgb(255, 255, 255)",
+      "width": 1280,
+      "mode": "light"
+    },
+    {
+      "checker": "repeating-conic-gradient(rgba(226, 232, 240, 0.12) 0%, rgba(226, 232, 240, 0.12) 25%, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 50%)",
+      "dialog": {
+        "height": 730.796875,
+        "left": 32,
+        "right": 343,
+        "width": 311
+      },
+      "image": {
+        "filter": "none",
+        "height": 147.578125,
+        "naturalHeight": 280,
+        "naturalWidth": 480,
+        "objectFit": "contain",
+        "sourceMatches": true,
+        "width": 253
+      },
+      "scrollWidth": 375,
+      "surface": "rgb(17, 24, 39)",
+      "width": 375,
+      "mode": "dark"
+    },
+    {
+      "checker": "repeating-conic-gradient(rgba(226, 232, 240, 0.12) 0%, rgba(226, 232, 240, 0.12) 25%, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 50%)",
+      "dialog": {
+        "height": 810,
+        "left": 32,
+        "right": 736,
+        "width": 704
+      },
+      "image": {
+        "filter": "none",
+        "height": 280,
+        "naturalHeight": 280,
+        "naturalWidth": 480,
+        "objectFit": "contain",
+        "sourceMatches": true,
+        "width": 480
+      },
+      "scrollWidth": 768,
+      "surface": "rgb(17, 24, 39)",
+      "width": 768,
+      "mode": "dark"
+    },
+    {
+      "checker": "repeating-conic-gradient(rgba(226, 232, 240, 0.12) 0%, rgba(226, 232, 240, 0.12) 25%, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 50%)",
+      "dialog": {
+        "height": 810,
+        "left": 40,
+        "right": 1240,
+        "width": 1200
+      },
+      "image": {
+        "filter": "none",
+        "height": 280,
+        "naturalHeight": 280,
+        "naturalWidth": 480,
+        "objectFit": "contain",
+        "sourceMatches": true,
+        "width": 480
+      },
+      "scrollWidth": 1280,
+      "surface": "rgb(17, 24, 39)",
+      "width": 1280,
+      "mode": "dark"
+    }
+  ],
+  "behavior": {
+    "viewerReplacement": {
+      "naturalWidth": 480,
+      "sourceMatchesSecond": true
+    },
+    "escapeAndCloseButtonVerified": true,
+    "avatar": {
+      "loaded": {
+        "loaded": true,
+        "naturalWidth": 480,
+        "scrollWidth": 375,
+        "viewport": 375,
+        "width": 56
+      },
+      "restored": {
+        "loaded": true,
+        "naturalWidth": 480,
+        "scrollWidth": 375,
+        "viewport": 375,
+        "width": 56
+      },
+      "failed": {
+        "fallback": "SP",
+        "hasImage": false,
+        "scrollWidth": 375,
+        "viewport": 375
+      }
+    }
+  },
+  "tests": {
+    "files": 6,
+    "total": 126,
+    "passed": 126,
+    "failed": 0,
+    "pending": 0
+  },
+  "lint": {
+    "total": 113,
+    "rules": {
+      "react(set-state-in-effect)": 91,
+      "react-hooks(exhaustive-deps)": 14,
+      "react(refs)": 8
+    }
+  }
+}

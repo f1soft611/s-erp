@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { ThemeProvider } from '@mui/material/styles';
 import { createAppTheme } from '../src/theme/theme';
 import { getNoticeCategoryPresentation } from '../src/pages/groupware/community/notice/data/noticeCategoryPresentation';
-import { normalizeNoticeEmbeddedImageSources } from '../src/pages/groupware/community/notice/components/NoticeFeedList';
+import { normalizeNoticeEmbeddedImageSources } from '../src/pages/groupware/community/notice/components/noticeFeedUtils';
 import { describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { NoticeFeedList } from '../src/pages/groupware/community/notice/components/NoticeFeedList';

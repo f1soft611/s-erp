@@ -1,0 +1,49 @@
+{
+  "actualHookProviderAndF1Grid": true,
+  "realServiceCacheAndCancellation": true,
+  "transport": "apiGet boundary replaced in owned tab only; six synthetic policy GET responses, all other requests blocked",
+  "storage": "Tab memory only; no persistent reads or writes",
+  "widths": [
+    {
+      "width": 375,
+      "appliedPolicy": "1.200",
+      "releasedAndPendingDefault": "1.2",
+      "explicitColumn": "1.3",
+      "noPreviousRuleInReleasedOrPendingCommits": true,
+      "lateResponseIgnored": true,
+      "syntheticGets": 2,
+      "documentWidth": 375
+    },
+    {
+      "width": 768,
+      "appliedPolicy": "1.200",
+      "releasedAndPendingDefault": "1.2",
+      "explicitColumn": "1.3",
+      "noPreviousRuleInReleasedOrPendingCommits": true,
+      "lateResponseIgnored": true,
+      "syntheticGets": 2,
+      "documentWidth": 768
+    },
+    {
+      "width": 1280,
+      "appliedPolicy": "1.200",
+      "releasedAndPendingDefault": "1.2",
+      "explicitColumn": "1.3",
+      "noPreviousRuleInReleasedOrPendingCommits": true,
+      "lateResponseIgnored": true,
+      "syntheticGets": 2,
+      "documentWidth": 1280
+    }
+  ],
+  "syntheticGets": 6,
+  "unknownRequests": 0,
+  "limitations": "Synthetic policy values with actual hook/Provider/F1Grid; real authentication, backend policy data and saves are not exercised. Provider/hook/cache imports use the same Vite timestamp URLs; fixture blob reexport uses an absolute local URL.",
+  "images": [
+    "applied-375.png",
+    "cleared-375.png",
+    "applied-768.png",
+    "cleared-768.png",
+    "applied-1280.png",
+    "cleared-1280.png"
+  ]
+}

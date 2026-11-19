@@ -1,0 +1,392 @@
+{
+  "layout": [
+    {
+      "buttons": [
+        {
+          "name": "닫기",
+          "width": 30
+        },
+        {
+          "name": "더보기",
+          "width": 64
+        },
+        {
+          "name": "완료",
+          "width": 64
+        },
+        {
+          "name": "제거",
+          "width": 64
+        }
+      ],
+      "documentWidth": 375,
+      "name": "Alpha favorite",
+      "opacity": 1,
+      "paper": {
+        "clientWidth": 309,
+        "height": 340,
+        "scrollWidth": 309,
+        "width": 311,
+        "x": 32,
+        "y": 330
+      },
+      "urlReadOnly": true,
+      "viewport": 375
+    },
+    {
+      "buttons": [
+        {
+          "name": "닫기",
+          "width": 30
+        },
+        {
+          "name": "더보기",
+          "width": 64
+        },
+        {
+          "name": "완료",
+          "width": 64
+        },
+        {
+          "name": "제거",
+          "width": 64
+        }
+      ],
+      "documentWidth": 768,
+      "name": "edited-alpha",
+      "opacity": 1,
+      "paper": {
+        "clientWidth": 478,
+        "height": 340,
+        "scrollWidth": 478,
+        "width": 480,
+        "x": 144,
+        "y": 330
+      },
+      "urlReadOnly": true,
+      "viewport": 768
+    },
+    {
+      "buttons": [
+        {
+          "name": "닫기",
+          "width": 30
+        },
+        {
+          "name": "더보기",
+          "width": 64
+        },
+        {
+          "name": "완료",
+          "width": 64
+        },
+        {
+          "name": "제거",
+          "width": 64
+        }
+      ],
+      "documentWidth": 1280,
+      "name": "edited-alpha",
+      "opacity": 1,
+      "paper": {
+        "clientWidth": 478,
+        "height": 340,
+        "scrollWidth": 478,
+        "width": 480,
+        "x": 400,
+        "y": 330
+      },
+      "urlReadOnly": true,
+      "viewport": 1280
+    }
+  ],
+  "behavior": {
+    "more": {
+      "dialog": false,
+      "state": {
+        "calls": [
+          {
+            "action": "save",
+            "folderId": null,
+            "name": "edited-alpha",
+            "target": "A"
+          },
+          {
+            "action": "save",
+            "folderId": 12,
+            "name": "saved-beta",
+            "target": "B"
+          },
+          {
+            "action": "close"
+          },
+          {
+            "action": "remove",
+            "target": "B"
+          },
+          {
+            "action": "close"
+          },
+          {
+            "action": "more"
+          }
+        ],
+        "failure": false,
+        "metadata": 1,
+        "open": false,
+        "target": "A"
+      }
+    },
+    "cancelledReopen": {
+      "dialog": true,
+      "error": "",
+      "folder": "Folder A",
+      "name": "Alpha favorite",
+      "state": {
+        "calls": [
+          {
+            "action": "save",
+            "folderId": null,
+            "name": "edited-alpha",
+            "target": "A"
+          },
+          {
+            "action": "save",
+            "folderId": 12,
+            "name": "saved-beta",
+            "target": "B"
+          },
+          {
+            "action": "close"
+          },
+          {
+            "action": "remove",
+            "target": "B"
+          },
+          {
+            "action": "close"
+          },
+          {
+            "action": "more"
+          },
+          {
+            "action": "close"
+          }
+        ],
+        "failure": false,
+        "metadata": 1,
+        "open": true,
+        "target": "A"
+      },
+      "url": "/fixture/a?metadata=1",
+      "urlReadOnly": true
+    },
+    "failedSave": {
+      "dialog": true,
+      "error": "Fixture save failed",
+      "folder": "즐겨찾기 루트",
+      "name": "  edited-alpha  ",
+      "state": {
+        "calls": [
+          {
+            "action": "save",
+            "folderId": null,
+            "name": "edited-alpha",
+            "target": "A"
+          }
+        ],
+        "failure": true,
+        "metadata": 0,
+        "open": true,
+        "target": "A"
+      },
+      "url": "/fixture/a?metadata=0",
+      "urlReadOnly": true
+    },
+    "targetReset": {
+      "dialog": true,
+      "error": "",
+      "folder": "즐겨찾기 루트",
+      "name": "Menu B",
+      "state": {
+        "calls": [
+          {
+            "action": "save",
+            "folderId": null,
+            "name": "edited-alpha",
+            "target": "A"
+          }
+        ],
+        "failure": true,
+        "metadata": 1,
+        "open": true,
+        "target": "B"
+      },
+      "url": "/fixture/b?metadata=1",
+      "urlReadOnly": true
+    },
+    "metadataPreserved": {
+      "dialog": true,
+      "error": "Fixture save failed",
+      "folder": "즐겨찾기 루트",
+      "name": "  edited-alpha  ",
+      "state": {
+        "calls": [
+          {
+            "action": "save",
+            "folderId": null,
+            "name": "edited-alpha",
+            "target": "A"
+          }
+        ],
+        "failure": true,
+        "metadata": 1,
+        "open": true,
+        "target": "A"
+      },
+      "url": "/fixture/a?metadata=1",
+      "urlReadOnly": true
+    },
+    "final": {
+      "dialog": false,
+      "state": {
+        "calls": [
+          {
+            "action": "save",
+            "folderId": null,
+            "name": "edited-alpha",
+            "target": "A"
+          },
+          {
+            "action": "save",
+            "folderId": 12,
+            "name": "saved-beta",
+            "target": "B"
+          },
+          {
+            "action": "close"
+          },
+          {
+            "action": "remove",
+            "target": "B"
+          },
+          {
+            "action": "close"
+          },
+          {
+            "action": "more"
+          },
+          {
+            "action": "close"
+          },
+          {
+            "action": "close"
+          }
+        ],
+        "failure": false,
+        "metadata": 1,
+        "open": false,
+        "target": "A"
+      }
+    },
+    "backendIntegrationClaimed": false,
+    "removed": {
+      "dialog": false,
+      "state": {
+        "calls": [
+          {
+            "action": "save",
+            "folderId": null,
+            "name": "edited-alpha",
+            "target": "A"
+          },
+          {
+            "action": "save",
+            "folderId": 12,
+            "name": "saved-beta",
+            "target": "B"
+          },
+          {
+            "action": "close"
+          },
+          {
+            "action": "remove",
+            "target": "B"
+          },
+          {
+            "action": "close"
+          }
+        ],
+        "failure": false,
+        "metadata": 1,
+        "open": false,
+        "target": "B"
+      }
+    },
+    "saved": {
+      "dialog": false,
+      "state": {
+        "calls": [
+          {
+            "action": "save",
+            "folderId": null,
+            "name": "edited-alpha",
+            "target": "A"
+          },
+          {
+            "action": "save",
+            "folderId": 12,
+            "name": "saved-beta",
+            "target": "B"
+          },
+          {
+            "action": "close"
+          }
+        ],
+        "failure": false,
+        "metadata": 1,
+        "open": false,
+        "target": "B"
+      }
+    },
+    "counts": {
+      "closes": 4,
+      "removes": 1,
+      "mores": 1,
+      "saves": 2
+    },
+    "nativeActionsOnly": true,
+    "validationVerifiedBeforeSave": true,
+    "reopened": {
+      "dialog": true,
+      "error": "",
+      "folder": "즐겨찾기 루트",
+      "name": "Menu B",
+      "state": {
+        "calls": [
+          {
+            "action": "save",
+            "folderId": null,
+            "name": "edited-alpha",
+            "target": "A"
+          },
+          {
+            "action": "save",
+            "folderId": 12,
+            "name": "saved-beta",
+            "target": "B"
+          },
+          {
+            "action": "close"
+          }
+        ],
+        "failure": false,
+        "metadata": 1,
+        "open": true,
+        "target": "B"
+      },
+      "url": "/fixture/b?metadata=1",
+      "urlReadOnly": true
+    }
+  }
+}

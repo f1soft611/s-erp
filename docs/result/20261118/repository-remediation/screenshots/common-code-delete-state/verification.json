@@ -1,0 +1,46 @@
+{
+  "actualPanelTreeGrid": true,
+  "transport": "Synthetic existing group 1/2 item GET only; all other fetch including save blocked",
+  "storage": "Tab-only memory storage and synthetic expiry prerequisite; no persistent reads or writes",
+  "native": "Selection, native right-button context menus, deletion, Escape, and existing splitter drag on tablet/desktop; hit-tested genuinely visible cell points, no forced or DOM click",
+  "widths": [
+    {
+      "width": 375,
+      "initialDetailsBlock": true,
+      "remainingDetailBlocks": true,
+      "lastDetailDeletionEnablesGroup": true,
+      "childGroupBlocks": true,
+      "deletedChildAllowsGroup": true,
+      "documentWidth": 375
+    },
+    {
+      "width": 768,
+      "initialDetailsBlock": true,
+      "remainingDetailBlocks": true,
+      "lastDetailDeletionEnablesGroup": true,
+      "childGroupBlocks": true,
+      "deletedChildAllowsGroup": true,
+      "documentWidth": 768
+    },
+    {
+      "width": 1280,
+      "initialDetailsBlock": true,
+      "remainingDetailBlocks": true,
+      "lastDetailDeletionEnablesGroup": true,
+      "childGroupBlocks": true,
+      "deletedChildAllowsGroup": true,
+      "documentWidth": 1280
+    }
+  ],
+  "syntheticRequests": 13,
+  "unknownRequests": 0,
+  "errors": 0,
+  "images": [
+    "enabled-375.png",
+    "blocked-375.png",
+    "enabled-768.png",
+    "blocked-768.png",
+    "enabled-1280.png",
+    "blocked-1280.png"
+  ]
+}

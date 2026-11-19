@@ -1,12 +1,12 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { useState } from 'react';
+import { Profiler, useState } from 'react';
 import { PageSearchArea } from '../src/shared/components/PageSearchArea';
 import {
   formatMonthValue,
-  MonthEditor,
   normalizeMonthInput,
-} from '../src/shared/components/f1-grid/editing/MonthEditor';
+} from '../src/shared/components/f1-grid/editing/monthInput';
+import { MonthEditor } from '../src/shared/components/f1-grid/editing/MonthEditor';
 import { toPageSearchFields, type PageSearchField } from '../src/shared/components/page-search/searchFields';
 
 describe('month helpers', () => {
@@ -31,6 +31,28 @@ describe('month helpers', () => {
 });
 
 describe('MonthEditor', () => {
+  it('commits external values without a stale draft and preserves equivalent partial input', () => {
+    const commits = vi.fn();
+    const view = (value: string) => (
+      <Profiler id="month-editor" onRender={() => commits((screen.getByRole('textbox', { name: '마감월' }) as HTMLInputElement).value)}>
+        <MonthEditor label="마감월" value={value} onChange={vi.fn()} />
+      </Profiler>
+    );
+    const { rerender } = render(view('202611'));
+    commits.mockClear();
+    rerender(view('202802'));
+    expect(commits).toHaveBeenNthCalledWith(1, '2028-02');
+
+    fireEvent.change(screen.getByRole('textbox', { name: '마감월' }), { target: { value: '2026-0' } });
+    rerender(view('20260'));
+    expect(screen.getByRole('textbox', { name: '마감월' })).toHaveValue('2026-0');
+    rerender(view('20260'));
+    expect(screen.getByRole('textbox', { name: '마감월' })).toHaveValue('2026-0');
+    commits.mockClear();
+    rerender(view('202912'));
+    expect(commits).toHaveBeenNthCalledWith(1, '2029-12');
+  });
+
   function Harness({ onChange }: { onChange: (value: string) => void }) {
     const [value, setValue] = useState('202611');
     return <MonthEditor label="마감월" value={value} onChange={(next) => { setValue(next); onChange(next); }} />;

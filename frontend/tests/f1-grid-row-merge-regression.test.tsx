@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { F1Grid, getGridMergeInfo } from '../src/shared/components/f1-grid';
-import { getGridCellBottomBorder } from '../src/shared/components/f1-grid/core/GridCell';
+import { getGridCellBottomBorder } from '../src/shared/components/f1-grid/core/gridCellUtils';
 
 type MergeRow = {
   id: string;

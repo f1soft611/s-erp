@@ -1,0 +1,35 @@
+{
+  "baseline": "91ccac018015cac04e375097eb276f514180d531",
+  "jsxAndPublicPropsAndExportsPreserved": true,
+  "allOriginalStateVariablesPreserved": true,
+  "allHelperBodiesPreserved": 51,
+  "overlayGeometryAndRowVirtualizationCalculationsPreserved": true,
+  "effectCount": 24,
+  "changedEffectsOnlyDependencyBindings": 3,
+  "resolverUsesExactCapturedValuesAndPrimitiveColumnCount": true,
+  "existingTestDeclarationsPreserved": 181,
+  "addedTestDeclarations": 1,
+  "addedRuntimeTests": 2,
+  "sourceFiles": 890,
+  "mismatches": [],
+  "changed": [
+    "frontend/src/pages/f1-grid-docs/F1-GRID.md",
+    "frontend/src/shared/components/f1-grid/core/F1Grid.tsx",
+    "frontend/tests/f1-grid.test.tsx"
+  ],
+  "lint": {
+    "before": 107,
+    "after": 103,
+    "removed": 4,
+    "added": 0
+  },
+  "red": {
+    "passed": 200,
+    "failed": 1,
+    "originalTestsPassed": 199
+  },
+  "tests": {
+    "files": 7,
+    "passed": 303
+  }
+}

@@ -1,0 +1,138 @@
+{
+  "layout": [
+    {
+      "fields": [
+        {
+          "field": "name",
+          "value": "alpha"
+        },
+        {
+          "field": "quantity",
+          "value": "1.5"
+        }
+      ],
+      "gridColumns": "343px",
+      "opacity": 1,
+      "paper": {
+        "clientWidth": 375,
+        "height": 1000,
+        "left": 0,
+        "right": 375,
+        "scrollWidth": 375,
+        "width": 375
+      },
+      "scrollWidth": 375,
+      "viewport": 375
+    },
+    {
+      "fields": [
+        {
+          "field": "name",
+          "value": "alpha"
+        },
+        {
+          "field": "quantity",
+          "value": "1.5"
+        }
+      ],
+      "gridColumns": "321px 321px",
+      "opacity": 1,
+      "paper": {
+        "clientWidth": 702,
+        "height": 282.1875,
+        "left": 32,
+        "right": 736,
+        "scrollWidth": 702,
+        "width": 704
+      },
+      "scrollWidth": 768,
+      "viewport": 768
+    },
+    {
+      "fields": [
+        {
+          "field": "name",
+          "value": "alpha"
+        },
+        {
+          "field": "quantity",
+          "value": "1.5"
+        }
+      ],
+      "gridColumns": "305.328px 305.328px 305.344px",
+      "opacity": 1,
+      "paper": {
+        "clientWidth": 988,
+        "height": 282.1875,
+        "left": 145,
+        "right": 1135,
+        "scrollWidth": 988,
+        "width": 990
+      },
+      "scrollWidth": 1280,
+      "viewport": 1280
+    }
+  ],
+  "behavior": {
+    "invalid": {
+      "error": "Name은(는) 필수입니다.",
+      "focused": true,
+      "value": ""
+    },
+    "differentRow": {
+      "name": "beta"
+    },
+    "reopened": {
+      "name": "alpha"
+    },
+    "editedAfterMetadataRerender": {
+      "changed": [
+        "name",
+        "name"
+      ],
+      "invalid": false,
+      "name": "edited-alpha",
+      "result": null,
+      "sourceName": "alpha"
+    },
+    "applied": {
+      "changed": [
+        "name",
+        "name",
+        "name",
+        "quantity"
+      ],
+      "result": {
+        "id": "B",
+        "name": "edited-beta",
+        "quantity": 3.5
+      },
+      "sourceA": {
+        "id": "A",
+        "name": "alpha",
+        "quantity": 1.5
+      },
+      "sourceB": {
+        "id": "B",
+        "name": "beta",
+        "quantity": 2
+      }
+    },
+    "differentDraft": {
+      "name": "edited-beta",
+      "quantity": 3.5,
+      "source": {
+        "id": "B",
+        "name": "beta",
+        "quantity": 2
+      }
+    },
+    "cancelled": {
+      "result": null,
+      "sourceName": "alpha"
+    }
+  },
+  "component": "F1GridFormModal",
+  "businessApiData": false,
+  "theme": "light"
+}

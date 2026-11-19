@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { FormDateField, normalizeFormDate } from '../src/shared/components/FormDateField';
+import { FormDateField } from '../src/shared/components/FormDateField';
+import { normalizeFormDate } from '../src/shared/components/formDateUtils';
 
 function Harness({
   initial = '',

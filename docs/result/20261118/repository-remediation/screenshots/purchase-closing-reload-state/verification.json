@@ -1,0 +1,91 @@
+{
+  "actualPageGridProfiler": true,
+  "onlyGetAndDefaultsBoundariesSynthetic": true,
+  "memoryStorageOnly": true,
+  "allWritesBlocked": true,
+  "syntheticRowsOnly": true,
+  "unitPriceEditingCoveredByUnitRegression": true,
+  "widths": [
+    {
+      "width": 375,
+      "sameDataInputRetainsNativeSupplierAndRowSelection": true,
+      "firstNewDataCommit": {
+        "checked": 0,
+        "filtered": false,
+        "text": "No입고번호마감마감월입고일발주번호품목코드품목명규격상세1OWN-A-1-REFRESH2026-11-17OWN-PO-1M-1Owned materialM82OWN-A-2-REFRESH마감2026-112026-11-17OWN-PO-1M-1Owned materialM83OWN-B-1-REFRESH2026-11-17OWN-PO-1M-1Owned materialM8합계"
+      },
+      "allNewDataCommitsReset": true,
+      "syntheticReloadGets": 2,
+      "unknownRequests": 0,
+      "documentOverflow": 0,
+      "screenshots": [
+        {
+          "stage": "selected",
+          "file": "selected-375.png",
+          "contentWidth": 360,
+          "sha256": "e7bc269ad91372ab88677b9b9a17232b194a8a784db14384e25c1ced0b838689"
+        },
+        {
+          "stage": "reloaded",
+          "file": "reloaded-375.png",
+          "contentWidth": 360,
+          "sha256": "57c4e6873313ab6bc6af4d0075fcc8a03eac5be59e3dbdb8a25d8f57ee73ed77"
+        }
+      ]
+    },
+    {
+      "width": 768,
+      "sameDataInputRetainsNativeSupplierAndRowSelection": true,
+      "firstNewDataCommit": {
+        "checked": 0,
+        "filtered": false,
+        "text": "No입고번호마감마감월입고일발주번호품목코드품목명규격단위1OWN-A-1-REFRESH2026-11-17OWN-PO-1M-1Owned materialM8EA2OWN-A-2-REFRESH마감2026-112026-11-17OWN-PO-1M-1Owned materialM8EA3OWN-B-1-REFRESH2026-11-17OWN-PO-1M-1Owned materialM8EA합계"
+      },
+      "allNewDataCommitsReset": true,
+      "syntheticReloadGets": 2,
+      "unknownRequests": 0,
+      "documentOverflow": 0,
+      "screenshots": [
+        {
+          "stage": "selected",
+          "file": "selected-768.png",
+          "contentWidth": 768,
+          "sha256": "751471529175aa872a97ecca9a53e0ff0162b07c04d99b51a2a4947d07a491b4"
+        },
+        {
+          "stage": "reloaded",
+          "file": "reloaded-768.png",
+          "contentWidth": 768,
+          "sha256": "1d6523455e8d47dfef1cf505ed2c222cec86e2b8e101f4e11b117963ff075af0"
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "sameDataInputRetainsNativeSupplierAndRowSelection": true,
+      "firstNewDataCommit": {
+        "checked": 0,
+        "filtered": false,
+        "text": "No입고번호마감마감월입고일발주번호품목코드품목명규격단위1OWN-A-1-REFRESH2026-11-17OWN-PO-1M-1Owned materialM8EA2OWN-A-2-REFRESH마감2026-112026-11-17OWN-PO-1M-1Owned materialM8EA3OWN-B-1-REFRESH2026-11-17OWN-PO-1M-1Owned materialM8EA합계"
+      },
+      "allNewDataCommitsReset": true,
+      "syntheticReloadGets": 2,
+      "unknownRequests": 0,
+      "documentOverflow": 0,
+      "screenshots": [
+        {
+          "stage": "selected",
+          "file": "selected-1280.png",
+          "contentWidth": 1280,
+          "sha256": "799f84877abe4de0e26d1dfd3f78a2139a93e59d376ea73638d7adb57d47ff41"
+        },
+        {
+          "stage": "reloaded",
+          "file": "reloaded-1280.png",
+          "contentWidth": 1280,
+          "sha256": "3a02f6bf14869558b615e4656a1c6ec928f6f5bcf957a3a3078490a373be2f10"
+        }
+      ]
+    }
+  ]
+}

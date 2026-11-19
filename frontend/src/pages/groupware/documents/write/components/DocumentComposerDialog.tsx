@@ -15,8 +15,8 @@ import {
 import {
   RichTextEditor,
   RichTextEditorToolbar,
-  richTextEditorIconButtonSx,
 } from '../../../../../shared/components/rich-text-editor/RichTextEditor';
+import { richTextEditorIconButtonSx } from '../../../../../shared/components/rich-text-editor/richTextEditorToolbarStyles';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { AppSaveButton } from '../../../../../shared/components/AppSaveButton';
 import { AppLoadingSpinner } from '../../../../../shared/components/AppLoadingSpinner';

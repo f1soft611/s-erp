@@ -1,0 +1,44 @@
+{
+  "baseline": "6c9b2ea045316ce6b5aed09c2c47f6d221b3dbd6",
+  "changed": [
+    "frontend\\src\\pages\\materials\\request\\status\\hooks\\usePurchaseRequestStatus.ts",
+    "frontend\\tests\\purchase-request-status.test.tsx"
+  ],
+  "onlySearchDefaultWrapperListAndDetailStartGuardsChanged": true,
+  "sameOwnerSessionSetterAndPassiveVersion1StoragePreserved": true,
+  "quietFilterChangeAndPausedLastStartedVersionPreserved": true,
+  "detailSameIdCloseReopenStaleCancellationAndEditorStatePreserved": true,
+  "servicesApiTypesPageUiJsxCssSearchApplyResetGridSelectionEditingConfirmationAndCallbacksUnchanged": true,
+  "renderRefStorageOrTransportAccessAdded": false,
+  "originalTestsBytePreservedExceptNullableDefaultMockControl": true,
+  "addedTests": 5,
+  "runtimeRed": {
+    "failed": 5,
+    "cause": "Initial/delayed search defaults were uninitialized and list/detail loading was false in first eligible commits"
+  },
+  "baselineTests": {
+    "files": 1,
+    "passed": 3
+  },
+  "relatedTests": {
+    "files": 3,
+    "passed": 25,
+    "statusPassed": 8
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 66,
+    "after": 63,
+    "removed": 3,
+    "added": 0,
+    "removedTokens": [
+      "setHasLoaded",
+      "setKeyword",
+      "setLoading"
+    ],
+    "otherDiagnosticsUnchangedIncludingLabels": true
+  },
+  "remainingRefs": 0,
+  "remainingStateInEffect": 63
+}

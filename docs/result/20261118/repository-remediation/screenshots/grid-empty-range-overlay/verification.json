@@ -1,0 +1,80 @@
+{
+  "actualF1Grid": true,
+  "actualProfiler": true,
+  "allTransportBlocked": true,
+  "memoryStorageOnly": true,
+  "osClipboardUnused": true,
+  "syntheticRowsOnly": true,
+  "copyCoveredByUnitRegression": true,
+  "widths": [
+    {
+      "width": 375,
+      "firstEscapeCommitOverlay": null,
+      "escapeCommits": 1,
+      "allEscapeCommitsClear": true,
+      "nativeKeyboardTarget": "gridcell",
+      "freshNativeRange": true,
+      "rowSelectionAndEditPreserved": true,
+      "requests": 0,
+      "documentOverflow": 0,
+      "screenshots": [
+        {
+          "stage": "selected",
+          "file": "selected-375.png",
+          "sha256": "2df978f0d2aa4971199918df839ca7ea9109410db00d9ad9ca7087e3b1d0ffe6"
+        },
+        {
+          "stage": "cleared",
+          "file": "cleared-375.png",
+          "sha256": "f6158867904b3ba4f3432a6b35c1c5fcb4709a72727f22c7e056928419a2f75c"
+        }
+      ]
+    },
+    {
+      "width": 768,
+      "firstEscapeCommitOverlay": null,
+      "escapeCommits": 1,
+      "allEscapeCommitsClear": true,
+      "nativeKeyboardTarget": "gridcell",
+      "freshNativeRange": true,
+      "rowSelectionAndEditPreserved": true,
+      "requests": 0,
+      "documentOverflow": 0,
+      "screenshots": [
+        {
+          "stage": "selected",
+          "file": "selected-768.png",
+          "sha256": "240cf546d57fb8a80a0da7364be4e07563011c13c24265ce89ae06093d9c4c00"
+        },
+        {
+          "stage": "cleared",
+          "file": "cleared-768.png",
+          "sha256": "8da9da959b04834a993b67893ff4b7149dd54b5888be1d3b1a260e0267730808"
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "firstEscapeCommitOverlay": null,
+      "escapeCommits": 1,
+      "allEscapeCommitsClear": true,
+      "nativeKeyboardTarget": "gridcell",
+      "freshNativeRange": true,
+      "rowSelectionAndEditPreserved": true,
+      "requests": 0,
+      "documentOverflow": 0,
+      "screenshots": [
+        {
+          "stage": "selected",
+          "file": "selected-1280.png",
+          "sha256": "6e959d38053406c3314e452d470572cc2a1bdb41413616542e29d433d7241f9c"
+        },
+        {
+          "stage": "cleared",
+          "file": "cleared-1280.png",
+          "sha256": "73f9d1d45783f9e8ca491c694bb44888b5d7c77117ea65bab5ad16415968860e"
+        }
+      ]
+    }
+  ]
+}

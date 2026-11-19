@@ -1,0 +1,78 @@
+{
+  "actualF1GridAndDataSourceController": true,
+  "source": "Local synthetic dataSource; all fetch blocked; no production API fallback",
+  "storage": "Tab-only memory replacement; no persisted storage reads or writes",
+  "initial": {
+    "requests": 1,
+    "offset": 0,
+    "limit": 12,
+    "total": 40
+  },
+  "widths": [
+    {
+      "width": 375,
+      "themeRequests": 0,
+      "sortRequests": 1,
+      "offset": 0,
+      "direction": "asc",
+      "total": 40,
+      "documentWidth": 375
+    },
+    {
+      "width": 768,
+      "themeRequests": 0,
+      "sortRequests": 1,
+      "offset": 0,
+      "direction": "desc",
+      "total": 40,
+      "documentWidth": 768
+    },
+    {
+      "width": 1280,
+      "themeRequests": 0,
+      "sortRequests": 1,
+      "offset": 0,
+      "direction": "asc",
+      "total": 40,
+      "documentWidth": 1280
+    }
+  ],
+  "append": {
+    "offset": 12,
+    "previousAndNextRowsPresent": true
+  },
+  "filter": {
+    "requests": 1,
+    "field": "code",
+    "operator": "contains",
+    "value": "ROW-0",
+    "total": 9
+  },
+  "ownership": {
+    "heldSignalAborted": true,
+    "staleResultIgnored": true,
+    "staleResolutionAdditionalRequests": 0
+  },
+  "currentErrorCallbacks": 1,
+  "recovery": {
+    "latestVersion": 4,
+    "succeeded": true,
+    "additionalErrors": 0
+  },
+  "totalQueries": 10,
+  "unknownRequests": 0,
+  "observerCorrections": [
+    "Sorting uses the existing header menu, not a header-label click",
+    "Measured internal scroller receives native mouse move/wheel; generic page scroll was not the scroller",
+    "Filter input is associated with a label, not a literal aria-label attribute",
+    "Read-only wait uses its supported flags and explicit page; URL pinning retained for all actions/eval"
+  ],
+  "images": [
+    "query-375.png",
+    "query-768.png",
+    "query-1280.png",
+    "filter-1280.png",
+    "stale-1280.png",
+    "error-1280.png"
+  ]
+}

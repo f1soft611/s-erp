@@ -1,0 +1,34 @@
+{
+  "baseline": "4871799e9004f6edd56719aa0974a4aaf7cfada9",
+  "changed": [
+    "frontend/src/pages/groupware/community/notice/components/NoticeFeedList.tsx",
+    "frontend/tests/notice-page-local-updates.test.tsx"
+  ],
+  "onlyOwnedKeyDecodingAndThreeLocalArrayBindingsChanged": true,
+  "allDependencyArraysUnchanged": true,
+  "orderedRequestIdsFailureIndexAndObjectUrlCleanupUnchanged": true,
+  "unchangedEffects": 3,
+  "allOtherSourceUiPublicPropsServerCommentsCursorAndBackendContractsUnchanged": true,
+  "existingTests": 39,
+  "onlyExistingImagePreviewTestExtended": true,
+  "sourceFiles": 890,
+  "byteMismatches": 0,
+  "red": {
+    "expectedTargetWarnings": 0,
+    "actualBefore": 1
+  },
+  "baselineTests": {
+    "files": 5,
+    "passed": 83
+  },
+  "relatedTests": {
+    "files": 5,
+    "passed": 83
+  },
+  "lint": {
+    "before": 92,
+    "after": 91,
+    "removed": 1,
+    "added": 0
+  }
+}

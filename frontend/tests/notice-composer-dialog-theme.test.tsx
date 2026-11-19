@@ -6,6 +6,79 @@ import { AttachmentList } from '../src/shared/components/feed/AttachmentList';
 import { createAppTheme } from '../src/theme/theme';
 
 describe('NoticeComposerDialog theme handling', () => {
+  it('keeps an open draft across default changes and applies the latest defaults on reopening', async () => {
+    const composer = (open: boolean, next = false) => (
+      <ThemeProvider theme={createAppTheme('light')}>
+        <NoticeComposerDialog
+          open={open}
+          isDark={false}
+          onClose={() => undefined}
+          defaultTitle={next ? 'Owned next title' : 'Owned first title'}
+          noticeGubunOptions={[
+            { code: 'GENERAL', name: 'Owned general' },
+            { code: 'OTHER', name: 'Owned other' },
+          ]}
+          defaultNoticeGubunCode={next ? 'OTHER' : 'GENERAL'}
+          defaultLoginPopupYn={next ? 'Y' : 'N'}
+          defaultPopupEndDate={next ? '2026-12-31' : '2026-11-18'}
+          defaultBody="<p>Owned body</p>"
+          defaultAttachments={[{
+            id: next ? 'owned-next' : 'owned-first',
+            name: next ? 'owned-next.txt' : 'owned-first.txt',
+          }]}
+        />
+      </ThemeProvider>
+    );
+    const { rerender } = render(composer(true));
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: 'Owned unsaved title' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '첨부 파일 삭제' }));
+
+    rerender(composer(true, true));
+
+    expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue('Owned unsaved title');
+    expect(screen.getByRole('combobox', { name: /구분/ })).toHaveTextContent('Owned general');
+    expect(screen.getByRole('checkbox', { name: '로그인 시 팝업' })).not.toBeChecked();
+    expect(screen.getByRole('textbox', { name: '팝업 종료일' })).toHaveValue('2026-11-18');
+    expect(screen.queryByText('owned-first.txt')).not.toBeInTheDocument();
+    expect(screen.queryByText('owned-next.txt')).not.toBeInTheDocument();
+
+    rerender(composer(false, true));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    rerender(composer(true, true));
+
+    expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue('Owned next title');
+    expect(screen.getByRole('combobox', { name: /구분/ })).toHaveTextContent('Owned other');
+    expect(screen.getByRole('checkbox', { name: '로그인 시 팝업' })).toBeChecked();
+    expect(screen.getByRole('textbox', { name: '팝업 종료일' })).toHaveValue('2026-12-31');
+    expect(screen.getByText('owned-next.txt')).toBeInTheDocument();
+  });
+
+  it('retains the existing field reset when paste debug mode changes while open', () => {
+    const originalUrl = window.location.href;
+    const nextUrl = new URL(originalUrl);
+    nextUrl.searchParams.delete('noticePasteDebug');
+    window.history.replaceState({}, '', nextUrl);
+    const composer = () => (
+      <ThemeProvider theme={createAppTheme('light')}>
+        <NoticeComposerDialog open isDark={false} onClose={() => undefined} defaultTitle="Owned baseline" />
+      </ThemeProvider>
+    );
+    try {
+      const { rerender } = render(composer());
+      fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+        target: { value: 'Owned unsaved title' },
+      });
+      nextUrl.searchParams.set('noticePasteDebug', '1');
+      window.history.replaceState({}, '', nextUrl);
+      rerender(composer());
+      expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue('Owned baseline');
+    } finally {
+      window.history.replaceState({}, '', originalUrl);
+    }
+  });
+
   it('applies the light theme tokens to the dialog shell', () => {
     render(
       <ThemeProvider theme={createAppTheme('light')}>

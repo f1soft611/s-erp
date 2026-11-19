@@ -1,0 +1,119 @@
+{
+  "panels": [
+    {
+      "kind": "date",
+      "results": [
+        {
+          "width": 375,
+          "panel": {
+            "left": 63,
+            "right": 359,
+            "width": 296
+          },
+          "scrollWidth": 375,
+          "selected": "2026-11-02",
+          "unchanged": true
+        },
+        {
+          "width": 768,
+          "panel": {
+            "left": 456,
+            "right": 752,
+            "width": 296
+          },
+          "scrollWidth": 768,
+          "selected": "2026-11-02",
+          "unchanged": true
+        },
+        {
+          "width": 1280,
+          "panel": {
+            "left": 480,
+            "right": 776,
+            "width": 296
+          },
+          "scrollWidth": 1280,
+          "selected": "2026-11-02",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "kind": "month",
+      "results": [
+        {
+          "width": 375,
+          "panel": {
+            "left": 63,
+            "right": 359,
+            "width": 296
+          },
+          "scrollWidth": 375,
+          "selected": "11월",
+          "unchanged": true
+        },
+        {
+          "width": 768,
+          "panel": {
+            "left": 456,
+            "right": 752,
+            "width": 296
+          },
+          "scrollWidth": 768,
+          "selected": "11월",
+          "unchanged": true
+        },
+        {
+          "width": 1280,
+          "panel": {
+            "left": 480,
+            "right": 776,
+            "width": 296
+          },
+          "scrollWidth": 1280,
+          "selected": "11월",
+          "unchanged": true
+        }
+      ]
+    }
+  ],
+  "behavior": {
+    "selection": {
+      "date": "2026-12-03",
+      "month": "2027-02"
+    },
+    "enabled": {
+      "buttonDisabled": false,
+      "inputDisabled": false,
+      "popups": 0
+    },
+    "dateReset": {
+      "grid": "2028년 2월",
+      "selected": "2028-02-29"
+    },
+    "monthReset": {
+      "selected": "2월",
+      "year": "2028"
+    },
+    "disabled": {
+      "buttonDisabled": true,
+      "inputDisabled": true,
+      "popups": 0
+    }
+  },
+  "tests": {
+    "files": 9,
+    "total": 158,
+    "passed": 158,
+    "failed": 0,
+    "pending": 0
+  },
+  "lint": {
+    "total": 115,
+    "rules": {
+      "react(set-state-in-effect)": 93,
+      "react(refs)": 8,
+      "react-hooks(exhaustive-deps)": 14
+    }
+  }
+}

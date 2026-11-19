@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { F1GridChanges } from '../../../../../shared/components/f1-grid';
-import { useNotification } from '../../../../../shared/context/NotificationContext';
+import { useNotification } from '../../../../../shared/context/notification';
 import { useInitialLoadState } from '../../../../../shared/hooks/useInitialLoadState';
 import type { CommonCodeItemRow } from '../../../master/common-code/types/commonCodeManagement.types';
 import {
@@ -117,8 +117,8 @@ export function useDraftFormManagement(initialFilters: DraftFormFilters = {}) {
   useEffect(() => {
     void Promise.all([loadRows(initialFiltersRef.current), loadOptions()]);
     return () => {
-      ++loadVersion.current;
-      ++optionsVersion.current;
+      loadVersion.current += 1;
+      optionsVersion.current += 1;
     };
   }, [loadOptions, loadRows]);
 

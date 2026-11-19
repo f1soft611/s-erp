@@ -1,0 +1,25 @@
+{
+  "run": 44293639019,
+  "sha": "e2b93480853e1a2bdecd7ab539715c5d5fe27179",
+  "conclusion": "success",
+  "files": 226,
+  "tests": 2649,
+  "jobs": [
+    {
+      "name": "frontend-tests",
+      "conclusion": "success"
+    },
+    {
+      "name": "frontend-lint",
+      "conclusion": "success"
+    },
+    {
+      "name": "frontend-build",
+      "conclusion": "success"
+    },
+    {
+      "name": "frontend-required",
+      "conclusion": "success"
+    }
+  ]
+}

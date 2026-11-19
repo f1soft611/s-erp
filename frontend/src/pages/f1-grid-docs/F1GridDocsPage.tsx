@@ -13,17 +13,14 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
-import { useOptionalAppSettings } from '../../shared/context/AppSettingsContext';
+import { useOptionalAppSettings } from '../../shared/context/appSettings';
 import {
   f1GridDocGroups,
   getF1GridDoc,
   f1GridDocs,
 } from './data/f1GridDocs';
-import {
-  DocContent,
-  getDocApiRowId,
-  getDocSectionId,
-} from './components/DocContent';
+import { DocContent } from './components/DocContent';
+import { getDocApiRowId, getDocSectionId } from './components/docContentUtils';
 import { F1GridPlayground } from './components/F1GridPlayground';
 import './F1GridDocsPage.css';
 
@@ -136,15 +133,12 @@ export function F1GridDocsPage({
     });
   }, [searchTerm]);
 
-  useEffect(() => {
-    if (filteredDocs.length === 0) {
-      return;
-    }
-
-    if (!filteredDocs.some((item) => item.id === selectedId)) {
-      setSelectedId(filteredDocs[0].id);
-    }
-  }, [filteredDocs, selectedId]);
+  if (
+    filteredDocs.length > 0 &&
+    !filteredDocs.some((item) => item.id === selectedId)
+  ) {
+    setSelectedId(filteredDocs[0].id);
+  }
 
   const doc = getF1GridDoc(selectedId);
   const normalizedSearch = searchTerm.trim();

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Box,
   Button,
@@ -26,7 +26,6 @@ import Placeholder from '@tiptap/extension-placeholder';
 import StarterKit from '@tiptap/starter-kit';
 import { AttachmentList } from './AttachmentList';
 import { ProfileAvatar } from '../ProfileAvatar';
-import { sanitizeHtml } from '../../utils/sanitizeHtml';
 import {
   commentMentionSx,
   filterMentionCandidates,
@@ -35,6 +34,7 @@ import {
   MentionHighlight,
   type MentionCandidate,
 } from './commentMentions';
+import { isCommentSubmitKey, sanitizeCommentHtml } from './commentThreadUtils';
 
 function getFileBadgeMeta(fileName: string) {
   const extension = fileName.split('.').pop()?.toLowerCase() ?? '';
@@ -129,15 +129,6 @@ export type CommentThreadProps = {
   mentionOptions?: CommentMentionOption[];
   enableMentions?: boolean;
 };
-
-export const sanitizeCommentHtml = sanitizeHtml;
-export function isCommentSubmitKey(event: {
-  key: string;
-  shiftKey: boolean;
-  isComposing: boolean;
-}): boolean {
-  return event.key === 'Enter' && !event.shiftKey && !event.isComposing;
-}
 
 function hasCommentText(html: string): boolean {
   if (typeof DOMParser === 'undefined')
@@ -240,9 +231,11 @@ function CommentEditor({
       // Keep the editor content and selected files when the API rejects.
     }
   };
-  submitRef.current = () => {
-    void submit();
-  };
+  useLayoutEffect(() => {
+    submitRef.current = () => {
+      void submit();
+    };
+  });
   const mentionCandidates = enableMentions && mentionQuery !== null
     ? filterMentionCandidates(mentionOptions, mentionQuery)
     : [];
@@ -451,10 +444,8 @@ function CommentEditor({
           hidden
           aria-label={fileInputLabel}
           onChange={(event) => {
-            setFiles((current) => [
-              ...current,
-              ...Array.from(event.target.files ?? []),
-            ]);
+            const selectedFiles = Array.from(event.target.files ?? []);
+            setFiles((current) => [...current, ...selectedFiles]);
             event.target.value = '';
           }}
         />

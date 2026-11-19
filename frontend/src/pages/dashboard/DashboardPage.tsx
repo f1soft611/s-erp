@@ -31,7 +31,7 @@ import SecurityOutlined from '@mui/icons-material/SecurityOutlined';
 import LogoutOutlined from '@mui/icons-material/LogoutOutlined';
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useAppSettings } from '../../shared/context/AppSettingsContext';
+import { useAppSettings } from '../../shared/context/appSettings';
 import { logout } from '../../shared/services/authService';
 import {
   buildPageContent,
@@ -119,7 +119,7 @@ const getMenuRoutePath = (module: ModuleItem, menuId: string): string => {
     return normalizeRoutePath(directMatch);
   }
 
-  return `${modulePath === '/' ? '' : modulePath}/${menuId}` || '/';
+  return `${modulePath === '/' ? '' : modulePath}/${menuId}`;
 };
 
 function findMenuPath(
@@ -407,6 +407,7 @@ function DashboardPage() {
     selectedModule.id === 'groupware' && currentMenu.id === 'notice'
       ? [selectedModule.name, '커뮤니티', currentMenu.name]
       : breadcrumbItems;
+  const recentBreadcrumbPath = recentBreadcrumbItems.join(' > ');
 
   const isValidDashboardRoute = useMemo(() => {
     const normalizedPath = normalizeRoutePath(effectivePath);
@@ -632,7 +633,7 @@ function DashboardPage() {
       menuId: selectedMenuId,
       moduleId: selectedModuleId,
       moduleName: selectedModule.name,
-      breadcrumbPath: recentBreadcrumbItems.join(' > '),
+      breadcrumbPath: recentBreadcrumbPath,
       label: currentMenu.name,
       path: nextPath,
       visitedAt: Date.now(),
@@ -670,6 +671,7 @@ function DashboardPage() {
     hasAccessibleMenu,
     location.pathname,
     menusLoading,
+    recentBreadcrumbPath,
     selectedMenuId,
     selectedModule,
     selectedModuleId,

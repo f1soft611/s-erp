@@ -1,0 +1,54 @@
+{
+  "actualPanelTreeGridAndCommonDialog": true,
+  "transport": "22 synthetic GET responses for existing group 1/2 item paths; all other fetch blocked",
+  "storage": "Tab-only memory storage and synthetic expiry prerequisite; no persistent reads or writes",
+  "native": "Selection/F2, picker open/cancel/reopen/choice, mobile form apply and existing splitter drag",
+  "coveredCell": "When a sticky sequence cell covers the target center, use a genuinely visible point verified with elementFromPoint and native mouse down/up; no forced or DOM click",
+  "limitation": "Saving prop alone can cause unchanged idle refetch; this is not evidence of actual in-flight save draft preservation. Existing deferred-save unit regressions cover that contract.",
+  "widths": [
+    {
+      "width": 375,
+      "cellEditMode": "Existing mobile row form",
+      "pane": "Existing stacked layout",
+      "detailPaneWidth": 343,
+      "cancelPreservesRows": true,
+      "reopenAndSelectChangesOnlyParentName": true,
+      "savingPropBlocksEditing": true,
+      "parentlessGroupHasNoEnabledParentPicker": true,
+      "documentWidth": 375
+    },
+    {
+      "width": 768,
+      "cellEditMode": "Existing inline code editor",
+      "pane": "Existing native splitter drag, within its minimum width",
+      "detailPaneWidth": 326,
+      "cancelPreservesRows": true,
+      "reopenAndSelectChangesOnlyParentName": true,
+      "savingPropBlocksEditing": true,
+      "parentlessGroupHasNoEnabledParentPicker": true,
+      "documentWidth": 768
+    },
+    {
+      "width": 1280,
+      "cellEditMode": "Existing inline code editor",
+      "pane": "Existing native splitter drag, within its minimum width",
+      "detailPaneWidth": 738,
+      "cancelPreservesRows": true,
+      "reopenAndSelectChangesOnlyParentName": true,
+      "savingPropBlocksEditing": true,
+      "parentlessGroupHasNoEnabledParentPicker": true,
+      "documentWidth": 1280
+    }
+  ],
+  "syntheticRequests": 22,
+  "unknownRequests": 0,
+  "errors": 0,
+  "images": [
+    "picker-375.png",
+    "selected-375.png",
+    "picker-768.png",
+    "selected-768.png",
+    "picker-1280.png",
+    "selected-1280.png"
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "actualHooksLayoutObserver": true,
+  "notFullBusinessScreen": true,
+  "memoryStorageOnly": true,
+  "allWritesAndUnownedTransportBlocked": true,
+  "firstNormalRetryAndQuietListCommitsCorrect": true,
+  "quietThenFilterIsNormalLoading": true,
+  "pausedQuietLastStartedVersionPreserved": true,
+  "rowsRetainedAndCancelledResponseIgnored": true,
+  "firstDetailRetryAndReopenCommitsCorrect": true,
+  "sameIdNoRequestAndLoadedRefreshPreserved": true,
+  "closedDetailResponseIgnored": true,
+  "closedRefreshNoRequestAndEditorCleared": true,
+  "unknownRequests": 0,
+  "errors": 0,
+  "documentOverflow": 0,
+  "listGetsPerWidth": 6,
+  "detailGetsPerWidth": 5,
+  "widths": [
+    375,
+    768,
+    1280
+  ],
+  "images": [
+    {
+      "file": "request072-list-375.png",
+      "width": 375,
+      "height": 1100,
+      "bytes": 39646
+    },
+    {
+      "file": "request072-detail-375.png",
+      "width": 375,
+      "height": 1100,
+      "bytes": 28289
+    },
+    {
+      "file": "request072-list-768.png",
+      "width": 768,
+      "height": 1100,
+      "bytes": 40079
+    },
+    {
+      "file": "request072-detail-768.png",
+      "width": 768,
+      "height": 1100,
+      "bytes": 40110
+    },
+    {
+      "file": "request072-list-1280.png",
+      "width": 1280,
+      "height": 1100,
+      "bytes": 38667
+    },
+    {
+      "file": "request072-detail-1280.png",
+      "width": 1280,
+      "height": 1100,
+      "bytes": 38912
+    }
+  ],
+  "actualIndependentSearchListDetailSessionHooks": true,
+  "defaultsProviderAndDeferredListDetailGetsSynthetic": true,
+  "firstDefaultCommitConsistent": true,
+  "noStorageWriteBeforeFirstEligibleLayout": true,
+  "allMemoryStorageWritesAfterCommit": true,
+  "editApplySessionRestoreAndLatestPeriodResetPreserved": true,
+  "searchGetsPerWidth": 0
+}

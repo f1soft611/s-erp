@@ -51,7 +51,8 @@ import type {
   PurchaseRequestConfirmCandidate,
 } from './types/purchaseRequestConfirm.types';
 import { useServerDateDefault } from '../../../../shared/hooks/useServerDateDefault';
-import { FormDateField, normalizeFormDate } from '../../../../shared/components/FormDateField';
+import { FormDateField } from '../../../../shared/components/FormDateField';
+import { normalizeFormDate } from '../../../../shared/components/formDateUtils';
 
 type Props = {
   selectedModule: ModuleItem;
@@ -309,7 +310,7 @@ export function PurchaseRequestConfirmPage({
       applyLoaded(await cancelPurchaseConfirm(loaded.purchaseConfirmId));
       setNotice('구매요청 확정을 취소했습니다. 이 확정의 품목은 다시 확정할 수 있습니다.');
     });
-  }, [applyLoaded, closeEditable, confirm, loaded, requestCount, runBusy]);
+  }, [activeRows, applyLoaded, closeEditable, confirm, loaded, runBusy]);
 
   const actions = useMemo<PermissionActionGroupDefinition[]>(() => [
     {

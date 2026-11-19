@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { Profiler } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { DatePanel } from '../src/shared/components/calendar/DatePanel';
 import { DateRangePanel } from '../src/shared/components/calendar/DateRangePanel';
@@ -7,6 +8,32 @@ import { MonthPanel } from '../src/shared/components/calendar/MonthPanel';
 const TODAY = '2026-11-17';
 
 describe('DatePanel', () => {
+  it('commits external dates without a stale month while preserving navigation for unchanged or empty values', () => {
+    const commits = vi.fn();
+    const view = (value: string, todayValue = TODAY) => (
+      <Profiler id="date-panel" onRender={() => commits(screen.getByRole('grid').getAttribute('aria-label'))}>
+        <DatePanel value={value} onChange={vi.fn()} onClear={vi.fn()} todayValue={todayValue} />
+      </Profiler>
+    );
+    const { rerender } = render(view('2026-11-02'));
+    commits.mockClear();
+    rerender(view('2028-02-29'));
+    expect(commits).toHaveBeenNthCalledWith(1, '2028년 2월');
+
+    fireEvent.click(screen.getByRole('button', { name: '다음 달' }));
+    rerender(view('2028-02-29'));
+    expect(screen.getByRole('grid', { name: '2028년 3월' })).toBeInTheDocument();
+    rerender(view(''));
+    rerender(view('', '2031-02-03'));
+    rerender(view('not-a-date', '2031-02-03'));
+    expect(screen.getByRole('grid', { name: '2028년 3월' })).toBeInTheDocument();
+
+    rerender(view('2028-02-29', '2031-02-03'));
+    fireEvent.click(screen.getByRole('button', { name: '다음 달' }));
+    rerender(view('2028-02-29', '2031-02-04'));
+    expect(screen.getByRole('grid', { name: '2028년 2월' })).toBeInTheDocument();
+  });
+
   it('shows Korean weekdays with Sunday first, the selected date and the today marker', () => {
     render(<DatePanel value="2026-11-02" onChange={vi.fn()} onClear={vi.fn()} todayValue={TODAY} />);
     expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual(
@@ -104,6 +131,34 @@ describe('DateRangePanel', () => {
 });
 
 describe('MonthPanel', () => {
+  it('commits external years without a stale view and retains the existing empty and invalid value rules', () => {
+    const commits = vi.fn();
+    const view = (value: string, todayValue = TODAY) => (
+      <Profiler id="month-panel" onRender={() => commits((screen.getByRole('combobox', { name: '연도' }) as HTMLSelectElement).value)}>
+        <MonthPanel value={value} onChange={vi.fn()} onClear={vi.fn()} todayValue={todayValue} />
+      </Profiler>
+    );
+    const { rerender } = render(view('202611'));
+    commits.mockClear();
+    rerender(view('202802'));
+    expect(commits).toHaveBeenNthCalledWith(1, '2028');
+
+    fireEvent.click(screen.getByRole('button', { name: '다음 연도' }));
+    rerender(view('202802'));
+    expect(screen.getByRole('combobox', { name: '연도' })).toHaveValue('2029');
+    rerender(view(''));
+    rerender(view('', '2031-02-03'));
+    rerender(view('2028xx', '2031-02-03'));
+    expect(screen.getByRole('combobox', { name: '연도' })).toHaveValue('2029');
+    rerender(view('202813', '2031-02-03'));
+    expect(screen.getByRole('combobox', { name: '연도' })).toHaveValue('2031');
+
+    rerender(view('202802', '2031-02-03'));
+    fireEvent.click(screen.getByRole('button', { name: '다음 연도' }));
+    rerender(view('202802', '2031-02-04'));
+    expect(screen.getByRole('combobox', { name: '연도' })).toHaveValue('2028');
+  });
+
   it('lists 1월 to 12월, marks the selected and current month, and picks a month', () => {
     const onChange = vi.fn();
     render(<MonthPanel value="202610" onChange={onChange} onClear={vi.fn()} todayValue={TODAY} />);

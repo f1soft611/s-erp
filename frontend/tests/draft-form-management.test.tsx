@@ -11,10 +11,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
 import {
-  createDraftFormColumns,
-  createDraftFormRow,
   DraftFormGrid,
 } from '../src/pages/co/workflow/form/components/DraftFormGrid';
+import {
+  createDraftFormColumns,
+  createDraftFormRow,
+} from '../src/pages/co/workflow/form/data/draftFormGridData';
 import { fetchDraftFormUsers } from '../src/pages/co/workflow/form/services/draftFormManagement.service';
 import { F1Grid, type F1GridRef } from '../src/shared/components/f1-grid';
 import type { DraftFormRow } from '../src/pages/co/workflow/form/types/draftFormManagement.types';

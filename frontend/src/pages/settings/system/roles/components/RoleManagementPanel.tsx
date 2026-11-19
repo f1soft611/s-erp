@@ -306,8 +306,11 @@ export const RoleManagementPanel = forwardRef<
   }, [onDirtyChange, roleGridDirty, userGridDirty, pendingSync]);
 
   // The update API does not persist role_code, so a committed create keeps its code.
-  const isUncommittedNewRole = (row: RoleManagementRow) =>
-    row.id.startsWith('new-role-') && !committedCreateRowIds.has(row.id);
+  const isUncommittedNewRole = useCallback(
+    (row: RoleManagementRow) =>
+      row.id.startsWith('new-role-') && !committedCreateRowIds.has(row.id),
+    [committedCreateRowIds],
+  );
 
   const roleEditorPlugin = {
     id: 'role-grid-editor',
@@ -327,63 +330,66 @@ export const RoleManagementPanel = forwardRef<
         (field === 'group' && isUncommittedNewRole(row))),
   };
 
-  const roleColumns: F1GridColumn<RoleManagementRow>[] = [
-    {
-      field: 'id',
-      type: 'rownumber',
-      width: 60,
-      headerName: '순번',
-      headerAlign: 'center',
-      align: 'center',
-      pinned: 'left',
-    },
-    {
-      field: 'group',
-      headerName: '역할 코드',
-      highlightSearch: true,
-      flex: 1,
-      editable: isUncommittedNewRole,
-      required: true,
-      headerAlign: 'center',
-    },
-    {
-      field: 'name',
-      headerName: '역할명',
-      highlightSearch: true,
-      flex: 1,
-      editable: true,
-      required: true,
-      headerAlign: 'center',
-    },
-    {
-      field: 'description',
-      headerName: '설명',
-      highlightSearch: true,
-      flex: 2,
-      editable: true,
-      wrapText: true,
-      headerAlign: 'center',
-    },
-    {
-      field: 'menuCount',
-      headerName: '사용자 수',
-      flex: 1,
-      type: 'number',
-      editable: false,
-      align: 'center',
-      headerAlign: 'center',
-    },
-    {
-      field: 'active',
-      headerName: '사용 여부',
-      flex: 1,
-      type: 'checkbox',
-      editable: true,
-      headerCheckbox: true,
-      align: 'center',
-      headerAlign: 'center',
-    },
-  ];
+  const roleColumns = useMemo<F1GridColumn<RoleManagementRow>[]>(
+    () => [
+      {
+        field: 'id',
+        type: 'rownumber',
+        width: 60,
+        headerName: '순번',
+        headerAlign: 'center',
+        align: 'center',
+        pinned: 'left',
+      },
+      {
+        field: 'group',
+        headerName: '역할 코드',
+        highlightSearch: true,
+        flex: 1,
+        editable: isUncommittedNewRole,
+        required: true,
+        headerAlign: 'center',
+      },
+      {
+        field: 'name',
+        headerName: '역할명',
+        highlightSearch: true,
+        flex: 1,
+        editable: true,
+        required: true,
+        headerAlign: 'center',
+      },
+      {
+        field: 'description',
+        headerName: '설명',
+        highlightSearch: true,
+        flex: 2,
+        editable: true,
+        wrapText: true,
+        headerAlign: 'center',
+      },
+      {
+        field: 'menuCount',
+        headerName: '사용자 수',
+        flex: 1,
+        type: 'number',
+        editable: false,
+        align: 'center',
+        headerAlign: 'center',
+      },
+      {
+        field: 'active',
+        headerName: '사용 여부',
+        flex: 1,
+        type: 'checkbox',
+        editable: true,
+        headerCheckbox: true,
+        align: 'center',
+        headerAlign: 'center',
+      },
+    ],
+    [isUncommittedNewRole],
+  );
 
   const userColumns: F1GridColumn<RoleUserRow>[] = [
     {

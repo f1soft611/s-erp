@@ -1,0 +1,31 @@
+{
+  "baseline": "02fe4825b90bf35c46713bd86f39a2d380f139e4",
+  "changed": [
+    "frontend/src/pages/groupware/messages/MessageInboxPage.tsx"
+  ],
+  "onlyTwoCallbackBindingsAndOneDependencyChanged": true,
+  "callbackBodiesAndRawSettersPreserved": true,
+  "unchangedEffectsAfterDependencyNormalization": 6,
+  "allOtherRefOwnershipRequestsHandlersMarkupStylesAndPublicContractsPreserved": true,
+  "sourceFiles": 890,
+  "byteMismatches": 0,
+  "red": {
+    "expectedTargetWarnings": 0,
+    "actualBefore": 1
+  },
+  "baselineTests": {
+    "files": 4,
+    "passed": 29
+  },
+  "relatedTests": {
+    "files": 4,
+    "passed": 29
+  },
+  "lint": {
+    "before": 96,
+    "after": 95,
+    "added": 0,
+    "removed": 1
+  },
+  "scopeLimit": "Stable callback binding only; no rewrite of message lifecycle or request ownership"
+}

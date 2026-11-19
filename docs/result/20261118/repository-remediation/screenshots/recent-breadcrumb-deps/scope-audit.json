@@ -1,0 +1,31 @@
+{
+  "baseline": "a553b7415fac9ec7244e8a56283b912b64eb7cbf",
+  "changed": [
+    "frontend/src/pages/dashboard/DashboardPage.tsx"
+  ],
+  "onlyThreePrimitiveBindingSitesChanged": true,
+  "unchangedEffectsAfterEquivalentValueAndDependencyNormalization": 5,
+  "historySignatureGuardRefUpdateVisitedAtSortingStorageAndSpecialNoticePathPreserved": true,
+  "allOtherSourcePublicPropsMarkupAndStylesPreserved": true,
+  "sourceFiles": 890,
+  "byteMismatches": 0,
+  "red": {
+    "expectedTargetWarnings": 0,
+    "actualBefore": 1
+  },
+  "baselineTests": {
+    "files": 3,
+    "passed": 28
+  },
+  "relatedTests": {
+    "files": 3,
+    "passed": 28
+  },
+  "lint": {
+    "before": 97,
+    "after": 96,
+    "added": 0,
+    "removed": 1
+  },
+  "scopeLimit": "Pure primitive path binding; no history-format or UI redesign"
+}

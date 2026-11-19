@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { F1Grid } from '../src/shared/components/f1-grid/core/F1Grid';
 
 describe('F1Grid pinned-column drag selection', () => {

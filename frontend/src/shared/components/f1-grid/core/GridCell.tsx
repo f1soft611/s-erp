@@ -1,7 +1,9 @@
 import {
   memo,
   useCallback,
+  useLayoutEffect,
   useMemo,
+  useState,
   type FocusEvent,
   type KeyboardEvent,
   type MouseEvent,
@@ -22,6 +24,7 @@ import {
   isGridCheckboxChecked,
 } from '../utils/grid.utils';
 import { F1GridHighlightText } from './GridHighlightText';
+import { getGridCellBottomBorder } from './gridCellUtils';
 
 type GridCellProps<T extends object> = {
   row: T;
@@ -71,19 +74,6 @@ function toJustifyContent(align: 'left' | 'center' | 'right') {
   if (align === 'right') return 'flex-end';
   if (align === 'center') return 'center';
   return 'flex-start';
-}
-
-export function getGridCellBottomBorder(
-  isLastRow: boolean | undefined,
-  merged: boolean,
-  isMergeStart: boolean | undefined,
-  mergeSpan?: number,
-  mergeEndsAtLastRow = false,
-) {
-  if (merged && !isMergeStart) return 0;
-  if (isLastRow || mergeEndsAtLastRow) return 1;
-  if (isMergeStart && mergeSpan && mergeSpan > 1) return 0;
-  return undefined;
 }
 
 const areGridCellPropsEqual = <T extends object>(
@@ -167,7 +157,7 @@ const GridCellInner = <T extends object>({
   pinOffset,
   adornment,
 }: GridCellProps<T>) => {
-  const cellAnchorRef = useRef<HTMLDivElement | null>(null);
+  const [userAnchorEl, setUserAnchorEl] = useState<HTMLElement | null>(null);
   const value = column.getValue?.(row) ?? row[column.field];
   const editable = isCellEditable(column, row);
   const cellRenderContext = useMemo(
@@ -251,10 +241,10 @@ const GridCellInner = <T extends object>({
   );
   const handleCellRef = useCallback(
     (node: HTMLElement | null) => {
-      cellAnchorRef.current = node as HTMLDivElement | null;
+      if (column.type === 'user' && editing) setUserAnchorEl(node);
       onCellRef(node);
     },
-    [onCellRef],
+    [column.type, editing, onCellRef],
   );
 
   return (
@@ -424,7 +414,7 @@ const GridCellInner = <T extends object>({
           column={column}
           value={String(draftValue ?? '')}
           userValue={draftValue}
-          userAnchorEl={cellAnchorRef.current}
+          userAnchorEl={userAnchorEl}
           onChange={onDraftChange}
           onUserChange={onDraftChange}
           onCommitEdit={() => onBlur?.()}
@@ -492,7 +482,9 @@ const MemoizedGridCell = memo(GridCellInner, areGridCellPropsEqual) as typeof Gr
 
 export function GridCell<T extends object>(props: GridCellProps<T>) {
   const latestProps = useRef(props);
-  latestProps.current = props;
+  useLayoutEffect(() => {
+    latestProps.current = props;
+  });
 
   // Visual memoization must not retain handlers that captured an older edit.
   const handlers = useMemo(() => ({

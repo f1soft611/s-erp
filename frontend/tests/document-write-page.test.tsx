@@ -79,7 +79,7 @@ afterEach(() => {
   restoreImagePreloader = undefined;
 });
 
-vi.mock('../src/shared/context/NotificationContext', () => ({
+vi.mock('../src/shared/context/notification', () => ({
   useNotification: () => composerNotifications,
 }));
 

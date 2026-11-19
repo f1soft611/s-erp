@@ -12,12 +12,19 @@ export function useSalesOrderStatusDetail() {
   const [error, setError] = useState('');
   const [refreshToken, setRefreshToken] = useState(0);
   const [editorMode, setEditorMode] = useState<SalesOrderEditorMode | null>(null);
+  const [previousRequest, setPreviousRequest] = useState({ id: selectedOrderId, token: refreshToken });
+
+  if (previousRequest.id !== selectedOrderId || previousRequest.token !== refreshToken) {
+    setPreviousRequest({ id: selectedOrderId, token: refreshToken });
+    if (selectedOrderId !== null) {
+      setLoading(true);
+      setError('');
+    }
+  }
 
   useEffect(() => {
     if (selectedOrderId === null) return;
     let active = true;
-    setLoading(true);
-    setError('');
     getSalesOrder(selectedOrderId)
       .then((loaded) => {
         if (active) setOrder(loaded);
