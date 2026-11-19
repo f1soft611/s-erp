@@ -5952,9 +5952,7 @@ describe('Document write page', () => {
   }, 15000);
 
   it('keeps reference users separate from approval stages', async () => {
-    render(<DashboardContent {...pageProps} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
     await waitForComposerReady();
 
     const referencePicker = screen.getByRole('combobox', {
