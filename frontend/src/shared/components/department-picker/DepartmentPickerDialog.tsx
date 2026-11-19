@@ -110,6 +110,7 @@ function DepartmentPickerBody({ selectedId, onChange, onPicked }: BodyProps) {
             <F1Tree
               key={keyword.trim()}
               ariaLabel="부서 선택 트리"
+              storageKey="department-picker-tree-v1"
               rows={rows}
               columns={COLUMNS}
               rowKey="departmentId"
