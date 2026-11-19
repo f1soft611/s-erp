@@ -568,15 +568,13 @@ const GridRowInner = <T extends object>({
             onKeyDown={onKeyDown}
             onSelectChange={(selectedValue: unknown) => {
               onDraftChange(String(selectedValue));
-              if (column.type === 'user') {
-                const changes =
-                  column.onValueChange?.(row, selectedValue) ??
-                  ({ [column.field]: selectedValue } as Partial<T>);
+              // 선택 값을 바꿀 때 다른 칸도 함께 바꾸는 onValueChange(예: 통화 변경 시 단가 전환)를 모든 선택 칸에서 호출한다.
+              const changes = column.onValueChange?.(row, selectedValue);
+              if (changes) {
                 onUpdateRow(changes);
-                onStopEdit();
-                return;
+              } else {
+                onUpdateCell(column.field, selectedValue);
               }
-              onUpdateCell(column.field, selectedValue);
               onStopEdit();
             }}
             onCheckboxChange={(checked: boolean) => {

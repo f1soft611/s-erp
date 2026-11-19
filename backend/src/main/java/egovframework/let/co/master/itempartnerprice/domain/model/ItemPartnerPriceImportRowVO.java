@@ -18,7 +18,13 @@ public class ItemPartnerPriceImportRowVO {
     private String customerCode;
     @Schema(description = "0 이상의 단가 문자열")
     private String unitPrice;
-    @Schema(description = "통화 코드. 공백은 KRW")
+    @Schema(description = "부가세구분 공통코드(PURCHASE_TAX_TYPE). 공백은 TAXABLE")
+    private String taxType;
+    @Schema(description = "부가세 포함 여부 Y/N. 공백은 N")
+    private String vatIncludedAt;
+    @Schema(description = "외화단가 문자열. 공백 허용, 입력하면 통화 필수")
+    private String foreignUnitPrice;
+    @Schema(description = "외화단가의 통화 코드(공통코드 CURRENCY)")
     private String currency;
     @Schema(description = "적용 시작일(YYYY-MM-DD)")
     private String startDt;

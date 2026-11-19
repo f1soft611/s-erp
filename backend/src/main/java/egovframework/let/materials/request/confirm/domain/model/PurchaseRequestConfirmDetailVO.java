@@ -106,6 +106,12 @@ public class PurchaseRequestConfirmDetailVO implements Serializable {
     @Schema(description = "통화 코드", example = "KRW")
     private String currencyCode;
 
+    @Schema(description = "확정 시 설정한 부가세구분(없으면 과세로 취급)", example = "TAXABLE")
+    private String taxType;
+
+    @Schema(description = "확정 시 설정한 부가세 포함 여부(없으면 미포함으로 취급)", example = "N")
+    private String vatIncludedAt;
+
     @Schema(description = "확정 금액(확정수량 × 확정단가)", example = "100000")
     private BigDecimal amount;
 

@@ -13,6 +13,12 @@
         <result property="tradeType" column="trade_type"/>
         <result property="unitPrice" column="unit_price"/>
         <result property="currency" column="currency"/>
+        <result property="taxType" column="tax_type"/>
+        <result property="vatIncludedAt" column="vat_included_at"/>
+        <result property="foreignUnitPrice" column="foreign_unit_price"/>
+        <result property="materialUnit" column="material_unit"/>
+        <result property="materialSpec" column="material_spec"/>
+        <result property="priceStatus" column="price_status"/>
         <result property="startDt" column="start_dt"/>
         <result property="endDt" column="end_dt"/>
         <result property="moq" column="moq"/>
@@ -26,7 +32,11 @@
     <sql id="priceColumns">
         p.price_id, p.tenant_id, p.material_id, m.material_code, m.material_name,
         p.customer_id, c.customer_code, c.customer_name, p.trade_type, p.unit_price,
-        p.currency, p.start_dt, p.end_dt, p.moq, p.use_at,
+        p.currency, p.tax_type, p.vat_included_at, p.foreign_unit_price, m.unit AS material_unit, m.material_spec,
+        CASE WHEN p.end_dt IS NOT NULL AND p.end_dt &lt; CURRENT_DATE THEN 'past'
+             WHEN p.start_dt &gt; CURRENT_DATE THEN 'future'
+             ELSE 'current' END AS price_status,
+        p.start_dt, p.end_dt, p.moq, p.use_at,
         p.created_by, p.created_at, p.updated_by, p.updated_at
     </sql>
 
@@ -44,6 +54,9 @@
                 OR c.customer_code ILIKE '%' || #{keyword} || '%'
                 OR c.customer_name ILIKE '%' || #{keyword} || '%')
         </if>
+        <if test="customerId != null">
+            AND p.customer_id = #{customerId}
+        </if>
         <if test="tradeType != null and tradeType != ''">
             AND p.trade_type = #{tradeType}
         </if>
@@ -54,7 +67,10 @@
         <if test="useAt != null and useAt != ''">
             AND p.use_at = #{useAt}
         </if>
-        ORDER BY p.trade_type, m.material_code, c.customer_code, p.start_dt DESC, p.price_id
+        <if test="!includeHistory and (effectiveOn == null or effectiveOn == '')">
+            AND (p.end_dt IS NULL OR p.end_dt &gt;= CURRENT_DATE)
+        </if>
+        ORDER BY p.trade_type, m.material_code, c.customer_code NULLS FIRST, p.start_dt DESC, p.price_id
     </select>
 
     <select id="resolveImportRows" parameterType="map"
@@ -84,7 +100,8 @@
             AND c.customer_code = r.customer_code AND c.use_at = 'Y'
         LEFT JOIN tb_item_partner_price existing ON existing.tenant_id = #{tenantId}
             AND existing.material_id = m.material_id
-            AND existing.customer_id = c.customer_id
+            AND existing.customer_id IS NOT DISTINCT FROM c.customer_id
+            AND (r.customer_code = '' OR c.customer_id IS NOT NULL)
             AND existing.trade_type = r.trade_type
             AND existing.start_dt = r.start_dt
         ORDER BY r.source_row_number
@@ -118,7 +135,7 @@
         FROM tb_item_partner_price
         WHERE tenant_id = #{tenantId}
             AND material_id = #{materialId}
-            AND customer_id = #{customerId}
+            AND customer_id IS NOT DISTINCT FROM CAST(#{customerId, jdbcType=BIGINT} AS BIGINT)
             AND trade_type = #{tradeType}
             AND start_dt = CAST(#{startDt} AS DATE)
         <if test="excludePriceId != null">
@@ -127,13 +144,179 @@
         LIMIT 1
     </select>
 
+    <!-- 품목 기준 화면: 사용 중인 품목을 코드순으로(상한+1건까지). 단가 상태 필터는 기준일의 적용 중·예정 단가 존재 여부로 판단한다. -->
+    <select id="selectOverviewMaterials" parameterType="map"
+            resultType="egovframework.let.co.master.itempartnerprice.domain.model.ItemPriceOverviewRowVO">
+        SELECT m.material_id AS "materialId", m.material_code AS "materialCode",
+               m.material_name AS "materialName", m.material_spec AS "materialSpec", m.unit AS "materialUnit"
+        FROM tb_material_info m
+        WHERE m.tenant_id = #{tenantId}
+          AND m.delete_status = 'N' AND m.deleted_at IS NULL
+        <if test="keyword != null and keyword != ''">
+            AND (m.material_code ILIKE '%' || #{keyword} || '%'
+                OR m.material_name ILIKE '%' || #{keyword} || '%'
+                OR m.material_spec ILIKE '%' || #{keyword} || '%')
+        </if>
+        <if test="priceFilter == 'NO_PURCHASE'">
+            AND NOT EXISTS (SELECT 1 FROM tb_item_partner_price p
+                WHERE p.tenant_id = m.tenant_id AND p.material_id = m.material_id
+                  AND p.customer_id IS NULL AND p.trade_type = '매입' AND p.use_at = 'Y'
+                  AND (p.end_dt IS NULL OR p.end_dt &gt;= CAST(#{effectiveOn} AS DATE)))
+        </if>
+        <if test="priceFilter == 'NO_SALES'">
+            AND NOT EXISTS (SELECT 1 FROM tb_item_partner_price p
+                WHERE p.tenant_id = m.tenant_id AND p.material_id = m.material_id
+                  AND p.customer_id IS NULL AND p.trade_type = '매출' AND p.use_at = 'Y'
+                  AND (p.end_dt IS NULL OR p.end_dt &gt;= CAST(#{effectiveOn} AS DATE)))
+        </if>
+        <if test="priceFilter == 'HAS_SPECIAL'">
+            AND EXISTS (SELECT 1 FROM tb_item_partner_price p
+                WHERE p.tenant_id = m.tenant_id AND p.material_id = m.material_id
+                  AND p.customer_id IS NOT NULL AND p.use_at = 'Y'
+                  AND (p.end_dt IS NULL OR p.end_dt &gt;= CAST(#{effectiveOn} AS DATE)))
+        </if>
+        ORDER BY m.material_code
+        LIMIT 2001
+    </select>
+
+    <!-- 거래처 기준 화면: 사용 중 거래처 목록과 거래처별 등록 건수(기준일에 적용 중·예정인 (품목, 거래구분) 수). 기본단가(거래처 NULL)는 세지 않는다. -->
+    <select id="selectCustomerOverview" parameterType="map"
+            resultType="egovframework.let.co.master.itempartnerprice.domain.model.ItemPriceCustomerOverviewRowVO">
+        SELECT c.customer_id AS "customerId", c.customer_code AS "customerCode",
+               c.customer_name AS "customerName", c.business_no AS "businessNo",
+               COALESCE(cnt.price_count, 0) AS "priceCount"
+        FROM tb_customer_info c
+        LEFT JOIN (
+            SELECT d.customer_id, COUNT(*) AS price_count
+            FROM (
+                SELECT DISTINCT customer_id, material_id, trade_type
+                FROM tb_item_partner_price
+                WHERE tenant_id = #{tenantId}
+                  AND customer_id IS NOT NULL
+                  AND use_at = 'Y'
+                  AND (end_dt IS NULL OR end_dt &gt;= CAST(#{effectiveOn} AS DATE))
+            ) d
+            GROUP BY d.customer_id
+        ) cnt ON cnt.customer_id = c.customer_id
+        WHERE c.tenant_id = #{tenantId}
+          AND c.use_at = 'Y'
+        <if test="keyword != null and keyword != ''">
+            AND (c.customer_code ILIKE '%' || #{keyword} || '%'
+                OR c.customer_name ILIKE '%' || #{keyword} || '%'
+                OR c.business_no ILIKE '%' || #{keyword} || '%')
+        </if>
+        <if test="registerFilter == 'REGISTERED'">
+            AND COALESCE(cnt.price_count, 0) &gt; 0
+        </if>
+        <if test="registerFilter == 'UNREGISTERED'">
+            AND COALESCE(cnt.price_count, 0) = 0
+        </if>
+        ORDER BY c.customer_code
+        LIMIT 2001
+    </select>
+
+    <!-- 조회된 품목의 사용 중 단가 중 기준일 이후에도 유효한 행(적용 중·예정). 기준 행 선택은 서비스에서 한다. -->
+    <select id="selectOverviewPrices" parameterType="map" resultMap="priceMap">
+        SELECT <include refid="priceColumns"/>
+        FROM tb_item_partner_price p
+        LEFT JOIN tb_material_info m
+            ON m.material_id = p.material_id AND m.tenant_id = p.tenant_id
+        LEFT JOIN tb_customer_info c
+            ON c.customer_id = p.customer_id AND c.tenant_id = p.tenant_id
+        WHERE p.tenant_id = #{tenantId}
+          AND p.use_at = 'Y'
+          AND (p.end_dt IS NULL OR p.end_dt &gt;= CAST(#{effectiveOn} AS DATE))
+          AND p.material_id IN
+        <foreach collection="materialIds" item="materialId" open="(" separator="," close=")">
+            #{materialId}
+        </foreach>
+        ORDER BY p.material_id, p.customer_id NULLS FIRST, p.trade_type, p.start_dt
+    </select>
+
+    <select id="existsCommonCode" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM tb_common_code_item i
+            JOIN tb_common_code_group g ON g.common_code_group_id = i.group_id
+            WHERE g.tenant_id = #{tenantId, jdbcType=BIGINT}
+              AND g.group_code = #{groupCode}
+              AND g.use_at = 'Y'
+              AND i.item_code = #{code}
+              AND i.use_at = 'Y'
+        )
+    </select>
+
+    <!-- 같은 (품목, 거래처 또는 기본, 거래구분)에서 기간이 겹치는 사용 중 행. 직전의 종료일 없는 행은 자동 종료 대상이라 제외한다. -->
+    <select id="selectOverlappingPriceId" parameterType="map" resultType="long">
+        SELECT price_id
+        FROM tb_item_partner_price
+        WHERE tenant_id = #{tenantId}
+            AND material_id = #{materialId}
+            AND customer_id IS NOT DISTINCT FROM CAST(#{customerId, jdbcType=BIGINT} AS BIGINT)
+            AND trade_type = #{tradeType}
+            AND use_at = 'Y'
+            AND start_dt &lt;= COALESCE(CAST(#{endDt, jdbcType=VARCHAR} AS DATE), DATE '9999-12-31')
+            AND COALESCE(end_dt, DATE '9999-12-31') &gt;= CAST(#{startDt} AS DATE)
+            AND NOT (end_dt IS NULL AND start_dt &lt; CAST(#{startDt} AS DATE))
+        <if test="excludePriceId != null">
+            AND price_id != #{excludePriceId}
+        </if>
+        LIMIT 1
+    </select>
+
+    <update id="closePreviousOpenPrices" parameterType="map">
+        UPDATE tb_item_partner_price SET
+            end_dt = CAST(#{startDt} AS DATE) - 1,
+            updated_by = #{updatedBy},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId}
+            AND material_id = #{materialId}
+            AND customer_id IS NOT DISTINCT FROM CAST(#{customerId, jdbcType=BIGINT} AS BIGINT)
+            AND trade_type = #{tradeType}
+            AND use_at = 'Y'
+            AND end_dt IS NULL
+            AND start_dt &lt; CAST(#{startDt} AS DATE)
+        <if test="excludePriceId != null">
+            AND price_id != #{excludePriceId}
+        </if>
+    </update>
+
+    <!-- 삭제 행이 자동 종료시켰던 직전 사용 행(종료일이 삭제 행 시작일의 전날) -->
+    <select id="selectPredecessorPriceId" parameterType="map" resultType="long">
+        SELECT price_id
+        FROM tb_item_partner_price
+        WHERE tenant_id = #{tenantId}
+            AND material_id = #{materialId}
+            AND customer_id IS NOT DISTINCT FROM CAST(#{customerId, jdbcType=BIGINT} AS BIGINT)
+            AND trade_type = #{tradeType}
+            AND use_at = 'Y'
+            AND end_dt = CAST(#{startDt} AS DATE) - 1
+            AND price_id != #{priceId}
+        LIMIT 1
+    </select>
+
+    <update id="reopenPrice" parameterType="map">
+        UPDATE tb_item_partner_price SET
+            end_dt = CAST(#{endDt, jdbcType=VARCHAR} AS DATE),
+            updated_by = #{updatedBy},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId} AND price_id = #{predecessorId}
+    </update>
+
+    <delete id="deleteItemPartnerPrice" parameterType="map">
+        DELETE FROM tb_item_partner_price
+        WHERE tenant_id = #{tenantId} AND price_id = #{priceId}
+    </delete>
+
     <select id="insertItemPartnerPrice" parameterType="map" resultType="long">
         INSERT INTO tb_item_partner_price (
             tenant_id, material_id, customer_id, trade_type, unit_price,
-            currency, start_dt, end_dt, moq, use_at, created_by, created_at, updated_by, updated_at
+            currency, tax_type, vat_included_at, foreign_unit_price,
+            start_dt, end_dt, moq, use_at, created_by, created_at, updated_by, updated_at
         ) VALUES (
-            #{tenantId}, #{materialId}, #{customerId}, #{tradeType}, #{unitPrice},
-            #{currency}, CAST(#{startDt} AS DATE), CAST(#{endDt} AS DATE), #{moq,jdbcType=NUMERIC},
+            #{tenantId}, #{materialId}, #{customerId,jdbcType=BIGINT}, #{tradeType}, #{unitPrice,jdbcType=NUMERIC},
+            #{currency,jdbcType=VARCHAR}, #{taxType}, #{vatIncludedAt}, #{foreignUnitPrice,jdbcType=NUMERIC},
+            CAST(#{startDt} AS DATE), CAST(#{endDt} AS DATE), #{moq,jdbcType=NUMERIC},
             #{useAt}, #{createdBy}, CURRENT_TIMESTAMP, #{updatedBy}, CURRENT_TIMESTAMP
         )
         RETURNING price_id
@@ -142,10 +325,13 @@
     <update id="updateItemPartnerPrice" parameterType="map">
         UPDATE tb_item_partner_price SET
             material_id = #{materialId},
-            customer_id = #{customerId},
+            customer_id = #{customerId,jdbcType=BIGINT},
             trade_type = #{tradeType},
-            unit_price = #{unitPrice},
-            currency = #{currency},
+            unit_price = #{unitPrice,jdbcType=NUMERIC},
+            currency = #{currency,jdbcType=VARCHAR},
+            tax_type = #{taxType},
+            vat_included_at = #{vatIncludedAt},
+            foreign_unit_price = #{foreignUnitPrice,jdbcType=NUMERIC},
             start_dt = CAST(#{startDt} AS DATE),
             end_dt = CAST(#{endDt} AS DATE),
             moq = #{moq,jdbcType=NUMERIC},

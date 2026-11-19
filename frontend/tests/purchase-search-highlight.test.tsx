@@ -2,12 +2,12 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { F1GridColumn } from '../src/shared/components/f1-grid';
-import { createClosingRowColumns } from '../src/pages/materials/receipt/closing/data/materialReceiptClosingColumns';
-import { createMaterialArrivalStatusColumns } from '../src/pages/materials/arrival/status/data/materialArrivalStatusColumns';
-import { createMaterialReceiptStatusColumns } from '../src/pages/materials/receipt/status/data/materialReceiptStatusColumns';
+import { createClosingRowColumns } from '../src/pages/materials/receipt/closing/data/purchaseReceiptClosingColumns';
+import { createPurchaseArrivalStatusColumns } from '../src/pages/materials/arrival/status/data/purchaseArrivalStatusColumns';
+import { createPurchaseReceiptStatusColumns } from '../src/pages/materials/receipt/status/data/purchaseReceiptStatusColumns';
 import { createPurchaseOrderStatusColumns } from '../src/pages/materials/order/status/data/purchaseOrderStatusColumns';
 import { createPurchaseRequestStatusColumns } from '../src/pages/materials/request/status/data/purchaseRequestStatusColumns';
-import { createMaterialInspectionStatusColumns } from '../src/pages/quality/inspect/status/data/materialInspectionStatusColumns';
+import { createQualityInspectionStatusColumns } from '../src/pages/quality/inspect/status/data/qualityInspectionStatusColumns';
 
 type AnyColumn = F1GridColumn<Record<string, unknown>>;
 
@@ -31,17 +31,17 @@ describe('purchase status screens highlight only the columns the server keyword 
   });
 
   it('arrival status: 가입고번호·구매처·담당자·품목코드·품목명', () => {
-    spec(createMaterialArrivalStatusColumns({ onOpenArrival: noop }),
+    spec(createPurchaseArrivalStatusColumns({ onOpenArrival: noop }),
       ['arrivalNo', 'supplierName', 'receiverName', 'materialCode', 'materialName']);
   });
 
   it('receipt status: 입고번호·구매처·담당자·품목코드·품목명 (가입고번호·검사번호는 통합검색 대상이 아니다)', () => {
-    spec(createMaterialReceiptStatusColumns({ onOpenReceipt: noop, onOpenArrival: noop }),
+    spec(createPurchaseReceiptStatusColumns({ onOpenReceipt: noop, onOpenArrival: noop }),
       ['receiptNo', 'supplierName', 'receiverName', 'materialCode', 'materialName']);
   });
 
   it('inspection status: 검사번호·가입고번호·구매처·검사자·품목코드·품목명', () => {
-    spec(createMaterialInspectionStatusColumns({ onOpenInspection: noop, onOpenArrival: noop }),
+    spec(createQualityInspectionStatusColumns({ onOpenInspection: noop, onOpenArrival: noop }),
       ['inspectionNo', 'arrivalNo', 'supplierName', 'inspectorName', 'materialCode', 'materialName']);
   });
 
@@ -72,7 +72,7 @@ describe('link columns highlight the matching text and keep the link behavior', 
   });
 
   it('without a keyword the link renders as before', () => {
-    const columns = createMaterialReceiptStatusColumns({ onOpenReceipt: vi.fn() });
+    const columns = createPurchaseReceiptStatusColumns({ onOpenReceipt: vi.fn() });
     render(<>{cellOf(columns, 'receiptNo', { receiptNo: 'MI-20261117-0003' }, undefined)}</>);
     const link = screen.getByRole('button', { name: 'MI-20261117-0003 상세 보기' });
     expect(link.querySelector('[data-f1-grid-highlight="true"]')).toBeNull();
@@ -87,8 +87,8 @@ describe('link columns highlight the matching text and keep the link behavior', 
   });
 
   it('inspection status highlights both the inspection number and the linked arrival number', () => {
-    const columns = createMaterialInspectionStatusColumns({ onOpenInspection: vi.fn(), onOpenArrival: vi.fn() });
-    const row = { inspectionNo: 'QI-20261117-0022', arrivalNo: 'MP-20261117-0040', arrivalLinked: true, materialArrivalId: 5 };
+    const columns = createQualityInspectionStatusColumns({ onOpenInspection: vi.fn(), onOpenArrival: vi.fn() });
+    const row = { inspectionNo: 'QI-20261117-0022', arrivalNo: 'MP-20261117-0040', arrivalLinked: true, purchaseArrivalId: 5 };
     const { unmount } = render(<>{cellOf(columns, 'inspectionNo', row, '22')}</>);
     expect(screen.getByRole('button', { name: 'QI-20261117-0022 상세 보기' }).querySelectorAll('[data-f1-grid-highlight="true"]'))
       .toHaveLength(1);
@@ -99,7 +99,7 @@ describe('link columns highlight the matching text and keep the link behavior', 
   });
 
   it('an unlinked arrival number is highlighted as plain text', () => {
-    const columns = createMaterialInspectionStatusColumns({ onOpenInspection: vi.fn(), onOpenArrival: vi.fn() });
+    const columns = createQualityInspectionStatusColumns({ onOpenInspection: vi.fn(), onOpenArrival: vi.fn() });
     const { container } = render(<>{cellOf(columns, 'arrivalNo', { arrivalNo: 'MP-20261117-0040', arrivalLinked: false }, '40')}</>);
     expect(container.querySelectorAll('[data-f1-grid-highlight="true"]')).toHaveLength(1);
     expect(screen.queryByRole('button')).toBeNull();

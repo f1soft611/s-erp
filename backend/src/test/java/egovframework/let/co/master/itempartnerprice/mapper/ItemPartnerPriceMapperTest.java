@@ -39,6 +39,134 @@ class ItemPartnerPriceMapperTest {
         verifyMoqBinding(statement, new BigDecimal("12.50"));
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void listFiltersPastRowsOnlyWhenHistoryIsNotRequested(boolean includeHistory) throws Exception {
+        Configuration configuration = loadConfiguration();
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 9L);
+        params.put("includeHistory", includeHistory);
+
+        String sql = configuration.getMappedStatement("ItemPartnerPriceDAO.selectItemPartnerPriceList")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+
+        assertThat(sql.contains("p.end_dt >= CURRENT_DATE")).isEqualTo(!includeHistory);
+        assertThat(sql).contains("p.tax_type", "p.vat_included_at", "p.foreign_unit_price", "price_status");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"selectOverlappingPriceId", "closePreviousOpenPrices", "existsCommonCode"})
+    void defaultPriceLookupsTreatNullCustomerAsDefaultKey(String statementId) throws Exception {
+        Configuration configuration = loadConfiguration();
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 9L);
+        params.put("startDt", "2026-11-18");
+
+        String sql = configuration.getMappedStatement("ItemPartnerPriceDAO." + statementId)
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+
+        if (!"existsCommonCode".equals(statementId)) {
+            assertThat(sql).contains("customer_id IS NOT DISTINCT FROM");
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ALL", "NO_PURCHASE", "NO_SALES", "HAS_SPECIAL"})
+    void overviewMaterialsApplyPriceFilterAndLimit(String filter) throws Exception {
+        Configuration configuration = loadConfiguration();
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 9L);
+        params.put("effectiveOn", "2026-11-18");
+        params.put("priceFilter", filter);
+
+        String sql = configuration.getMappedStatement("ItemPartnerPriceDAO.selectOverviewMaterials")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+
+        assertThat(sql).contains("ORDER BY m.material_code LIMIT 2001", "m.delete_status = 'N'");
+        assertThat(sql.contains("NOT EXISTS") && sql.contains("'매입'")).isEqualTo("NO_PURCHASE".equals(filter));
+        assertThat(sql.contains("NOT EXISTS") && sql.contains("'매출'")).isEqualTo("NO_SALES".equals(filter));
+        assertThat(sql.contains("AND EXISTS")).isEqualTo("HAS_SPECIAL".equals(filter));
+    }
+
+    @org.junit.jupiter.api.Test
+    void overviewPricesOnlyReadActiveRowsOfTheRequestedItems() throws Exception {
+        Configuration configuration = loadConfiguration();
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 9L);
+        params.put("effectiveOn", "2026-11-18");
+        params.put("materialIds", java.util.Arrays.asList(1L, 2L));
+
+        String sql = configuration.getMappedStatement("ItemPartnerPriceDAO.selectOverviewPrices")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+
+        assertThat(sql).contains("p.use_at = 'Y'", "p.material_id IN");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ALL", "REGISTERED", "UNREGISTERED"})
+    void customerOverviewCountsOnlyActiveSpecialPricesAndAppliesRegisterFilter(String filter) throws Exception {
+        Configuration configuration = loadConfiguration();
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 9L);
+        params.put("effectiveOn", "2026-11-18");
+        params.put("registerFilter", filter);
+        params.put("keyword", "abc");
+
+        String sql = configuration.getMappedStatement("ItemPartnerPriceDAO.selectCustomerOverview")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+
+        assertThat(sql).contains("customer_id IS NOT NULL", "use_at = 'Y'", "c.use_at = 'Y'",
+                "ORDER BY c.customer_code LIMIT 2001", "ILIKE");
+        assertThat(sql.contains("price_count, 0) > 0")).isEqualTo("REGISTERED".equals(filter));
+        assertThat(sql.contains("price_count, 0) = 0")).isEqualTo("UNREGISTERED".equals(filter));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void listFiltersByCustomerOnlyWhenRequested(boolean withCustomer) throws Exception {
+        Configuration configuration = loadConfiguration();
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 9L);
+        params.put("includeHistory", true);
+        if (withCustomer) params.put("customerId", 301L);
+
+        String sql = configuration.getMappedStatement("ItemPartnerPriceDAO.selectItemPartnerPriceList")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+
+        assertThat(sql.contains("p.customer_id = ?")).isEqualTo(withCustomer);
+        assertThat(sql).contains("m.material_spec");
+    }
+
+    @org.junit.jupiter.api.Test
+    void deleteStatementsMatchTheSpec() throws Exception {
+        Configuration configuration = loadConfiguration();
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 9L);
+        params.put("priceId", 44L);
+        params.put("startDt", "2026-11-18");
+
+        String predecessor = configuration.getMappedStatement("ItemPartnerPriceDAO.selectPredecessorPriceId")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        assertThat(predecessor).contains("customer_id IS NOT DISTINCT FROM", "use_at = 'Y'", "end_dt = CAST(? AS DATE) - 1");
+        String reopen = configuration.getMappedStatement("ItemPartnerPriceDAO.reopenPrice")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        assertThat(reopen).contains("UPDATE tb_item_partner_price SET end_dt = CAST(");
+        String delete = configuration.getMappedStatement("ItemPartnerPriceDAO.deleteItemPartnerPrice")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        assertThat(delete).contains("DELETE FROM tb_item_partner_price", "tenant_id = ?", "price_id = ?");
+    }
+
+    private Configuration loadConfiguration() throws Exception {
+        Configuration configuration;
+        try (InputStream input = Resources.getResourceAsStream(CONFIG)) {
+            configuration = new XMLConfigBuilder(input).parse();
+        }
+        try (InputStream input = Resources.getResourceAsStream(MAPPER)) {
+            new XMLMapperBuilder(input, configuration, MAPPER, configuration.getSqlFragments()).parse();
+        }
+        return configuration;
+    }
+
     private void verifyMoqBinding(String statementId, BigDecimal moq) throws Exception {
         Configuration configuration;
         try (InputStream input = Resources.getResourceAsStream(CONFIG)) {

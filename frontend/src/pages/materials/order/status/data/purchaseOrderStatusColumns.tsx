@@ -1,6 +1,10 @@
 import { Link } from '@mui/material';
 import type { F1GridColumn } from '../../../../../shared/components/f1-grid/types/grid.types';
-import { PURCHASE_ORDER_SOURCE_OPTIONS, PURCHASE_ORDER_STATUS_OPTIONS } from '../services/purchaseOrderStatus.service';
+import {
+  PURCHASE_ORDER_RECEIPT_CLOSE_OPTIONS,
+  PURCHASE_ORDER_SOURCE_OPTIONS,
+  PURCHASE_ORDER_STATUS_OPTIONS,
+} from '../services/purchaseOrderStatus.service';
 import type { PurchaseOrderStatusRow } from '../types/purchaseOrderStatus.types';
 import { F1GridHighlightText } from '../../../../../shared/components/f1-grid';
 
@@ -8,16 +12,31 @@ export type PurchaseOrderStatusColumnOptions = {
   onOpenOrder?: (row: PurchaseOrderStatusRow) => void;
 };
 
-const amountColumn = (
+/** 수량·단가: 자릿수를 고정하지 않고 정책 관리의 모듈 소수점 정책을 따른다. */
+const quantityColumn = (
   field: keyof PurchaseOrderStatusRow,
   headerName: string,
-  decimalPlaces = 2,
   width = 110,
 ): F1GridColumn<PurchaseOrderStatusRow> => ({
   field,
   headerName,
   type: 'decimal',
-  decimalPlaces,
+  width,
+  align: 'right',
+  editable: false,
+  search: { hidden: true },
+});
+
+/** 금액: 컬럼에서 2자리로 고정한다(정책 대상은 수량·단가). */
+const amountColumn = (
+  field: keyof PurchaseOrderStatusRow,
+  headerName: string,
+  width = 110,
+): F1GridColumn<PurchaseOrderStatusRow> => ({
+  field,
+  headerName,
+  type: 'decimal',
+  decimalPlaces: 2,
   width,
   align: 'right',
   editable: false,
@@ -155,11 +174,13 @@ export function createPurchaseOrderStatusColumns({
     { field: 'materialName', highlightSearch: true, headerName: '품목명', type: 'text', width: 180, editable: false, search: { hidden: true } },
     { field: 'materialSpec', headerName: '규격', type: 'text', width: 110, editable: false, search: { hidden: true } },
     { field: 'unit', headerName: '단위', type: 'text', width: 60, align: 'center', editable: false, search: { hidden: true } },
-    amountColumn('orderQty', '발주수량', 2, 100),
-    amountColumn('unitPrice', '발주단가'),
-    amountColumn('supplyAmt', '공급가', 2, 120),
+    quantityColumn('orderQty', '발주수량', 100),
+    quantityColumn('arrivedQty', '가입고수량', 100),
+    quantityColumn('remainQty', '입고잔량', 100),
+    quantityColumn('unitPrice', '발주단가'),
+    amountColumn('supplyAmt', '공급가', 120),
     amountColumn('vatAmt', '세액'),
-    amountColumn('totalAmt', '합계', 2, 120),
+    amountColumn('totalAmt', '합계', 120),
     {
       field: 'deliveryDt',
       headerName: '납기일',
@@ -167,7 +188,7 @@ export function createPurchaseOrderStatusColumns({
       width: 100,
       align: 'center',
       editable: false,
-      search: { label: '납기일', order: 7, span: 2, group: '부가날짜' },
+      search: { label: '납기일', order: 8, span: 2, group: '부가날짜' },
     },
     { field: 'warehouseName', headerName: '입고창고', type: 'text', width: 110, align: 'center', editable: false, search: { hidden: true } },
     {
@@ -202,5 +223,15 @@ export function createPurchaseOrderStatusColumns({
       search: { hidden: true },
     },
     { field: 'remark', headerName: '비고', type: 'text', width: 180, editable: false, search: { hidden: true } },
+    // 검색 전용 열: 입고대기마감을 미마감/마감으로 거른다(비우면 전체). 그리드에는 보이지 않는다.
+    {
+      field: 'receiptCloseType' as keyof PurchaseOrderStatusRow,
+      headerName: '입고대기마감',
+      type: 'select',
+      options: PURCHASE_ORDER_RECEIPT_CLOSE_OPTIONS,
+      hidden: true,
+      editable: false,
+      search: { label: '입고대기마감', order: 7, span: 1, group: '선택' },
+    },
   ];
 }

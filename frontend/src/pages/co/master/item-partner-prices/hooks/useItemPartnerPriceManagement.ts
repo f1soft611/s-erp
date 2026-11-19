@@ -41,16 +41,31 @@ export function toItemPartnerPricePayload(row: ItemPartnerPriceRow): ItemPartner
   if (!Number.isSafeInteger(Number(row.materialId)) || Number(row.materialId) <= 0) {
     throw new Error('품목을 선택해 주세요.');
   }
-  if (!Number.isSafeInteger(Number(row.customerId)) || Number(row.customerId) <= 0) {
-    throw new Error('거래처를 선택해 주세요.');
+  // 거래처를 비우면 품목 기본단가(거래처 공통)로 저장한다.
+  if (row.customerId != null &&
+      (!Number.isSafeInteger(Number(row.customerId)) || Number(row.customerId) <= 0)) {
+    throw new Error('거래처를 확인해 주세요.');
   }
   if (row.tradeType !== '매입' && row.tradeType !== '매출') {
     throw new Error('거래구분을 선택해 주세요.');
   }
-  const unitPrice = numericValue(row.unitPrice, '단가', false);
+  const unitPrice = numericValue(row.unitPrice, '원화단가', true);
+  const foreignUnitPrice = numericValue(row.foreignUnitPrice, '외화단가', true);
+  if (unitPrice === null && foreignUnitPrice === null) {
+    throw new Error('원화단가 또는 외화단가를 입력해 주세요.');
+  }
   const moq = numericValue(row.moq, '최소주문수량', true);
-  const currency = row.currency.trim() || 'KRW';
+  const currency = row.currency.trim();
   if (currency.length > 10) throw new Error('통화는 10자 이하여야 합니다.');
+  if (foreignUnitPrice !== null && !currency) {
+    throw new Error('외화단가를 입력하면 통화를 선택해 주세요.');
+  }
+  if (row.vatIncludedAt !== 'Y' && row.vatIncludedAt !== 'N') {
+    throw new Error('부가세포함 여부를 선택해 주세요.');
+  }
+  if (row.vatIncludedAt === 'Y' && (row.taxType || 'TAXABLE') !== 'TAXABLE') {
+    throw new Error('부가세 포함은 과세일 때만 선택할 수 있습니다.');
+  }
   if (!validDate(row.startDt)) throw new Error('적용 시작일을 YYYY-MM-DD 형식으로 입력해 주세요.');
   const endDt = row.endDt?.trim() || null;
   if (endDt && (!validDate(endDt) || endDt < row.startDt)) {
@@ -61,10 +76,13 @@ export function toItemPartnerPricePayload(row: ItemPartnerPriceRow): ItemPartner
   }
   return {
     materialId: Number(row.materialId),
-    customerId: Number(row.customerId),
+    customerId: row.customerId == null ? null : Number(row.customerId),
     tradeType: row.tradeType,
     unitPrice,
-    currency,
+    taxType: row.taxType || 'TAXABLE',
+    vatIncludedAt: row.vatIncludedAt,
+    foreignUnitPrice,
+    currency: foreignUnitPrice === null ? '' : currency,
     startDt: row.startDt,
     endDt,
     moq,

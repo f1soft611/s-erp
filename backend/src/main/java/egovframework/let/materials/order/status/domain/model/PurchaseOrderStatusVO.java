@@ -91,6 +91,12 @@ public class PurchaseOrderStatusVO implements Serializable {
     @Schema(description = "발주수량", example = "10")
     private BigDecimal orderQty;
 
+    @Schema(description = "가입고수량. 유효 가입고 합계에서 유효 수입검사 불합격 수량 합계를 뺀 값(가입고가 없으면 0)", example = "6")
+    private BigDecimal arrivedQty;
+
+    @Schema(description = "입고잔량. 발주수량에서 가입고수량을 뺀 값이며 0 미만이면 0", example = "4")
+    private BigDecimal remainQty;
+
     @Schema(description = "단가", example = "1250")
     private BigDecimal unitPrice;
 

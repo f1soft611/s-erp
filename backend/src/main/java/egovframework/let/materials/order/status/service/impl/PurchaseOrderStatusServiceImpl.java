@@ -48,6 +48,7 @@ public class PurchaseOrderStatusServiceImpl extends EgovAbstractServiceImpl impl
         params.put("materialKeyword", text(condition.getMaterialKeyword()));
         params.put("status", status(condition.getStatus()));
         params.put("sourceType", enumValue(condition.getSourceType(), "CONFIRM", "DIRECT"));
+        params.put("receiptCloseType", enumValue(condition.getReceiptCloseType(), "OPEN", "CLOSED"));
         putDateRange(params, "orderDt", condition.getOrderDtFrom(), condition.getOrderDtTo());
         putDateRange(params, "deliveryDt", condition.getDeliveryDtFrom(), condition.getDeliveryDtTo());
         return purchaseOrderStatusDAO.selectOrderStatusList(params);

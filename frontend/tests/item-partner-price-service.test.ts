@@ -42,6 +42,44 @@ describe('item partner price service', () => {
     expect(() => normalizeItemPartnerPriceRow({ ...sample, useAt: 'X' })).toThrow();
   });
 
+  it('normalizes default price rows, VAT and foreign price fields', () => {
+    expect(normalizeItemPartnerPriceRow({
+      ...sample,
+      customerId: null,
+      customerCode: null,
+      customerName: null,
+      currency: 'USD',
+      taxType: 'ZERO_RATED',
+      vatIncludedAt: 'Y',
+      foreignUnitPrice: '9.50',
+      materialUnit: 'EA',
+      priceStatus: 'future',
+    })).toMatchObject({
+      customerId: null,
+      customerCode: '',
+      taxType: 'ZERO_RATED',
+      vatIncludedAt: 'Y',
+      foreignUnitPrice: 9.5,
+      currency: 'USD',
+      materialUnit: 'EA',
+      priceStatus: 'future',
+    });
+    expect(normalizeItemPartnerPriceRow({ ...sample, currency: null })).toMatchObject({
+      currency: '', taxType: 'TAXABLE', vatIncludedAt: 'N', foreignUnitPrice: null,
+    });
+    expect(() => normalizeItemPartnerPriceRow({ ...sample, priceStatus: 'old' })).toThrow();
+  });
+
+  it('sends includeHistory only when history is requested', async () => {
+    api.apiGet.mockResolvedValue({ resultList: [] });
+    await fetchItemPartnerPrices({ includeHistory: true });
+    expect(api.apiGet).toHaveBeenLastCalledWith(
+      '/api/v1/co/master/item-partner-prices?includeHistory=true',
+    );
+    await fetchItemPartnerPrices({ includeHistory: false });
+    expect(api.apiGet).toHaveBeenLastCalledWith('/api/v1/co/master/item-partner-prices');
+  });
+
   it('encodes submitted list filters without tenant identity', async () => {
     api.apiGet.mockResolvedValue({ resultList: [sample] });
     await fetchItemPartnerPrices({

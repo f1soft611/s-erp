@@ -21,7 +21,10 @@ const parsedRow = {
   materialCode: '000101',
   customerCode: '000201',
   unitPrice: '1250.50',
-  currency: 'KRW',
+  taxType: 'TAXABLE',
+  vatIncludedAt: 'N',
+  foreignUnitPrice: '',
+  currency: '',
   startDt: '2026-10-01',
   endDt: null,
   moq: null,
@@ -75,6 +78,31 @@ describe('item partner price import dialog', () => {
         materialCode: '000101',
         customerCode: '000201',
         unitPrice: 1250.5,
+      }),
+    ]);
+  });
+
+  it('stages a blank-customer row as a default price with VAT and foreign price fields', async () => {
+    mocks.parse.mockResolvedValue([{
+      ...parsedRow, customerCode: '', taxType: 'EXEMPT', vatIncludedAt: 'Y',
+      foreignUnitPrice: '9.5', currency: 'USD',
+    }]);
+    mocks.validate.mockResolvedValue({
+      rows: [{ ...resolvedRow, customerId: undefined, customerCode: undefined, customerName: undefined }],
+    });
+    const { onStage } = renderDialog();
+    fireEvent.change(screen.getByLabelText('엑셀 파일 선택'), {
+      target: { files: [new File(['xlsx'], 'prices.xlsx')] },
+    });
+    await screen.findByDisplayValue('000101');
+    fireEvent.click(screen.getByRole('button', { name: '검증' }));
+    const stage = screen.getByRole('button', { name: '그리드에 추가' });
+    await waitFor(() => expect(stage).toBeEnabled());
+    fireEvent.click(stage);
+    expect(onStage).toHaveBeenCalledWith([
+      expect.objectContaining({
+        customerId: null, customerCode: '', taxType: 'EXEMPT', vatIncludedAt: 'Y',
+        foreignUnitPrice: 9.5, currency: 'USD',
       }),
     ]);
   });

@@ -72,7 +72,12 @@ class PurchaseRequestConfirmMapperTest {
         Configuration configuration = parse();
         assertThat(sql(configuration, "selectConfirms")).contains("pc.use_at = ?", "ORDER BY pc.confirm_dt DESC", "LIMIT 200");
         assertThat(sql(configuration, "selectDefaultUnitPrice")).contains("trade_type = '매입'", "use_at = 'Y'",
-                "ORDER BY p.start_dt DESC, p.price_id DESC", "LIMIT 1");
+                "p.customer_id IS NULL", "ORDER BY (p.customer_id IS NULL), p.start_dt DESC, p.price_id DESC", "LIMIT 1");
+        assertThat(sql(configuration, "selectDefaultUnitPrice")).contains("p.tax_type", "p.vat_included_at",
+                "p.foreign_unit_price");
+        assertThat(sql(configuration, "existsTaxType")).contains("PURCHASE_TAX_TYPE");
+        assertThat(sql(configuration, "updateDetailConfirm")).contains("tax_type =", "vat_included_at =");
+        assertThat(sql(configuration, "clearDetailsByConfirm")).contains("tax_type = NULL", "vat_included_at = NULL");
         assertThat(sql(configuration, "existsWarehouse")).contains("disuse_at = 'N'");
     }
 

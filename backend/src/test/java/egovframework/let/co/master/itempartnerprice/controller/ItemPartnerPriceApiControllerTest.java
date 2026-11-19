@@ -23,17 +23,19 @@ import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceBatchSaveResultVO;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceImportValidationVO;
 import egovframework.let.co.master.itempartnerprice.service.ItemPartnerPriceBatchService;
+import egovframework.let.co.master.itempartnerprice.service.ItemPartnerPriceOverviewService;
 import egovframework.let.co.master.itempartnerprice.service.ItemPartnerPriceService;
 
 class ItemPartnerPriceApiControllerTest {
     private final ItemPartnerPriceService service = mock(ItemPartnerPriceService.class);
     private final ItemPartnerPriceBatchService batch = mock(ItemPartnerPriceBatchService.class);
+    private final ItemPartnerPriceOverviewService overview = mock(ItemPartnerPriceOverviewService.class);
     private MockMvc mvc;
 
     @BeforeEach
     void setup() {
         mvc = MockMvcBuilders.standaloneSetup(
-                new ItemPartnerPriceApiController(new ResultVoHelper(), service, batch))
+                new ItemPartnerPriceApiController(new ResultVoHelper(), service, batch, overview))
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                     @Override
                     public boolean supportsParameter(MethodParameter parameter) {
@@ -77,6 +79,33 @@ class ItemPartnerPriceApiControllerTest {
                 .andExpect(status().isOk());
         verify(service).validateImport(eq(9L), argThat(rows -> rows.size() == 1
                 && "000101".equals(rows.get(0).getMaterialCode())));
+    }
+
+    @Test
+    void overviewUsesAuthenticatedTenantAndMapsConditions() throws Exception {
+        when(overview.listOverview(eq(9L), any())).thenReturn(Collections.emptyList());
+
+        mvc.perform(get("/api/v1/co/master/item-partner-prices/overview")
+                .param("tenantId", "888").param("keyword", "flour").param("priceFilter", "NO_SALES")
+                .principal(user("TENANT_USER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.resultList").isArray());
+        verify(overview).listOverview(eq(9L), argThat(condition ->
+                "flour".equals(condition.getKeyword()) && "NO_SALES".equals(condition.getPriceFilter())));
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void customerOverviewUsesAuthenticatedTenantAndMapsConditions() throws Exception {
+        when(overview.listCustomerOverview(eq(9L), any())).thenReturn(Collections.emptyList());
+
+        mvc.perform(get("/api/v1/co/master/item-partner-prices/customer-overview")
+                .param("tenantId", "888").param("keyword", "abc").param("registerFilter", "UNREGISTERED")
+                .principal(user("TENANT_USER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.resultList").isArray());
+        verify(overview).listCustomerOverview(eq(9L), argThat(condition ->
+                "abc".equals(condition.getKeyword()) && "UNREGISTERED".equals(condition.getRegisterFilter())));
     }
 
     @Test

@@ -126,6 +126,7 @@ export function detailToRow(detail: PurchaseOrderDetailItem, supplierId: number 
     warehouseId: String(detail.warehouseId),
     inspectAt: detail.inspectAt === 'Y',
     receiptClosed: detail.receiptCloseAt === 'Y',
+    arrivedQty: detail.arrivedQty == null ? 0 : Number(detail.arrivedQty),
     supplyAmt: Number(detail.supplyAmt),
     vatAmt: Number(detail.vatAmt),
     totalAmt: Number(detail.totalAmt),
@@ -199,6 +200,7 @@ export function candidateToRow(
     warehouseId: candidate.warehouseId == null ? '' : String(candidate.warehouseId),
     inspectAt: candidate.inspectAt === 'Y',
     receiptClosed: false,
+    arrivedQty: 0,
     supplyAmt: 0,
     vatAmt: 0,
     totalAmt: 0,
@@ -213,6 +215,17 @@ export function candidateToRow(
   const amounts = calculateOrderAmounts(base.orderQty, base.unitPrice, taxType, vatIncluded);
   const row = { ...base, ...amounts };
   return { ...row, diffNote: buildDiffNote(row, supplierId) };
+}
+
+/** 확정 행의 부가세구분·부가세포함 조합 목록(없으면 과세·미포함). 두 가지 이상이면 한 발주서에 담을 수 없다. */
+export function distinctCandidateTaxSettings(candidates: PurchaseOrderCandidate[]): { taxType: PurchaseOrderTaxType; vatIncluded: boolean }[] {
+  const seen = new Map<string, { taxType: PurchaseOrderTaxType; vatIncluded: boolean }>();
+  for (const candidate of candidates) {
+    const taxType = ((candidate.taxType as PurchaseOrderTaxType | null | undefined) || 'TAXABLE');
+    const vatIncluded = taxType === 'TAXABLE' && candidate.vatIncludedAt === 'Y';
+    seen.set(`${taxType}|${vatIncluded}`, { taxType, vatIncluded });
+  }
+  return [...seen.values()];
 }
 
 /** 같은 통화 확정 행인지 확인한다. 통화가 섞이면 발주서를 하나로 만들 수 없다. */

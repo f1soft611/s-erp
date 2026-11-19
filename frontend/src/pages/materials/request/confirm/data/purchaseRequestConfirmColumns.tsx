@@ -28,6 +28,12 @@ export type PurchaseRequestConfirmRow = {
   supplierName: string;
   unitPrice: number | null;
   currencyCode: string;
+  taxType: string;
+  vatIncludedAt: 'Y' | 'N';
+  /** 단가 조회 결과(저장하지 않음): 통화를 바꿀 때 단가를 바꿔 채우는 데 쓴다. */
+  wonUnitPrice: number | null;
+  foreignUnitPrice: number | null;
+  foreignCurrency: string;
   amount: number;
   confirmRemark: string;
   orderClosed: boolean;
@@ -53,6 +59,15 @@ function toNullableNumber(value: unknown): number | null {
   return Number.isFinite(number) ? number : null;
 }
 
+/** 통화를 바꿀 때의 단가. 단가를 조회한 적이 없으면(직접 입력) 기존 단가를 그대로 둔다. */
+export function convertUnitPriceForCurrency(row: PurchaseRequestConfirmRow, currencyCode: string): number | null {
+  const looked = row.wonUnitPrice != null || row.foreignUnitPrice != null;
+  if (!looked) return row.unitPrice;
+  if (row.foreignCurrency && currencyCode === row.foreignCurrency && row.foreignUnitPrice != null) return row.foreignUnitPrice;
+  if (currencyCode === 'KRW' && row.wonUnitPrice != null) return row.wonUnitPrice;
+  return null;
+}
+
 export function supplierPatch(option: MasterPickerOption): Partial<PurchaseRequestConfirmRow> {
   return { supplierId: option.id, supplierCode: option.code, supplierName: option.name };
 }
@@ -62,6 +77,8 @@ type ColumnOptions = {
   closeEditable: boolean;
   warehouseOptions: ConfirmSelectOption[];
   orderTypeOptions: ConfirmSelectOption[];
+  taxTypeOptions?: ConfirmSelectOption[];
+  currencyOptions?: ConfirmSelectOption[];
   onOpenSupplierPicker: OpenSupplierPicker;
 };
 
@@ -70,6 +87,8 @@ export function createPurchaseRequestConfirmColumns({
   closeEditable,
   warehouseOptions,
   orderTypeOptions,
+  taxTypeOptions = [],
+  currencyOptions = [],
   onOpenSupplierPicker,
 }: ColumnOptions): F1GridColumn<PurchaseRequestConfirmRow>[] {
   const readOnly = { editable: false } as const;
@@ -82,14 +101,13 @@ export function createPurchaseRequestConfirmColumns({
     { field: 'materialName', headerName: '품목명', type: 'text', width: 170, ...readOnly },
     { field: 'materialSpec', headerName: '규격', type: 'text', width: 110, ...readOnly },
     { field: 'unit', headerName: '단위', type: 'text', width: 64, align: 'center', ...readOnly },
-    { field: 'requestQty', headerName: '요청수량', type: 'decimal', decimalPlaces: 2, width: 96, align: 'right', ...readOnly },
+    { field: 'requestQty', headerName: '요청수량', type: 'decimal', width: 96, align: 'right', ...readOnly },
     { field: 'requestDeliveryDt', headerName: '요청납기일', type: 'date', width: 110, ...readOnly },
     { field: 'useTypeName', headerName: '사용용도', type: 'text', width: 96, align: 'center', ...readOnly },
     {
       field: 'confirmQty',
       headerName: '확정수량',
       type: 'decimal',
-      decimalPlaces: 2,
       width: 100,
       align: 'right',
       editable: confirmEditable,
@@ -155,7 +173,6 @@ export function createPurchaseRequestConfirmColumns({
       field: 'unitPrice',
       headerName: '단가',
       type: 'decimal',
-      decimalPlaces: 2,
       width: 110,
       align: 'right',
       editable: confirmEditable,
@@ -169,7 +186,46 @@ export function createPurchaseRequestConfirmColumns({
         return { unitPrice, amount: calculateAmount(row.confirmQty, unitPrice) };
       },
     },
-    { field: 'currencyCode', headerName: '통화', type: 'text', width: 64, align: 'center', ...readOnly },
+    {
+      field: 'currencyCode',
+      headerName: '통화',
+      type: 'select',
+      options: currencyOptions,
+      width: 90,
+      align: 'center',
+      editable: confirmEditable,
+      // 단가를 조회한 행이면 통화에 맞는 단가로 바꿔 채운다: 외화통화 → 외화단가, KRW → 원화단가, 그 밖의 통화 → 비움.
+      onValueChange: (row, value) => {
+        const currencyCode = String(value ?? '');
+        const unitPrice = convertUnitPriceForCurrency(row, currencyCode);
+        return { currencyCode, unitPrice, amount: calculateAmount(row.confirmQty, unitPrice) };
+      },
+    },
+    {
+      field: 'taxType',
+      headerName: '부가세구분',
+      type: 'select',
+      options: taxTypeOptions,
+      width: 110,
+      align: 'center',
+      editable: confirmEditable,
+      // 부가세포함은 과세일 때만 가능하므로 과세가 아니면 미포함으로 되돌린다.
+      onValueChange: (_row, value) => ({
+        taxType: String(value ?? ''),
+        ...(value === 'TAXABLE' ? {} : { vatIncludedAt: 'N' as const }),
+      }),
+    },
+    {
+      field: 'vatIncludedAt',
+      headerName: '부가세포함',
+      type: 'select',
+      options: [{ value: 'N', label: '미포함' }, { value: 'Y', label: '포함' }],
+      width: 100,
+      align: 'center',
+      editable: confirmEditable,
+      validate: (value, row) => (value === 'Y' && row.taxType !== 'TAXABLE'
+        ? '부가세 포함은 과세일 때만 선택할 수 있습니다.' : true),
+    },
     { field: 'amount', headerName: '금액', type: 'decimal', decimalPlaces: 2, width: 120, align: 'right', ...readOnly },
     {
       field: 'confirmRemark',

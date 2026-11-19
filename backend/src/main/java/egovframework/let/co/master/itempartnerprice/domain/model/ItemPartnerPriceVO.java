@@ -21,6 +21,12 @@ public class ItemPartnerPriceVO extends ItemPartnerPriceSaveRequestVO {
     private String customerCode;
     @Schema(description = "거래처명")
     private String customerName;
+    @Schema(description = "품목 규격(조회 전용)")
+    private String materialSpec;
+    @Schema(description = "품목 마스터 단위(조회 전용)")
+    private String materialUnit;
+    @Schema(description = "적용 상태. past(종료)/current(적용 중)/future(예정)", allowableValues = {"past", "current", "future"})
+    private String priceStatus;
     @Schema(description = "등록자 ID")
     private String createdBy;
     @Schema(description = "등록일시")

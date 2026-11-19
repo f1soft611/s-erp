@@ -126,6 +126,49 @@ class PurchaseOrderStatusTest {
         assertThat(all).contains("CASE WHEN oh.use_at = 'Y' THEN 'ACTIVE' ELSE 'CANCELED' END AS status");
     }
 
+    @Test
+    void passesTheReceiptCloseTypeAndRejectsUnknownValues() throws Exception {
+        PurchaseOrderStatusSearchVO open = new PurchaseOrderStatusSearchVO();
+        open.setReceiptCloseType(" OPEN ");
+        service.selectOrderStatusList(1L, open);
+        PurchaseOrderStatusSearchVO closed = new PurchaseOrderStatusSearchVO();
+        closed.setReceiptCloseType("CLOSED");
+        service.selectOrderStatusList(1L, closed);
+        service.selectOrderStatusList(1L, new PurchaseOrderStatusSearchVO());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass((Class<Map<String, Object>>) (Class<?>) Map.class);
+        verify(dao, org.mockito.Mockito.times(3)).selectOrderStatusList(captor.capture());
+        assertThat(captor.getAllValues()).extracting(params -> params.get("receiptCloseType"))
+                .containsExactly("OPEN", "CLOSED", null);
+        assertBadRequest(search -> search.setReceiptCloseType("ALL"));
+        assertBadRequest(search -> search.setReceiptCloseType("Y"));
+    }
+
+    @Test
+    void mapperReturnsArrivedAndRemainQtyAndFiltersByReceiptClose() throws Exception {
+        Configuration configuration = new Configuration();
+        try (InputStream input = Resources.getResourceAsStream(RESOURCE)) {
+            new XMLMapperBuilder(input, configuration, RESOURCE, configuration.getSqlFragments()).parse();
+        }
+        String id = "PurchaseOrderStatusDAO.selectOrderStatusList";
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("tenantId", 1L);
+        params.put("status", "ACTIVE");
+        String base = configuration.getMappedStatement(id).getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        // 가입고 대상 조회와 같은 정의: 유효 가입고 합 - 유효 불합격 합, 잔량은 0 미만이 되지 않는다.
+        assertThat(base).contains("AS arrivedQty", "AS remainQty", "GREATEST(od.order_qty - COALESCE(a.arrived_qty, 0), 0)",
+                "sum(ad.arrival_qty)", "sum(fd.fail_qty)", "ah.use_at = 'Y'", "ih.use_at = 'Y'");
+        assertThat(base).doesNotContain("od.receipt_close_at = 'N'", "od.receipt_close_at = 'Y'");
+
+        params.put("receiptCloseType", "OPEN");
+        assertThat(configuration.getMappedStatement(id).getBoundSql(params).getSql().replaceAll("\\s+", " "))
+                .contains("AND od.receipt_close_at = 'N'").doesNotContain("AND od.receipt_close_at = 'Y'");
+        params.put("receiptCloseType", "CLOSED");
+        assertThat(configuration.getMappedStatement(id).getBoundSql(params).getSql().replaceAll("\\s+", " "))
+                .contains("AND od.receipt_close_at = 'Y'").doesNotContain("AND od.receipt_close_at = 'N'");
+    }
+
     private static String sql(Configuration configuration, String id, String status) {
         Map<String, Object> params = new HashMap<String, Object>();
         params.put("tenantId", 1L);

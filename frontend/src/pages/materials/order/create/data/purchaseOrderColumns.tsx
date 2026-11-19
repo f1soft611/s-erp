@@ -25,6 +25,8 @@ export type PurchaseOrderRow = {
   inspectAt: boolean;
   /** 입고대기 마감 여부. 저장된 발주에서만 바뀌고 등록 중인 행은 false다. */
   receiptClosed: boolean;
+  /** 가입고수량(불합격 제외). 0보다 크면 이 행의 수량·단가·납기·창고·검사대상·세액은 수정할 수 없다. */
+  arrivedQty: number;
   supplyAmt: number;
   vatAmt: number;
   totalAmt: number;
@@ -94,6 +96,9 @@ export function createPurchaseOrderColumns({
   warehouseOptions,
 }: ColumnOptions): F1GridColumn<PurchaseOrderRow>[] {
   const readOnly = { editable: false } as const;
+  // 가입고가 있는 행은 값을 바꿀 수 없다(비고만 가능). 편집 가능한 화면에서만 행별로 판단한다.
+  const unlessArrived: boolean | ((row: PurchaseOrderRow) => boolean) =
+    editable ? (row: PurchaseOrderRow) => !(row.arrivedQty > 0) : false;
   const patch = (row: PurchaseOrderRow, changes: Partial<PurchaseOrderRow>): Partial<PurchaseOrderRow> => {
     const merged = { ...row, ...changes };
     const amounts = calculateOrderAmounts(merged.orderQty, merged.unitPrice, taxType, vatIncluded);
@@ -117,16 +122,19 @@ export function createPurchaseOrderColumns({
     { field: 'materialName', headerName: '품목명', type: 'text', width: 170, ...readOnly },
     { field: 'materialSpec', headerName: '규격', type: 'text', width: 110, ...readOnly },
     { field: 'unit', headerName: '단위', type: 'text', width: 64, align: 'center', ...readOnly },
-    { field: 'stockQty', headerName: '재고량', type: 'decimal', decimalPlaces: 2, width: 90, align: 'right', ...readOnly },
-    { field: 'remainQty', headerName: '잔량', type: 'decimal', decimalPlaces: 2, width: 90, align: 'right', ...readOnly },
+    { field: 'stockQty', headerName: '재고량', type: 'decimal', width: 90, align: 'right', ...readOnly },
+    { field: 'remainQty', headerName: '잔량', type: 'decimal', width: 90, align: 'right', ...readOnly },
+    ...(showReceiptClose
+      ? [{ field: 'arrivedQty' as const, headerName: '가입고수량', type: 'decimal' as const, width: 100,
+        align: 'right' as const, editable: false }]
+      : []),
     {
       field: 'orderQty',
       headerName: '발주수량',
       type: 'decimal',
-      decimalPlaces: 2,
       width: 100,
       align: 'right',
-      editable,
+      editable: unlessArrived,
       required: true,
       min: 0,
       validate: (value) => (Number(value) > 0 ? true : '발주수량은 0보다 커야 합니다.'),
@@ -136,10 +144,9 @@ export function createPurchaseOrderColumns({
       field: 'unitPrice',
       headerName: '발주단가',
       type: 'decimal',
-      decimalPlaces: 2,
       width: 110,
       align: 'right',
-      editable,
+      editable: unlessArrived,
       min: 0,
       validate: (value) =>
         value === null || value === undefined || String(value) === '' || Number(value) >= 0
@@ -152,7 +159,7 @@ export function createPurchaseOrderColumns({
       headerName: '납기일',
       type: 'date',
       width: 130,
-      editable,
+      editable: unlessArrived,
       required: true,
       validate: (value) => (value ? true : '납기일을 입력해 주세요.'),
       onValueChange: (row, value) => patch(row, { deliveryDt: String(value ?? '') }),
@@ -164,12 +171,12 @@ export function createPurchaseOrderColumns({
       options: warehouseOptions,
       width: 130,
       align: 'center',
-      editable,
+      editable: unlessArrived,
       required: true,
       validate: (value) => (value ? true : '입고창고를 선택해 주세요.'),
       onValueChange: (row, value) => patch(row, { warehouseId: String(value ?? '') }),
     },
-    { field: 'inspectAt', headerName: '검사대상', type: 'checkbox', width: 90, align: 'center', editable },
+    { field: 'inspectAt', headerName: '검사대상', type: 'checkbox', width: 90, align: 'center', editable: unlessArrived },
     { field: 'supplyAmt', headerName: '공급가', type: 'decimal', decimalPlaces: 2, width: 120, align: 'right', ...readOnly },
     {
       field: 'vatAmt',
@@ -178,7 +185,7 @@ export function createPurchaseOrderColumns({
       decimalPlaces: 2,
       width: 110,
       align: 'right',
-      editable: editable && isTaxable(taxType),
+      editable: isTaxable(taxType) ? unlessArrived : false,
       min: 0,
       onValueChange: (row, value) => {
         const vatAmt = Math.max(0, toNullableNumber(value) ?? 0);

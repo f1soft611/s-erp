@@ -64,7 +64,9 @@ export function normalizeItemPartnerPriceRow(source: ApiRecord): ItemPartnerPric
   const useAt = source.useAt;
   if (useAt !== 'Y' && useAt !== 'N') throw new Error('사용여부 응답을 확인할 수 없습니다.');
   const materialId = positiveId(source.materialId, '품목 ID');
-  const customerId = positiveId(source.customerId, '거래처 ID');
+  const customerId = source.customerId == null || source.customerId === ''
+    ? null
+    : positiveId(source.customerId, '거래처 ID');
   const startDt = text(source.startDt, '적용 시작일');
   const endDt = source.endDt == null || source.endDt === ''
     ? null
@@ -75,6 +77,16 @@ export function normalizeItemPartnerPriceRow(source: ApiRecord): ItemPartnerPric
   }
   const currency = text(source.currency, '통화');
   if (currency.length > 10) throw new Error('통화 응답을 확인할 수 없습니다.');
+  const taxType = text(source.taxType, '부가세구분') || 'TAXABLE';
+  const vatIncludedAt = source.vatIncludedAt == null ? 'N' : source.vatIncludedAt;
+  if (vatIncludedAt !== 'Y' && vatIncludedAt !== 'N') {
+    throw new Error('부가세포함 응답을 확인할 수 없습니다.');
+  }
+  const priceStatus = source.priceStatus;
+  if (priceStatus != null && priceStatus !== 'past' && priceStatus !== 'current' &&
+      priceStatus !== 'future') {
+    throw new Error('단가 적용 상태 응답을 확인할 수 없습니다.');
+  }
   const result: ItemPartnerPriceRow = {
     priceId: positiveId(source.priceId, '단가 ID'),
     materialId,
@@ -85,13 +97,19 @@ export function normalizeItemPartnerPriceRow(source: ApiRecord): ItemPartnerPric
     customerName: text(source.customerName, '거래처명'),
     tradeType,
     unitPrice: nullableNumber(source.unitPrice, '단가'),
+    taxType,
+    vatIncludedAt,
+    foreignUnitPrice: nullableNumber(source.foreignUnitPrice, '외화단가'),
     currency,
     startDt,
     endDt,
     moq: nullableNumber(source.moq, '최소주문수량'),
     useAt,
   };
-  if (result.unitPrice === null) throw new Error('단가 응답을 확인할 수 없습니다.');
+  if (result.unitPrice === null && result.foreignUnitPrice === null) throw new Error('단가 응답을 확인할 수 없습니다.');
+  if (source.materialUnit != null) result.materialUnit = text(source.materialUnit, '단위');
+  if (source.materialSpec != null) result.materialSpec = text(source.materialSpec, '규격');
+  if (priceStatus != null) result.priceStatus = priceStatus;
   if (source.tenantId != null) result.tenantId = positiveId(source.tenantId, '테넌트 ID');
   for (const field of ['createdBy', 'createdAt', 'updatedBy', 'updatedAt'] as const) {
     if (source[field] != null) result[field] = text(source[field], field);
@@ -113,6 +131,8 @@ export async function fetchItemPartnerPrices(
   for (const [key, value] of Object.entries(filters)) {
     if (typeof value === 'string' && value.trim()) query.set(key, value.trim());
   }
+  if (filters.includeHistory) query.set('includeHistory', 'true');
+  if (filters.customerId) query.set('customerId', String(filters.customerId));
   const result = await apiGet<{ resultList?: unknown }>(
     `/api/v1/co/master/item-partner-prices${query.size ? `?${query}` : ''}`,
   );
@@ -148,9 +168,8 @@ function normalizeImportValidationRow(
     if (value[field] != null) result[field] = text(value[field], field);
   }
   if (!errors.length &&
-      (!result.materialId || !result.customerId ||
-        !result.materialCode || !result.materialName ||
-        !result.customerCode || !result.customerName)) {
+      (!result.materialId || !result.materialCode || !result.materialName ||
+        Boolean(result.customerId) !== Boolean(result.customerCode))) {
     throw new Error('정상 검증 행의 품목·거래처 응답이 누락되었습니다.');
   }
   return result;

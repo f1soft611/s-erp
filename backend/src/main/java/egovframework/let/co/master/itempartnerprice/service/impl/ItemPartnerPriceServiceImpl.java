@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.egovframe.rte.fdl.cmmn.EgovAbstractServiceImpl;
 import org.springframework.dao.DuplicateKeyException;
@@ -35,6 +36,9 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
         TRADE_TYPES.add("매출");
     }
 
+    private static final String TAX_TYPE_GROUP = "PURCHASE_TAX_TYPE";
+    private static final String CURRENCY_GROUP = "CURRENCY";
+
     private final ItemPartnerPriceDAO dao;
 
     public ItemPartnerPriceServiceImpl(ItemPartnerPriceDAO dao) {
@@ -45,8 +49,13 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
     public List<ItemPartnerPriceVO> listPrices(Long tenantId, ItemPartnerPriceSearchCondition condition)
             throws Exception {
         Map<String, Object> params = tenantParams(tenantId);
+        params.put("includeHistory", condition != null && condition.isIncludeHistory());
         if (condition != null) {
             putSearch(params, "keyword", condition.getKeyword());
+            if (condition.getCustomerId() != null) {
+                if (condition.getCustomerId() <= 0) throw new IllegalArgumentException("올바른 거래처 ID가 필요합니다.");
+                params.put("customerId", condition.getCustomerId());
+            }
             if (StringUtils.hasText(condition.getTradeType())) {
                 String tradeType = condition.getTradeType().trim();
                 if (!TRADE_TYPES.contains(tradeType)) {
@@ -128,9 +137,12 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
                 result.setMaterialCode(resolution.getMaterialCode());
                 result.setMaterialName(resolution.getMaterialName());
             }
+            boolean defaultPrice = safeText(row.getCustomerCode()).isEmpty();
             if (resolution.getCustomerId() == null) {
-                addError(result, "CUSTOMER_NOT_FOUND", "엑셀 " + row.getSourceRowNumber()
-                        + "행의 거래처코드가 현재 테넌트의 사용 가능한 거래처에 없습니다.");
+                if (!defaultPrice) {
+                    addError(result, "CUSTOMER_NOT_FOUND", "엑셀 " + row.getSourceRowNumber()
+                            + "행의 거래처코드가 현재 테넌트의 사용 가능한 거래처에 없습니다.");
+                }
             } else {
                 result.setCustomerId(resolution.getCustomerId());
                 result.setCustomerCode(resolution.getCustomerCode());
@@ -140,7 +152,7 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
                 addError(result, "EXISTING_PRICE_KEY", "엑셀 " + row.getSourceRowNumber()
                         + "행의 품목·거래처·거래구분·적용시작일 단가가 이미 존재합니다.");
             }
-            if (resolution.getMaterialId() != null && resolution.getCustomerId() != null
+            if (resolution.getMaterialId() != null && (resolution.getCustomerId() != null || defaultPrice)
                     && TRADE_TYPES.contains(safeText(row.getTradeType()))
                     && validDate(safeText(row.getStartDt()))) {
                 String key = businessKey(resolution.getMaterialId(), resolution.getCustomerId(),
@@ -151,9 +163,43 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
                 }
             }
         }
+        validateImportCodes(tenantId, rows, results);
         ItemPartnerPriceImportValidationVO validation = new ItemPartnerPriceImportValidationVO();
         validation.setRows(results);
         return validation;
+    }
+
+    private void validateImportCodes(Long tenantId, List<ItemPartnerPriceImportRowVO> rows,
+            List<ItemPartnerPriceImportRowResultVO> results) throws Exception {
+        Map<String, Boolean> known = new HashMap<String, Boolean>();
+        for (int i = 0; i < rows.size(); i++) {
+            ItemPartnerPriceImportRowVO row = rows.get(i);
+            String taxType = safeText(row.getTaxType());
+            if (!taxType.isEmpty() && !commonCodeExists(tenantId, TAX_TYPE_GROUP, taxType, known)) {
+                addError(results.get(i), "INVALID_TAX_TYPE", "엑셀 " + row.getSourceRowNumber()
+                        + "행의 부가세구분이 공통코드에 없습니다.");
+            }
+            String currency = safeText(row.getCurrency());
+            if (!currency.isEmpty() && currency.length() <= 10
+                    && !commonCodeExists(tenantId, CURRENCY_GROUP, currency, known)) {
+                addError(results.get(i), "INVALID_CURRENCY", "엑셀 " + row.getSourceRowNumber()
+                        + "행의 통화가 공통코드에 없습니다.");
+            }
+        }
+    }
+
+    private boolean commonCodeExists(Long tenantId, String groupCode, String code, Map<String, Boolean> known)
+            throws Exception {
+        String key = groupCode + "|" + code;
+        Boolean cached = known.get(key);
+        if (cached == null) {
+            Map<String, Object> params = tenantParams(tenantId);
+            params.put("groupCode", groupCode);
+            params.put("code", code);
+            cached = Boolean.TRUE.equals(dao.existsCommonCode(params));
+            known.put(key, cached);
+        }
+        return cached;
     }
 
     private void validateImportValues(ItemPartnerPriceImportRowVO row, ItemPartnerPriceImportRowResultVO result) {
@@ -165,15 +211,32 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
         if (!validCode(row.getMaterialCode())) {
             addError(result, "INVALID_ITEM_CODE", "엑셀 " + sourceRow + "행의 품목코드를 입력해 주세요(최대 20자).");
         }
-        if (!validCode(row.getCustomerCode())) {
-            addError(result, "INVALID_CUSTOMER_CODE", "엑셀 " + sourceRow + "행의 거래처코드를 입력해 주세요(최대 20자).");
+        if (!safeText(row.getCustomerCode()).isEmpty() && !validCode(row.getCustomerCode())) {
+            addError(result, "INVALID_CUSTOMER_CODE", "엑셀 " + sourceRow + "행의 거래처코드는 최대 20자입니다.");
         }
-        if (!validAmount(row.getUnitPrice(), false)) {
-            addError(result, "INVALID_UNIT_PRICE", "엑셀 " + sourceRow + "행의 단가는 0 이상, 소수 둘째 자리까지 입력해 주세요.");
+        boolean hasUnitPrice = !safeText(row.getUnitPrice()).isEmpty();
+        boolean hasForeignPrice = !safeText(row.getForeignUnitPrice()).isEmpty();
+        if (!hasUnitPrice && !hasForeignPrice) {
+            addError(result, "INVALID_UNIT_PRICE", "엑셀 " + sourceRow + "행의 원화단가 또는 외화단가를 입력해 주세요.");
+        } else if (hasUnitPrice && !validAmount(row.getUnitPrice(), false)) {
+            addError(result, "INVALID_UNIT_PRICE", "엑셀 " + sourceRow + "행의 원화단가는 0 이상, 소수 둘째 자리까지 입력해 주세요.");
         }
         String currency = safeText(row.getCurrency());
         if (currency.length() > 10) {
             addError(result, "INVALID_CURRENCY", "엑셀 " + sourceRow + "행의 통화는 10자 이하여야 합니다.");
+        }
+        if (!validAmount(row.getForeignUnitPrice(), true)) {
+            addError(result, "INVALID_FOREIGN_UNIT_PRICE",
+                    "엑셀 " + sourceRow + "행의 외화단가는 0 이상, 소수 둘째 자리까지 입력해 주세요.");
+        } else if (!safeText(row.getForeignUnitPrice()).isEmpty() && currency.isEmpty()) {
+            addError(result, "INVALID_CURRENCY", "엑셀 " + sourceRow + "행의 외화단가에는 통화가 필요합니다.");
+        }
+        String vatIncluded = safeText(row.getVatIncludedAt());
+        if (!vatIncluded.isEmpty() && !"Y".equals(vatIncluded) && !"N".equals(vatIncluded)) {
+            addError(result, "INVALID_VAT_INCLUDED_AT", "엑셀 " + sourceRow + "행의 부가세포함은 Y 또는 N이어야 합니다.");
+        } else if ("Y".equals(vatIncluded) && !safeText(row.getTaxType()).isEmpty()
+                && !"TAXABLE".equals(safeText(row.getTaxType()))) {
+            addError(result, "INVALID_VAT_INCLUDED_AT", "엑셀 " + sourceRow + "행의 부가세 포함은 과세일 때만 선택할 수 있습니다.");
         }
         if (!validDate(safeText(row.getStartDt()))) {
             addError(result, "INVALID_START_DATE", "엑셀 " + sourceRow + "행의 적용 시작일은 YYYY-MM-DD 형식이어야 합니다.");
@@ -227,8 +290,11 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
     public ItemPartnerPriceVO createPrice(Long tenantId, String actor, ItemPartnerPriceSaveRequestVO payload)
             throws Exception {
         Map<String, Object> params = saveParams(tenantId, actor, payload);
-        requireActiveMasters(params);
+        requireActiveMaterial(params);
+        if (params.get("customerId") != null) requireActiveCustomer(params);
+        requireKnownCodes(tenantId, payload, params);
         ensureUniqueKey(params, null);
+        ensurePeriodAndClosePrevious(params, null);
         try {
             Long id = dao.insertItemPartnerPrice(params);
             if (id == null) throw new IllegalStateException("단가 등록 결과를 확인할 수 없습니다.");
@@ -246,9 +312,15 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
         ItemPartnerPriceVO existing = findById(tenantId, priceId);
         Map<String, Object> params = saveParams(tenantId, actor, payload);
         params.put("priceId", priceId);
+        requireEditable(existing, params);
         if (!existing.getMaterialId().equals(params.get("materialId"))) requireActiveMaterial(params);
-        if (!existing.getCustomerId().equals(params.get("customerId"))) requireActiveCustomer(params);
+        if (params.get("customerId") != null
+                && !params.get("customerId").equals(existing.getCustomerId())) {
+            requireActiveCustomer(params);
+        }
+        requireKnownCodes(tenantId, payload, params);
         ensureUniqueKey(params, priceId);
+        ensurePeriodAndClosePrevious(params, priceId);
         try {
             if (dao.updateItemPartnerPrice(params) == 0) throw notFound();
             return findById(tenantId, priceId);
@@ -257,9 +329,79 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
         }
     }
 
-    private void requireActiveMasters(Map<String, Object> params) throws Exception {
-        requireActiveMaterial(params);
-        requireActiveCustomer(params);
+    /** 종료된 과거 단가는 수정할 수 없고, 적용 중인 단가는 기간·품목·거래처·거래구분을 바꿀 수 없다(서버 날짜 기준). */
+    private void requireEditable(ItemPartnerPriceVO existing, Map<String, Object> params) {
+        LocalDate today = LocalDate.now();
+        LocalDate start = LocalDate.parse(existing.getStartDt());
+        LocalDate end = StringUtils.hasText(existing.getEndDt()) ? LocalDate.parse(existing.getEndDt()) : null;
+        if (end != null && end.isBefore(today)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "종료된 과거 단가는 수정할 수 없습니다. 새 적용일로 단가를 추가해 주세요.");
+        }
+        if (!start.isAfter(today)) {
+            boolean sameKey = existing.getStartDt().equals(params.get("startDt"))
+                    && existing.getMaterialId().equals(params.get("materialId"))
+                    && Objects.equals(existing.getCustomerId(), params.get("customerId"))
+                    && existing.getTradeType().equals(params.get("tradeType"));
+            if (!sameKey) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "적용 중인 단가는 적용 시작일·품목·거래처·거래구분을 바꿀 수 없습니다. 새 적용일로 단가를 추가해 주세요.");
+            }
+        }
+    }
+
+    private void requireKnownCodes(Long tenantId, ItemPartnerPriceSaveRequestVO payload,
+            Map<String, Object> params) throws Exception {
+        Map<String, Boolean> known = new HashMap<String, Boolean>();
+        if (StringUtils.hasText(payload.getTaxType())
+                && !commonCodeExists(tenantId, TAX_TYPE_GROUP, (String) params.get("taxType"), known)) {
+            throw new IllegalArgumentException("부가세구분이 공통코드에 없습니다.");
+        }
+        if (params.get("currency") != null
+                && !commonCodeExists(tenantId, CURRENCY_GROUP, (String) params.get("currency"), known)) {
+            throw new IllegalArgumentException("통화가 공통코드에 없습니다.");
+        }
+    }
+
+    /** 기간이 겹치면 막고, 새 행보다 앞서 시작한 종료일 없는 행은 새 적용일 전날로 자동 종료한다. */
+    private void ensurePeriodAndClosePrevious(Map<String, Object> params, Long excludePriceId) throws Exception {
+        if (!"Y".equals(params.get("useAt"))) return;
+        params.put("excludePriceId", excludePriceId);
+        if (dao.selectOverlappingPriceId(params) != null) {
+            throw new IllegalArgumentException("같은 품목·거래처·거래구분의 다른 단가와 적용 기간이 겹칩니다.");
+        }
+        dao.closePreviousOpenPrices(params);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deletePrice(Long tenantId, String actor, Long priceId) throws Exception {
+        if (priceId == null || priceId <= 0) throw new IllegalArgumentException("올바른 단가 ID가 필요합니다.");
+        if (!StringUtils.hasText(actor) || actor.trim().length() > 10) {
+            throw new IllegalArgumentException("인증 사용자 정보를 확인할 수 없습니다.");
+        }
+        ItemPartnerPriceVO existing = findById(tenantId, priceId);
+        LocalDate end = StringUtils.hasText(existing.getEndDt()) ? LocalDate.parse(existing.getEndDt()) : null;
+        if (end != null && end.isBefore(LocalDate.now())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "종료된 과거 단가는 삭제할 수 없습니다.");
+        }
+        Map<String, Object> params = tenantParams(tenantId);
+        params.put("priceId", priceId);
+        params.put("materialId", existing.getMaterialId());
+        params.put("customerId", existing.getCustomerId());
+        params.put("tradeType", existing.getTradeType());
+        params.put("startDt", existing.getStartDt());
+        params.put("endDt", existing.getEndDt());
+        params.put("updatedBy", actor.trim());
+        // 사용 중인 행만 직전 단가를 자동 종료시켰으므로, 미사용 행을 지울 때는 직전 단가를 건드리지 않는다.
+        if (!"N".equals(existing.getUseAt())) {
+            Long predecessorId = dao.selectPredecessorPriceId(params);
+            if (predecessorId != null) {
+                params.put("predecessorId", predecessorId);
+                dao.reopenPrice(params);
+            }
+        }
+        if (dao.deleteItemPartnerPrice(params) == 0) throw notFound();
     }
 
     private void requireActiveMaterial(Map<String, Object> params) throws Exception {
@@ -291,22 +433,43 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
         Map<String, Object> params = tenantParams(tenantId);
         if (payload == null) throw new IllegalArgumentException("단가 저장 요청이 비어 있습니다.");
         if (payload.getMaterialId() == null || payload.getMaterialId() <= 0
-                || payload.getCustomerId() == null || payload.getCustomerId() <= 0) {
-            throw new IllegalArgumentException("품목과 거래처를 선택해 주세요.");
+                || payload.getCustomerId() != null && payload.getCustomerId() <= 0) {
+            throw new IllegalArgumentException("품목을 선택해 주세요. 거래처를 비우면 품목 기본단가로 저장됩니다.");
         }
         if (!TRADE_TYPES.contains(safeText(payload.getTradeType()))) {
             throw new IllegalArgumentException("거래구분은 매입 또는 매출이어야 합니다.");
         }
-        if (payload.getUnitPrice() == null || !validAmount(payload.getUnitPrice().toPlainString(), false)) {
-            throw new IllegalArgumentException("단가는 0 이상, 소수 둘째 자리까지 입력해 주세요.");
+        if (payload.getUnitPrice() == null && payload.getForeignUnitPrice() == null) {
+            throw new IllegalArgumentException("원화단가 또는 외화단가를 입력해 주세요.");
+        }
+        if (payload.getUnitPrice() != null && !validAmount(payload.getUnitPrice().toPlainString(), false)) {
+            throw new IllegalArgumentException("원화단가는 0 이상, 소수 둘째 자리까지 입력해 주세요.");
         }
         BigDecimal moq = payload.getMoq();
         if (moq != null && !validAmount(moq.toPlainString(), false)) {
             throw new IllegalArgumentException("최소주문수량은 0 이상, 소수 둘째 자리까지 입력해 주세요.");
         }
+        BigDecimal foreignUnitPrice = payload.getForeignUnitPrice();
+        if (foreignUnitPrice != null && !validAmount(foreignUnitPrice.toPlainString(), false)) {
+            throw new IllegalArgumentException("외화단가는 0 이상, 소수 둘째 자리까지 입력해 주세요.");
+        }
         String currency = safeText(payload.getCurrency());
-        if (currency.isEmpty()) currency = "KRW";
         if (currency.length() > 10) throw new IllegalArgumentException("통화는 10자 이하여야 합니다.");
+        if (foreignUnitPrice != null && currency.isEmpty()) {
+            throw new IllegalArgumentException("외화단가를 입력하면 통화를 선택해 주세요.");
+        }
+        // 통화는 외화단가의 통화이므로 외화단가가 없으면 저장하지 않는다.
+        String storedCurrency = foreignUnitPrice == null ? null : currency;
+        String taxType = StringUtils.hasText(payload.getTaxType()) ? payload.getTaxType().trim() : "TAXABLE";
+        if (taxType.length() > 30) throw new IllegalArgumentException("부가세구분 코드가 올바르지 않습니다.");
+        String vatIncludedAt = StringUtils.hasText(payload.getVatIncludedAt())
+                ? payload.getVatIncludedAt().trim() : "N";
+        if (!"Y".equals(vatIncludedAt) && !"N".equals(vatIncludedAt)) {
+            throw new IllegalArgumentException("부가세포함 여부는 Y 또는 N이어야 합니다.");
+        }
+        if ("Y".equals(vatIncludedAt) && !"TAXABLE".equals(taxType)) {
+            throw new IllegalArgumentException("부가세 포함은 과세일 때만 선택할 수 있습니다.");
+        }
         String start = date(payload.getStartDt(), "적용 시작일");
         String end = null;
         if (StringUtils.hasText(payload.getEndDt())) {
@@ -323,7 +486,10 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
         params.put("customerId", payload.getCustomerId());
         params.put("tradeType", payload.getTradeType().trim());
         params.put("unitPrice", payload.getUnitPrice());
-        params.put("currency", currency);
+        params.put("currency", storedCurrency);
+        params.put("taxType", taxType);
+        params.put("vatIncludedAt", vatIncludedAt);
+        params.put("foreignUnitPrice", foreignUnitPrice);
         params.put("startDt", start);
         params.put("endDt", end);
         params.put("moq", moq);
@@ -364,7 +530,7 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
     }
 
     private String businessKey(Long materialId, Long customerId, String tradeType, String startDt) {
-        return materialId + "|" + customerId + "|" + tradeType + "|" + startDt;
+        return materialId + "|" + (customerId == null ? "default" : customerId) + "|" + tradeType + "|" + startDt;
     }
 
     private void addError(ItemPartnerPriceImportRowResultVO row, String code, String message) {
@@ -372,7 +538,7 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
     }
 
     private IllegalArgumentException duplicateKey() {
-        return new IllegalArgumentException("같은 품목·거래처·거래구분·적용시작일의 단가가 이미 존재합니다.");
+        return new IllegalArgumentException("같은 품목·거래처(또는 기본단가)·거래구분·적용시작일의 단가가 이미 존재합니다.");
     }
 
     private ResponseStatusException notFound() {

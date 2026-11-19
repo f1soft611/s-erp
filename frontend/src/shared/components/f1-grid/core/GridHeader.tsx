@@ -597,7 +597,7 @@ function GridHeaderInner<T extends object>({
                 >
                   {column.headerName}
                 </Box>
-                {column.required ? (
+                {column.required || column.requiredMark ? (
                   <Box
                     component="span"
                     aria-label={`${column.headerName} 필수`}

@@ -3,6 +3,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import { Alert, Box, Button, Chip, TextField } from '@mui/material';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { PageMessageArea } from '../../../../../shared/components/PageMessageArea';
+import { PickerDateRangeFields } from '../../../../../shared/components/PickerDateRangeFields';
+import { usePickerDateRange } from '../../../../../shared/hooks/usePickerDateRange';
 import { F1Grid, type F1GridColumn, type F1GridRef } from '../../../../../shared/components/f1-grid';
 import { distinctCandidateCurrencies, searchOrderCandidates } from '../services/purchaseOrder.service';
 import type { PurchaseOrderCandidate } from '../types/purchaseOrder.types';
@@ -24,6 +26,7 @@ export function PurchaseOrderConfirmPicker({ open, onClose, onSelect }: {
   const request = useRef(0);
   const programmaticSelection = useRef(false);
   const [keyword, setKeyword] = useState('');
+  const { fromDt, toDt, setFromDt, setToDt, ready: rangeReady } = usePickerDateRange(open);
   const [rows, setRows] = useState<PurchaseOrderCandidate[]>([]);
   const [selectedIds, setSelectedIds] = useState<RowId[]>([]);
   const [lockedSupplier, setLockedSupplier] = useState<{ id: number; name: string } | null>(null);
@@ -34,11 +37,15 @@ export function PurchaseOrderConfirmPicker({ open, onClose, onSelect }: {
   const rowById = useMemo(() => new Map(rows.map((row) => [row.purchaseRequestDetailId, row])), [rows]);
 
   const search = useCallback(async (nextKeyword: string) => {
+    if (fromDt && toDt && fromDt > toDt) {
+      setError('확정일 시작일은 종료일보다 늦을 수 없습니다.');
+      return;
+    }
     const token = ++request.current;
     setLoading(true);
     setError('');
     try {
-      const result = await searchOrderCandidates({ fromDt: '', toDt: '', keyword: nextKeyword });
+      const result = await searchOrderCandidates({ fromDt, toDt, keyword: nextKeyword });
       if (token === request.current) {
         setRows(result);
         setSelectedIds([]);
@@ -50,13 +57,13 @@ export function PurchaseOrderConfirmPicker({ open, onClose, onSelect }: {
     } finally {
       if (token === request.current) setLoading(false);
     }
-  }, []);
+  }, [fromDt, toDt]);
 
   useEffect(() => {
-    if (open) void search(keyword);
+    if (open && rangeReady) void search(keyword);
     // 열릴 때 현재 검색어로 한 번 조회한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, rangeReady]);
 
   useEffect(() => () => {
     request.current += 1;
@@ -113,10 +120,10 @@ export function PurchaseOrderConfirmPicker({ open, onClose, onSelect }: {
     { field: 'materialName', headerName: '품목명', width: 180 },
     { field: 'materialSpec', headerName: '규격', width: 110 },
     { field: 'unit', headerName: '단위', width: 64, align: 'center' },
-    { field: 'stockQty', headerName: '재고량', type: 'decimal', decimalPlaces: 2, width: 90, align: 'right' },
-    { field: 'confirmQty', headerName: '확정수량', type: 'decimal', decimalPlaces: 2, width: 96, align: 'right' },
-    { field: 'orderedQty', headerName: '기발주', type: 'decimal', decimalPlaces: 2, width: 90, align: 'right' },
-    { field: 'remainQty', headerName: '잔량', type: 'decimal', decimalPlaces: 2, width: 90, align: 'right' },
+    { field: 'stockQty', headerName: '재고량', type: 'decimal', width: 90, align: 'right' },
+    { field: 'confirmQty', headerName: '확정수량', type: 'decimal', width: 96, align: 'right' },
+    { field: 'orderedQty', headerName: '기발주', type: 'decimal', width: 90, align: 'right' },
+    { field: 'remainQty', headerName: '잔량', type: 'decimal', width: 90, align: 'right' },
     { field: 'requestDeliveryDt', headerName: '요청납기일', type: 'date', width: 104, align: 'center' },
     { field: 'confirmDeliveryDt', headerName: '확정납기일', type: 'date', width: 104, align: 'center' },
     { field: 'useTypeName', headerName: '사용용도', width: 90, align: 'center' },
@@ -160,16 +167,16 @@ export function PurchaseOrderConfirmPicker({ open, onClose, onSelect }: {
             event.preventDefault();
             void search(keyword);
           }}
-          sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, flexShrink: 0 }}
+          sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, minWidth: 0, flexShrink: 0 }}
         >
+          <PickerDateRangeFields label="확정일" fromDt={fromDt} toDt={toDt} onFromChange={setFromDt} onToChange={setToDt} />
           <TextField
             size="small"
             margin="none"
-            fullWidth
             label="확정번호·구매요청번호·구매처·품목코드·품목명 검색"
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
-            sx={{ flex: 1, minWidth: 0, '& .MuiOutlinedInput-root': { height: SEARCH_CONTROL_HEIGHT } }}
+            sx={{ flex: '1 1 200px', minWidth: 0, '& .MuiOutlinedInput-root': { height: SEARCH_CONTROL_HEIGHT } }}
           />
           <Button
             type="submit"

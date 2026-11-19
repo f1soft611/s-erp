@@ -84,6 +84,7 @@ export function GridFormField<T extends object>({
   );
   const options = column.options ?? [];
   const isRequired = Boolean(column.required);
+  const showRequiredMark = isRequired || Boolean(column.requiredMark);
 
   const applyValue = (nextValue: unknown, normalizeString = true) => {
     const normalizedValue =
@@ -111,7 +112,7 @@ export function GridFormField<T extends object>({
   const sharedTextFieldProps = {
     fullWidth: true,
     disabled,
-    label: renderRequiredFieldLabel(column.headerName, isRequired),
+    label: renderRequiredFieldLabel(column.headerName, showRequiredMark),
     margin: 'none' as const,
     required: false,
     error: Boolean(error),
@@ -163,7 +164,7 @@ export function GridFormField<T extends object>({
   if (column.type === 'image') {
     return (
       <FormControl disabled={disabled} error={Boolean(error)}>
-        <FormLabel>{renderRequiredFieldLabel(column.headerName, isRequired)}</FormLabel>
+        <FormLabel>{renderRequiredFieldLabel(column.headerName, showRequiredMark)}</FormLabel>
         <Box data-f1-grid-form-image sx={{
           ...(disabled || readOnly ? {
             backgroundColor: 'action.disabledBackground',
@@ -186,7 +187,7 @@ export function GridFormField<T extends object>({
         aria-required={isRequired}
       >
         <FormControlLabel
-          label={renderRequiredFieldLabel(column.headerName, isRequired)}
+          label={renderRequiredFieldLabel(column.headerName, showRequiredMark)}
           disabled={disabled}
           sx={{
             alignItems: 'center',
@@ -319,7 +320,7 @@ export function GridFormField<T extends object>({
             {...params}
             fullWidth
             disabled={disabled}
-            label={renderRequiredFieldLabel(column.headerName, isRequired)}
+            label={renderRequiredFieldLabel(column.headerName, showRequiredMark)}
             margin="none"
             size="small"
             required={false}

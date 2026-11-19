@@ -94,6 +94,9 @@ public class PurchaseOrderDetailVO implements Serializable {
     @Schema(description = "입고대기 마감 여부(Y 마감, N 미마감)", example = "N")
     private String receiptCloseAt;
 
+    @Schema(description = "가입고수량. 유효 가입고 합계에서 유효 수입검사 불합격 수량 합계를 뺀 값(상세 조회에서만 채워지며 가입고가 없으면 0). 0보다 크면 이 행은 수정할 수 없다", example = "4")
+    private BigDecimal arrivedQty;
+
     @Schema(description = "비고")
     private String remark;
 
