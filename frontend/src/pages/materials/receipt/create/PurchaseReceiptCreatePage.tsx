@@ -207,10 +207,15 @@ export function PurchaseReceiptCreatePage({
     resetGrid((item.details ?? []).map(detailToRow));
   }, [resetGrid]);
 
+  const [loadedRequestId, setLoadedRequestId] = useState<typeof purchaseReceiptId | undefined>(undefined);
+  if (loadedRequestId !== purchaseReceiptId) {
+    setLoadedRequestId(purchaseReceiptId);
+    if (purchaseReceiptId != null) setIsLoading(true);
+  }
+
   useEffect(() => {
     if (purchaseReceiptId == null) return undefined;
     let active = true;
-    setIsLoading(true);
     getPurchaseReceipt(purchaseReceiptId)
       .then((item) => { if (active) applyLoaded(item); })
       .catch((loadError: unknown) => {
