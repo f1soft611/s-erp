@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { F1GridChanges } from '../../../../../shared/components/f1-grid';
-import { useNotification } from '../../../../../shared/context/NotificationContext';
+import { useNotification } from '../../../../../shared/context/notification';
 import { useInitialLoadState } from '../../../../../shared/hooks/useInitialLoadState';
 import { getSystemDate } from '../../../../../shared/services/systemDateService';
 import { fetchItemPriceOverview, saveItemPriceOverviewBatch } from '../services/itemPriceOverview.service';
