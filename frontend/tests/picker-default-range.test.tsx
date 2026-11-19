@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PurchaseOrderConfirmPicker } from '../src/pages/materials/order/create/components/PurchaseOrderConfirmPicker';
 import { PurchaseConfirmPicker } from '../src/pages/materials/request/confirm/components/PurchaseConfirmPicker';
 import { PurchaseRequestSourcePicker } from '../src/pages/materials/request/confirm/components/PurchaseRequestSourcePicker';
-import { MaterialArrivalOrderPicker } from '../src/pages/materials/arrival/create/components/MaterialArrivalOrderPicker';
-import { MaterialReceiptInspectionPicker } from '../src/pages/materials/receipt/create/components/MaterialReceiptInspectionPicker';
-import { MaterialInspectionArrivalPicker } from '../src/pages/quality/inspect/create/components/MaterialInspectionArrivalPicker';
+import { PurchaseArrivalOrderPicker } from '../src/pages/materials/arrival/create/components/PurchaseArrivalOrderPicker';
+import { PurchaseReceiptInspectionPicker } from '../src/pages/materials/receipt/create/components/PurchaseReceiptInspectionPicker';
+import { QualityInspectionArrivalPicker } from '../src/pages/quality/inspect/create/components/QualityInspectionArrivalPicker';
 import { usePickerDateRange } from '../src/shared/hooks/usePickerDateRange';
 import { apiGet } from '../src/shared/services/apiClient';
 import { getSystemDate } from '../src/shared/services/systemDateService';
@@ -47,9 +47,9 @@ const PICKERS: Array<[string, () => JSX.Element, string, RegExp]> = [
   ['구매요청 선택', () => <PurchaseRequestSourcePicker open onClose={noop} onSelect={noop} />, '요청일', /purchase-request-confirms\/candidates\?/],
   ['구매요청확정 선택', () => <PurchaseConfirmPicker open onClose={noop} onSelect={noop} />, '확정일', /purchase-request-confirms\?/],
   ['확정 품목 선택', () => <PurchaseOrderConfirmPicker open onClose={noop} onSelect={noop} />, '확정일', /purchase-orders\/candidates\?/],
-  ['발주 품목 선택', () => <MaterialArrivalOrderPicker open onClose={noop} onSelect={noop} />, '발주일', /material-arrivals\/candidates\?/],
-  ['수입검사 합격분 선택', () => <MaterialReceiptInspectionPicker open onClose={noop} onSelect={noop} />, '검사일', /material-receipts\/candidates\?/],
-  ['검사 대기 가입고 선택', () => <MaterialInspectionArrivalPicker open onClose={noop} onSelect={noop} />, '가입고일', /material-inspections\/candidates\?/],
+  ['발주 품목 선택', () => <PurchaseArrivalOrderPicker open onClose={noop} onSelect={noop} />, '발주일', /purchase-arrivals\/candidates\?/],
+  ['수입검사 합격분 선택', () => <PurchaseReceiptInspectionPicker open onClose={noop} onSelect={noop} />, '검사일', /purchase-receipts\/candidates\?/],
+  ['검사 대기 가입고 선택', () => <QualityInspectionArrivalPicker open onClose={noop} onSelect={noop} />, '가입고일', /quality-inspections\/candidates\?/],
 ];
 
 describe('every picker opens with the default one-month period and sends it to the search', () => {

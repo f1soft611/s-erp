@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="PurchaseReceiptStatusDAO">
+
+    <!-- 입고 품목 행 목록. status가 ACTIVE면 정상, CANCELED면 취소, ALL이면 취소 포함 전체를 조회한다. -->
+    <select id="selectReceiptStatusList" parameterType="map"
+            resultType="egovframework.let.materials.receipt.status.domain.model.PurchaseReceiptStatusVO">
+        SELECT rh.purchase_receipt_id AS purchaseReceiptId,
+               rd.purchase_receipt_detail_id AS purchaseReceiptDetailId,
+               rh.receipt_no AS receiptNo,
+               rh.receipt_dt AS receiptDt,
+               c.customer_name AS supplierName,
+               u.user_nm AS receiverName,
+               CASE WHEN rh.use_at = 'Y' THEN 'ACTIVE' ELSE 'CANCELED' END AS status,
+               rh.tax_type AS taxType,
+               tci.item_nm AS taxTypeName,
+               rh.vat_included_at AS vatIncludedAt,
+               rh.supply_amt AS headerSupplyAmt,
+               rh.vat_amt AS headerVatAmt,
+               rh.total_amt AS headerTotalAmt,
+               rh.remark AS headerRemark,
+               rd.line_no AS lineNo,
+               rd.arrival_no AS arrivalNo,
+               ad.purchase_arrival_id AS purchaseArrivalId,
+               (ah.use_at = 'Y') AS arrivalLinked,
+               rd.inspection_no AS inspectionNo,
+               rd.closing_month AS closingMonth,
+               oh.order_no AS orderNo,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.material_spec AS materialSpec,
+               m.unit AS unit,
+               rd.receipt_qty AS receiptQty,
+               rd.unit_price AS unitPrice,
+               rd.supply_amt AS supplyAmt,
+               rd.vat_amt AS vatAmt,
+               rd.total_amt AS totalAmt,
+               w.warehouse_name AS warehouseName,
+               rd.manufacture_dt AS manufactureDt,
+               rd.expire_dt AS expireDt,
+               rd.lot_no AS lotNo,
+               rd.remark AS remark,
+               cu.user_nm AS createdByName
+        FROM tb_purchase_receipt_hd rh
+        JOIN tb_purchase_receipt_dt rd
+          ON rd.purchase_receipt_id = rh.purchase_receipt_id
+         AND rd.tenant_id = rh.tenant_id
+        JOIN tb_purchase_order_dt od
+          ON od.purchase_order_detail_id = rd.purchase_order_detail_id
+        JOIN tb_purchase_order_hd oh
+          ON oh.purchase_order_id = od.purchase_order_id
+         AND oh.tenant_id = od.tenant_id
+        LEFT JOIN tb_purchase_arrival_dt ad
+          ON ad.purchase_arrival_detail_id = rd.purchase_arrival_detail_id
+        LEFT JOIN tb_purchase_arrival_hd ah
+          ON ah.purchase_arrival_id = ad.purchase_arrival_id
+         AND ah.tenant_id = ad.tenant_id
+        LEFT JOIN tb_customer_info c
+          ON c.customer_id = rh.supplier_id
+         AND c.tenant_id = rh.tenant_id
+        LEFT JOIN tb_user u
+          ON u.user_id = rh.receiver_id
+        LEFT JOIN tb_login_account cla
+          ON cla.login_code = rh.created_by
+         AND cla.tenant_id = rh.tenant_id
+        LEFT JOIN tb_user cu
+          ON cu.login_id = cla.login_id
+         AND cu.tenant_id = cla.tenant_id
+        LEFT JOIN tb_material_info m
+          ON m.material_id = rd.material_id
+         AND m.tenant_id = rd.tenant_id
+        LEFT JOIN tb_warehouse w
+          ON w.warehouse_id = rd.warehouse_id
+        LEFT JOIN tb_common_code_group tcg
+          ON tcg.tenant_id = rh.tenant_id
+         AND tcg.group_code = 'PURCHASE_TAX_TYPE'
+        LEFT JOIN tb_common_code_item tci
+          ON tci.group_id = tcg.common_code_group_id
+         AND tci.item_code = rh.tax_type
+        WHERE rh.tenant_id = #{tenantId, jdbcType=BIGINT}
+        <if test="status == 'ACTIVE'">
+          AND rh.use_at = 'Y'
+        </if>
+        <if test="status == 'CANCELED'">
+          AND rh.use_at = 'N'
+        </if>
+        <if test="keyword != null">
+          AND (rh.receipt_no ILIKE '%' || #{keyword} || '%'
+               OR c.customer_name ILIKE '%' || #{keyword} || '%'
+               OR m.material_code ILIKE '%' || #{keyword} || '%'
+               OR m.material_name ILIKE '%' || #{keyword} || '%'
+               OR u.user_nm ILIKE '%' || #{keyword} || '%')
+        </if>
+        <if test="receiptNo != null">
+          AND rh.receipt_no ILIKE '%' || #{receiptNo} || '%'
+        </if>
+        <if test="supplierKeyword != null">
+          AND c.customer_name ILIKE '%' || #{supplierKeyword} || '%'
+        </if>
+        <if test="materialKeyword != null">
+          AND (m.material_code ILIKE '%' || #{materialKeyword} || '%'
+               OR m.material_name ILIKE '%' || #{materialKeyword} || '%')
+        </if>
+        <if test="orderNo != null">
+          AND oh.order_no ILIKE '%' || #{orderNo} || '%'
+        </if>
+        <if test="arrivalNo != null">
+          AND rd.arrival_no ILIKE '%' || #{arrivalNo} || '%'
+        </if>
+        <if test="receiptDtFrom != null">
+          AND rh.receipt_dt &gt;= CAST(#{receiptDtFrom} AS date)
+        </if>
+        <if test="receiptDtTo != null">
+          AND rh.receipt_dt &lt;= CAST(#{receiptDtTo} AS date)
+        </if>
+        ORDER BY rh.receipt_dt DESC, rh.receipt_no DESC, rd.line_no
+    </select>
+</mapper>
