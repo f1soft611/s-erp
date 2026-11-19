@@ -49,6 +49,8 @@ import { QualityInspectionCreatePage } from '../../quality/inspect/create/Qualit
 import { QualityInspectionStatusPage } from '../../quality/inspect/status/QualityInspectionStatusPage';
 import { PurchaseReceiptStatusPage } from '../../materials/receipt/status/PurchaseReceiptStatusPage';import { PurchaseRequestConfirmPage } from '../../materials/request/confirm/PurchaseRequestConfirmPage';
 import { DraftFormManagementPage } from '../../co/workflow/form/DraftFormManagementPage';
+import { DepartmentManagePage } from '../../hr/department/DepartmentManagePage';
+import { EmployeeManagePage } from '../../hr/employee/EmployeeManagePage';
 import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
 import { F1GridDocsPage } from '../../f1-grid-docs/F1GridDocsPage';
 import { PageHeader } from '../../../shared/components/PageHeader';
@@ -328,6 +330,18 @@ export function DashboardContent({
     const PurchaseReceiptPage = currentPageKey === 'receipt-create' ? PurchaseReceiptCreatePage : PurchaseReceiptStatusPage;
     return <PurchaseReceiptPage selectedModule={selectedModule} currentMenuName={currentMenuName}
       content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
+  }
+
+  if (selectedModule.id === 'hr' && currentPageKey === 'department-manage') {
+    return <DepartmentManagePage selectedModule={selectedModule} currentMenuName={currentMenuName}
+      content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions}
+      isTenantAdmin={isTenantAdmin} />;
+  }
+
+  if (selectedModule.id === 'hr' && currentPageKey === 'employee-manage') {
+    return <EmployeeManagePage selectedModule={selectedModule} currentMenuName={currentMenuName}
+      content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions}
+      isTenantAdmin={isTenantAdmin} />;
   }
 
   if (selectedModule.id === 'quality' && (currentPageKey === 'inspect-create' || currentPageKey === 'inspect-status')) {

@@ -34,6 +34,7 @@ function F1TreeInner<T extends object>(
     parentKey,
     treeColumn,
     treeCheckbox = false,
+    treeNodeIcon,
     defaultExpandAll,
     defaultExpanded = 'all',
     getRowOrder,
@@ -467,6 +468,15 @@ function F1TreeInner<T extends object>(
                 ) : null}
               </Box>
             )}
+            {treeNodeIcon
+              ? treeNodeIcon({
+                  row,
+                  rowId,
+                  depth: meta.depth,
+                  expanded,
+                  hasChildren: meta.hasChildren,
+                })
+              : null}
           </Box>
         );
       }}

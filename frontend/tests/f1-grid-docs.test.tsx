@@ -36,7 +36,7 @@ const expectedPublicApiByContract: Record<string, string[]> = {
     .trim()
     .split(/\s+/),
   F1TreeProps: `
-    parentKey treeColumn treeCheckbox defaultExpandAll defaultExpanded getRowOrder
+    parentKey treeColumn treeCheckbox treeNodeIcon defaultExpandAll defaultExpanded getRowOrder
     onDeleteBlocked onTreeCheckboxChange isDeleteDisabled
   `
     .trim()
