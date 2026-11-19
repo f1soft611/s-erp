@@ -190,10 +190,15 @@ export function PurchaseArrivalCreatePage({
     resetGrid((item.details ?? []).map(detailToRow));
   }, [resetGrid]);
 
+  const [loadedRequestId, setLoadedRequestId] = useState<typeof purchaseArrivalId | undefined>(undefined);
+  if (loadedRequestId !== purchaseArrivalId) {
+    setLoadedRequestId(purchaseArrivalId);
+    if (purchaseArrivalId != null) setIsLoading(true);
+  }
+
   useEffect(() => {
     if (purchaseArrivalId == null) return undefined;
     let active = true;
-    setIsLoading(true);
     getPurchaseArrival(purchaseArrivalId)
       .then((item) => { if (active) applyLoaded(item); })
       .catch((loadError: unknown) => {
