@@ -228,10 +228,15 @@ export function PurchaseOrderCreatePage({
     resetGrid((item.details ?? []).map((detail) => detailToRow(detail, supplierId)));
   }, [resetGrid]);
 
+  const [loadedRequestId, setLoadedRequestId] = useState<typeof purchaseOrderId | undefined>(undefined);
+  if (loadedRequestId !== purchaseOrderId) {
+    setLoadedRequestId(purchaseOrderId);
+    if (purchaseOrderId != null) setIsLoading(true);
+  }
+
   useEffect(() => {
     if (purchaseOrderId == null) return undefined;
     let active = true;
-    setIsLoading(true);
     getPurchaseOrder(purchaseOrderId)
       .then((item) => { if (active) applyLoaded(item); })
       .catch((loadError: unknown) => {

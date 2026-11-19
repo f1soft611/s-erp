@@ -163,10 +163,15 @@ export function QualityInspectionCreatePage({
     resetGrid((item.details ?? []).map(detailToRow));
   }, [resetGrid]);
 
+  const [loadedRequestId, setLoadedRequestId] = useState<typeof qualityInspectionId | undefined>(undefined);
+  if (loadedRequestId !== qualityInspectionId) {
+    setLoadedRequestId(qualityInspectionId);
+    if (qualityInspectionId != null) setIsLoading(true);
+  }
+
   useEffect(() => {
     if (qualityInspectionId == null) return undefined;
     let active = true;
-    setIsLoading(true);
     getQualityInspection(qualityInspectionId)
       .then((item) => { if (active) applyLoaded(item); })
       .catch((loadError: unknown) => {

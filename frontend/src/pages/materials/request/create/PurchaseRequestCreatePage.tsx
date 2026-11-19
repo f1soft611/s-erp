@@ -193,10 +193,15 @@ export function PurchaseRequestCreatePage({
     void reloadServerDate();
   }, [applyForm, reloadServerDate, setError]);
 
+  const [loadedRequestId, setLoadedRequestId] = useState<typeof purchaseRequestId | undefined>(undefined);
+  if (loadedRequestId !== purchaseRequestId) {
+    setLoadedRequestId(purchaseRequestId);
+    if (purchaseRequestId != null) setIsLoading(true);
+  }
+
   useEffect(() => {
     if (purchaseRequestId == null) return;
     let active = true;
-    setIsLoading(true);
     getPurchaseRequest(purchaseRequestId)
       .then((item) => {
         if (active) applyLoaded(item);
