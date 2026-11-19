@@ -1,0 +1,34 @@
+{
+  "baseline": "b2a90b99e90a76c8d0fb36be75631eb7cba2a28d",
+  "changed": [
+    "frontend/src/pages/groupware/community/notice/components/NoticeFeedList.tsx"
+  ],
+  "onlyNoOpGuardAndOneDependencyAdded": true,
+  "unchangedBranchSkippedOnlyWhenServerRevisionAndEveryCommentSnapshotMatch": true,
+  "guardedNoOpMapCopies": 4,
+  "allExistingSettersUpdatersSnapshotRefWritesAndChangedBranchesUnchanged": true,
+  "unchangedOtherEffects": 3,
+  "allHandlersUiPublicPropsTestsAndBackendContractsUnchanged": true,
+  "renderRefReadsOrWritesAdded": 0,
+  "sourceFiles": 890,
+  "byteMismatches": 0,
+  "red": {
+    "expectedTargetWarnings": 0,
+    "actualBefore": 1
+  },
+  "baselineTests": {
+    "files": 5,
+    "passed": 83
+  },
+  "relatedTests": {
+    "files": 5,
+    "passed": 83
+  },
+  "lint": {
+    "before": 91,
+    "after": 90,
+    "removed": 1,
+    "added": 0,
+    "remainingExhaustiveDeps": 0
+  }
+}

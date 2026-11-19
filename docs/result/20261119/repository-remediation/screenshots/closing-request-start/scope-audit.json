@@ -1,0 +1,43 @@
+{
+  "baseline": "eb58f171f797558e4a728c5fea46540d612bb4d7",
+  "changed": [
+    "frontend\\src\\pages\\materials\\receipt\\closing\\hooks\\useMaterialReceiptClosing.ts",
+    "frontend\\tests\\material-receipt-closing.test.tsx"
+  ],
+  "onlySearchDefaultWrapperAndDataStartGuardsChanged": true,
+  "sameOwnerSessionSetterAndPassiveStoragePreserved": true,
+  "promiseAllAtomicPublicationCancellationAndDataVersionUnchanged": true,
+  "quietFilterChangeAndPausedLastStartedVersionPreserved": true,
+  "servicesApiTypesPageUiJsxCssSearchApplyResetGridSelectionEditCloseReleaseAndCallbacksUnchanged": true,
+  "renderRefStorageOrTransportAccessAdded": false,
+  "originalTestsBytePreservedExceptNullableDefaultMockControl": true,
+  "addedTests": 4,
+  "runtimeRed": {
+    "failed": 4,
+    "cause": "Initial/delayed search defaults were uninitialized and data-start loading was false in first eligible commits"
+  },
+  "baselineTests": {
+    "files": 1,
+    "passed": 14
+  },
+  "relatedTests": {
+    "files": 3,
+    "passed": 62,
+    "closingPassed": 18
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 68,
+    "after": 66,
+    "removed": 2,
+    "added": 0,
+    "removedTokens": [
+      "setHasLoaded",
+      "setKeyword"
+    ],
+    "otherDiagnosticsUnchangedIncludingLabels": true
+  },
+  "remainingRefs": 0,
+  "remainingStateInEffect": 66
+}

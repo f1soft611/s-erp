@@ -129,27 +129,27 @@
 		<dependency>
 		    <groupId>org.apache.tomcat.embed</groupId>
 		    <artifactId>tomcat-embed-core</artifactId>
-			<version>9.0.91</version>
+			<version>9.0.124</version>
 		</dependency>
 		<dependency>
 		    <groupId>org.apache.tomcat.embed</groupId>
 		    <artifactId>tomcat-embed-el</artifactId>
-			<version>9.0.91</version>
+			<version>9.0.124</version>
 		</dependency>
 		<dependency>
 		    <groupId>org.apache.tomcat.embed</groupId>
 		    <artifactId>tomcat-embed-jasper</artifactId>
-			<version>9.0.91</version>
+			<version>9.0.124</version>
 		</dependency>
 		<dependency>
 		    <groupId>org.apache.tomcat.embed</groupId>
 		    <artifactId>tomcat-embed-websocket</artifactId>
-			<version>9.0.91</version>
+			<version>9.0.124</version>
 		</dependency>
 		<dependency>
 		    <groupId>org.apache.tomcat</groupId>
 		    <artifactId>tomcat-annotations-api</artifactId>
-			<version>9.0.91</version>
+			<version>9.0.124</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -339,7 +339,7 @@
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
-			<version>42.6.0</version>
+			<version>42.7.14</version>
 		</dependency>
 
 		<!-- validator -->
@@ -377,7 +377,7 @@
 		<dependency>
 			<groupId>commons-fileupload</groupId>
 			<artifactId>commons-fileupload</artifactId>
-			<version>1.5</version>
+			<version>1.6.0</version>
 		</dependency>
 
 		<dependency>

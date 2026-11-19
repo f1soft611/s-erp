@@ -1,0 +1,42 @@
+{
+  "baseline": "bff5a5cf31f0533e7995de2c919717eaabc92b3b",
+  "changed": [
+    "frontend\\src\\pages\\co\\master\\common-code\\components\\CommonCodeManagementPanel.tsx",
+    "frontend\\tests\\common-code-management-page.test.tsx"
+  ],
+  "onlyBoundedDefaultGroupSelectionChanged": true,
+  "loadingEmptyUnsavedValidIdAndNormalizationPriorityPreserved": true,
+  "jsxCssServicesDetailEffectsRefsSaveGuardsAndPublicTypesUnchanged": true,
+  "originalTestsBytePreserved": true,
+  "addedTests": 3,
+  "runtimeRed": {
+    "failed": 2,
+    "unsavedGuardPassed": 1,
+    "cause": "First ready immediate/loading-complete commit exposed no selected group"
+  },
+  "baselineTests": {
+    "files": 1,
+    "passed": 35
+  },
+  "commonTests": {
+    "files": 1,
+    "passed": 38
+  },
+  "relatedTests": {
+    "files": 2,
+    "passed": 91
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 78,
+    "after": 77,
+    "removed": 1,
+    "added": 0,
+    "removedToken": "setSelectedGroupId",
+    "otherFilesUnchangedIncludingDiagnosticLabels": true,
+    "remainingTargetToken": "loadItemRows"
+  },
+  "remainingRefs": 0,
+  "remainingStateInEffect": 77
+}

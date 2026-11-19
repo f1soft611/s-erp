@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GridSaveReconciliationError, type F1GridChanges, type F1GridRef } from '../../../../../shared/components/f1-grid';
-import { useNotification } from '../../../../../shared/context/NotificationContext';
+import { useNotification } from '../../../../../shared/context/notification';
 import { useInitialLoadState } from '../../../../../shared/hooks/useInitialLoadState';
 import { fetchMaterialOptions, fetchMaterials, saveMaterialRows, toMaterialPayload } from '../services/materialManagement.service';
 import type { MaterialFilters, MaterialOption, MaterialRow } from '../types/materialManagement.types';
@@ -47,7 +47,7 @@ export function useMaterialManagement(initialFilters: MaterialFilters = {}) {
 
   useEffect(() => {
     void loadRows(initialFiltersRef.current);
-    return () => { ++loadVersion.current; };
+    return () => { loadVersion.current += 1; };
   }, [loadRows]);
 
   const applyFilters = useCallback((filters: MaterialFilters) => {

@@ -1,0 +1,161 @@
+{
+  "component": "PageSearchArea",
+  "businessApiData": false,
+  "toolbar": "searchField plus children action controls",
+  "behavior": {
+    "preserved": {
+      "draftPreserved": "typed"
+    },
+    "external": {
+      "from": "2028-02-01",
+      "name": "beta",
+      "to": "2028-02-29"
+    },
+    "restored": {
+      "chips": [
+        "이름: alpha",
+        "상태: 사용",
+        "기준일: 2026-11-01 ~ 2026-11-30"
+      ],
+      "name": ""
+    },
+    "removed": {
+      "name": "",
+      "notice": "조건 변경 내용은 조회 버튼을 눌러 적용하세요."
+    },
+    "cleared": {
+      "chips": 0,
+      "notice": false
+    },
+    "explicitSearch": {
+      "name": "beta",
+      "period": {
+        "from": "2028-02-01",
+        "to": "2028-02-29"
+      },
+      "status": "Y"
+    },
+    "reset": {
+      "chips": 0,
+      "inputs": [
+        {
+          "label": "이름",
+          "value": ""
+        },
+        {
+          "label": "기준일 시작일",
+          "value": ""
+        },
+        {
+          "label": "기준일 종료일",
+          "value": ""
+        }
+      ],
+      "notice": false,
+      "result": {
+        "reset": {
+          "name": "",
+          "period": {
+            "from": "",
+            "to": ""
+          },
+          "status": ""
+        }
+      }
+    }
+  },
+  "legacyInputSlotObservation": {
+    "badgeRight": 778,
+    "scrollWidth": 778,
+    "setup": "Three toolbar controls supplied through the legacy children input slot without searchField",
+    "sourceJsxChanged": false,
+    "viewport": 768
+  },
+  "layout": [
+    {
+      "chips": [
+        "이름: alpha",
+        "상태: 사용",
+        "기준일: 2026-11-01 ~ 2026-11-30"
+      ],
+      "fields": [
+        {
+          "label": "이름",
+          "value": "alpha"
+        },
+        {
+          "label": "기준일 시작일",
+          "value": "2026-11-01"
+        },
+        {
+          "label": "기준일 종료일",
+          "value": "2026-11-30"
+        }
+      ],
+      "panel": {
+        "left": 16,
+        "right": 359,
+        "width": 343
+      },
+      "scrollWidth": 375,
+      "width": 375
+    },
+    {
+      "chips": [
+        "이름: alpha",
+        "상태: 사용",
+        "기준일: 2026-11-01 ~ 2026-11-30"
+      ],
+      "fields": [
+        {
+          "label": "이름",
+          "value": "alpha"
+        },
+        {
+          "label": "기준일 시작일",
+          "value": "2026-11-01"
+        },
+        {
+          "label": "기준일 종료일",
+          "value": "2026-11-30"
+        }
+      ],
+      "panel": {
+        "left": 16,
+        "right": 752,
+        "width": 736
+      },
+      "scrollWidth": 768,
+      "width": 768
+    },
+    {
+      "chips": [
+        "이름: alpha",
+        "상태: 사용",
+        "기준일: 2026-11-01 ~ 2026-11-30"
+      ],
+      "fields": [
+        {
+          "label": "이름",
+          "value": "alpha"
+        },
+        {
+          "label": "기준일 시작일",
+          "value": "2026-11-01"
+        },
+        {
+          "label": "기준일 종료일",
+          "value": "2026-11-30"
+        }
+      ],
+      "panel": {
+        "left": 16,
+        "right": 944,
+        "width": 928
+      },
+      "scrollWidth": 1280,
+      "width": 1280
+    }
+  ],
+  "theme": "light"
+}

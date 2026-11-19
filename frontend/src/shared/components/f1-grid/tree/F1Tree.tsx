@@ -38,6 +38,7 @@ function F1TreeInner<T extends object>(
     defaultExpanded = 'all',
     getRowOrder,
     onDeleteBlocked,
+    onChangesChange,
     onTreeCheckboxChange,
     isDeleteDisabled,
     rows,
@@ -94,6 +95,23 @@ function F1TreeInner<T extends object>(
             : defaultExpanded,
       ),
   );
+  const [previousExpansionInputs, setPreviousExpansionInputs] = useState({
+    allParentIds,
+    defaultExpandAll,
+  });
+  if (
+    previousExpansionInputs.allParentIds !== allParentIds ||
+    previousExpansionInputs.defaultExpandAll !== defaultExpandAll
+  ) {
+    setPreviousExpansionInputs({ allParentIds, defaultExpandAll });
+    if (defaultExpandAll && allParentIds.length > 0) {
+      setExpandedIds((current) => {
+        const next = new Set(current);
+        allParentIds.forEach((rowId) => next.add(rowId));
+        return next;
+      });
+    }
+  }
   const [treeCheckedIds, setTreeCheckedIds] = useState<Set<F1GridRowId>>(
     () => new Set(),
   );
@@ -173,15 +191,6 @@ function F1TreeInner<T extends object>(
   useEffect(() => {
     onTreeCheckboxChange?.([...treeCheckedIds]);
   }, [onTreeCheckboxChange, treeCheckedIds]);
-
-  useEffect(() => {
-    if (!defaultExpandAll || allParentIds.length === 0) return;
-    setExpandedIds((current) => {
-      const next = new Set(current);
-      allParentIds.forEach((rowId) => next.add(rowId));
-      return next;
-    });
-  }, [allParentIds, defaultExpandAll]);
 
   const projectRows = (gridRows: T[]) => {
     const cached = treeIndexCacheRef.current;
@@ -280,9 +289,9 @@ function F1TreeInner<T extends object>(
           new Set(current).add(pendingInsert.parentId),
         );
       }
-      gridProps.onChangesChange?.(changes);
+      onChangesChange?.(changes);
     },
-    [gridProps.onChangesChange, parentKey, rowKey],
+    [onChangesChange, parentKey, rowKey],
   );
 
   function addChildRow(parentId: F1GridRowId, row?: Partial<T>) {

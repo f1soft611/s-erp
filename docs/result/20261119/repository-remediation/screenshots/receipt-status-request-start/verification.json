@@ -1,0 +1,63 @@
+{
+  "actualHooksLayoutObserver": true,
+  "notFullBusinessScreen": true,
+  "onlyDeferredListAndDetailGetsSynthetic": true,
+  "memoryStorageOnly": true,
+  "allWritesAndUnownedTransportBlocked": true,
+  "firstNormalRetryAndQuietListCommitsCorrect": true,
+  "quietThenFilterIsNormalLoading": true,
+  "pausedQuietLastStartedVersionPreserved": true,
+  "rowsRetainedAndCancelledResponseIgnored": true,
+  "firstDetailRetryAndReopenCommitsCorrect": true,
+  "sameIdNoRequestAndLoadedRefreshPreserved": true,
+  "closedDetailResponseIgnored": true,
+  "closedRefreshNoRequestAndEditorCleared": true,
+  "unknownRequests": 0,
+  "errors": 0,
+  "documentOverflow": 0,
+  "listGetsPerWidth": 6,
+  "detailGetsPerWidth": 5,
+  "widths": [
+    375,
+    768,
+    1280
+  ],
+  "images": [
+    {
+      "file": "receipt069-list-375.png",
+      "width": 375,
+      "height": 1100,
+      "bytes": 30882
+    },
+    {
+      "file": "receipt069-detail-375.png",
+      "width": 375,
+      "height": 1100,
+      "bytes": 30951
+    },
+    {
+      "file": "receipt069-list-768.png",
+      "width": 768,
+      "height": 1100,
+      "bytes": 29210
+    },
+    {
+      "file": "receipt069-detail-768.png",
+      "width": 768,
+      "height": 1100,
+      "bytes": 29297
+    },
+    {
+      "file": "receipt069-list-1280.png",
+      "width": 1280,
+      "height": 1100,
+      "bytes": 29092
+    },
+    {
+      "file": "receipt069-detail-1280.png",
+      "width": 1280,
+      "height": 1100,
+      "bytes": 29314
+    }
+  ]
+}

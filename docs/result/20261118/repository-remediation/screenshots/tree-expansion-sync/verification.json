@@ -1,0 +1,292 @@
+{
+  "layouts": [
+    {
+      "width": 375,
+      "grid": {
+        "bottom": 500,
+        "height": 320,
+        "left": 16,
+        "right": 359,
+        "top": 180,
+        "width": 343,
+        "x": 16,
+        "y": 180
+      },
+      "documentWidth": 375,
+      "body": {
+        "clientWidth": 341,
+        "scrollWidth": 412
+      },
+      "initialNames": [
+        "Root",
+        "Child",
+        "Sibling",
+        "Other"
+      ],
+      "collapsedNames": [
+        "Root",
+        "Other"
+      ],
+      "metadataNames": [
+        "Root",
+        "Other"
+      ],
+      "callbackCounts": {
+        "collapsed": 1,
+        "metadata": 1
+      },
+      "sameContentNewRowsExpanded": true,
+      "flagDisabledExpanded": false,
+      "flagEnabledExpanded": true
+    },
+    {
+      "width": 768,
+      "grid": {
+        "bottom": 476,
+        "height": 320,
+        "left": 16,
+        "right": 752,
+        "top": 156,
+        "width": 736,
+        "x": 16,
+        "y": 156
+      },
+      "documentWidth": 768,
+      "body": {
+        "clientWidth": 734,
+        "scrollWidth": 734
+      },
+      "initialNames": [
+        "Root",
+        "Child",
+        "Sibling",
+        "Other"
+      ],
+      "collapsedNames": [
+        "Root",
+        "Other"
+      ],
+      "metadataNames": [
+        "Root",
+        "Other"
+      ],
+      "callbackCounts": {
+        "collapsed": 1,
+        "metadata": 1
+      },
+      "sameContentNewRowsExpanded": true,
+      "flagDisabledExpanded": false,
+      "flagEnabledExpanded": true
+    },
+    {
+      "width": 1280,
+      "grid": {
+        "bottom": 476,
+        "height": 320,
+        "left": 16,
+        "right": 1264,
+        "top": 156,
+        "width": 1248,
+        "x": 16,
+        "y": 156
+      },
+      "documentWidth": 1280,
+      "body": {
+        "clientWidth": 1246,
+        "scrollWidth": 1246
+      },
+      "initialNames": [
+        "Root",
+        "Child",
+        "Sibling",
+        "Other"
+      ],
+      "collapsedNames": [
+        "Root",
+        "Other"
+      ],
+      "metadataNames": [
+        "Root",
+        "Other"
+      ],
+      "callbackCounts": {
+        "collapsed": 1,
+        "metadata": 1
+      },
+      "sameContentNewRowsExpanded": true,
+      "flagDisabledExpanded": false,
+      "flagEnabledExpanded": true
+    }
+  ],
+  "checkbox": {
+    "checkedIds": [
+      "root",
+      "child",
+      "sibling"
+    ],
+    "states": [
+      {
+        "checked": true,
+        "indeterminate": false,
+        "name": "Root",
+        "present": true
+      },
+      {
+        "checked": true,
+        "indeterminate": false,
+        "name": "Child",
+        "present": true
+      },
+      {
+        "checked": true,
+        "indeterminate": false,
+        "name": "Sibling",
+        "present": true
+      },
+      {
+        "checked": false,
+        "indeterminate": false,
+        "name": "Other",
+        "present": true
+      }
+    ],
+    "updatedRows": [
+      {
+        "allowed": true,
+        "id": "root",
+        "name": "Root",
+        "order": 1,
+        "parentId": null
+      },
+      {
+        "allowed": true,
+        "id": "child",
+        "name": "Child",
+        "order": 1,
+        "parentId": "root"
+      },
+      {
+        "allowed": true,
+        "id": "sibling",
+        "name": "Sibling",
+        "order": 2,
+        "parentId": "root"
+      }
+    ],
+    "newCallVersions": [
+      1
+    ]
+  },
+  "draft": {
+    "rootExpanded": false,
+    "inserted": 0,
+    "dialog": {
+      "fields": [
+        {
+          "checked": false,
+          "label": "Name 3",
+          "value": "Draft child"
+        },
+        {
+          "checked": false,
+          "label": "Allowed",
+          "value": "on"
+        }
+      ],
+      "name": "_r_19_",
+      "paperScrollWidth": 375,
+      "paperWidth": 375,
+      "rect": {
+        "bottom": 1000,
+        "height": 1000,
+        "left": 0,
+        "right": 375,
+        "top": 0,
+        "width": 375,
+        "x": 0,
+        "y": 0
+      }
+    }
+  },
+  "cancelled": {
+    "rootExpanded": false,
+    "inserted": 0
+  },
+  "applied": {
+    "rootExpanded": true,
+    "visibleNames": [
+      "Root",
+      "Child",
+      "Sibling",
+      "Applied child",
+      "Other"
+    ],
+    "insertedRows": [
+      {
+        "allowed": false,
+        "id": "owned-child",
+        "name": "Applied child",
+        "order": 2,
+        "parentId": "root"
+      }
+    ],
+    "updatedRows": [
+      {
+        "allowed": true,
+        "id": "root",
+        "name": "Root",
+        "order": 1,
+        "parentId": null
+      },
+      {
+        "allowed": true,
+        "id": "child",
+        "name": "Child",
+        "order": 1,
+        "parentId": "root"
+      },
+      {
+        "allowed": true,
+        "id": "sibling",
+        "name": "Sibling",
+        "order": 2,
+        "parentId": "root"
+      }
+    ],
+    "callback": 1
+  },
+  "separateUnchangedProjectionObservation": {
+    "baseline": "7eedc6a2b81392a01d3fe080de4d74ae5103b1a0",
+    "source": "frontend/src/shared/components/f1-grid/tree/TreeProjection.ts",
+    "baselineSourceIdentical": true,
+    "supplementaryDiagnosticPassed": 1,
+    "rows": [
+      {
+        "id": "root",
+        "parentId": null
+      },
+      {
+        "id": "child",
+        "parentId": "root"
+      },
+      {
+        "id": "grandchild",
+        "parentId": "child"
+      },
+      {
+        "id": "other",
+        "parentId": null
+      }
+    ],
+    "expandedIds": [
+      "child"
+    ],
+    "observedOutputIds": [
+      "root",
+      "other",
+      "grandchild"
+    ],
+    "fixedInThisUnit": false,
+    "temporaryDiagnosticRemoved": true
+  }
+}

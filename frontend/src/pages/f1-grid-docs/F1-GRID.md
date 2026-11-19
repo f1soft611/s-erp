@@ -38,6 +38,10 @@ React + TypeScript 기반의 ERP 시스템에서 공통으로 사용할 수 있�
 - CSS 또는 프로젝트의 공통 Styling System
 - React Hooks
 
+## 소스 모듈 경계
+
+F1-Grid의 렌더링 컴포넌트는 TSX 모듈에서 관리하고, 순수 행·셀 계산은 `core/gridRowUtils.ts`와 `core/gridCellUtils.ts`, 편집기 입력 정규화는 `editing/dateInput.ts`와 `editing/monthInput.ts`, decimal 정책 Context와 hook은 `core/gridDecimalPolicyContext.ts`에서 관리한다. Provider는 기존 `core/GridDecimalPolicy.tsx`에 둔다. 이 분리는 모듈 갱신 경계를 명확히 할 뿐 컴포넌트 동작이나 공개 API를 변경하지 않는다. 기존 `shared/components/f1-grid/index.ts` 공개 barrel은 그대로 유지한다.
+
 ## 금지
 
 다음 Grid 라이브러리를 사용하지 않는다.
@@ -98,6 +102,10 @@ const columns: F1GridColumn<Row>[] = [
 - `DateEditor`는 입력 규칙(직접 입력, 축약 입력, 정규화, `disabled`, 오류 표시)과 달력 열기 버튼 이름을 그대로 두고, 선택 prop `renderCalendar({ value, close })`로 팝업 내용을 바꿀 수 있다. 없으면 `DatePanel`을 쓴다. `disabled`이면 팝업이 열리지 않는다.
 - 날짜/시간 입력(`DateTimeEditor`)과 시간 입력(`TimeEditor`)은 모양은 그대로이고 한국어 로케일만 적용했다.
 - 달력의 "오늘"과 오늘 점은 이동·표시용이며 입력 기본값 규칙(서버 날짜)과 무관하다. 서버 날짜를 쓰는 화면은 패널의 `todayValue`로 넘길 수 있다.
+
+외부 `value`가 바뀌면 날짜·월 입력과 패널의 표시 월·연도는 이전 값이 먼저 화면에 반영되지 않도록 같은 컴포넌트의 commit 전에 동기화한다. 이전 primitive 입력값이 바뀐 경우에만 렌더를 재시도하며 effect·타이머·remount를 사용하지 않는다. 같은 입력값의 재렌더는 사용자가 탐색한 월·연도와 직접 입력 중인 draft를 유지한다. `DateEditor`는 `disabled` 변경 시에도 draft를 외부 값으로 맞추고, 비활성화 시 열린 달력을 닫아 재활성화 후 다시 열리지 않게 한다. 월 입력은 draft의 숫자가 새 `value`와 같으면 `2026-0` 같은 부분 입력 표시를 보존한다.
+
+패널의 기존 빈 값·잘못된 값 처리도 유지한다. `DatePanel`은 유효한 날짜일 때만 `value`/`todayValue` 변경으로 표시 월을 맞춘다. `MonthPanel`은 기존의 숫자 6자리 조건을 유지하므로 빈 값·비숫자 값은 탐색 연도를 유지하고, `202813`처럼 월이 잘못된 숫자 6자리는 `todayValue` 연도로 돌아간다. 입력 정규화·오류 검증·선택 이벤트·달력 폭은 변경하지 않는다.
 
 ### 컬럼 집계 행 (2026-11-12)
 
@@ -165,10 +173,15 @@ const columns: F1GridColumn<Row>[] = [
 - 단일 선택에서 `initialSelectedRowIds`/ref `setSelectedRowIds`에 복수 ID를 전달하면 현재 표시 순서에서 첫 유효 행만 선택한다. 실행 중 true→false 전환도 첫 선택 행만 유지하며 다시 true로 바꿔도 이전 다중 선택을 복구하지 않는다. 콜백/ref/강조/행 복사는 같은 선택 상태를 사용한다.
 - Ctrl+C는 선택된 표시 행의 모든 표시 컬럼을 TSV로 복사한다. `cell`의 기존 셀/범위 복사와 붙여넣기·편집 계약은 유지한다.
 - `showCheckbox`와 독립적이다. 체크박스, `initialSelectedRowIds`, `onSelectionChange`, 선택 ref API는 동일한 행 선택 상태를 사용한다.
+- 유효한 `initialSelectedRowIds`는 적용 commit부터 checkbox/ref/callback에 일치한다. 문자열 ID로 구성한 동일 복원 key는 한 번만 적용하므로 사용자 해제 뒤 배열 참조만 바뀌어도 다시 선택하지 않는다. 새 key만 기존 표시 순서·단일/다중 제한으로 적용한다.
 - 강조는 실제 행 높이 단위이므로 병합 셀 그룹 전체가 아닌 선택된 상세 행에만 표시된다. 고정 열과 가로 스크롤에서도 정렬된다. `selectRowOnContextMenu={false}`이면 우클릭으로 선택 행을 바꾸지 않는다.
 - 실행 중 모드를 바꾸면 이전 셀 범위와 복사 표시를 해제하고 행 선택은 유지한다. 옵션은 수주현황·문서현황에 적용되며 다른 화면은 명시적으로 설정해야 한다.
 
 다중 행 작업이 필요한 화면만 `<F1Grid selectionMode="row" multiSelect ... />`로 명시한다. `multiSelect`는 셀 모드의 직사각형 범위 선택·복사 및 F1Tree의 `treeCheckbox` 부모·자식 값 전파를 제한하지 않는다.
+
+`selectionMode`가 바뀐 commit에는 이전 셀 선택·복사 범위와 드래그 표시를 노출하지 않는다. 같은 모드의 일반 render에서는 범위를 유지하며, 모드 전환과 재진입은 행 checkbox 선택·포커스·편집값·Grid 변경 데이터를 초기화하지 않는다.
+
+Escape 등으로 셀 선택과 복사 범위를 모두 해제하면 첫 해제 commit부터 이전 범위 overlay를 표시하지 않는다. 유효 범위의 DOM 기하 측정과 scroll/resize 갱신, 행 선택·편집 데이터와 새 범위 생성 동작은 유지한다.
 
 ### 선택·편집 렌더 성능 (2026-10-23)
 
@@ -178,6 +191,11 @@ const columns: F1GridColumn<Row>[] = [
 - 드래그 중 행 높이 조절 비활성화는 부모 상태/CSS로 전달한다. 단순 클릭만으로 모든 행의 조절 버튼을 다시 만들지 않는다.
 - 편집 문자열 변경으로 헤더를 다시 만들지 않으며, 비체크박스 열에서는 헤더 전체 선택 상태를 계산하지 않는다.
 - 표시를 memo로 생략해도 이벤트는 최신 편집·선택 상태를 사용한다. Enter/Tab 확정, Escape 취소 및 셀 이동 계약은 유지한다.
+- 헤더 이벤트는 마지막으로 commit된 callback을 사용한다. Suspense로 대기 중인 재렌더는 기존 DOM의 전체 선택/정렬·필터 이벤트를 바꾸지 않으며 commit 뒤 새 callback을 사용한다. checkbox 표시용 getter는 현재 rows/columns의 render 입력으로 별도 계산하고, callback identity만 바뀐 편집 draft는 기존 헤더 memo를 유지한다.
+- 사용자 편집 셀의 popup inset은 DOM 연결 결과를 state로 게시해 계산한다. 최초부터 편집 상태로 mount되어도 연결된 셀 기준 위치를 반영하며, 일반 셀의 DOM 연결에는 이 state 게시를 추가하지 않는다.
+- 셀 이벤트도 마지막으로 commit된 callback을 사용한다. 대기 중인 재렌더는 기존 DOM의 checkbox·draft·편집 이벤트에 노출하지 않고, commit 후에는 표시 memo가 유지되어도 최신 callback을 사용한다. 셀 DOM 등록과 사용자 anchor 게시 순서는 별도로 유지한다.
+- 행 이벤트도 commit된 callback만 사용한다. child 셀/편집 DOM 등록은 이벤트 ref와 분리해 현재 commit의 callback으로 전달하고, detach는 해당 attachment callback으로 같은 cache를 정리한다. callback-only 변경은 기존 행 memo를 유지하며 실제 재연결은 최신 등록 callback을 사용한다.
+- 범위 드래그 중 표시 컬럼 수가 바뀌면 경계 hit-test도 현재 컬럼 수를 사용한다. 표시 행 참조·행 키·표시 컬럼 수가 유지되는 부모의 컬럼 metadata 재렌더는 대기 중인 pointer frame을 취소하지 않는다. 범위 테두리의 스크롤·리사이즈 좌표 계산은 유지한다.
 - 품목·거래처 페이지는 저장 성공 응답의 해당 행만 `acceptSavedRows`로 확정한다. 저장 후 목록/옵션 재조회나 그리드 초기화 없이 서버의 최종값·실제 ID·자동 코드를 반영한다.
 - 이 개선은 프론트엔드 렌더 비용에 대한 것이며, 저장 API/DB의 응답시간을 보장하지 않는다.
 
@@ -236,10 +254,12 @@ const currentRows = grid.acceptSavedRows(savedRows);
 - `stripeRows` 기본값은 `true`이며, 홀수 행에 스트라이프 배경을 적용해 가독성을 높인다. 고정(pinned) 컬럼에서도 동일한 규칙을 유지하며, sticky 레이어가 다른 셀과 겹치지 않도록 별도 stacking context를 유지한다.
 - `rowHeight`, `minRowHeight`, `maxRowHeight`, `resizableRows`를 통해 Grid 인스턴스 단위의 행 높이를 제어한다.
 - `loading` 상태에서는 그리드 전체 입력을 막는 오버레이의 중앙에 공통 `AppLoadingSpinner`를 34px·2.4px 두께로 표시한다. 색상은 테마 기본값을 사용하고, 오버레이는 테마 `background.default`를 84% 불투명도로 적용한다. 스피너는 MUI 기본 indeterminate 애니메이션을 사용해 원호 길이가 변하면서 회전한다. F1Grid/F1Tree와 다른 기본 로딩 화면은 같은 2.4px 기본 두께를 사용한다. 앱 첫 접속 로더만 기존 외형 보존을 위해 3.6px를 명시한다. F1Tree의 `loading`도 내부 F1Grid로 전달된다. 화면별 loading 정책은 변경하지 않는다. `minHeight`를 넘겨 부모 영역에서 내부 스크롤을 유지할 수 있다.
+- 로딩 회귀 검증은 root의 `aria-busy`와 전체 영역 `f1-grid-loading-overlay`, 헤더 보존, 완료 후 실제 행 및 오버레이 제거를 확인한다. 저장 후 조용한 재조회에는 오버레이가 없어야 한다. 과거 `grid-loading-skeleton`/`grid-loading-row-skeleton` 식별자의 부재만으로 현재 로딩이 없다고 판단하지 않는다.
 - 외부 `loading`, 내부 조회 또는 data-source loading이 시작되면 셀 범위 선택·복사 표시와 진행 중 포인터 드래그를 초기화한다. 행 checkbox 선택, 행 데이터와 편집 변경은 유지한다. 포인터가 가리키는 행과 선택 오버레이의 행 위치는 기존 `rowIndexById` 인덱스로 조회해 드래그마다 전체 행을 선형 탐색하지 않는다.
 - 부모의 조회 결과 `rows`는 내부 그리드 편집 모델에 브라우저 페인트 전에 반영한다. 조회 로딩이 종료되는 화면 프레임에 이전 빈 상태가 먼저 노출되지 않으며, API 요청과 페이지별 `loading` 상태 계약은 유지한다.
 - `F1GridColumn.pinned` 옵션으로 초기 좌/우 고정 컬럼을 지정할 수 있다.
 - `F1Tree.defaultExpandAll` 옵션으로 최초 렌더링 시 전체 트리를 펼친 상태로 시작할 수 있다.
+- `defaultExpandAll`을 켜거나, 켜진 상태에서 `rows` 참조·`rowKey`·`parentKey`가 바뀌면 현재 모든 부모를 기존 펼침 집합에 합친다. 같은 입력의 컬럼 metadata·콜백 재렌더는 사용자가 접은 상태를 유지한다. `defaultExpanded`만 바꾸면 현재 상태를 초기화하지 않으며, 부모 목록이 비어도 기존 펼침 집합을 지우지 않는다.
 - F1Tree의 `ㄴ` 하위 메뉴 마커는 루트가 아닌 최하위 행에만 표시한다. 자식이 있는 중간 행에는 접힘 여부와 관계없이 표시하지 않는다. `treeCheckbox`가 켜져 있으면 마커는 체크박스 뒤의 빈 펼침 버튼 슬롯에 표시해 체크박스와 겹치지 않는다.
 - 품목·거래처 분류 설정 팝업은 `F1Tree`의 `id`/`parentId` 계층과 `name` 트리 컬럼을 사용한다. 분류명·정렬순서·사용여부를 셀에서 직접 편집하고 여러 변경 행을 저장한다. 신규 부모·자식은 부모부터 생성하고 반환된 ID로 연결하며, 기존 분류의 사용 해제는 자식부터 저장한다. 단건 API 중간 실패 시 성공한 행은 재전송하지 않고 나머지 입력을 유지한다. 추가는 화면 버튼으로만 허용하며 품목 3단계·거래처 2단계, 메뉴별 등록/수정 권한을 적용한다. 공통 F1Tree 자체의 API나 동작은 변경하지 않는다.
 - 분류 트리는 `CommonDialog` 안에 표시한다. 타이틀 아래 description에 최대 단계·셀 더블클릭 편집·사용여부 해제 안내를 표시하고, 추가 버튼은 트리 위 우측에 배치한다. 헤더 X와 하단 닫기는 같은 미저장 변경 보호를 적용하며 저장 중에는 닫히지 않는다.
@@ -261,6 +281,7 @@ const currentRows = grid.acceptSavedRows(savedRows);
 - 저장 뒤 목록을 재조회하는 기존 페이지는 저장 상태와 Grid `loading`을 분리한다. 품목관리와 거래처관리는 저장 후 재조회 자체를 하지 않는다. 두 화면 모두 저장 진행 아이콘·중복 저장 방지·편집 잠금을 유지하고, 최초/사용자 조회에만 Grid 로딩을 표시한다.
 - 인라인 편집 중 같은 Grid의 다른 셀 또는 툴바/액션으로 이동하면 edit를 commit하고 dirty 변경 집합에 반영한다. Grid가 중첩 MUI Dialog/Modal 안에 있어도 조상 모달의 이벤트를 editor popup으로 오인하지 않는다. 실제 editor popup으로 포인터/포커스가 이동할 때만 commit을 보류한다. 따라서 폼 바깥의 저장 버튼도 편집 commit으로 갱신된 dirty 상태를 기준으로 동작한다.
 - 컨텍스트 메뉴 등으로 추가한 신규 행을 저장 전에 삭제하면 해당 행은 `deleted` 변경으로 남지 않는다. 행과 원본·dirty 상태를 함께 제거하므로 `getChanges()`의 inserted/updated/deleted 목록에서 모두 제외되며, 변경이 없으면 페이지 저장 액션도 비활성화할 수 있다.
+- 기안양식관리의 행 삭제는 수정 권한이 있고 저장 중이 아닐 때만 제공한다. 기존 행은 저장 시 기존 수정 API의 `useAt=N`으로 사용 해제하며 물리 삭제하지 않는다. 저장 요청과 조용한 재조회 동안 메뉴·단축키의 행 삭제도 차단한다.
 - dirty 표시는 컬럼 타입에 관계없이 동일하게 적용된다(텍스트, 숫자, 체크박스, 날짜, 시간 등). 컬럼 타입별 렌더링 분기와 무관하게 셀 루트에서 공통으로 마크를 그리기 때문이다.
 - `column.getValue`로 값을 파생시키는 컬럼(예: 여러 체크박스가 하나의 배열 필드를 공유하는 권한 체크박스)은 dirty 판정도 `getValue(row)`를 원본 값과 비교해 계산한다. `onValueChange`가 실제로 갱신하는 필드명이 `column.field`와 다르더라도(예: `permissionCodes` 배열을 갱신하지만 컬럼은 `readPermission`) 해당 컬럼 셀에 정확히 dirty 마크가 표시된다.
 - `type: 'user'` 컬럼은 `userOptions`의 사용자 항목(`value`, `label`, `avatarUrl`, `positionName`, `departmentName`)을 검색/선택한다. 셀 편집과 row form modal은 같은 avatar/name/position/department 선택 UI를 사용하고, `form.multiple: true`면 선택 ID 배열과 개별 chip 해제를 제공한다.
@@ -276,6 +297,8 @@ const currentRows = grid.acceptSavedRows(savedRows);
 ## 개발자 문서 포털
 
 `/f1-grid-docs` 포털은 기능 중심의 12개 그룹으로 문서를 탐색한다: 시작하기, 그리드와 데이터, 편집과 검증, 선택·클립보드·행 작업, 필터와 정렬, 컬럼·레이아웃·행 높이, 대용량 데이터, 트리 그리드, 행 병합, 플러그인과 확장, API 참조, 테스트.
+
+검색 결과가 현재 문서를 제외하면 첫 일치 문서로 선택을 맞춰 이전 본문이 잠시 남지 않게 한다. 현재 문서가 결과에 포함되면 사용자 선택을 유지하며, 결과가 없거나 검색을 해제해도 현재 문서와 Playground의 편집 상태를 임의 초기화하지 않는다. API 검색 결과의 앵커 이동과 목차 동작은 유지한다.
 
 - 데스크톱은 왼쪽 그룹 메뉴, 중앙 본문, 오른쪽 섹션 목차로 표시한다. 태블릿과 모바일은 목차를 접을 수 있으며, 모바일 문서 메뉴도 열고 닫을 수 있다.
 - 기본 메뉴는 현재 문서가 속한 그룹만 펼친다. 그룹 제목을 선택하면 해당 그룹의 첫 문서로 이동하고, 검색 중에는 일치 문서가 있는 모든 그룹과 API 결과를 표시한다.
@@ -643,6 +666,8 @@ const columns: F1GridColumn<Item>[] = [
 // 2026-10-20T09:21:00 -> 2026/10/20
 ```
 
+셀 편집에서 입력한 날짜는 `YYYY-MM-DD`로 정규화해 확정한다(`20261118`, `261118`, `1118` 등 지원). 유효하지 않은 날짜(예: `2026-13-45`)는 입력 원문으로 저장하지 않고 변경 없이 기존 값을 유지하며, 빈 값으로 지우는 것은 허용한다. 셀 붙여넣기(TSV)도 같은 규칙을 적용해 유효한 날짜는 정규화하고, 유효하지 않은 날짜 셀은 붙여넣지 않고 기존 값을 유지한다.
+
 지원 토큰은 `yyyy`/`YYYY`(4자리 연도), `yy`/`YY`(2자리 연도), `mm`/`MM`(2자리 월), `m`/`M`(월), `dd`/`DD`(2자리 일), `d`/`D`(일)이다. 구분자와 한글을 조합할 수 있으며, `[문자열]`은 토큰 치환 없이 표시한다. ISO 날짜/timestamp, 8자리 `yyyymmdd`, 유효한 `Date` 객체를 지원한다. Timestamp 문자열은 시간대 변환 없이 명시된 날짜를 사용한다.
 
 빈 값은 빈 셀, 잘못된 날짜는 원문으로 표시한다. 표시 포맷은 원본 데이터, 날짜 편집기의 `YYYY-MM-DD` 값, 검색/정렬/필터 값을 변경하지 않는다. 사용자 `renderCell`이 있으면 기존처럼 우선 적용된다. 공통 표시 함수를 사용하는 자동 너비 계산과 Excel 텍스트 출력에도 같은 형식이 적용된다. 기존 숫자 `format`과 `datetime`/`time` 동작은 유지한다.
@@ -664,6 +689,8 @@ const columns: F1GridColumn<Item>[] = [
 `format: 'currency'`의 기본 0자리 KRW 표시와 명시적 `decimalPlaces` 동작은 유지한다. Excel 숫자 서식은 기본 숫자의 정수 값에 `#,##0`, 소수 값에 `#,##0.#####`, 명시 자릿수에 고정 서식을 적용한다. 정수와 소수 값이 같은 컬럼에 있어도 셀 값별 서식을 적용한다.
 
 ## 모듈별 소수점 정책 (자동 적용)
+
+모듈 컨텍스트를 공백으로 해제한 commit에는 이전 정책을 노출하지 않고 기본값을 사용한다. 해제 시 local rule도 비워 재진입의 조회 대기 상태에 이전 값이 재노출되지 않으며, 해제 전에 시작한 조회의 늦은 응답은 무시한다. 기존 조회 cache와 컬럼 우선순위·반올림·저장 계약은 유지한다.
 
 정책 관리에 `GRID_DECIMAL_{모듈코드}`(예: `GRID_DECIMAL_SALES`) NUMBER 정책을 등록하면 F1Grid가 자동으로 적용한다. 화면 코드 수정은 필요 없다. 대시보드가 `GridDecimalModuleProvider`로 현재 모듈 코드를 제공하고, F1Grid가 `type`이 `number`/`decimal`/`currency`이면서 `decimalPlaces`가 없는 컬럼에 정책값을 채운다. 우선순위: 컬럼 `decimalPlaces` > 모듈 정책 > F1-Grid 기본값(최대 5자리, 끝자리 0 제거). 특정 컬럼만 고정하려면 `decimal: { places, trailingZeros, rounding }` 객체 하나로 지정한다(예: `decimal: { places: 0 }`, `decimal: { places: 3, trailingZeros: 'AUTO', rounding: 'DOWN' }`). 객체에서 지정한 항목만 정책보다 우선하고 생략한 항목은 정책을 따른다. 기존 개별 옵션(`decimalPlaces`, `trailingZeros`, `rounding`)도 호환되지만, 둘 다 있으면 `decimal` 객체가 우선한다. 조회 API는 `GET /api/v1/system/policies/grid-decimals`이며 세션당 1회 캐시한다(변경 반영은 재로그인/새로고침). 모듈 컨텍스트 밖의 F1Grid는 정책을 조회하지 않는다.
 
@@ -705,6 +732,8 @@ inputFormat: { type: 'korean-phone', maxDigits: 11 } // 02는 10자리, 그 외 
 
 조건 칩을 모두 해제해 표시할 칩이 없으면 데스크톱에서 안내가 버튼과 같은 첫 행 왼쪽으로 올라온다. 모바일은 안내를 버튼 아래에 두어 겹침을 방지한다.
 
+외부 `defaultValues`/`detailValues`의 참조가 바뀌면 기존 값 비교에 따라 첫 commit 전에 초안을 맞춘다. 같은 두 prop의 재렌더나 필드 metadata·적용조건만의 변경은 입력 중 초안을 초기화하지 않는다. `appliedDetailValues`/`detailFields` 변경으로 더 이상 유효하지 않은 칩 제거 대기도 commit 전에 정리해 이전 안내나 tombstone이 남지 않게 한다. 이벤트용 draft ref 동기화와 빠른 날짜 요청 무효화는 commit에서만 수행하며 render에서는 ref나 요청 map을 읽거나 변경하지 않는다. 중단된 transition은 현재 요청을 취소하지 않고, 실제 외부 값 commit은 기존처럼 오래된 응답을 차단한다.
+
 `select` 상세검색 필드는 기본적으로 빈 값 "전체" 선택지를 맨 위에 보여 준다. 기본값이 항상 채워지는 필드(예: 취소 이력이 있는 현황 화면의 상태 `정상(기본)/취소/전체`)는 `search.allowEmpty: false`로 이 빈 값 선택지를 숨긴다. 옵션에 이미 `전체`(`ALL`)가 있으면 빈 값 "전체"와 겹쳐 "전체"를 고르고도 기본 조건이 적용되는 오해가 생기므로 `required: true`와 함께 쓴다. `search.inputType: 'month'`를 지정하면 상세검색 필드가 월 달력(`MonthPanel`)이 있는 월 입력(`MonthEditor`)으로 바뀐다. 값은 열 type과 무관하게 `YYYYMM` 문자열이며 `YYYY-MM`로 보여 주고, 직접 입력도 `YYYYMM`/`YYYY-MM`를 받는다. 월이 01~12가 아니면 "올바른 월을 입력하세요."로 조회를 막고, `required`면 비어 있을 때 막는다. 적용조건 칩은 `YYYY-MM`로 표시한다. 화면에 표시하지 않는 검색 전용 열은 `hidden: true`와 함께 `search`만 정의한다(매입마감처리의 마감월). 검색 컬럼 metadata의 `search.required: true`로 상세검색 필수조건을 지정할 수 있다. 필수 조건은 적용조건 칩에서도 제거할 수 없으며, 다른 조회 진입점에서도 적용된 필수 값이 유지되어야 한다. 필수 날짜 필드는 시작일과 종료일을 모두 입력하고 유효한 날짜로 정규화해야 조회가 실행된다. 예를 들어 수주현황의 `orderDt`와 문서현황의 `submittedAt`은 필수 날짜 범위여서 한쪽 끝이 비거나 형식이 잘못되면 상세검색 패널을 유지하고 필드 오류를 표시하며 목록 요청을 보내지 않는다. 신규 현황 페이지도 업무 기준일을 필수 검색조건으로 선언한다. 서버 날짜 기반 초기 범위와 초기화 동작은 기존 설정을 따른다. 상세검색 패널은 그리드 로딩 덮개 위에 표시되므로 조회나 초기화로 그리드가 로딩될 때 검색 조건이 가려지지 않는다.
 
 공통코드관리, 수주현황, 문서현황의 기존 검색 세션을 유지하고, 품목관리·거래처관리·기안양식관리·자료실은 마지막 실행 검색어와 상세조건을 현재 탭 세션에서 복원한다. 자료실은 폴더 범위도 복원한다. 편집 중인 초안, 행 선택 및 Grid 레이아웃은 검색 세션에 저장하지 않는다.
@@ -735,6 +764,8 @@ search: {
 #### 빠른 날짜 세팅
 
 상세검색에 필수(`search.required`) 날짜 범위 필드(기준일)가 있으면 해당 필드 옆에 `오늘`, `이번주`(월~일), `이번달`, `전월`, `최근 30일` 버튼이 한 줄로 표시된다. 버튼을 누르면 `GET /api/v1/common/system-date`의 서버 날짜 기준으로 시작일·종료일이 채워지며(자동 조회는 하지 않음), 서버 날짜 조회에 실패하면 프런트엔드 시계로 대체하지 않고 오류 문구를 표시한다. 필수가 아닌 날짜 필드에는 표시되지 않는다. 날짜 필드와 버튼 폭은 `search.span`(영업관리 현황은 2: 시작일·종료일 각 1칸, 버튼은 나머지 칸)으로 조절한다.
+
+서버 응답을 기다리는 동안 다른 상세조건을 수정해도 최신 입력을 유지한다. 같은 날짜를 직접 수정하거나 다음 빠른 날짜 버튼을 누르면 이전 요청은 무효다. 초기화·패널 닫기·외부 조건 복원·화면 해제 후 도착한 응답은 값이나 오류를 바꾸지 않는다. 서로 다른 날짜 필드의 요청은 독립적으로 적용하며 자동 조회·기존 callback 계약은 유지한다.
 
 기본값이 지정된 날짜 필드는 첫 조회와 상세검색 초기화에 해석된 기본값을 사용한다. 초기화 시 공통 검색 영역은 값을 갱신하지만 자동 조회 여부는 페이지가 선택한다. 문서현황은 서버 날짜 해석이 완료된 뒤 첫 목록을 조회하고, 저장된 탭 세션 조건이 있으면 이를 우선 복원한다. 사용자가 초기화하면 최근 1개월 범위를 서버 날짜 기준으로 다시 적용하고 같은 조건을 세션에 저장한다.
 
@@ -817,6 +848,8 @@ const columns: F1GridColumn<PurchaseLine>[] = [
 ```
 
 `wrapText: true`인 컬럼은 행 높이가 기본 높이보다 커지면 셀 안에서 줄바꿈한다. `wrapText`가 없는 컬럼은 행 높이가 커져도 한 줄 말줄임을 유지한다. 높이 설정은 현재 Grid 인스턴스에만 적용하며 서버나 사용자 레이아웃으로 저장하지 않는다.
+
+가변 높이 행의 가상화 창과 상·하단 padding도 현재 행 높이를 반영한다. 고정 높이 임계값과 기본 overscan 동작은 동일하다.
 
 ## Selection
 
@@ -1058,9 +1091,13 @@ interface F1GridProps<T extends object> {
 
 `F1TreeRef.addRow()`는 부모 기본값을 유지한 루트 draft를 열고, `addChildRow(parentId, partial?)`는 `parentKey` 값을 보존한 하위 draft를 연다. 하위 행은 적용된 뒤에만 추가되고 부모 노드가 펼쳐지며, 취소 시 펼침 상태를 바꾸지 않는다. 트리 펼침 상태와 모달 open 상태는 독립적이다.
 
+F1Tree는 하위 행 적용에 따른 펼침 처리를 유지하면서 현재 `onChangesChange`에 기존 변경 집합을 전달한다. 부모가 콜백을 교체한 뒤의 셀 수정은 이전 콜백으로 전달하지 않는다.
+
 1280px 이상에서는 최대 `960px`의 3열 폼, 768px 이상 1280px 미만에서는 2열 폼, 768px 미만에서는 full-screen 1열 폼을 사용한다. `form.span`은 각 뷰포트의 가용 열 수를 넘지 않게 제한된다. 모달은 `background`, `text`, `divider`, `primary`, `action` MUI 테마 토큰을 사용해 라이트·다크 테마에 대응한다.
 
 행 폼 모달의 외곽은 공통 `CommonDialog` 셸을 사용한다. 제목·선택 설명·닫기 동작은 공통 헤더에 배치되고 본문만 세로 스크롤되며 헤더와 푸터는 유지된다. “적용 후 화면의 저장 버튼으로 최종 저장됩니다.” 안내는 선택형 푸터 좌측 슬롯에, 적용/취소는 우측 액션 영역에 표시한다. 기안양식관리처럼 `rowFormPlugin`을 사용하는 화면도 동일한 셸을 공유하며, 폼 필드/그룹 배치는 기존 화면 설정을 따른다.
+
+행 폼의 입력 초안은 local state로 유지한다. `open` 또는 `row` 참조가 바뀐 경우 현재 폼이 열려 있을 때만 현재 row의 복사로 맞추고 local 검증 오류·포커스 요청을 비운다. 재개방과 열린 row 교체는 첫 DOM commit부터 새 값이 표시된다. 닫힌 상태에서는 초안을 건드리지 않으며, 컬럼·플러그인·모드·외부 오류만 바뀌는 재렌더는 입력 중 초안을 초기화하지 않는다. 외부 오류의 merge와 실제 검증 포커스 effect, 적용·취소 콜백은 그대로다.
 
 footer 경계는 공통 셸이 색상 prop 없이 렌더링하는 기본 MUI `Divider` 한 개로 표시한다. 본문이나 호출 화면에서 추가 하단 경계선을 넣지 않는다.
 
@@ -1268,6 +1305,8 @@ Ctrl + D
 → Row 복제
 ```
 
+행 동작 단축키는 대응하는 컨텍스트 메뉴 항목의 설정을 따릅니다. `allowAddRowInContextMenu={false}`이면 `Insert`, `allowDeleteRowInContextMenu={false}`이면 선택 행의 `Delete`, `allowDuplicateRowInContextMenu={false}`이면 `Ctrl+D`가 각각 행을 변경하지 않습니다. 행 삭제가 차단된 경우 셀 값 지우기로 전환하지 않습니다. 선택 행이 없는 편집 가능한 셀이나 이미지 셀의 값 지우기는 기존대로 동작합니다. `disableContextMenu` 자체는 메뉴 표시만 제어합니다.
+
 ---
 
 # 11-1. Row Merge
@@ -1299,6 +1338,7 @@ ERP 전표, 발주, 생산지시, BOM, 재고조회 화면에서 같은 값이 �
 - 병합 그룹 선택 경계는 현재 포커스/편집 중인 셀의 컬럼에만 표시하며, 같은 행의 다른 컬럼을 클릭해도 다른 병합 컬럼을 활성화하지 않는다.
 - 병합 내부의 숨은 셀은 실제 그리드 마지막 행이어도 별도 하단선을 표시하지 않아 중간 병합 그룹의 경계선이 두꺼워지지 않도록 한다.
 - 병합된 영역 안에서도 마우스 드래그를 이용한 셀 범위 선택(Drag Cell Range Selection) 및 핀 고정(pinned) 컬럼과의 병합 동작을 지원한다. 드래그 중에는 개별 포커스/병합 outline을 숨기고 선택 범위 overlay만 표시한다.
+- 드래그 진행 핸들러는 이벤트 시점의 선택 범위와 dragging 상태를 최신 props ref에서 확인한다. 내부 callback 의존성은 본문에서 직접 읽는 값만 소유하며, 불필요한 identity invalidation을 줄이는 정리는 포인터·키보드·범위 선택·고정 컬럼 동작이나 외부 API를 바꾸지 않는다.
 - 핀 고정 컬럼이 드래그 범위에 포함되더라도 수평 스크롤 상태에서 overlay 위치가 컬럼 위치와 함께 자연스럽게 보정되며, sticky 컬럼 경계에서 좌표가 어긋나지 않는다.
 - 병합된 영역 안에서도 행 선택과 체크박스 선택은 개별 Row 기준으로 유지한다.
 
@@ -1893,7 +1933,7 @@ interface GridDataState<T> {
 설정을 기본값으로 복원
 ```
 
-F1Tree는 `루트 추가` 항목이 `컬럼 길이 자동 조정` 아래, `행 추가` 위에 추가로 표시된다. F1Tree도 `F1Grid`와 동일하게 호출자가 전달한 `disableSorting`/`disableFiltering` 정책을 따르므로, 두 기능이 활성화된 화면에서는 필터 해제/정렬 해제 항목을 사용할 수 있다.
+F1Tree는 `루트 추가` 항목이 `컬럼 길이 자동 조정` 아래, `행 추가` 위에 추가로 표시된다. [20261014 공통 Grid 사양 §6](../../../../docs/spec/20261014/20261014_002_f1_grid_docs_overhaul_사양서.md)에 따라 계층 보존을 위해 정렬·필터를 비활성화하며, `disableSorting={false}`/`disableFiltering={false}`로도 이 보호를 해제하지 않는다. 헤더 정렬·필터 및 본문 정렬 해제·필터 해제 항목은 표시되지 않는다. 일반 F1Grid의 해당 기능은 유지한다. 단순히 제한을 제거하면 투영된 자식이 부모보다 먼저 정렬될 수 있으므로 변경하지 않는다. 최신 사양에 따른 구형 회귀 정정 근거는 [후속 사양](../../../../docs/spec/20261118/20261118_010_tree-policy-alignment_상세사양서.md)을 참고한다.
 
 `disableFiltering`과 `disableSorting`으로 필터 해제/정렬 해제 항목이 모두 숨겨지면 해당 빈 그룹 앞 구분선도 숨기고, 설정 복원 앞 구분선만 유지한다. 두 항목 중 하나라도 표시되면 그룹 구분선은 기존처럼 표시된다.
 
@@ -2359,6 +2399,8 @@ F1-Grid는 전체 데이터/선택/편집 상태와 실제 DOM 렌더 범위를 
 - 다음 페이지를 추가하거나 서버 결과를 교체해도 local dirty row와 sparse patch는 유지한다.
 - 서버 모드에서는 로컬 Worker 정렬/필터를 중복 적용하지 않는다.
 - 기존 `rows` 기반 화면은 변경 없이 로컬 모드로 동작한다.
+
+서버 페이지 조회 callback은 `dataSource`·정렬·필터·오류 callback에 맞춰 안정적으로 바인딩하며 초기 조회 effect도 그 callback을 명시적으로 의존한다. 이 네 값이 그대로인 테마/무관한 재렌더는 서버 조회를 다시 시작하지 않는다. 다음 페이지 스크롤도 같은 조회 함수를 사용하고 기존 취소·최신 요청 guard·append/교체 규칙을 유지한다.
 
 ## Phase 8 - Advanced
 

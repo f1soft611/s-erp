@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { normalizeDateInput } from '../../../../../shared/components/f1-grid/editing/DateEditor';
+import { normalizeDateInput } from '../../../../../shared/components/f1-grid/editing/dateInput';
 import { toPageSearchFields } from '../../../../../shared/components/page-search/searchFields';
 import { usePageSessionState } from '../../../../../shared/hooks/usePageSessionState';
 import { usePageSearchDefaults } from '../../../../../shared/hooks/usePageSearchDefaults';

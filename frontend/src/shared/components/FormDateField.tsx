@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { DateEditor, normalizeDateInput } from './f1-grid/editing/DateEditor';
+import { DateEditor } from './f1-grid/editing/DateEditor';
+import { normalizeFormDate } from './formDateUtils';
 
 type FormDateFieldProps = {
   /** 필드 이름(예: 입고일). 오류 문구와 접근성 이름에 쓴다. */
@@ -14,15 +15,6 @@ type FormDateFieldProps = {
   /** 저장 직전 검증 등 외부 오류 문구. blur 오류보다 우선한다. */
   error?: string;
 };
-
-/**
- * 저장 직전 검증용: 입력을 `YYYY-MM-DD`로 정규화한다.
- * `invalid`는 값이 비어 있지 않은데 올바른 날짜가 아닌 경우이며, 이때 `date`는 빈 문자열이다.
- */
-export function normalizeFormDate(value: string): { date: string; invalid: boolean } {
-  const date = value.trim() ? normalizeDateInput(value) : '';
-  return { date, invalid: Boolean(value.trim()) && !date };
-}
 
 /**
  * 작성 화면의 날짜 입력. 공통 `DateEditor`(한국어 달력, 축약 입력)에 blur 정규화와 오류 표시를 더했다.

@@ -26,7 +26,7 @@ import { ProfileAvatar } from '../../../../../shared/components/ProfileAvatar';
 import { PostDetailPanel } from '../../../../../shared/components/feed/PostDetailPanel';
 import { ImageViewerDialog } from '../../../../../shared/components/ImageViewerDialog';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
-import { useNotification } from '../../../../../shared/context/NotificationContext';
+import { useNotification } from '../../../../../shared/context/notification';
 import { DocumentActionsMenu } from './DocumentActionsMenu';
 import { DocumentReferenceAddDialog } from './DocumentReferenceAddDialog';
 import { DocumentLinkPreviews } from './DocumentLinkPreviews';

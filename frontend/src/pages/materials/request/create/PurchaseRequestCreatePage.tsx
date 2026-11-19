@@ -38,7 +38,8 @@ import {
 import type { PurchaseRequestItem, PurchaseRequestUseTypeOption } from './types/purchaseRequest.types';
 import { usePageMessages } from '../../../../shared/hooks/usePageMessages';
 import { useServerDateDefault } from '../../../../shared/hooks/useServerDateDefault';
-import { FormDateField, normalizeFormDate } from '../../../../shared/components/FormDateField';
+import { FormDateField } from '../../../../shared/components/FormDateField';
+import { normalizeFormDate } from '../../../../shared/components/formDateUtils';
 
 export type PurchaseRequestPageMode = 'create' | 'edit' | 'view';
 

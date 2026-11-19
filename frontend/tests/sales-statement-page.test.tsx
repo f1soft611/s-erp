@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { createMemoryRouter, RouterProvider } from 'react-router-dom';
+import { Profiler } from 'react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { SalesStatementCreatePage } from '../src/pages/sales/shipment/statement/create/SalesStatementCreatePage';
 import { SalesStatementStatusPage } from '../src/pages/sales/shipment/statement/status/SalesStatementStatusPage';
@@ -7,6 +8,7 @@ import { createStatement, getStatement, getStatementStatus, searchStatementSourc
 import { getDelivery } from '../src/pages/sales/shipment/delivery/create/services/salesDelivery.service';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
 import { getSystemDate } from '../src/shared/services/systemDateService';
+import type { StatementItem, StatementStatusRow } from '../src/pages/sales/shipment/statement/types/salesStatement.types';
 
 vi.mock('../src/shared/services/systemDateService', () => ({
   getSystemDate: vi.fn(),
@@ -41,6 +43,86 @@ beforeEach(() => {
   vi.mocked(searchStatementSources).mockResolvedValue([source]);
   vi.mocked(getStatement).mockResolvedValue(item);
   vi.mocked(getStatementStatus).mockResolvedValue([]);
+});
+it.each([false, true])('starts statement list loading in the first eligible page commit (initial permission: %s)', async (initialRead) => {
+  const row: StatementStatusRow = { ...detail, salesStatementId: 3, statementNo: 'TS-1',
+    statementDt: '2026-11-09', deliveryNo: 'SD-1', customerCode: 'C1', customerName: '거래처', lineTotalAmt: 220 };
+  const requests: Array<{ resolve: (rows: StatementStatusRow[]) => void; reject: (error: Error) => void }> = [];
+  vi.mocked(getStatementStatus).mockImplementation(() => new Promise<StatementStatusRow[]>((resolve, reject) => {
+    requests.push({ resolve, reject });
+  }));
+  const commits: Array<boolean | null> = [];
+  const page = (read: boolean) => <MemoryRouter><Profiler id="statement-list" onRender={() => {
+    commits.push((screen.queryByRole('button', { name: '조회', exact: true }) as HTMLButtonElement | null)?.disabled ?? null);
+  }}><SalesStatementStatusPage {...props} selectedMenuPermissions={{ ...props.selectedMenuPermissions, read }} /></Profiler></MemoryRouter>;
+  const mounted = render(page(initialRead));
+  if (!initialRead) {
+    expect(requests).toHaveLength(0);
+    commits.length = 0;
+    mounted.rerender(page(true));
+  }
+  expect(commits[0]).toBe(true);
+  await act(async () => requests[0].reject(new Error('Owned statement list failure')));
+  expect(screen.getByText('Owned statement list failure')).toBeInTheDocument();
+  commits.length = 0;
+  fireEvent.click(screen.getByRole('button', { name: '조회', exact: true }));
+  expect(commits[0]).toBe(true);
+  await act(async () => requests[1].resolve([row]));
+  const input = screen.getByRole('textbox', { name: '거래명세서현황 빠른 검색' });
+  fireEvent.change(input, { target: { value: 'Owned changed' } });
+  expect(requests).toHaveLength(2);
+  commits.length = 0;
+  fireEvent.click(screen.getByRole('button', { name: '조회', exact: true }));
+  expect(commits[0]).toBe(true);
+  mounted.rerender(page(false));
+  mounted.rerender(page(true));
+  expect(requests).toHaveLength(4);
+  await act(async () => requests[2].resolve([{ ...row, statementNo: 'OWNED-STALE' }]));
+  expect(screen.queryByRole('button', { name: 'OWNED-STALE 상세 보기' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '조회', exact: true })).toBeDisabled();
+  await act(async () => requests[3].resolve([row]));
+  expect(screen.getByRole('button', { name: 'TS-1 상세 보기' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '조회', exact: true })).toBeEnabled();
+  expect(createStatement).not.toHaveBeenCalled();
+  expect(updateStatement).not.toHaveBeenCalled();
+});
+it('starts statement detail loading in its first page commit and ignores a closed request on reopen', async () => {
+  vi.mocked(getStatementStatus).mockResolvedValue([{ ...detail, salesStatementId: 3, statementNo: 'TS-1',
+    statementDt: '2026-11-09', deliveryNo: 'SD-1', customerCode: 'C1', customerName: '거래처', lineTotalAmt: 220 }]);
+  const requests: Array<{ resolve: (value: StatementItem) => void; reject: (error: Error) => void }> = [];
+  vi.mocked(getStatement).mockImplementation(() => new Promise<StatementItem>((resolve, reject) => {
+    requests.push({ resolve, reject });
+  }));
+  const commits: Array<{ loading: boolean; oldError: boolean }> = [];
+  mount(<Profiler id="statement-detail" onRender={() => {
+    const panel = screen.queryByRole('region', { name: '거래명세서 상세' });
+    if (panel) commits.push({
+      loading: Boolean(panel.querySelector('[data-testid="post-detail-panel-content"][role="status"]')),
+      oldError: panel.textContent?.includes('Owned statement detail failure') ?? false,
+    });
+  }}><SalesStatementStatusPage {...props} /></Profiler>);
+  const open = await screen.findByRole('button', { name: 'TS-1 상세 보기' });
+  fireEvent.click(open);
+  expect(commits[0]).toEqual({ loading: true, oldError: false });
+  await act(async () => requests[0].reject(new Error('Owned statement detail failure')));
+  expect(screen.getByText('Owned statement detail failure')).toBeInTheDocument();
+  fireEvent.click(within(screen.getByRole('region', { name: '거래명세서 상세' })).getByRole('button', { name: '상세 닫기' }));
+  commits.length = 0;
+  fireEvent.click(open);
+  expect(commits[0]).toEqual({ loading: true, oldError: false });
+  fireEvent.click(within(screen.getByRole('region', { name: '거래명세서 상세' })).getByRole('button', { name: '상세 닫기' }));
+  commits.length = 0;
+  fireEvent.click(open);
+  expect(commits[0]).toEqual({ loading: true, oldError: false });
+  expect(requests).toHaveLength(3);
+  await act(async () => requests[1].resolve({ ...item, statementNo: 'OWNED-STALE' }));
+  const panel = screen.getByRole('region', { name: '거래명세서 상세' });
+  expect(panel.querySelector('[data-testid="post-detail-panel-content"][role="status"]')).not.toBeNull();
+  expect(panel).not.toHaveTextContent('OWNED-STALE');
+  await act(async () => requests[2].resolve(item));
+  expect(within(panel).getByRole('table', { name: '거래명세서 품목 목록' })).toBeInTheDocument();
+  expect(createStatement).not.toHaveBeenCalled();
+  expect(updateStatement).not.toHaveBeenCalled();
 });
 it('uses the server date as the initial statement date for a new statement', async () => {
   mount(<SalesStatementCreatePage {...props} />);

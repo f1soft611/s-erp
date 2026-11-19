@@ -38,6 +38,10 @@ import {
   deleteModule,
   updateModule,
 } from '../services/moduleManagement.service';
+import {
+  canEditModuleCode,
+  MODULE_ICON_OPTIONS,
+} from '../data/moduleManagementData';
 
 type ModuleManagementPanelProps = {
   modules: ModuleManagementRow[];
@@ -70,25 +74,6 @@ const emptyChanges = <T extends object>(): F1GridChanges<T> => ({
   deletedRows: [],
 });
 
-export const MODULE_ICON_OPTIONS = [
-  { value: 'Settings', label: 'Settings' },
-  { value: 'Folder', label: 'Folder' },
-  { value: 'Dashboard', label: 'Dashboard' },
-  { value: 'Inventory', label: 'Inventory' },
-  { value: 'People', label: 'People' },
-  { value: 'Business', label: 'Business' },
-  { value: 'AdminPanelSettings', label: 'AdminPanelSettings' },
-  { value: 'ListAlt', label: 'ListAlt' },
-  { value: 'FileText', label: 'FileText' },
-  { value: 'ClipboardCheck', label: 'ClipboardCheck' },
-  { value: 'CheckCircle', label: 'CheckCircle' },
-  { value: 'Notifications', label: 'Notifications' },
-  { value: 'Assignment', label: 'Assignment' },
-  { value: 'Security', label: 'Security' },
-  { value: 'CalendarMonth', label: 'CalendarMonth' },
-  { value: 'ShoppingCart', label: 'ShoppingCart' },
-];
-
 const moduleIconMap = {
   Settings: <SettingsOutlined fontSize="small" />,
   Folder: <FolderOutlined fontSize="small" />,
@@ -115,9 +100,6 @@ const renderModuleOptionIcon = (option: {
   const iconName = String(option.value);
   return moduleIconMap[iconName as keyof typeof moduleIconMap] ?? undefined;
 };
-
-export const canEditModuleCode = (row: ModuleManagementRow): boolean =>
-  !row.id || String(row.id).startsWith('new-module-');
 
 export const ModuleManagementPanel = forwardRef<
   ModuleManagementPanelHandle,

@@ -4,7 +4,7 @@ import { Alert, Box, Button, Chip, Container, Stack } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
-import { useNotification } from '../../../../shared/context/NotificationContext';
+import { useNotification } from '../../../../shared/context/notification';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { ContentSplitLayout } from '../../../../shared/components/view-mode/ContentSplitLayout';
 import { FeedView } from '../../../../shared/components/view-mode/FeedView';

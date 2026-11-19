@@ -36,7 +36,7 @@ vi.mock('../src/pages/groupware/documents/write/components/DocumentApprovalDetai
   }) => <section aria-label={`상세 ${electronicApprovalId}`}><button onClick={onClose}>링크 상세 닫기</button></section>,
 }));
 vi.mock('../src/shared/components/PageHeader', () => ({ PageHeader: () => null }));
-vi.mock('../src/shared/context/NotificationContext', () => ({
+vi.mock('../src/shared/context/notification', () => ({
   useNotification: () => ({ showError: vi.fn() }),
 }));
 const props = {

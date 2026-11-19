@@ -19,6 +19,7 @@ import { MetricCard, OverviewEmpty, OverviewError, OverviewListRow, OverviewPane
 import { SalesOverview } from '../dashboard/overview/components/SalesOverview';
 import { DocumentStatusDetail } from './documents/status/components/DocumentStatusDetail';
 import type { DocumentApprovalDetail } from './documents/write/types/documentWrite.types';
+import { getApprovalStatusPresentation } from './documents/write/data/documentPresentation';
 
 type OverviewPageProps = {
   selectedModule: ModuleItem;
@@ -134,12 +135,10 @@ export function OverviewPage({ selectedModule, currentMenuName }: OverviewPagePr
                         {approval.notices.map((item) => (
                           <OverviewListRow key={item.electronicApprovalId} onClick={() => setDocumentId(item.electronicApprovalId)}>
                             <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Chip size="small" label={item.noticeType === 'REVISION_REQUESTED' ? '보완요청' : '결재대기'}
-                                sx={(theme) => ({
-                                  mb: 0.9, fontSize: '0.65rem', height: 22, borderRadius: 1, fontWeight: 700,
-                                  color: theme.palette[item.noticeType === 'REVISION_REQUESTED' ? 'warning' : 'primary'].main,
-                                  bgcolor: alpha(theme.palette[item.noticeType === 'REVISION_REQUESTED' ? 'warning' : 'primary'].main, 0.1),
-                                })} />
+                              <Chip size="small"
+                                label={item.noticeType === 'REVISION_REQUESTED' ? '보완요청' : '결재대기'}
+                                color={getApprovalStatusPresentation(item.noticeType === 'REVISION_REQUESTED' ? 'REVISION_REQUESTED' : 'PENDING').color}
+                                sx={{ mb: 0.9, fontSize: '0.65rem', height: 22, borderRadius: 1, fontWeight: 700 }} />
                               <Typography sx={{ fontSize: '0.85rem', fontWeight: 650, overflowWrap: 'anywhere' }}>{item.title}</Typography>
                             </Box>
                           </OverviewListRow>

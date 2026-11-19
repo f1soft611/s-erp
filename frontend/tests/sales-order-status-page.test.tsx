@@ -1,11 +1,14 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { useLayoutEffect } from 'react';
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiGet, apiPut } from '../src/shared/services/apiClient';
 import { SalesOrderStatusPage } from '../src/pages/sales/order/status/SalesOrderStatusPage';
 import { SalesOrderStatusGrid } from '../src/pages/sales/order/status/components/SalesOrderStatusGrid';
+import { useSalesOrderStatusDetail } from '../src/pages/sales/order/status/hooks/useSalesOrderStatusDetail';
+import { useSalesOrderStatusList } from '../src/pages/sales/order/status/hooks/useSalesOrderStatusList';
 import { createSalesOrderStatusColumns } from '../src/pages/sales/order/status/data/salesOrderStatusColumns';
 import { fetchSalesOrderCommonCodes } from '../src/pages/sales/order/services/salesOrderCommonCode.service';
-import type { SalesOrderStatusRow } from '../src/pages/sales/order/status/types/salesOrderStatus.types';
+import type { SalesOrderStatusFilters, SalesOrderStatusRow } from '../src/pages/sales/order/status/types/salesOrderStatus.types';
 import type { SalesOrderItem } from '../src/pages/sales/order/create/types/salesOrder.types';
 import type { MenuPermission, ModuleItem } from '../src/pages/dashboard/types/dashboard';
 
@@ -183,6 +186,129 @@ describe('sales order status page', () => {
     });
 
     apiPutMock.mockImplementation(() => Promise.resolve({ item: orderItem }));
+  });
+
+  it('publishes order request-start state in the first commit without changing cancellation or same-ID behavior', async () => {
+    const requests: Array<{
+      resolve: (value: { item: SalesOrderItem }) => void;
+      reject: (error: Error) => void;
+    }> = [];
+    apiGetMock.mockImplementation(() => new Promise<{ item: SalesOrderItem }>((resolve, reject) => {
+      requests.push({ resolve, reject });
+    }));
+    const commits: Array<{ id: number | null; loading: boolean; error: string }> = [];
+    const { result } = renderHook(() => {
+      const detail = useSalesOrderStatusDetail();
+      useLayoutEffect(() => {
+        commits.push({ id: detail.selectedOrderId, loading: detail.loading, error: detail.error });
+      });
+      return detail;
+    });
+
+    act(() => result.current.openDetail(300));
+    expect(commits.find(({ id }) => id === 300)).toEqual({ id: 300, loading: true, error: '' });
+    await act(async () => requests[0].reject(new Error('Owned order detail failure')));
+    expect(result.current.error).toBe('Owned order detail failure');
+    commits.length = 0;
+    act(() => result.current.refreshDetail());
+    expect(commits[0]).toEqual({ id: 300, loading: true, error: '' });
+    await act(async () => requests[1].resolve({ item: createOrderItem() }));
+    expect(result.current.order?.salesOrderId).toBe(300);
+    expect(result.current.loading).toBe(false);
+
+    act(() => result.current.openDetail(300));
+    expect(requests).toHaveLength(2);
+    expect(result.current.loading).toBe(false);
+    expect(result.current.order?.salesOrderId).toBe(300);
+    commits.length = 0;
+    act(() => result.current.refreshDetail());
+    expect(commits[0]).toEqual({ id: 300, loading: true, error: '' });
+    expect(result.current.order?.salesOrderId).toBe(300);
+    await act(async () => requests[2].resolve({ item: createOrderItem() }));
+    act(() => result.current.openDetail(301));
+    act(() => result.current.closeDetail());
+    commits.length = 0;
+    act(() => result.current.openDetail(300));
+    expect(commits[0]).toEqual({ id: 300, loading: true, error: '' });
+    expect(requests).toHaveLength(5);
+    await act(async () => requests[3].resolve({ item: createOrderItem({ salesOrderId: 301 }) }));
+    expect(result.current.selectedOrderId).toBe(300);
+    expect(result.current.order).toBeNull();
+    expect(result.current.loading).toBe(true);
+    await act(async () => requests[4].resolve({ item: createOrderItem() }));
+    expect(result.current.order?.salesOrderId).toBe(300);
+    expect(result.current.loading).toBe(false);
+    act(() => result.current.closeDetail());
+    act(() => result.current.refreshDetail());
+    expect(requests).toHaveLength(5);
+    expect(result.current.selectedOrderId).toBeNull();
+    expect(result.current.loading).toBe(false);
+  });
+
+  it.each([false, true])('publishes order list-start commits while preserving quiet reloads and paused request versions (initially ready: %s)', async (initiallyReady) => {
+    const requests: Array<{
+      resolve: (value: { resultList: SalesOrderStatusRow[] }) => void;
+      reject: (error: Error) => void;
+    }> = [];
+    apiGetMock.mockImplementation(() => new Promise<{ resultList: SalesOrderStatusRow[] }>((resolve, reject) => {
+      requests.push({ resolve, reject });
+    }));
+    const filters: SalesOrderStatusFilters = { orderDtFrom: '2026-10-01', orderDtTo: '2026-10-31' };
+    const initialProps: { filters: SalesOrderStatusFilters | null } = { filters: initiallyReady ? filters : null };
+    const commits: Array<{ loading: boolean; hasLoaded: boolean; error: string; initialLoading: boolean }> = [];
+    const { result, rerender } = renderHook(({ filters: current }) => {
+      const list = useSalesOrderStatusList(current);
+      useLayoutEffect(() => {
+        commits.push({ loading: list.loading, hasLoaded: list.hasLoaded, error: list.error, initialLoading: list.initialLoad.loading });
+      });
+      return list;
+    }, { initialProps });
+    if (!initiallyReady) {
+      expect(requests).toHaveLength(0);
+      commits.length = 0;
+      rerender({ filters });
+    }
+    const normalStart = { loading: true, hasLoaded: false, error: '', initialLoading: true };
+    const quietStart = { ...normalStart, loading: false };
+    expect(commits[0]).toEqual(normalStart);
+    await act(async () => requests[0].reject(new Error('Owned order list failure')));
+    expect(result.current.error).toBe('Owned order list failure');
+    commits.length = 0;
+    act(() => result.current.retry());
+    expect(commits[0]).toEqual(normalStart);
+    await act(async () => requests[1].resolve({ resultList: [statusRow] }));
+    expect(result.current.hasLoaded).toBe(true);
+
+    commits.length = 0;
+    act(() => result.current.refreshQuietly());
+    expect(commits[0]).toEqual(quietStart);
+    expect(result.current.rows).toEqual([statusRow]);
+    await act(async () => requests[2].resolve({ resultList: [statusRow] }));
+    commits.length = 0;
+    rerender({ filters: { ...filters, keyword: 'Owned changed' } });
+    expect(commits[0]).toEqual(normalStart);
+    rerender({ filters: { ...filters, keyword: 'Owned latest' } });
+    expect(requests).toHaveLength(5);
+    await act(async () => requests[3].resolve({ resultList: [{ ...statusRow, salesOrderId: 301 }] }));
+    expect(result.current.rows).toEqual([statusRow]);
+    expect(result.current.loading).toBe(true);
+    await act(async () => requests[4].resolve({ resultList: [statusRow] }));
+    expect(result.current.loading).toBe(false);
+    expect(result.current.hasLoaded).toBe(true);
+
+    rerender({ filters: null });
+    act(() => result.current.refreshQuietly());
+    expect(requests).toHaveLength(5);
+    expect(result.current.loading).toBe(false);
+    commits.length = 0;
+    rerender({ filters });
+    expect(commits[0]).toEqual(quietStart);
+    expect(result.current.rows).toEqual([statusRow]);
+    await act(async () => requests[5].resolve({ resultList: [statusRow] }));
+    rerender({ filters });
+    expect(requests).toHaveLength(6);
+    expect(result.current.loading).toBe(false);
+    expect(result.current.hasLoaded).toBe(true);
   });
 
   it('displays totals for order quantity and amounts in the status grid', () => {
@@ -519,12 +645,15 @@ describe('sales order status page', () => {
     expect(within(grid).getByText('거래처 10')).toBeInTheDocument();
     expect(within(grid).getByText('Q-1')).toBeInTheDocument();
     expect(createSalesOrderStatusColumns().map((column) => column.headerName)).toEqual([
-      'No', '수주번호', '수주일자', '거래처코드', '거래처명', '견적번호', '진행상태', '수주상태', '납품장소', '배송방법',
-      '행', '품목코드', '품목명', '단위', '주문수량', '단가', '공급가', '부가세', '합계',
+      'No', '수주번호', '수주일자', '거래처코드', '거래처명', '견적번호', '수주상태', '납품장소', '배송방법',
+      '행', '진행상태', '품목코드', '품목명', '단위', '주문수량', '단가', '공급가', '부가세', '합계',
       '납기일자', '출하수량', '비고',
     ]);
     expect(within(grid).queryByText('수주상태')).not.toBeInTheDocument();
-    expect(within(grid).getByText('진행상태')).toBeInTheDocument();
+    fireEvent.scroll(within(grid).getByTestId('f1-grid-body-scroll'), {
+      target: { scrollLeft: 800 },
+    });
+    expect(await within(grid).findByText('진행상태')).toBeInTheDocument();
     expect(within(grid).getByText('대기 중')).toBeInTheDocument();
 
     const request = listRequests().at(-1)!;

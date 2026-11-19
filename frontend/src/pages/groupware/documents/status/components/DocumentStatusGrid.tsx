@@ -3,8 +3,6 @@ import { F1Grid } from '../../../../../shared/components/f1-grid';
 import { createDocumentStatusColumns } from '../data/documentStatusColumns';
 import type { DocumentStatusRow } from '../types/documentStatus.types';
 
-export { createDocumentStatusColumns } from '../data/documentStatusColumns';
-
 type DocumentStatusGridProps = {
   rows: DocumentStatusRow[];
   loading: boolean;

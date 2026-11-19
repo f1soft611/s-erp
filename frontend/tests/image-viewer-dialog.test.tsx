@@ -1,10 +1,32 @@
 import { render, screen } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
-import { describe, expect, it } from 'vitest';
+import { Profiler } from 'react';
+import { describe, expect, it, vi } from 'vitest';
 import { ImageViewerDialog } from '../src/shared/components/ImageViewerDialog';
 import { createAppTheme } from '../src/theme/theme';
 
 describe('ImageViewerDialog', () => {
+  it('commits the current image source without showing the previous image first', () => {
+    const commits = vi.fn();
+    const view = (src: string, open = true) => (
+      <Profiler id="image-viewer" onRender={() => commits(screen.queryByRole('img', { name: 'probe.png' })?.getAttribute('src') ?? null)}>
+        <ImageViewerDialog open={open} src={src} alt="probe.png" onClose={() => undefined} />
+      </Profiler>
+    );
+    const { rerender } = render(view('blob:first'));
+    commits.mockClear();
+    rerender(view('blob:second'));
+    expect(commits).toHaveBeenNthCalledWith(1, 'blob:second');
+    expect(screen.getByRole('img', { name: 'probe.png' })).toHaveAttribute('src', 'blob:second');
+
+    rerender(view(''));
+    expect(screen.queryByRole('img', { name: 'probe.png' })).not.toBeInTheDocument();
+    rerender(view('blob:closed', false));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    rerender(view('blob:reopened'));
+    expect(screen.getByRole('img', { name: 'probe.png' })).toHaveAttribute('src', 'blob:reopened');
+  });
+
   it.each(['light', 'dark'] as const)(
     'preserves the image and uses a neutral canvas in %s theme',
     (mode) => {

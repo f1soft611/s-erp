@@ -1,0 +1,45 @@
+{
+  "actualF1Grid": true,
+  "transport": "All fetch blocked; no transport attempted",
+  "storage": "Tab memory only; no persistent reads or writes",
+  "osClipboardUnused": true,
+  "widths": [
+    {
+      "width": 375,
+      "nativePointerRange": true,
+      "sameModeCommitKeepsRange": true,
+      "rowModeAndCellReentryCommitsContainNoOldRange": true,
+      "rowSelectionAndUpdatedRowsPreserved": true,
+      "freshPointerDragAfterReentry": true,
+      "documentWidth": 375
+    },
+    {
+      "width": 768,
+      "nativePointerRange": true,
+      "sameModeCommitKeepsRange": true,
+      "rowModeAndCellReentryCommitsContainNoOldRange": true,
+      "rowSelectionAndUpdatedRowsPreserved": true,
+      "freshPointerDragAfterReentry": true,
+      "documentWidth": 768
+    },
+    {
+      "width": 1280,
+      "nativePointerRange": true,
+      "sameModeCommitKeepsRange": true,
+      "rowModeAndCellReentryCommitsContainNoOldRange": true,
+      "rowSelectionAndUpdatedRowsPreserved": true,
+      "freshPointerDragAfterReentry": true,
+      "documentWidth": 1280
+    }
+  ],
+  "unknownRequests": 0,
+  "limitations": "Synthetic rows with a native fixture button calling the existing editable-column setCellValue API; actual text editing and copied-range transitions are additionally covered by the two runtime regression tests. No live API save or OS clipboard.",
+  "images": [
+    "selected-375.png",
+    "cleared-375.png",
+    "selected-768.png",
+    "cleared-768.png",
+    "selected-1280.png",
+    "cleared-1280.png"
+  ]
+}

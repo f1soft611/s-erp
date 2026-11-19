@@ -1,9 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  AppSettingsProvider,
-  useAppSettings,
-} from '../src/shared/context/AppSettingsContext';
+import { AppSettingsProvider } from '../src/shared/context/AppSettingsContext';
+import { useAppSettings } from '../src/shared/context/appSettings';
 
 function DisplayScaleProbe() {
   const { displayScale } = useAppSettings();

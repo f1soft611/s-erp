@@ -22,7 +22,8 @@ import {
 import type { MenuPermission, ModuleItem, PageContent } from '../../../dashboard/types/dashboard';
 import { ClassificationSettingsDialog } from '../classification/components/ClassificationSettingsDialog';
 import { ClassificationPickerDialog } from '../classification/components/ClassificationPickerDialog';
-import { MaterialGrid, createMaterialColumns } from './components/MaterialGrid';
+import { MaterialGrid } from './components/MaterialGrid';
+import { createMaterialColumns } from './data/materialGridData';
 import { useMaterialManagement } from './hooks/useMaterialManagement';
 import { materialSearchFields, type MaterialFilters, type MaterialRow } from './types/materialManagement.types';
 

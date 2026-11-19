@@ -11,9 +11,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
 import {
-  createDraftFormColumns,
   DraftFormGrid,
 } from '../src/pages/co/workflow/form/components/DraftFormGrid';
+import {
+  createDraftFormColumns,
+  createDraftFormRow,
+} from '../src/pages/co/workflow/form/data/draftFormGridData';
 import { fetchDraftFormUsers } from '../src/pages/co/workflow/form/services/draftFormManagement.service';
 import { F1Grid, type F1GridRef } from '../src/shared/components/f1-grid';
 import type { DraftFormRow } from '../src/pages/co/workflow/form/types/draftFormManagement.types';
@@ -93,6 +96,44 @@ beforeEach(() => {
 });
 
 describe('Draft form management page', () => {
+  it.each([
+    { canUpdate: false, saving: false, allowed: false },
+    { canUpdate: true, saving: true, allowed: false },
+    { canUpdate: true, saving: false, allowed: true },
+  ])('gates soft disabling by update permission and save lock %o', (policy) => {
+    const gridRef = createRef<F1GridRef<DraftFormRow>>();
+    render(
+      <DraftFormGrid
+        rows={[{ ...createDraftFormRow(), draftingWorkCategoryId: 71, codeName: '권한 검증' }]}
+        columns={[{ field: 'codeName', headerName: '양식명' }]}
+        canCreate={false}
+        canUpdate={policy.canUpdate}
+        canExportExcel={false}
+        saving={policy.saving}
+        loading={false}
+        gridKey={0}
+        gridRef={gridRef}
+        onChangesChange={vi.fn()}
+      />,
+    );
+    const cell = screen.getByRole('gridcell', { name: '권한 검증' });
+    fireEvent.contextMenu(cell);
+    const remove = screen.queryByRole('menuitem', { name: '행 삭제' });
+    if (policy.allowed) {
+      expect(remove).toBeVisible();
+      fireEvent.click(remove!);
+      expect(gridRef.current?.getChanges().deletedRows)
+        .toEqual([expect.objectContaining({ draftingWorkCategoryId: 71 })]);
+    } else {
+      expect(remove).not.toBeInTheDocument();
+      fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+      fireEvent.keyDown(cell, { key: 'Delete' });
+      expect(gridRef.current?.getChanges()).toEqual(expect.objectContaining({
+        deletedRows: [], updatedRows: [],
+      }));
+    }
+  });
+
   it('hides Excel export when the grid does not have Excel permission', async () => {
     render(
       <DraftFormGrid
@@ -997,7 +1038,7 @@ describe('Draft form management page', () => {
       name: '기안양식 등록',
     });
     fireEvent.change(
-      within(formDialog).getByRole('textbox', { name: '구분명' }),
+      within(formDialog).getByRole('textbox', { name: '양식명' }),
       { target: { value: '미저장 양식' } },
     );
     fireEvent.mouseDown(
@@ -1172,7 +1213,7 @@ describe('Draft form management page', () => {
       name: '기안양식 등록',
     });
     fireEvent.change(
-      within(formDialog).getByRole('textbox', { name: '구분명' }),
+      within(formDialog).getByRole('textbox', { name: '양식명' }),
       {
         target: { value: '정기점검' },
       },
@@ -1304,7 +1345,7 @@ describe('Draft form management page', () => {
     expect(reviewerDeleteIcon).not.toBeNull();
     fireEvent.click(reviewerDeleteIcon!);
     fireEvent.change(
-      within(formDialog).getByRole('textbox', { name: '구분명' }),
+      within(formDialog).getByRole('textbox', { name: '양식명' }),
       {
         target: { value: '수정양식' },
       },
@@ -1498,7 +1539,7 @@ describe('Draft form management page', () => {
       name: '기안양식 수정',
     });
     fireEvent.change(
-      within(formDialog).getByRole('textbox', { name: '구분명' }),
+      within(formDialog).getByRole('textbox', { name: '양식명' }),
       { target: { value: '수정양식' } },
     );
     fireEvent.click(within(formDialog).getByRole('button', { name: '적용' }));

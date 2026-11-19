@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useNotification } from '../../../shared/context/NotificationContext';
+import { useNotification } from '../../../shared/context/notification';
 import { CommonDialog } from '../../../shared/components/CommonDialog';
 import { useRealtimeRefresh } from '../../../shared/hooks/useRealtimeRefresh';
 import {

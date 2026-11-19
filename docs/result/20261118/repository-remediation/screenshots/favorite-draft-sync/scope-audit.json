@@ -1,0 +1,33 @@
+{
+  "baseline": "fb1a89d5bf7b158fdb7ee6b330535af65fc96969",
+  "jsxAndPublicPropsPreserved": true,
+  "allSaveRemoveCloseCallbacksAndSubmittingStatePreserved": true,
+  "initialDraftUsesOpenFavoriteValues": true,
+  "dependencyKeysAndObjectIsMeaningPreserved": true,
+  "resetStatementsPreserved": true,
+  "renderGuardsWithoutRefAccess": 1,
+  "existingTestsPreserved": 13,
+  "addedTestDeclarations": 3,
+  "addedRuntimeTests": 6,
+  "sourceFiles": 890,
+  "mismatches": [],
+  "changed": [
+    "frontend/src/pages/dashboard/components/MenuFavoriteEditDialog.tsx",
+    "frontend/tests/menu-favorites.test.tsx"
+  ],
+  "lint": {
+    "before": 109,
+    "after": 108,
+    "removed": 1,
+    "added": 0
+  },
+  "red": {
+    "passed": 15,
+    "failed": 4,
+    "originalTestsPassed": 13
+  },
+  "tests": {
+    "files": 4,
+    "passed": 54
+  }
+}

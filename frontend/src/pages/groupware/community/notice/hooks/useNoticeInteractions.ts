@@ -1,4 +1,10 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { fetchNoticePostDetail } from '../services/noticeBoardService';
 import { mapNoticePost } from '../data/noticePostAdapter';
@@ -29,6 +35,10 @@ export function useNoticeInteractions({
     number | null
   >(null);
   const noticeDetailRequests = useRef(new Map<number, Promise<void>>());
+  const noticeItemsRef = useRef({ noticeItems, pinnedNoticeItems });
+  useLayoutEffect(() => {
+    noticeItemsRef.current = { noticeItems, pinnedNoticeItems };
+  }, [noticeItems, pinnedNoticeItems]);
   const selectedNotice = useMemo(
     () =>
       [...noticeItems, ...pinnedNoticeItems].find(
@@ -44,18 +54,35 @@ export function useNoticeInteractions({
         if (expand) setExpandedNoticeId(noticeId);
         return pendingRequest;
       }
+      const itemAtRequestStart = [
+        ...noticeItemsRef.current.noticeItems,
+        ...(noticeItemsRef.current.pinnedNoticeItems ?? []),
+      ].find((item) => item.id === noticeId);
+      const commentsAtRequestStart = itemAtRequestStart?.comments;
+      const commentCountAtRequestStart = itemAtRequestStart?.commentCount;
       if (expand) setExpandedNoticeId(noticeId);
       const request = Promise.resolve()
         .then(() => fetchNoticePostDetail(noticeId))
         .then((detail) => {
           const detailItem = mapNoticePost(detail, noticeGubunNamesRef?.current);
-          const mergeDetail = (item: NoticeFeedItem) => ({
-            ...item,
-            ...detailItem,
-            liked: item.liked,
-            likeCount: item.likeCount,
-            bookmarked: item.bookmarked,
-          });
+          const mergeDetail = (item: NoticeFeedItem) => {
+            const commentsChangedDuringRequest =
+              item.comments !== commentsAtRequestStart ||
+              item.commentCount !== commentCountAtRequestStart;
+            return {
+              ...item,
+              ...detailItem,
+              ...(commentsChangedDuringRequest
+                ? {
+                    comments: item.comments,
+                    commentCount: item.commentCount,
+                  }
+                : {}),
+              liked: item.liked,
+              likeCount: item.likeCount,
+              bookmarked: item.bookmarked,
+            };
+          };
           setNoticeItems((current) =>
             appendMissing && !current.some((item) => item.id === noticeId)
               ? [detailItem, ...current]

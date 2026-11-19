@@ -19,7 +19,7 @@ import { headerCounterBadgeSx } from './headerCounterBadgeSx';
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh';
 import { useNavigate } from 'react-router-dom';
-import { useNotification } from '../context/NotificationContext';
+import { useNotification } from '../context/notification';
 import {
   getNotificationSummary,
   listNotifications,

@@ -1,0 +1,93 @@
+{
+  "actualPageServiceRouterChatAndNotificationProvider": true,
+  "transport": "Closed synthetic responses only; unknown transport requests throw",
+  "storage": "Tab-only in-memory replacement; no persisted storage reads or writes",
+  "pendingList": {
+    "resolve": 0,
+    "day": 0,
+    "read": 0
+  },
+  "initialLists": {
+    "initialLoad": 1,
+    "existingFocusRefresh": 2,
+    "total": 3
+  },
+  "firstSource": {
+    "sourceId": 901,
+    "threadId": 31,
+    "resolve": 1,
+    "day": 1,
+    "read": 1,
+    "orderPreserved": true
+  },
+  "widths": [
+    {
+      "width": 375,
+      "themeRerenderRequests": 0,
+      "realtime": {
+        "list": 1,
+        "day": 1,
+        "resolve": 0,
+        "read": 0
+      },
+      "replyDraftPreserved": true,
+      "sourceResolveCount": 1,
+      "documentWidth": 375,
+      "composerInsideViewport": true
+    },
+    {
+      "width": 768,
+      "themeRerenderRequests": 0,
+      "realtime": {
+        "list": 1,
+        "day": 1,
+        "resolve": 0,
+        "read": 0
+      },
+      "replyDraftPreserved": true,
+      "sourceResolveCount": 1,
+      "documentWidth": 768,
+      "composerInsideViewport": true
+    },
+    {
+      "width": 1280,
+      "themeRerenderRequests": 0,
+      "realtime": {
+        "list": 1,
+        "day": 1,
+        "resolve": 0,
+        "read": 0
+      },
+      "replyDraftPreserved": true,
+      "sourceResolveCount": 1,
+      "documentWidth": 1280,
+      "composerInsideViewport": true
+    }
+  ],
+  "nextSource": {
+    "sourceId": 902,
+    "threadId": 32,
+    "resolve": 1,
+    "day": 1,
+    "read": 1
+  },
+  "sameSource": {
+    "additionalRequests": 0
+  },
+  "invalidSource": {
+    "additionalRequests": 0,
+    "errorAlertVisible": true
+  },
+  "unknownRequests": 0,
+  "totalRequests": 15,
+  "images": [
+    "pending-375.png",
+    "chat-375.png",
+    "chat-768.png",
+    "chat-1280.png",
+    "next-1280.png",
+    "invalid-1280.png"
+  ],
+  "boundary": "Direct page fixture is not a full authentication or production network test",
+  "observerCorrection": "Initial-list-only assumption rejected: two native focus events invoked the unchanged refreshQuietly path; stack and event correlation captured"
+}

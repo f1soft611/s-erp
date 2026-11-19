@@ -10,7 +10,7 @@ import { type PermissionActionGroupDefinition } from '../../../../shared/compone
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
-import { useNotification } from '../../../../shared/context/NotificationContext';
+import { useNotification } from '../../../../shared/context/notification';
 import { usePageSessionState } from '../../../../shared/hooks/usePageSessionState';
 import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import type {
@@ -19,9 +19,9 @@ import type {
 } from '../../../dashboard/types/dashboard';
 import {
   CommonCodeManagementPanel,
-  buildGroupColumns,
   type CommonCodeManagementPanelHandle,
 } from './components/CommonCodeManagementPanel';
+import { buildGroupColumns } from './data/commonCodeManagementGrid';
 import {
   fetchCommonCodeGroups,
   fetchCommonCodeModuleOptions,

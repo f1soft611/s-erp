@@ -1,15 +1,15 @@
 package egovframework.com.security;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.lang.annotation.Annotation;
+import java.io.InputStream;
 import java.lang.reflect.Field;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Properties;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,15 +35,20 @@ class SecurityConfigTest {
         assertTrue(Arrays.asList(whitelist).contains("/swagger-ui/**"));
     }
 
-    @DisplayName("Swagger 스캔은 로그인/인증 공통 영역만 남겨야 한다")
+    @DisplayName("Swagger 공통 기본 스캔은 로그인/인증 공통 영역만 포함해야 한다")
     @Test
-    void swaggerScanShouldBeLimitedToLoginAndSharedAuthModules() throws IOException {
-        Path propertiesPath = Paths.get("src/main/resources/application-dev.properties");
-        String content = new String(Files.readAllBytes(propertiesPath), StandardCharsets.UTF_8);
-
-        assertTrue(content.contains("springdoc.packages-to-scan=egovframework.com,egovframework.let.uat.uia.web"));
-        assertTrue(content.contains("springdoc.packages-to-scan=egovframework.com,egovframework.let.uat.uia.web")
-            || content.contains("springdoc.packages-to-scan=egovframework.com,egovframework.let.uat.uia.web,egovframework.let.main"));
+    void swaggerPublicDefaultsShouldBeLimitedToLoginAndSharedAuthModules() throws IOException {
+        Properties properties = new Properties();
+        try (InputStream input = SecurityConfig.class.getClassLoader()
+                .getResourceAsStream("application.properties")) {
+            assertNotNull(input, "Public application defaults must be on the classpath");
+            properties.load(input);
+        }
+        String scanPackages = properties.getProperty("springdoc.packages-to-scan");
+        assertNotNull(scanPackages, "Public Swagger scan packages must be configured");
+        assertEquals(new HashSet<>(Arrays.asList(
+                "egovframework.com", "egovframework.let.uat.uia.web")),
+                new HashSet<>(Arrays.asList(scanPackages.trim().split("\\s*,\\s*"))));
     }
 
     @DisplayName("애플리케이션 스캔은 로그인/공통 인증 패키지로 제한되어야 한다")

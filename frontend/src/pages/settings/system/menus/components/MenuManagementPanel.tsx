@@ -16,7 +16,7 @@ import {
   DEFAULT_PERMISSION_GROUPS,
   hasPermissionGroup,
   togglePermissionGroup,
-} from '../../../../../shared/components/PermissionGroup';
+} from '../../../../../shared/components/permissionGroupData';
 import {
   createMenuSaveCheckpoint,
   replaceMenuPermissions,
@@ -84,49 +84,6 @@ export const MenuManagementPanel = forwardRef<
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [treeKey, setTreeKey] = useState(0);
-
-  useImperativeHandle(ref, () => ({
-    saveCurrentChanges: handleSave,
-    deleteSelectedRows: () => {
-      if (!saving) treeRef.current?.deleteSelectedRows();
-    },
-    exportCurrentRows: () => {
-      const rows = treeRef.current?.getActiveRows() ?? [];
-      if (rows.length === 0) return;
-      const headers = columns.map((column) => column.headerName);
-      const csvRows = rows.map((row) =>
-        columns
-          .map((column) => {
-            const value = row[column.field as keyof MenuManagementRow];
-            const stringValue = Array.isArray(value)
-              ? value.join(';')
-              : value == null
-                ? ''
-                : String(value);
-            return `"${stringValue.replace(/"/g, '""')}"`;
-          })
-          .join(','),
-      );
-      const content = [headers.join(','), ...csvRows].join('\n');
-      const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `${selectedModule?.moduleName ?? 'menu'}-export.csv`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
-    },
-  }));
-
-  useEffect(() => {
-    onDirtyChange?.(
-      changes.insertedRows.length > 0 ||
-        changes.updatedRows.length > 0 ||
-        changes.deletedRows.length > 0,
-    );
-  }, [changes, onDirtyChange]);
 
   function notifyError(nextMessage: string) {
     if (onError) {
@@ -357,6 +314,49 @@ export const MenuManagementPanel = forwardRef<
       onSavingChange?.(false);
     }
   }
+
+  useImperativeHandle(ref, () => ({
+    saveCurrentChanges: handleSave,
+    deleteSelectedRows: () => {
+      if (!saving) treeRef.current?.deleteSelectedRows();
+    },
+    exportCurrentRows: () => {
+      const rows = treeRef.current?.getActiveRows() ?? [];
+      if (rows.length === 0) return;
+      const headers = columns.map((column) => column.headerName);
+      const csvRows = rows.map((row) =>
+        columns
+          .map((column) => {
+            const value = row[column.field as keyof MenuManagementRow];
+            const stringValue = Array.isArray(value)
+              ? value.join(';')
+              : value == null
+                ? ''
+                : String(value);
+            return `"${stringValue.replace(/"/g, '""')}"`;
+          })
+          .join(','),
+      );
+      const content = [headers.join(','), ...csvRows].join('\n');
+      const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${selectedModule?.moduleName ?? 'menu'}-export.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    },
+  }));
+
+  useEffect(() => {
+    onDirtyChange?.(
+      changes.insertedRows.length > 0 ||
+        changes.updatedRows.length > 0 ||
+        changes.deletedRows.length > 0,
+    );
+  }, [changes, onDirtyChange]);
 
   return (
     <Box

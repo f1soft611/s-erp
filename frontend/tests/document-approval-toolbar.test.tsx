@@ -7,7 +7,6 @@ describe('DocumentApprovalToolbar', () => {
   it('renders available slots in the approved order with a 4px column gap', () => {
     render(
       <DocumentApprovalToolbar
-        approvalActions={<button type="button">승인 액션</button>}
         status={<span style={{ marginRight: 4 }}>결재상태</span>}
         pinControl={
           <button type="button" style={{ marginLeft: 4 }}>
@@ -25,7 +24,6 @@ describe('DocumentApprovalToolbar', () => {
     const pin = within(toolbar).getByRole('button', { name: '상단고정' });
     const more = within(toolbar).getByRole('button', { name: '더보기' });
     const orderedElements = [
-      within(toolbar).getByRole('button', { name: '승인 액션' }),
       status,
       within(toolbar).getByText('문서구분'),
       divider,
@@ -39,6 +37,7 @@ describe('DocumentApprovalToolbar', () => {
     expect(getComputedStyle(status).marginRight).toBe('4px');
     expect(getComputedStyle(pin).marginLeft).toBe('4px');
     expect(pin.nextElementSibling).toBe(more);
+    expect(within(toolbar).getAllByRole('button')).toHaveLength(2);
     for (let index = 0; index < orderedElements.length - 1; index += 1) {
       const current = orderedElements[index];
       const next = orderedElements[index + 1];

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Alert,
   Button,
@@ -35,17 +35,31 @@ export function MenuFavoriteEditDialog({
   onSave,
   onRemove,
 }: Props) {
-  const [name, setName] = useState(menuName);
-  const [folderValue, setFolderValue] = useState('root');
+  const [name, setName] = useState(
+    open ? favorite?.favoriteName?.trim() || menuName : menuName,
+  );
+  const [folderValue, setFolderValue] = useState(
+    open && favorite?.folderId != null ? String(favorite.folderId) : 'root',
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const inputs = [
+    favorite?.favoriteId,
+    favorite?.favoriteName,
+    favorite?.folderId,
+    menuName,
+    open,
+  ] as const;
+  const [previousInputs, setPreviousInputs] = useState(inputs);
 
-  useEffect(() => {
-    if (!open) return;
-    setName(favorite?.favoriteName?.trim() || menuName);
-    setFolderValue(favorite?.folderId == null ? 'root' : String(favorite.folderId));
-    setError('');
-  }, [favorite?.favoriteId, favorite?.favoriteName, favorite?.folderId, menuName, open]);
+  if (inputs.some((value, index) => !Object.is(value, previousInputs[index]))) {
+    setPreviousInputs(inputs);
+    if (open) {
+      setName(favorite?.favoriteName?.trim() || menuName);
+      setFolderValue(favorite?.folderId == null ? 'root' : String(favorite.folderId));
+      setError('');
+    }
+  }
 
   const close = () => {
     if (!submitting) onClose();

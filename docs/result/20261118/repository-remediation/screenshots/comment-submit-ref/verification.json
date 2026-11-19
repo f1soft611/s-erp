@@ -1,0 +1,51 @@
+{
+  "actualCommentThreadEditorAndNativeKeyboardAndFilePicker": true,
+  "transport": "All fetch blocked; local callbacks only; no file upload request",
+  "storage": "Tab-only memory storage; no persistent reads or writes",
+  "widths": [
+    {
+      "width": 375,
+      "documentWidth": 375,
+      "shiftEnterDoesNotSubmit": true,
+      "themeAndCallbackRevisionPreserveDraftAndFile": true,
+      "enterUsesLatestCommittedCallbackAndFile": true,
+      "repeatedSelectionAfterSuccess": true,
+      "failurePreservesDraftAndFile": true,
+      "retryClearsOnSuccess": true
+    },
+    {
+      "width": 768,
+      "documentWidth": 768,
+      "shiftEnterDoesNotSubmit": true,
+      "themeAndCallbackRevisionPreserveDraftAndFile": true,
+      "enterUsesLatestCommittedCallbackAndFile": true,
+      "repeatedSelectionAfterSuccess": true,
+      "failurePreservesDraftAndFile": true,
+      "retryClearsOnSuccess": true
+    },
+    {
+      "width": 1280,
+      "documentWidth": 1280,
+      "shiftEnterDoesNotSubmit": true,
+      "themeAndCallbackRevisionPreserveDraftAndFile": true,
+      "enterUsesLatestCommittedCallbackAndFile": true,
+      "repeatedSelectionAfterSuccess": true,
+      "failurePreservesDraftAndFile": true,
+      "retryClearsOnSuccess": true
+    }
+  ],
+  "submitAttempts": 9,
+  "successes": 6,
+  "rejections": 3,
+  "unknownRequests": 0,
+  "suspendedRenderTiming": "Covered by the focused Vitest RED/GREEN; not claimed as browser coverage",
+  "imeAndMentionScope": "Existing source branches preserved; not claimed as native IME or mention browser coverage",
+  "images": [
+    "draft-375.png",
+    "failed-375.png",
+    "draft-768.png",
+    "failed-768.png",
+    "draft-1280.png",
+    "failed-1280.png"
+  ]
+}

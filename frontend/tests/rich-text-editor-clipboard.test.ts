@@ -33,7 +33,7 @@ describe('shared rich text editor clipboard normalization', () => {
 
   it('normalizes plain text and detects tabular clipboard content', () => {
     expect(normalizeClipboardTextForEditor('가\t나\r\n다\t라')).toBe(
-      '가 | 나\n다 | 라',
+      '가\t나\n다\t라',
     );
     expect(
       hasSpreadsheetClipboardContent({

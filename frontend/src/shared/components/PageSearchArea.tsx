@@ -1,6 +1,8 @@
 import {
   Fragment,
   useEffect,
+  useLayoutEffect,
+  useRef,
   useState,
   type KeyboardEvent,
   type ReactNode,
@@ -17,6 +19,7 @@ import {
   InputLabel,
   MenuItem,
   Paper,
+  Portal,
   Select,
   TextField,
 } from '@mui/material';
@@ -24,8 +27,13 @@ import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import KeyboardArrowUpRoundedIcon from '@mui/icons-material/KeyboardArrowUpRounded';
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
-import { DateEditor, normalizeDateInput } from './f1-grid/editing/DateEditor';
-import { formatMonthValue, MonthEditor, normalizeMonthInput } from './f1-grid/editing/MonthEditor';
+import { DateEditor } from './f1-grid/editing/DateEditor';
+import { normalizeDateInput } from './f1-grid/editing/dateInput';
+import { MonthEditor } from './f1-grid/editing/MonthEditor';
+import {
+  formatMonthValue,
+  normalizeMonthInput,
+} from './f1-grid/editing/monthInput';
 import { useF1GridFormattedInput } from './f1-grid/editing/useF1GridFormattedInput';
 import { QUICK_DATE_PRESETS, resolveQuickDate } from './page-search/quickDates';
 import { getSystemDate } from '../services/systemDateService';
@@ -39,6 +47,7 @@ type SearchRenderBlock =
   | { group: string; fields: PageSearchField[] }
   | { field: PageSearchField };
 
+const EMPTY_SEARCH_FIELDS: PageSearchField[] = [];
 const EMPTY_SEARCH_VALUES: Record<string, PageSearchFieldValue> = {};
 
 type PageSearchTextFieldProps = {
@@ -185,7 +194,7 @@ export function PageSearchArea({
   children,
   searchField,
   onDefaultSearch,
-  detailFields = [],
+  detailFields = EMPTY_SEARCH_FIELDS,
   detailValues = EMPTY_SEARCH_VALUES,
   appliedDetailValues = EMPTY_SEARCH_VALUES,
   defaultValues = EMPTY_SEARCH_VALUES,
@@ -207,33 +216,64 @@ export function PageSearchArea({
   const [pendingRemovalFields, setPendingRemovalFields] = useState<
     Record<string, boolean>
   >({});
+  const [previousDraftInputs, setPreviousDraftInputs] = useState({
+    defaultValues,
+    detailValues,
+  });
+  const [previousRemovalInputs, setPreviousRemovalInputs] = useState({
+    appliedDetailValues,
+    detailFields,
+  });
+  const draftValuesRef = useRef(draftValues);
+  const quickDateRequestsRef = useRef(new Map<string, symbol>());
 
-  useEffect(() => {
+  if (
+    previousDraftInputs.defaultValues !== defaultValues ||
+    previousDraftInputs.detailValues !== detailValues
+  ) {
+    setPreviousDraftInputs({ defaultValues, detailValues });
     const resolvedValues = mergeSearchValues(defaultValues, detailValues);
-    setDraftValues((current) =>
-      areSearchValuesEqual(current, resolvedValues) ? current : resolvedValues,
+    if (!areSearchValuesEqual(draftValues, resolvedValues)) {
+      setDraftValues(resolvedValues);
+    }
+  }
+
+  if (
+    previousRemovalInputs.appliedDetailValues !== appliedDetailValues ||
+    previousRemovalInputs.detailFields !== detailFields
+  ) {
+    setPreviousRemovalInputs({ appliedDetailValues, detailFields });
+    const next = Object.fromEntries(
+      Object.entries(pendingRemovalFields).filter(([fieldName]) => {
+        const field = detailFields.find((candidate) => candidate.field === fieldName);
+        return (
+          field !== undefined &&
+          !isFieldValueEmpty(field, appliedDetailValues[fieldName])
+        );
+      }),
     );
+    if (Object.keys(next).length !== Object.keys(pendingRemovalFields).length) {
+      setPendingRemovalFields(next);
+    }
+  }
+
+  useLayoutEffect(() => {
+    const resolvedValues = mergeSearchValues(defaultValues, detailValues);
+    if (!areSearchValuesEqual(draftValuesRef.current, resolvedValues)) {
+      quickDateRequestsRef.current.clear();
+    }
+    draftValuesRef.current = resolvedValues;
   }, [defaultValues, detailValues]);
 
   useEffect(() => {
-    setPendingRemovalFields((current) => {
-      const next = Object.fromEntries(
-        Object.entries(current).filter(([fieldName]) => {
-          const field = detailFields.find((candidate) => candidate.field === fieldName);
-          return (
-            field !== undefined &&
-            !isFieldValueEmpty(field, appliedDetailValues[fieldName])
-          );
-        }),
-      );
-      return Object.keys(next).length === Object.keys(current).length
-        ? current
-        : next;
-    });
-  }, [appliedDetailValues, detailFields]);
+    const requests = quickDateRequestsRef.current;
+    return () => requests.clear();
+  }, []);
 
   const updateValue = (field: string, value: PageSearchFieldValue) => {
-    const next = { ...draftValues, [field]: value };
+    quickDateRequestsRef.current.delete(field);
+    const next = { ...draftValuesRef.current, [field]: value };
+    draftValuesRef.current = next;
     setDraftValues(next);
     setPendingRemovalFields((current) => {
       if (!current[field]) return current;
@@ -255,8 +295,11 @@ export function PageSearchArea({
     field: PageSearchField,
     preset: (typeof QUICK_DATE_PRESETS)[number],
   ) => {
+    const request = Symbol();
+    quickDateRequestsRef.current.set(field.field, request);
     try {
       const today = await getSystemDate();
+      if (quickDateRequestsRef.current.get(field.field) !== request) return;
       const range = resolveQuickDate(preset, dayjs(today));
       setQuickDateError(false);
       setDateErrors((current) => {
@@ -267,11 +310,14 @@ export function PageSearchArea({
       });
       updateValue(field.field, range);
     } catch {
+      if (quickDateRequestsRef.current.get(field.field) !== request) return;
+      quickDateRequestsRef.current.delete(field.field);
       setQuickDateError(true);
     }
   };
 
   const closeDetails = () => {
+    quickDateRequestsRef.current.clear();
     setDetailOpen(false);
     onDetailClose?.();
   };
@@ -356,6 +402,7 @@ export function PageSearchArea({
   const searchDetails = () => {
     const next = validateSearchValues(draftValues);
     if (!next) return;
+    draftValuesRef.current = next;
     setDraftValues(next);
     if (!areSearchValuesEqual(draftValues, next)) {
       onDetailValuesChange?.(next);
@@ -565,6 +612,8 @@ export function PageSearchArea({
       ...draftValues,
       [field.field]: field.type === 'date' ? { from: '', to: '' } : '',
     };
+    quickDateRequestsRef.current.delete(field.field);
+    draftValuesRef.current = next;
     setDraftValues(next);
     setPendingRemovalFields((current) => ({ ...current, [field.field]: true }));
     setDateErrors((current) =>
@@ -598,6 +647,21 @@ export function PageSearchArea({
         transition: 'background-color 0.2s ease',
       })}
     >
+      {detailOpen && detailFields.length > 0 && (
+        // backdrop-filter가 fixed 기준을 부모로 바꾸므로 body로 포탈
+        <Portal>
+          <Box
+            aria-hidden="true"
+            data-testid="detail-search-backdrop"
+            sx={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 12,
+              bgcolor: 'rgba(15, 23, 42, 0.12)',
+            }}
+          />
+        </Portal>
+      )}
       <Box
         sx={{
           display: 'flex',
@@ -760,7 +824,10 @@ export function PageSearchArea({
               }
               aria-expanded={detailOpen}
               data-active={activeDetailFilters.length > 0}
-              onClick={() => setDetailOpen((current) => !current)}
+              onClick={() => {
+                quickDateRequestsRef.current.clear();
+                setDetailOpen((current) => !current);
+              }}
               sx={{
                 flex: '0 0 auto',
                 color: activeDetailFilters.length ? 'primary.main' : 'text.secondary',
@@ -945,6 +1012,8 @@ export function PageSearchArea({
                 type="button"
                 variant="outlined"
                 onClick={() => {
+                  quickDateRequestsRef.current.clear();
+                  draftValuesRef.current = defaultValues;
                   setDraftValues(defaultValues);
                   setDateErrors({});
                   setRequiredErrors({});

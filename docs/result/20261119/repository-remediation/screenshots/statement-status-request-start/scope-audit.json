@@ -1,0 +1,41 @@
+{
+  "baseline": "a4e36534c2b7728d58498d3fcd80401e48f8f6c4",
+  "changed": [
+    "frontend\\src\\pages\\sales\\shipment\\statement\\status\\hooks\\useSalesStatementStatus.ts",
+    "frontend\\tests\\sales-statement-page.test.tsx"
+  ],
+  "onlyBoundedListAndDetailRequestGuardsAndExistingStartSettersChanged": true,
+  "permissionPeriodAndTruthyIdPredicatesPreserved": true,
+  "requestTokenAndActiveCleanupUnchanged": true,
+  "renderRefReadsOrWritesAdded": false,
+  "servicesApiTypesUiJsxCssSearchEditorPrintAndCloseGuardsUnchanged": true,
+  "originalTestsBytePreserved": true,
+  "addedTests": 3,
+  "runtimeRed": {
+    "failed": 3,
+    "cause": "First list page commits left query enabled; first detail page commit lacked loading status"
+  },
+  "baselineTests": {
+    "files": 1,
+    "passed": 9
+  },
+  "relatedTests": {
+    "files": 1,
+    "passed": 12
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 73,
+    "after": 71,
+    "removed": 2,
+    "added": 0,
+    "removedTokens": [
+      "setDetailLoading",
+      "setLoading"
+    ],
+    "otherDiagnosticsUnchangedIncludingLabels": true
+  },
+  "remainingRefs": 0,
+  "remainingStateInEffect": 71
+}

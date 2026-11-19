@@ -33,7 +33,7 @@ import { DashboardContent } from '../src/pages/dashboard/components/DashboardCon
 import { pageContentMap } from '../src/pages/dashboard/services/dashboardData';
 import { DocumentApprovalDetailFeed } from '../src/pages/groupware/documents/write/components/DocumentApprovalDetailFeed';
 import { DocumentComposerDialog } from '../src/pages/groupware/documents/write/components/DocumentComposerDialog';
-import { createDocumentStatusColumns } from '../src/pages/groupware/documents/status/components/DocumentStatusGrid';
+import { createDocumentStatusColumns } from '../src/pages/groupware/documents/status/data/documentStatusColumns';
 import type { DocumentApprovalDetail } from '../src/pages/groupware/documents/write/types/documentWrite.types';
 import type { DocumentStatusRow } from '../src/pages/groupware/documents/status/types/documentStatus.types';
 import { toPageSearchFields } from '../src/shared/components/page-search/searchFields';

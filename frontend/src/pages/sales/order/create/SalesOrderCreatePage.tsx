@@ -21,7 +21,8 @@ import { PageHeader } from '../../../../shared/components/PageHeader';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useCommonConfirmDialog } from '../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
-import { DateEditor, normalizeDateInput } from '../../../../shared/components/f1-grid/editing/DateEditor';
+import { DateEditor } from '../../../../shared/components/f1-grid/editing/DateEditor';
+import { normalizeDateInput } from '../../../../shared/components/f1-grid/editing/dateInput';
 import {
   MaterialPickerDialog,
   CustomerPicker,

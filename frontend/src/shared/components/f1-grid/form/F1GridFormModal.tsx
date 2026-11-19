@@ -57,14 +57,16 @@ export function F1GridFormModal<T extends object>({
     Record<string, string>
   >({});
   const [focusRequest, setFocusRequest] = useState<{ field: string }>();
+  const [previousInputs, setPreviousInputs] = useState({ open, row });
 
-  useEffect(() => {
-    if (!open) return;
-
-    setDraftRow({ ...row });
-    setValidationErrors({});
-    setFocusRequest(undefined);
-  }, [open, row]);
+  if (previousInputs.open !== open || previousInputs.row !== row) {
+    setPreviousInputs({ open, row });
+    if (open) {
+      setDraftRow({ ...row });
+      setValidationErrors({});
+      setFocusRequest(undefined);
+    }
+  }
 
   useEffect(() => {
     if (!focusRequest) return;

@@ -1,0 +1,33 @@
+{
+  "baseline": "93abcd93290d1341275c53fa021f386be66d3bd4",
+  "changed": [
+    "frontend\\src\\pages\\co\\master\\common-code\\components\\CommonCodeManagementPanel.tsx",
+    "frontend\\tests\\common-code-management-page.test.tsx"
+  ],
+  "onlyDeletedIdPublicationStateAndPureRenderPolicyChanged": true,
+  "actualDeletionSavePickerAndAsyncGuardsIdentical": true,
+  "allOtherMarkupStylesEffectsAndContractsIdentical": true,
+  "originalTestsBytePreserved": true,
+  "addedRegression": 1,
+  "runtimeRed": {
+    "failed": 1,
+    "cause": "Last detail deletion in an already-dirty batch leaves group menu disabled"
+  },
+  "baselineTests": {
+    "files": 3,
+    "passed": 43
+  },
+  "relatedTests": {
+    "files": 3,
+    "passed": 44
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 87,
+    "after": 86,
+    "removed": 1,
+    "added": 0
+  },
+  "commonCodePanelRefDiagnostics": 0
+}

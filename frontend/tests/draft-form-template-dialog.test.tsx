@@ -436,7 +436,7 @@ describe('DraftFormTemplateDialog', () => {
     expect(
       await screen.findByRole('dialog', { name: '저장하지 않은 변경사항' }),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '변경 버리기' }));
+    fireEvent.click(screen.getByRole('button', { name: '계속' }));
 
     await waitFor(() =>
       expect(apiMocks.apiDelete).toHaveBeenCalledWith(

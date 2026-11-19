@@ -1,0 +1,3690 @@
+{
+  "smallScroll": {
+    "body": {
+      "bottom": 483,
+      "clientHeight": 330,
+      "clientWidth": 1246,
+      "height": 330,
+      "left": 17,
+      "right": 1263,
+      "scrollHeight": 2952,
+      "scrollLeft": 0,
+      "scrollTop": 72,
+      "scrollWidth": 1246,
+      "top": 153,
+      "width": 1246,
+      "x": 17,
+      "y": 153
+    },
+    "cells": [
+      {
+        "bottom": 189,
+        "height": 108,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-1",
+        "top": 81,
+        "width": 180,
+        "x": 61,
+        "y": 81
+      },
+      {
+        "bottom": 189,
+        "height": 108,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 1 with wrapped text",
+        "top": 81,
+        "width": 200,
+        "x": 241,
+        "y": 81
+      },
+      {
+        "bottom": 189,
+        "height": 108,
+        "left": 441,
+        "right": 551,
+        "text": "1",
+        "top": 81,
+        "width": 110,
+        "x": 441,
+        "y": 81
+      },
+      {
+        "bottom": 225,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-2",
+        "top": 189,
+        "width": 180,
+        "x": 61,
+        "y": 189
+      },
+      {
+        "bottom": 225,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 2 with wrapped text",
+        "top": 189,
+        "width": 200,
+        "x": 241,
+        "y": 189
+      },
+      {
+        "bottom": 225,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "2",
+        "top": 189,
+        "width": 110,
+        "x": 441,
+        "y": 189
+      },
+      {
+        "bottom": 261,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-3",
+        "top": 225,
+        "width": 180,
+        "x": 61,
+        "y": 225
+      },
+      {
+        "bottom": 261,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 3 with wrapped text",
+        "top": 225,
+        "width": 200,
+        "x": 241,
+        "y": 225
+      },
+      {
+        "bottom": 261,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "3",
+        "top": 225,
+        "width": 110,
+        "x": 441,
+        "y": 225
+      }
+    ],
+    "copies": [
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+    ],
+    "documentWidth": 1280,
+    "firstRow": {
+      "bottom": 189,
+      "height": 108,
+      "left": 61,
+      "right": 241,
+      "top": 81,
+      "width": 180,
+      "x": 61,
+      "y": 81
+    },
+    "grid": {
+      "bottom": 484,
+      "height": 360,
+      "left": 16,
+      "right": 1264,
+      "top": 124,
+      "width": 1248,
+      "x": 16,
+      "y": 124
+    },
+    "overlay": {
+      "borderStyle": "solid",
+      "bottom": 260,
+      "height": 178,
+      "kind": "drag",
+      "left": 62,
+      "right": 440,
+      "top": 82,
+      "width": 378,
+      "x": 62,
+      "y": 82
+    },
+    "renderedRows": 12,
+    "selectedCells": 6,
+    "state": {
+      "columns": 3,
+      "rows": 80,
+      "version": 0
+    },
+    "totalRows": 80,
+    "viewport": 1280
+  },
+  "metadata": {
+    "body": {
+      "bottom": 483,
+      "clientHeight": 330,
+      "clientWidth": 1246,
+      "height": 330,
+      "left": 17,
+      "right": 1263,
+      "scrollHeight": 2952,
+      "scrollLeft": 0,
+      "scrollTop": 0,
+      "scrollWidth": 1246,
+      "top": 153,
+      "width": 1246,
+      "x": 17,
+      "y": 153
+    },
+    "cells": [
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-1",
+        "top": 153,
+        "width": 180,
+        "x": 61,
+        "y": 153
+      },
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 1 with wrapped text",
+        "top": 153,
+        "width": 200,
+        "x": 241,
+        "y": 153
+      },
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 441,
+        "right": 551,
+        "text": "1",
+        "top": 153,
+        "width": 110,
+        "x": 441,
+        "y": 153
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-2",
+        "top": 261,
+        "width": 180,
+        "x": 61,
+        "y": 261
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 2 with wrapped text",
+        "top": 261,
+        "width": 200,
+        "x": 241,
+        "y": 261
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "2",
+        "top": 261,
+        "width": 110,
+        "x": 441,
+        "y": 261
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-3",
+        "top": 297,
+        "width": 180,
+        "x": 61,
+        "y": 297
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 3 with wrapped text",
+        "top": 297,
+        "width": 200,
+        "x": 241,
+        "y": 297
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "3",
+        "top": 297,
+        "width": 110,
+        "x": 441,
+        "y": 297
+      }
+    ],
+    "copies": [
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+    ],
+    "documentWidth": 1280,
+    "firstRow": {
+      "bottom": 261,
+      "height": 108,
+      "left": 61,
+      "right": 241,
+      "top": 153,
+      "width": 180,
+      "x": 61,
+      "y": 153
+    },
+    "grid": {
+      "bottom": 484,
+      "height": 360,
+      "left": 16,
+      "right": 1264,
+      "top": 124,
+      "width": 1248,
+      "x": 16,
+      "y": 124
+    },
+    "overlay": {
+      "borderStyle": "solid",
+      "bottom": 296,
+      "height": 142,
+      "kind": "drag",
+      "left": 62,
+      "right": 440,
+      "top": 154,
+      "width": 378,
+      "x": 62,
+      "y": 154
+    },
+    "renderedRows": 10,
+    "selectedCells": 4,
+    "state": {
+      "columns": 3,
+      "rows": 80,
+      "version": 1
+    },
+    "totalRows": 80,
+    "viewport": 1280
+  },
+  "largeScroll": {
+    "body": {
+      "bottom": 483,
+      "clientHeight": 330,
+      "clientWidth": 1246,
+      "height": 330,
+      "left": 17,
+      "right": 1263,
+      "scrollHeight": 2952,
+      "scrollLeft": 0,
+      "scrollTop": 900,
+      "scrollWidth": 1246,
+      "top": 153,
+      "width": 1246,
+      "x": 17,
+      "y": 153
+    },
+    "cells": [
+      {
+        "bottom": 189,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-24",
+        "top": 153,
+        "width": 180,
+        "x": 61,
+        "y": 153
+      },
+      {
+        "bottom": 189,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 24 with wrapped text",
+        "top": 153,
+        "width": 200,
+        "x": 241,
+        "y": 153
+      },
+      {
+        "bottom": 189,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "24",
+        "top": 153,
+        "width": 110,
+        "x": 441,
+        "y": 153
+      },
+      {
+        "bottom": 225,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-25",
+        "top": 189,
+        "width": 180,
+        "x": 61,
+        "y": 189
+      },
+      {
+        "bottom": 225,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 25 with wrapped text",
+        "top": 189,
+        "width": 200,
+        "x": 241,
+        "y": 189
+      },
+      {
+        "bottom": 225,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "25",
+        "top": 189,
+        "width": 110,
+        "x": 441,
+        "y": 189
+      },
+      {
+        "bottom": 261,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-26",
+        "top": 225,
+        "width": 180,
+        "x": 61,
+        "y": 225
+      },
+      {
+        "bottom": 261,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 26 with wrapped text",
+        "top": 225,
+        "width": 200,
+        "x": 241,
+        "y": 225
+      },
+      {
+        "bottom": 261,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "26",
+        "top": 225,
+        "width": 110,
+        "x": 441,
+        "y": 225
+      }
+    ],
+    "copies": [
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+    ],
+    "documentWidth": 1280,
+    "firstRow": {
+      "bottom": 189,
+      "height": 36,
+      "left": 61,
+      "right": 241,
+      "top": 153,
+      "width": 180,
+      "x": 61,
+      "y": 153
+    },
+    "grid": {
+      "bottom": 484,
+      "height": 360,
+      "left": 16,
+      "right": 1264,
+      "top": 124,
+      "width": 1248,
+      "x": 16,
+      "y": 124
+    },
+    "overlay": {
+      "borderStyle": "solid",
+      "bottom": -568,
+      "height": 178,
+      "kind": "drag",
+      "left": 62,
+      "right": 440,
+      "top": -746,
+      "width": 378,
+      "x": 62,
+      "y": -746
+    },
+    "renderedRows": 12,
+    "selectedCells": 0,
+    "state": {
+      "columns": 3,
+      "rows": 80,
+      "version": 0
+    },
+    "totalRows": 80,
+    "viewport": 1280
+  },
+  "beforeHeight": {
+    "body": {
+      "bottom": 483,
+      "clientHeight": 330,
+      "clientWidth": 1246,
+      "height": 330,
+      "left": 17,
+      "right": 1263,
+      "scrollHeight": 2880,
+      "scrollLeft": 0,
+      "scrollTop": 0,
+      "scrollWidth": 1246,
+      "top": 153,
+      "width": 1246,
+      "x": 17,
+      "y": 153
+    },
+    "cells": [
+      {
+        "bottom": 189,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-1",
+        "top": 153,
+        "width": 180,
+        "x": 61,
+        "y": 153
+      },
+      {
+        "bottom": 189,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 1 with wrapped text",
+        "top": 153,
+        "width": 200,
+        "x": 241,
+        "y": 153
+      },
+      {
+        "bottom": 189,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "1",
+        "top": 153,
+        "width": 110,
+        "x": 441,
+        "y": 153
+      },
+      {
+        "bottom": 225,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-2",
+        "top": 189,
+        "width": 180,
+        "x": 61,
+        "y": 189
+      },
+      {
+        "bottom": 225,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 2 with wrapped text",
+        "top": 189,
+        "width": 200,
+        "x": 241,
+        "y": 189
+      },
+      {
+        "bottom": 225,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "2",
+        "top": 189,
+        "width": 110,
+        "x": 441,
+        "y": 189
+      },
+      {
+        "bottom": 261,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-3",
+        "top": 225,
+        "width": 180,
+        "x": 61,
+        "y": 225
+      },
+      {
+        "bottom": 261,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 3 with wrapped text",
+        "top": 225,
+        "width": 200,
+        "x": 241,
+        "y": 225
+      },
+      {
+        "bottom": 261,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "3",
+        "top": 225,
+        "width": 110,
+        "x": 441,
+        "y": 225
+      }
+    ],
+    "copies": [
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+    ],
+    "documentWidth": 1280,
+    "firstRow": {
+      "bottom": 189,
+      "height": 36,
+      "left": 61,
+      "right": 241,
+      "top": 153,
+      "width": 180,
+      "x": 61,
+      "y": 153
+    },
+    "grid": {
+      "bottom": 484,
+      "height": 360,
+      "left": 16,
+      "right": 1264,
+      "top": 124,
+      "width": 1248,
+      "x": 16,
+      "y": 124
+    },
+    "overlay": null,
+    "renderedRows": 12,
+    "selectedCells": 0,
+    "state": {
+      "columns": 3,
+      "rows": 80,
+      "version": 0
+    },
+    "totalRows": 80,
+    "viewport": 1280
+  },
+  "growth": {
+    "body": {
+      "bottom": 483,
+      "clientHeight": 330,
+      "clientWidth": 1246,
+      "height": 330,
+      "left": 17,
+      "right": 1263,
+      "scrollHeight": 2952,
+      "scrollLeft": 0,
+      "scrollTop": 0,
+      "scrollWidth": 1246,
+      "top": 153,
+      "width": 1246,
+      "x": 17,
+      "y": 153
+    },
+    "cells": [
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-1",
+        "top": 153,
+        "width": 180,
+        "x": 61,
+        "y": 153
+      },
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 1 with wrapped text",
+        "top": 153,
+        "width": 200,
+        "x": 241,
+        "y": 153
+      },
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 441,
+        "right": 551,
+        "text": "1",
+        "top": 153,
+        "width": 110,
+        "x": 441,
+        "y": 153
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-2",
+        "top": 261,
+        "width": 180,
+        "x": 61,
+        "y": 261
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 2 with wrapped text",
+        "top": 261,
+        "width": 200,
+        "x": 241,
+        "y": 261
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "2",
+        "top": 261,
+        "width": 110,
+        "x": 441,
+        "y": 261
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-3",
+        "top": 297,
+        "width": 180,
+        "x": 61,
+        "y": 297
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 3 with wrapped text",
+        "top": 297,
+        "width": 200,
+        "x": 241,
+        "y": 297
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "3",
+        "top": 297,
+        "width": 110,
+        "x": 441,
+        "y": 297
+      }
+    ],
+    "copies": [
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+    ],
+    "documentWidth": 1280,
+    "firstRow": {
+      "bottom": 261,
+      "height": 108,
+      "left": 61,
+      "right": 241,
+      "top": 153,
+      "width": 180,
+      "x": 61,
+      "y": 153
+    },
+    "grid": {
+      "bottom": 484,
+      "height": 360,
+      "left": 16,
+      "right": 1264,
+      "top": 124,
+      "width": 1248,
+      "x": 16,
+      "y": 124
+    },
+    "overlay": {
+      "borderStyle": "solid",
+      "bottom": 332,
+      "height": 178,
+      "kind": "drag",
+      "left": 62,
+      "right": 440,
+      "top": 154,
+      "width": 378,
+      "x": 62,
+      "y": 154
+    },
+    "renderedRows": 10,
+    "selectedCells": 6,
+    "state": {
+      "columns": 3,
+      "rows": 80,
+      "version": 1
+    },
+    "totalRows": 80,
+    "viewport": 1280
+  },
+  "collapsed": {
+    "body": {
+      "bottom": 483,
+      "clientHeight": 330,
+      "clientWidth": 1246,
+      "height": 330,
+      "left": 17,
+      "right": 1263,
+      "scrollHeight": 2952,
+      "scrollLeft": 0,
+      "scrollTop": 0,
+      "scrollWidth": 1246,
+      "top": 153,
+      "width": 1246,
+      "x": 17,
+      "y": 153
+    },
+    "cells": [
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-1",
+        "top": 153,
+        "width": 180,
+        "x": 61,
+        "y": 153
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-2",
+        "top": 261,
+        "width": 180,
+        "x": 61,
+        "y": 261
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-3",
+        "top": 297,
+        "width": 180,
+        "x": 61,
+        "y": 297
+      },
+      {
+        "bottom": 369,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-4",
+        "top": 333,
+        "width": 180,
+        "x": 61,
+        "y": 333
+      },
+      {
+        "bottom": 405,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-5",
+        "top": 369,
+        "width": 180,
+        "x": 61,
+        "y": 369
+      },
+      {
+        "bottom": 441,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-6",
+        "top": 405,
+        "width": 180,
+        "x": 61,
+        "y": 405
+      },
+      {
+        "bottom": 477,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-7",
+        "top": 441,
+        "width": 180,
+        "x": 61,
+        "y": 441
+      },
+      {
+        "bottom": 513,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-8",
+        "top": 477,
+        "width": 180,
+        "x": 61,
+        "y": 477
+      },
+      {
+        "bottom": 549,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-9",
+        "top": 513,
+        "width": 180,
+        "x": 61,
+        "y": 513
+      }
+    ],
+    "copies": [
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+    ],
+    "documentWidth": 1280,
+    "firstRow": {
+      "bottom": 261,
+      "height": 108,
+      "left": 61,
+      "right": 241,
+      "top": 153,
+      "width": 180,
+      "x": 61,
+      "y": 153
+    },
+    "grid": {
+      "bottom": 484,
+      "height": 360,
+      "left": 16,
+      "right": 1264,
+      "top": 124,
+      "width": 1248,
+      "x": 16,
+      "y": 124
+    },
+    "overlay": null,
+    "renderedRows": 10,
+    "selectedCells": 3,
+    "state": {
+      "columns": 1,
+      "rows": 80,
+      "version": 0
+    },
+    "totalRows": 80,
+    "viewport": 1280
+  },
+  "heightRange": {
+    "body": {
+      "bottom": 483,
+      "clientHeight": 330,
+      "clientWidth": 1246,
+      "height": 330,
+      "left": 17,
+      "right": 1263,
+      "scrollHeight": 2952,
+      "scrollLeft": 0,
+      "scrollTop": 0,
+      "scrollWidth": 1246,
+      "top": 153,
+      "width": 1246,
+      "x": 17,
+      "y": 153
+    },
+    "cells": [
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-1",
+        "top": 153,
+        "width": 180,
+        "x": 61,
+        "y": 153
+      },
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 1 with wrapped text",
+        "top": 153,
+        "width": 200,
+        "x": 241,
+        "y": 153
+      },
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 441,
+        "right": 551,
+        "text": "1",
+        "top": 153,
+        "width": 110,
+        "x": 441,
+        "y": 153
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-2",
+        "top": 261,
+        "width": 180,
+        "x": 61,
+        "y": 261
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 2 with wrapped text",
+        "top": 261,
+        "width": 200,
+        "x": 241,
+        "y": 261
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "2",
+        "top": 261,
+        "width": 110,
+        "x": 441,
+        "y": 261
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-3",
+        "top": 297,
+        "width": 180,
+        "x": 61,
+        "y": 297
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 3 with wrapped text",
+        "top": 297,
+        "width": 200,
+        "x": 241,
+        "y": 297
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "3",
+        "top": 297,
+        "width": 110,
+        "x": 441,
+        "y": 297
+      }
+    ],
+    "copies": [
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+    ],
+    "documentWidth": 1280,
+    "firstRow": {
+      "bottom": 261,
+      "height": 108,
+      "left": 61,
+      "right": 241,
+      "top": 153,
+      "width": 180,
+      "x": 61,
+      "y": 153
+    },
+    "grid": {
+      "bottom": 484,
+      "height": 360,
+      "left": 16,
+      "right": 1264,
+      "top": 124,
+      "width": 1248,
+      "x": 16,
+      "y": 124
+    },
+    "overlay": {
+      "borderStyle": "solid",
+      "bottom": 332,
+      "height": 178,
+      "kind": "drag",
+      "left": 62,
+      "right": 440,
+      "top": 154,
+      "width": 378,
+      "x": 62,
+      "y": 154
+    },
+    "renderedRows": 10,
+    "selectedCells": 6,
+    "state": {
+      "columns": 3,
+      "rows": 80,
+      "version": 0
+    },
+    "totalRows": 80,
+    "viewport": 1280
+  },
+  "expanded": {
+    "body": {
+      "bottom": 483,
+      "clientHeight": 330,
+      "clientWidth": 1246,
+      "height": 330,
+      "left": 17,
+      "right": 1263,
+      "scrollHeight": 2952,
+      "scrollLeft": 0,
+      "scrollTop": 0,
+      "scrollWidth": 1246,
+      "top": 153,
+      "width": 1246,
+      "x": 17,
+      "y": 153
+    },
+    "cells": [
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-1",
+        "top": 153,
+        "width": 180,
+        "x": 61,
+        "y": 153
+      },
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 1 with wrapped text",
+        "top": 153,
+        "width": 200,
+        "x": 241,
+        "y": 153
+      },
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 441,
+        "right": 551,
+        "text": "1",
+        "top": 153,
+        "width": 110,
+        "x": 441,
+        "y": 153
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-2",
+        "top": 261,
+        "width": 180,
+        "x": 61,
+        "y": 261
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 2 with wrapped text",
+        "top": 261,
+        "width": 200,
+        "x": 241,
+        "y": 261
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "2",
+        "top": 261,
+        "width": 110,
+        "x": 441,
+        "y": 261
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-3",
+        "top": 297,
+        "width": 180,
+        "x": 61,
+        "y": 297
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 3 with wrapped text",
+        "top": 297,
+        "width": 200,
+        "x": 241,
+        "y": 297
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "3",
+        "top": 297,
+        "width": 110,
+        "x": 441,
+        "y": 297
+      }
+    ],
+    "copies": [
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+    ],
+    "documentWidth": 1280,
+    "firstRow": {
+      "bottom": 261,
+      "height": 108,
+      "left": 61,
+      "right": 241,
+      "top": 153,
+      "width": 180,
+      "x": 61,
+      "y": 153
+    },
+    "grid": {
+      "bottom": 484,
+      "height": 360,
+      "left": 16,
+      "right": 1264,
+      "top": 124,
+      "width": 1248,
+      "x": 16,
+      "y": 124
+    },
+    "overlay": null,
+    "renderedRows": 10,
+    "selectedCells": 1,
+    "state": {
+      "columns": 3,
+      "rows": 80,
+      "version": 0
+    },
+    "totalRows": 80,
+    "viewport": 1280
+  },
+  "layouts": [
+    {
+      "cleared": {
+        "body": {
+          "bottom": 507,
+          "clientHeight": 330,
+          "clientWidth": 341,
+          "height": 330,
+          "left": 17,
+          "right": 358,
+          "scrollHeight": 2880,
+          "scrollLeft": 0,
+          "scrollTop": 0,
+          "scrollWidth": 534,
+          "top": 177,
+          "width": 341,
+          "x": 17,
+          "y": 177
+        },
+        "cells": [
+          {
+            "bottom": 213,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-1",
+            "top": 177,
+            "width": 180,
+            "x": 61,
+            "y": 177
+          },
+          {
+            "bottom": 213,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 1 with wrapped text",
+            "top": 177,
+            "width": 200,
+            "x": 241,
+            "y": 177
+          },
+          {
+            "bottom": 213,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "1",
+            "top": 177,
+            "width": 110,
+            "x": 441,
+            "y": 177
+          },
+          {
+            "bottom": 249,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-2",
+            "top": 213,
+            "width": 180,
+            "x": 61,
+            "y": 213
+          },
+          {
+            "bottom": 249,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 2 with wrapped text",
+            "top": 213,
+            "width": 200,
+            "x": 241,
+            "y": 213
+          },
+          {
+            "bottom": 249,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "2",
+            "top": 213,
+            "width": 110,
+            "x": 441,
+            "y": 213
+          },
+          {
+            "bottom": 285,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-3",
+            "top": 249,
+            "width": 180,
+            "x": 61,
+            "y": 249
+          },
+          {
+            "bottom": 285,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 3 with wrapped text",
+            "top": 249,
+            "width": 200,
+            "x": 241,
+            "y": 249
+          },
+          {
+            "bottom": 285,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "3",
+            "top": 249,
+            "width": 110,
+            "x": 441,
+            "y": 249
+          }
+        ],
+        "copies": [
+          "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+        ],
+        "documentWidth": 375,
+        "firstRow": {
+          "bottom": 213,
+          "height": 36,
+          "left": 61,
+          "right": 241,
+          "top": 177,
+          "width": 180,
+          "x": 61,
+          "y": 177
+        },
+        "grid": {
+          "bottom": 508,
+          "height": 360,
+          "left": 16,
+          "right": 359,
+          "top": 148,
+          "width": 343,
+          "x": 16,
+          "y": 148
+        },
+        "overlay": null,
+        "renderedRows": 12,
+        "selectedCells": 0,
+        "state": {
+          "columns": 3,
+          "rows": 80,
+          "version": 0
+        },
+        "totalRows": 80,
+        "viewport": 375
+      },
+      "width": 375,
+      "copied": {
+        "body": {
+          "bottom": 507,
+          "clientHeight": 330,
+          "clientWidth": 341,
+          "height": 330,
+          "left": 17,
+          "right": 358,
+          "scrollHeight": 2880,
+          "scrollLeft": 0,
+          "scrollTop": 0,
+          "scrollWidth": 534,
+          "top": 177,
+          "width": 341,
+          "x": 17,
+          "y": 177
+        },
+        "cells": [
+          {
+            "bottom": 213,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-1",
+            "top": 177,
+            "width": 180,
+            "x": 61,
+            "y": 177
+          },
+          {
+            "bottom": 213,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 1 with wrapped text",
+            "top": 177,
+            "width": 200,
+            "x": 241,
+            "y": 177
+          },
+          {
+            "bottom": 213,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "1",
+            "top": 177,
+            "width": 110,
+            "x": 441,
+            "y": 177
+          },
+          {
+            "bottom": 249,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-2",
+            "top": 213,
+            "width": 180,
+            "x": 61,
+            "y": 213
+          },
+          {
+            "bottom": 249,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 2 with wrapped text",
+            "top": 213,
+            "width": 200,
+            "x": 241,
+            "y": 213
+          },
+          {
+            "bottom": 249,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "2",
+            "top": 213,
+            "width": 110,
+            "x": 441,
+            "y": 213
+          },
+          {
+            "bottom": 285,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-3",
+            "top": 249,
+            "width": 180,
+            "x": 61,
+            "y": 249
+          },
+          {
+            "bottom": 285,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 3 with wrapped text",
+            "top": 249,
+            "width": 200,
+            "x": 241,
+            "y": 249
+          },
+          {
+            "bottom": 285,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "3",
+            "top": 249,
+            "width": 110,
+            "x": 441,
+            "y": 249
+          }
+        ],
+        "copies": [
+          "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+        ],
+        "documentWidth": 375,
+        "firstRow": {
+          "bottom": 213,
+          "height": 36,
+          "left": 61,
+          "right": 241,
+          "top": 177,
+          "width": 180,
+          "x": 61,
+          "y": 177
+        },
+        "grid": {
+          "bottom": 508,
+          "height": 360,
+          "left": 16,
+          "right": 359,
+          "top": 148,
+          "width": 343,
+          "x": 16,
+          "y": 148
+        },
+        "overlay": {
+          "borderStyle": "dashed",
+          "bottom": 284,
+          "height": 106,
+          "kind": "copy",
+          "left": 62,
+          "right": 440,
+          "top": 178,
+          "width": 378,
+          "x": 62,
+          "y": 178
+        },
+        "renderedRows": 12,
+        "selectedCells": 6,
+        "state": {
+          "columns": 3,
+          "rows": 80,
+          "version": 0
+        },
+        "totalRows": 80,
+        "viewport": 375
+      },
+      "initial": {
+        "body": {
+          "bottom": 507,
+          "clientHeight": 330,
+          "clientWidth": 341,
+          "height": 330,
+          "left": 17,
+          "right": 358,
+          "scrollHeight": 2880,
+          "scrollLeft": 0,
+          "scrollTop": 0,
+          "scrollWidth": 534,
+          "top": 177,
+          "width": 341,
+          "x": 17,
+          "y": 177
+        },
+        "cells": [
+          {
+            "bottom": 213,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-1",
+            "top": 177,
+            "width": 180,
+            "x": 61,
+            "y": 177
+          },
+          {
+            "bottom": 213,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 1 with wrapped text",
+            "top": 177,
+            "width": 200,
+            "x": 241,
+            "y": 177
+          },
+          {
+            "bottom": 213,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "1",
+            "top": 177,
+            "width": 110,
+            "x": 441,
+            "y": 177
+          },
+          {
+            "bottom": 249,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-2",
+            "top": 213,
+            "width": 180,
+            "x": 61,
+            "y": 213
+          },
+          {
+            "bottom": 249,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 2 with wrapped text",
+            "top": 213,
+            "width": 200,
+            "x": 241,
+            "y": 213
+          },
+          {
+            "bottom": 249,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "2",
+            "top": 213,
+            "width": 110,
+            "x": 441,
+            "y": 213
+          },
+          {
+            "bottom": 285,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-3",
+            "top": 249,
+            "width": 180,
+            "x": 61,
+            "y": 249
+          },
+          {
+            "bottom": 285,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 3 with wrapped text",
+            "top": 249,
+            "width": 200,
+            "x": 241,
+            "y": 249
+          },
+          {
+            "bottom": 285,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "3",
+            "top": 249,
+            "width": 110,
+            "x": 441,
+            "y": 249
+          }
+        ],
+        "copies": [],
+        "documentWidth": 375,
+        "firstRow": {
+          "bottom": 213,
+          "height": 36,
+          "left": 61,
+          "right": 241,
+          "top": 177,
+          "width": 180,
+          "x": 61,
+          "y": 177
+        },
+        "grid": {
+          "bottom": 508,
+          "height": 360,
+          "left": 16,
+          "right": 359,
+          "top": 148,
+          "width": 343,
+          "x": 16,
+          "y": 148
+        },
+        "overlay": null,
+        "renderedRows": 12,
+        "selectedCells": 0,
+        "state": {
+          "columns": 3,
+          "rows": 80,
+          "version": 0
+        },
+        "totalRows": 80,
+        "viewport": 375
+      },
+      "range": {
+        "body": {
+          "bottom": 507,
+          "clientHeight": 330,
+          "clientWidth": 341,
+          "height": 330,
+          "left": 17,
+          "right": 358,
+          "scrollHeight": 2880,
+          "scrollLeft": 0,
+          "scrollTop": 0,
+          "scrollWidth": 534,
+          "top": 177,
+          "width": 341,
+          "x": 17,
+          "y": 177
+        },
+        "cells": [
+          {
+            "bottom": 213,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-1",
+            "top": 177,
+            "width": 180,
+            "x": 61,
+            "y": 177
+          },
+          {
+            "bottom": 213,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 1 with wrapped text",
+            "top": 177,
+            "width": 200,
+            "x": 241,
+            "y": 177
+          },
+          {
+            "bottom": 213,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "1",
+            "top": 177,
+            "width": 110,
+            "x": 441,
+            "y": 177
+          },
+          {
+            "bottom": 249,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-2",
+            "top": 213,
+            "width": 180,
+            "x": 61,
+            "y": 213
+          },
+          {
+            "bottom": 249,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 2 with wrapped text",
+            "top": 213,
+            "width": 200,
+            "x": 241,
+            "y": 213
+          },
+          {
+            "bottom": 249,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "2",
+            "top": 213,
+            "width": 110,
+            "x": 441,
+            "y": 213
+          },
+          {
+            "bottom": 285,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-3",
+            "top": 249,
+            "width": 180,
+            "x": 61,
+            "y": 249
+          },
+          {
+            "bottom": 285,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 3 with wrapped text",
+            "top": 249,
+            "width": 200,
+            "x": 241,
+            "y": 249
+          },
+          {
+            "bottom": 285,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "3",
+            "top": 249,
+            "width": 110,
+            "x": 441,
+            "y": 249
+          }
+        ],
+        "copies": [],
+        "documentWidth": 375,
+        "firstRow": {
+          "bottom": 213,
+          "height": 36,
+          "left": 61,
+          "right": 241,
+          "top": 177,
+          "width": 180,
+          "x": 61,
+          "y": 177
+        },
+        "grid": {
+          "bottom": 508,
+          "height": 360,
+          "left": 16,
+          "right": 359,
+          "top": 148,
+          "width": 343,
+          "x": 16,
+          "y": 148
+        },
+        "overlay": {
+          "borderStyle": "solid",
+          "bottom": 284,
+          "height": 106,
+          "kind": "drag",
+          "left": 62,
+          "right": 440,
+          "top": 178,
+          "width": 378,
+          "x": 62,
+          "y": 178
+        },
+        "renderedRows": 12,
+        "selectedCells": 6,
+        "state": {
+          "columns": 3,
+          "rows": 80,
+          "version": 0
+        },
+        "totalRows": 80,
+        "viewport": 375
+      }
+    },
+    {
+      "cleared": {
+        "body": {
+          "bottom": 483,
+          "clientHeight": 330,
+          "clientWidth": 734,
+          "height": 330,
+          "left": 17,
+          "right": 751,
+          "scrollHeight": 2880,
+          "scrollLeft": 0,
+          "scrollTop": 0,
+          "scrollWidth": 734,
+          "top": 153,
+          "width": 734,
+          "x": 17,
+          "y": 153
+        },
+        "cells": [
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-1",
+            "top": 153,
+            "width": 180,
+            "x": 61,
+            "y": 153
+          },
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 1 with wrapped text",
+            "top": 153,
+            "width": 200,
+            "x": 241,
+            "y": 153
+          },
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "1",
+            "top": 153,
+            "width": 110,
+            "x": 441,
+            "y": 153
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-2",
+            "top": 189,
+            "width": 180,
+            "x": 61,
+            "y": 189
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 2 with wrapped text",
+            "top": 189,
+            "width": 200,
+            "x": 241,
+            "y": 189
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "2",
+            "top": 189,
+            "width": 110,
+            "x": 441,
+            "y": 189
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-3",
+            "top": 225,
+            "width": 180,
+            "x": 61,
+            "y": 225
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 3 with wrapped text",
+            "top": 225,
+            "width": 200,
+            "x": 241,
+            "y": 225
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "3",
+            "top": 225,
+            "width": 110,
+            "x": 441,
+            "y": 225
+          }
+        ],
+        "copies": [
+          "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+          "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+        ],
+        "documentWidth": 768,
+        "firstRow": {
+          "bottom": 189,
+          "height": 36,
+          "left": 61,
+          "right": 241,
+          "top": 153,
+          "width": 180,
+          "x": 61,
+          "y": 153
+        },
+        "grid": {
+          "bottom": 484,
+          "height": 360,
+          "left": 16,
+          "right": 752,
+          "top": 124,
+          "width": 736,
+          "x": 16,
+          "y": 124
+        },
+        "overlay": null,
+        "renderedRows": 12,
+        "selectedCells": 0,
+        "state": {
+          "columns": 3,
+          "rows": 80,
+          "version": 0
+        },
+        "totalRows": 80,
+        "viewport": 768
+      },
+      "width": 768,
+      "copied": {
+        "body": {
+          "bottom": 483,
+          "clientHeight": 330,
+          "clientWidth": 734,
+          "height": 330,
+          "left": 17,
+          "right": 751,
+          "scrollHeight": 2880,
+          "scrollLeft": 0,
+          "scrollTop": 0,
+          "scrollWidth": 734,
+          "top": 153,
+          "width": 734,
+          "x": 17,
+          "y": 153
+        },
+        "cells": [
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-1",
+            "top": 153,
+            "width": 180,
+            "x": 61,
+            "y": 153
+          },
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 1 with wrapped text",
+            "top": 153,
+            "width": 200,
+            "x": 241,
+            "y": 153
+          },
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "1",
+            "top": 153,
+            "width": 110,
+            "x": 441,
+            "y": 153
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-2",
+            "top": 189,
+            "width": 180,
+            "x": 61,
+            "y": 189
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 2 with wrapped text",
+            "top": 189,
+            "width": 200,
+            "x": 241,
+            "y": 189
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "2",
+            "top": 189,
+            "width": 110,
+            "x": 441,
+            "y": 189
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-3",
+            "top": 225,
+            "width": 180,
+            "x": 61,
+            "y": 225
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 3 with wrapped text",
+            "top": 225,
+            "width": 200,
+            "x": 241,
+            "y": 225
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "3",
+            "top": 225,
+            "width": 110,
+            "x": 441,
+            "y": 225
+          }
+        ],
+        "copies": [
+          "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+          "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+        ],
+        "documentWidth": 768,
+        "firstRow": {
+          "bottom": 189,
+          "height": 36,
+          "left": 61,
+          "right": 241,
+          "top": 153,
+          "width": 180,
+          "x": 61,
+          "y": 153
+        },
+        "grid": {
+          "bottom": 484,
+          "height": 360,
+          "left": 16,
+          "right": 752,
+          "top": 124,
+          "width": 736,
+          "x": 16,
+          "y": 124
+        },
+        "overlay": {
+          "borderStyle": "dashed",
+          "bottom": 260,
+          "height": 106,
+          "kind": "copy",
+          "left": 62,
+          "right": 440,
+          "top": 154,
+          "width": 378,
+          "x": 62,
+          "y": 154
+        },
+        "renderedRows": 12,
+        "selectedCells": 6,
+        "state": {
+          "columns": 3,
+          "rows": 80,
+          "version": 0
+        },
+        "totalRows": 80,
+        "viewport": 768
+      },
+      "initial": {
+        "body": {
+          "bottom": 483,
+          "clientHeight": 330,
+          "clientWidth": 734,
+          "height": 330,
+          "left": 17,
+          "right": 751,
+          "scrollHeight": 2880,
+          "scrollLeft": 0,
+          "scrollTop": 0,
+          "scrollWidth": 734,
+          "top": 153,
+          "width": 734,
+          "x": 17,
+          "y": 153
+        },
+        "cells": [
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-1",
+            "top": 153,
+            "width": 180,
+            "x": 61,
+            "y": 153
+          },
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 1 with wrapped text",
+            "top": 153,
+            "width": 200,
+            "x": 241,
+            "y": 153
+          },
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "1",
+            "top": 153,
+            "width": 110,
+            "x": 441,
+            "y": 153
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-2",
+            "top": 189,
+            "width": 180,
+            "x": 61,
+            "y": 189
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 2 with wrapped text",
+            "top": 189,
+            "width": 200,
+            "x": 241,
+            "y": 189
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "2",
+            "top": 189,
+            "width": 110,
+            "x": 441,
+            "y": 189
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-3",
+            "top": 225,
+            "width": 180,
+            "x": 61,
+            "y": 225
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 3 with wrapped text",
+            "top": 225,
+            "width": 200,
+            "x": 241,
+            "y": 225
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "3",
+            "top": 225,
+            "width": 110,
+            "x": 441,
+            "y": 225
+          }
+        ],
+        "copies": [
+          "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+        ],
+        "documentWidth": 768,
+        "firstRow": {
+          "bottom": 189,
+          "height": 36,
+          "left": 61,
+          "right": 241,
+          "top": 153,
+          "width": 180,
+          "x": 61,
+          "y": 153
+        },
+        "grid": {
+          "bottom": 484,
+          "height": 360,
+          "left": 16,
+          "right": 752,
+          "top": 124,
+          "width": 736,
+          "x": 16,
+          "y": 124
+        },
+        "overlay": null,
+        "renderedRows": 12,
+        "selectedCells": 0,
+        "state": {
+          "columns": 3,
+          "rows": 80,
+          "version": 0
+        },
+        "totalRows": 80,
+        "viewport": 768
+      },
+      "range": {
+        "body": {
+          "bottom": 483,
+          "clientHeight": 330,
+          "clientWidth": 734,
+          "height": 330,
+          "left": 17,
+          "right": 751,
+          "scrollHeight": 2880,
+          "scrollLeft": 0,
+          "scrollTop": 0,
+          "scrollWidth": 734,
+          "top": 153,
+          "width": 734,
+          "x": 17,
+          "y": 153
+        },
+        "cells": [
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-1",
+            "top": 153,
+            "width": 180,
+            "x": 61,
+            "y": 153
+          },
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 1 with wrapped text",
+            "top": 153,
+            "width": 200,
+            "x": 241,
+            "y": 153
+          },
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "1",
+            "top": 153,
+            "width": 110,
+            "x": 441,
+            "y": 153
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-2",
+            "top": 189,
+            "width": 180,
+            "x": 61,
+            "y": 189
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 2 with wrapped text",
+            "top": 189,
+            "width": 200,
+            "x": 241,
+            "y": 189
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "2",
+            "top": 189,
+            "width": 110,
+            "x": 441,
+            "y": 189
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-3",
+            "top": 225,
+            "width": 180,
+            "x": 61,
+            "y": 225
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 3 with wrapped text",
+            "top": 225,
+            "width": 200,
+            "x": 241,
+            "y": 225
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "3",
+            "top": 225,
+            "width": 110,
+            "x": 441,
+            "y": 225
+          }
+        ],
+        "copies": [
+          "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+        ],
+        "documentWidth": 768,
+        "firstRow": {
+          "bottom": 189,
+          "height": 36,
+          "left": 61,
+          "right": 241,
+          "top": 153,
+          "width": 180,
+          "x": 61,
+          "y": 153
+        },
+        "grid": {
+          "bottom": 484,
+          "height": 360,
+          "left": 16,
+          "right": 752,
+          "top": 124,
+          "width": 736,
+          "x": 16,
+          "y": 124
+        },
+        "overlay": {
+          "borderStyle": "solid",
+          "bottom": 260,
+          "height": 106,
+          "kind": "drag",
+          "left": 62,
+          "right": 440,
+          "top": 154,
+          "width": 378,
+          "x": 62,
+          "y": 154
+        },
+        "renderedRows": 12,
+        "selectedCells": 6,
+        "state": {
+          "columns": 3,
+          "rows": 80,
+          "version": 0
+        },
+        "totalRows": 80,
+        "viewport": 768
+      }
+    },
+    {
+      "cleared": {
+        "body": {
+          "bottom": 483,
+          "clientHeight": 330,
+          "clientWidth": 1246,
+          "height": 330,
+          "left": 17,
+          "right": 1263,
+          "scrollHeight": 2880,
+          "scrollLeft": 0,
+          "scrollTop": 0,
+          "scrollWidth": 1246,
+          "top": 153,
+          "width": 1246,
+          "x": 17,
+          "y": 153
+        },
+        "cells": [
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-1",
+            "top": 153,
+            "width": 180,
+            "x": 61,
+            "y": 153
+          },
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 1 with wrapped text",
+            "top": 153,
+            "width": 200,
+            "x": 241,
+            "y": 153
+          },
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "1",
+            "top": 153,
+            "width": 110,
+            "x": 441,
+            "y": 153
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-2",
+            "top": 189,
+            "width": 180,
+            "x": 61,
+            "y": 189
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 2 with wrapped text",
+            "top": 189,
+            "width": 200,
+            "x": 241,
+            "y": 189
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "2",
+            "top": 189,
+            "width": 110,
+            "x": 441,
+            "y": 189
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-3",
+            "top": 225,
+            "width": 180,
+            "x": 61,
+            "y": 225
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 3 with wrapped text",
+            "top": 225,
+            "width": 200,
+            "x": 241,
+            "y": 225
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "3",
+            "top": 225,
+            "width": 110,
+            "x": 441,
+            "y": 225
+          }
+        ],
+        "copies": [
+          "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+          "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+          "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+        ],
+        "documentWidth": 1280,
+        "firstRow": {
+          "bottom": 189,
+          "height": 36,
+          "left": 61,
+          "right": 241,
+          "top": 153,
+          "width": 180,
+          "x": 61,
+          "y": 153
+        },
+        "grid": {
+          "bottom": 484,
+          "height": 360,
+          "left": 16,
+          "right": 1264,
+          "top": 124,
+          "width": 1248,
+          "x": 16,
+          "y": 124
+        },
+        "overlay": null,
+        "renderedRows": 12,
+        "selectedCells": 0,
+        "state": {
+          "columns": 3,
+          "rows": 80,
+          "version": 0
+        },
+        "totalRows": 80,
+        "viewport": 1280
+      },
+      "width": 1280,
+      "copied": {
+        "body": {
+          "bottom": 483,
+          "clientHeight": 330,
+          "clientWidth": 1246,
+          "height": 330,
+          "left": 17,
+          "right": 1263,
+          "scrollHeight": 2880,
+          "scrollLeft": 0,
+          "scrollTop": 0,
+          "scrollWidth": 1246,
+          "top": 153,
+          "width": 1246,
+          "x": 17,
+          "y": 153
+        },
+        "cells": [
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-1",
+            "top": 153,
+            "width": 180,
+            "x": 61,
+            "y": 153
+          },
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 1 with wrapped text",
+            "top": 153,
+            "width": 200,
+            "x": 241,
+            "y": 153
+          },
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "1",
+            "top": 153,
+            "width": 110,
+            "x": 441,
+            "y": 153
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-2",
+            "top": 189,
+            "width": 180,
+            "x": 61,
+            "y": 189
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 2 with wrapped text",
+            "top": 189,
+            "width": 200,
+            "x": 241,
+            "y": 189
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "2",
+            "top": 189,
+            "width": 110,
+            "x": 441,
+            "y": 189
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-3",
+            "top": 225,
+            "width": 180,
+            "x": 61,
+            "y": 225
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 3 with wrapped text",
+            "top": 225,
+            "width": 200,
+            "x": 241,
+            "y": 225
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "3",
+            "top": 225,
+            "width": 110,
+            "x": 441,
+            "y": 225
+          }
+        ],
+        "copies": [
+          "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+          "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+          "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+        ],
+        "documentWidth": 1280,
+        "firstRow": {
+          "bottom": 189,
+          "height": 36,
+          "left": 61,
+          "right": 241,
+          "top": 153,
+          "width": 180,
+          "x": 61,
+          "y": 153
+        },
+        "grid": {
+          "bottom": 484,
+          "height": 360,
+          "left": 16,
+          "right": 1264,
+          "top": 124,
+          "width": 1248,
+          "x": 16,
+          "y": 124
+        },
+        "overlay": {
+          "borderStyle": "dashed",
+          "bottom": 260,
+          "height": 106,
+          "kind": "copy",
+          "left": 62,
+          "right": 440,
+          "top": 154,
+          "width": 378,
+          "x": 62,
+          "y": 154
+        },
+        "renderedRows": 12,
+        "selectedCells": 6,
+        "state": {
+          "columns": 3,
+          "rows": 80,
+          "version": 0
+        },
+        "totalRows": 80,
+        "viewport": 1280
+      },
+      "initial": {
+        "body": {
+          "bottom": 483,
+          "clientHeight": 330,
+          "clientWidth": 1246,
+          "height": 330,
+          "left": 17,
+          "right": 1263,
+          "scrollHeight": 2880,
+          "scrollLeft": 0,
+          "scrollTop": 0,
+          "scrollWidth": 1246,
+          "top": 153,
+          "width": 1246,
+          "x": 17,
+          "y": 153
+        },
+        "cells": [
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-1",
+            "top": 153,
+            "width": 180,
+            "x": 61,
+            "y": 153
+          },
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 1 with wrapped text",
+            "top": 153,
+            "width": 200,
+            "x": 241,
+            "y": 153
+          },
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "1",
+            "top": 153,
+            "width": 110,
+            "x": 441,
+            "y": 153
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-2",
+            "top": 189,
+            "width": 180,
+            "x": 61,
+            "y": 189
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 2 with wrapped text",
+            "top": 189,
+            "width": 200,
+            "x": 241,
+            "y": 189
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "2",
+            "top": 189,
+            "width": 110,
+            "x": 441,
+            "y": 189
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-3",
+            "top": 225,
+            "width": 180,
+            "x": 61,
+            "y": 225
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 3 with wrapped text",
+            "top": 225,
+            "width": 200,
+            "x": 241,
+            "y": 225
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "3",
+            "top": 225,
+            "width": 110,
+            "x": 441,
+            "y": 225
+          }
+        ],
+        "copies": [
+          "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+          "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+        ],
+        "documentWidth": 1280,
+        "firstRow": {
+          "bottom": 189,
+          "height": 36,
+          "left": 61,
+          "right": 241,
+          "top": 153,
+          "width": 180,
+          "x": 61,
+          "y": 153
+        },
+        "grid": {
+          "bottom": 484,
+          "height": 360,
+          "left": 16,
+          "right": 1264,
+          "top": 124,
+          "width": 1248,
+          "x": 16,
+          "y": 124
+        },
+        "overlay": null,
+        "renderedRows": 12,
+        "selectedCells": 0,
+        "state": {
+          "columns": 3,
+          "rows": 80,
+          "version": 0
+        },
+        "totalRows": 80,
+        "viewport": 1280
+      },
+      "range": {
+        "body": {
+          "bottom": 483,
+          "clientHeight": 330,
+          "clientWidth": 1246,
+          "height": 330,
+          "left": 17,
+          "right": 1263,
+          "scrollHeight": 2880,
+          "scrollLeft": 0,
+          "scrollTop": 0,
+          "scrollWidth": 1246,
+          "top": 153,
+          "width": 1246,
+          "x": 17,
+          "y": 153
+        },
+        "cells": [
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-1",
+            "top": 153,
+            "width": 180,
+            "x": 61,
+            "y": 153
+          },
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 1 with wrapped text",
+            "top": 153,
+            "width": 200,
+            "x": 241,
+            "y": 153
+          },
+          {
+            "bottom": 189,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "1",
+            "top": 153,
+            "width": 110,
+            "x": 441,
+            "y": 153
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-2",
+            "top": 189,
+            "width": 180,
+            "x": 61,
+            "y": 189
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 2 with wrapped text",
+            "top": 189,
+            "width": 200,
+            "x": 241,
+            "y": 189
+          },
+          {
+            "bottom": 225,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "2",
+            "top": 189,
+            "width": 110,
+            "x": 441,
+            "y": 189
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 61,
+            "right": 241,
+            "text": "CODE-3",
+            "top": 225,
+            "width": 180,
+            "x": 61,
+            "y": 225
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 241,
+            "right": 441,
+            "text": "Synthetic name 3 with wrapped text",
+            "top": 225,
+            "width": 200,
+            "x": 241,
+            "y": 225
+          },
+          {
+            "bottom": 261,
+            "height": 36,
+            "left": 441,
+            "right": 551,
+            "text": "3",
+            "top": 225,
+            "width": 110,
+            "x": 441,
+            "y": 225
+          }
+        ],
+        "copies": [
+          "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+          "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+        ],
+        "documentWidth": 1280,
+        "firstRow": {
+          "bottom": 189,
+          "height": 36,
+          "left": 61,
+          "right": 241,
+          "top": 153,
+          "width": 180,
+          "x": 61,
+          "y": 153
+        },
+        "grid": {
+          "bottom": 484,
+          "height": 360,
+          "left": 16,
+          "right": 1264,
+          "top": 124,
+          "width": 1248,
+          "x": 16,
+          "y": 124
+        },
+        "overlay": {
+          "borderStyle": "solid",
+          "bottom": 260,
+          "height": 106,
+          "kind": "drag",
+          "left": 62,
+          "right": 440,
+          "top": 154,
+          "width": 378,
+          "x": 62,
+          "y": 154
+        },
+        "renderedRows": 12,
+        "selectedCells": 6,
+        "state": {
+          "columns": 3,
+          "rows": 80,
+          "version": 0
+        },
+        "totalRows": 80,
+        "viewport": 1280
+      }
+    }
+  ],
+  "beforeMetadata": {
+    "body": {
+      "bottom": 483,
+      "clientHeight": 330,
+      "clientWidth": 1246,
+      "height": 330,
+      "left": 17,
+      "right": 1263,
+      "scrollHeight": 2952,
+      "scrollLeft": 0,
+      "scrollTop": 0,
+      "scrollWidth": 1246,
+      "top": 153,
+      "width": 1246,
+      "x": 17,
+      "y": 153
+    },
+    "cells": [
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-1",
+        "top": 153,
+        "width": 180,
+        "x": 61,
+        "y": 153
+      },
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 1 with wrapped text",
+        "top": 153,
+        "width": 200,
+        "x": 241,
+        "y": 153
+      },
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 441,
+        "right": 551,
+        "text": "1",
+        "top": 153,
+        "width": 110,
+        "x": 441,
+        "y": 153
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-2",
+        "top": 261,
+        "width": 180,
+        "x": 61,
+        "y": 261
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 2 with wrapped text",
+        "top": 261,
+        "width": 200,
+        "x": 241,
+        "y": 261
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "2",
+        "top": 261,
+        "width": 110,
+        "x": 441,
+        "y": 261
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-3",
+        "top": 297,
+        "width": 180,
+        "x": 61,
+        "y": 297
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 3 with wrapped text",
+        "top": 297,
+        "width": 200,
+        "x": 241,
+        "y": 297
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "3",
+        "top": 297,
+        "width": 110,
+        "x": 441,
+        "y": 297
+      }
+    ],
+    "copies": [
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+    ],
+    "documentWidth": 1280,
+    "firstRow": {
+      "bottom": 261,
+      "height": 108,
+      "left": 61,
+      "right": 241,
+      "top": 153,
+      "width": 180,
+      "x": 61,
+      "y": 153
+    },
+    "grid": {
+      "bottom": 484,
+      "height": 360,
+      "left": 16,
+      "right": 1264,
+      "top": 124,
+      "width": 1248,
+      "x": 16,
+      "y": 124
+    },
+    "overlay": {
+      "borderStyle": "solid",
+      "bottom": 296,
+      "height": 142,
+      "kind": "drag",
+      "left": 62,
+      "right": 440,
+      "top": 154,
+      "width": 378,
+      "x": 62,
+      "y": 154
+    },
+    "renderedRows": 10,
+    "selectedCells": 4,
+    "state": {
+      "columns": 3,
+      "rows": 80,
+      "version": 0
+    },
+    "totalRows": 80,
+    "viewport": 1280
+  },
+  "returned": {
+    "body": {
+      "bottom": 483,
+      "clientHeight": 330,
+      "clientWidth": 1246,
+      "height": 330,
+      "left": 17,
+      "right": 1263,
+      "scrollHeight": 2952,
+      "scrollLeft": 0,
+      "scrollTop": 0,
+      "scrollWidth": 1246,
+      "top": 153,
+      "width": 1246,
+      "x": 17,
+      "y": 153
+    },
+    "cells": [
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-1",
+        "top": 153,
+        "width": 180,
+        "x": 61,
+        "y": 153
+      },
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 1 with wrapped text",
+        "top": 153,
+        "width": 200,
+        "x": 241,
+        "y": 153
+      },
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 441,
+        "right": 551,
+        "text": "1",
+        "top": 153,
+        "width": 110,
+        "x": 441,
+        "y": 153
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-2",
+        "top": 261,
+        "width": 180,
+        "x": 61,
+        "y": 261
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 2 with wrapped text",
+        "top": 261,
+        "width": 200,
+        "x": 241,
+        "y": 261
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "2",
+        "top": 261,
+        "width": 110,
+        "x": 441,
+        "y": 261
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-3",
+        "top": 297,
+        "width": 180,
+        "x": 61,
+        "y": 297
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 3 with wrapped text",
+        "top": 297,
+        "width": 200,
+        "x": 241,
+        "y": 297
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "3",
+        "top": 297,
+        "width": 110,
+        "x": 441,
+        "y": 297
+      }
+    ],
+    "copies": [
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+    ],
+    "documentWidth": 1280,
+    "firstRow": {
+      "bottom": 261,
+      "height": 108,
+      "left": 61,
+      "right": 241,
+      "top": 153,
+      "width": 180,
+      "x": 61,
+      "y": 153
+    },
+    "grid": {
+      "bottom": 484,
+      "height": 360,
+      "left": 16,
+      "right": 1264,
+      "top": 124,
+      "width": 1248,
+      "x": 16,
+      "y": 124
+    },
+    "overlay": null,
+    "renderedRows": 10,
+    "selectedCells": 6,
+    "state": {
+      "columns": 3,
+      "rows": 80,
+      "version": 0
+    },
+    "totalRows": 80,
+    "viewport": 1280
+  },
+  "afterHeight": {
+    "body": {
+      "bottom": 483,
+      "clientHeight": 330,
+      "clientWidth": 1246,
+      "height": 330,
+      "left": 17,
+      "right": 1263,
+      "scrollHeight": 2952,
+      "scrollLeft": 0,
+      "scrollTop": 0,
+      "scrollWidth": 1246,
+      "top": 153,
+      "width": 1246,
+      "x": 17,
+      "y": 153
+    },
+    "cells": [
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-1",
+        "top": 153,
+        "width": 180,
+        "x": 61,
+        "y": 153
+      },
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 1 with wrapped text",
+        "top": 153,
+        "width": 200,
+        "x": 241,
+        "y": 153
+      },
+      {
+        "bottom": 261,
+        "height": 108,
+        "left": 441,
+        "right": 551,
+        "text": "1",
+        "top": 153,
+        "width": 110,
+        "x": 441,
+        "y": 153
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-2",
+        "top": 261,
+        "width": 180,
+        "x": 61,
+        "y": 261
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 2 with wrapped text",
+        "top": 261,
+        "width": 200,
+        "x": 241,
+        "y": 261
+      },
+      {
+        "bottom": 297,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "2",
+        "top": 261,
+        "width": 110,
+        "x": 441,
+        "y": 261
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 61,
+        "right": 241,
+        "text": "CODE-3",
+        "top": 297,
+        "width": 180,
+        "x": 61,
+        "y": 297
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 241,
+        "right": 441,
+        "text": "Synthetic name 3 with wrapped text",
+        "top": 297,
+        "width": 200,
+        "x": 241,
+        "y": 297
+      },
+      {
+        "bottom": 333,
+        "height": 36,
+        "left": 441,
+        "right": 551,
+        "text": "3",
+        "top": 297,
+        "width": 110,
+        "x": 441,
+        "y": 297
+      }
+    ],
+    "copies": [
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text",
+      "CODE-1\tSynthetic name 1 with wrapped text\nCODE-2\tSynthetic name 2 with wrapped text\nCODE-3\tSynthetic name 3 with wrapped text"
+    ],
+    "documentWidth": 1280,
+    "firstRow": {
+      "bottom": 261,
+      "height": 108,
+      "left": 61,
+      "right": 241,
+      "top": 153,
+      "width": 180,
+      "x": 61,
+      "y": 153
+    },
+    "grid": {
+      "bottom": 484,
+      "height": 360,
+      "left": 16,
+      "right": 1264,
+      "top": 124,
+      "width": 1248,
+      "x": 16,
+      "y": 124
+    },
+    "overlay": null,
+    "renderedRows": 10,
+    "selectedCells": 0,
+    "state": {
+      "columns": 3,
+      "rows": 80,
+      "version": 0
+    },
+    "totalRows": 80,
+    "viewport": 1280
+  }
+}

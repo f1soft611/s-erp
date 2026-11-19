@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Avatar from '@mui/material/Avatar';
 import type { AvatarProps } from '@mui/material/Avatar';
 
@@ -17,10 +17,12 @@ export function ProfileAvatar({
   ...avatarProps
 }: ProfileAvatarProps) {
   const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
+  const [previousImageUrl, setPreviousImageUrl] = useState(imageUrl);
 
-  useEffect(() => {
+  if (previousImageUrl !== imageUrl) {
+    setPreviousImageUrl(imageUrl);
     setFailedImageUrl(null);
-  }, [imageUrl]);
+  }
 
   return (
     <Avatar

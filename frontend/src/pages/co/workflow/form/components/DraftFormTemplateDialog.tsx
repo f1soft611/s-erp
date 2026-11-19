@@ -6,7 +6,7 @@ import { AppLoadingSpinner } from '../../../../../shared/components/AppLoadingSp
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { AppSaveButton } from '../../../../../shared/components/AppSaveButton';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
-import { useNotification } from '../../../../../shared/context/NotificationContext';
+import { useNotification } from '../../../../../shared/context/notification';
 import { useUnsavedChangesBeforeUnload } from '../../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import {
   RichTextEditor,

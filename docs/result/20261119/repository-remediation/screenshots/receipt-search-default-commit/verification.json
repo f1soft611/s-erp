@@ -1,0 +1,60 @@
+{
+  "actualSearchAndSessionHooksLayoutObserver": true,
+  "notFullBusinessScreen": true,
+  "defaultsProviderSynthetic": true,
+  "memoryStorageOnly": true,
+  "allTransportAndPermanentStorageBlocked": true,
+  "delayedDefaultsFirstEligibleCommitConsistent": true,
+  "noStorageWriteBeforeFirstEligibleLayout": true,
+  "allMemoryStorageWritesAfterCommit": true,
+  "unsubmittedEditsDoNotChangeAppliedOrStoredSnapshot": true,
+  "applyPersistsVersion2Snapshot": true,
+  "changedDefaultsAndReopenPreserveValidSession": true,
+  "resetUsesLatestDefaults": true,
+  "unknownRequests": 0,
+  "errors": 0,
+  "documentOverflow": 0,
+  "widths": [
+    375,
+    768,
+    1280
+  ],
+  "images": [
+    {
+      "file": "search070-initial-375.png",
+      "width": 375,
+      "height": 1100,
+      "bytes": 28833
+    },
+    {
+      "file": "search070-restored-375.png",
+      "width": 375,
+      "height": 1100,
+      "bytes": 30872
+    },
+    {
+      "file": "search070-initial-768.png",
+      "width": 768,
+      "height": 1100,
+      "bytes": 29024
+    },
+    {
+      "file": "search070-restored-768.png",
+      "width": 768,
+      "height": 1100,
+      "bytes": 31669
+    },
+    {
+      "file": "search070-initial-1280.png",
+      "width": 1280,
+      "height": 1100,
+      "bytes": 30730
+    },
+    {
+      "file": "search070-restored-1280.png",
+      "width": 1280,
+      "height": 1100,
+      "bytes": 33496
+    }
+  ]
+}

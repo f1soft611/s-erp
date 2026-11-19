@@ -1,0 +1,26 @@
+{
+  "headSha": "93abcd93290d1341275c53fa021f386be66d3bd4",
+  "runId": 44352484307,
+  "url": "https://github.com/f1soft611/s-erp/actions/runs/44352484307",
+  "conclusion": "success",
+  "files": 227,
+  "tests": 2686,
+  "jobs": [
+    {
+      "name": "frontend-build",
+      "conclusion": "success"
+    },
+    {
+      "name": "frontend-lint",
+      "conclusion": "success"
+    },
+    {
+      "name": "frontend-tests",
+      "conclusion": "success"
+    },
+    {
+      "name": "frontend-required",
+      "conclusion": "success"
+    }
+  ]
+}

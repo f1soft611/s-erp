@@ -1,0 +1,36 @@
+{
+  "baseline": "2120439c0aa6de32dc44ccf3f02cc8a99f40d544",
+  "changed": [
+    "frontend\\src\\pages\\f1-grid-docs\\F1-GRID.md",
+    "frontend\\src\\shared\\components\\f1-grid\\core\\GridHeader.tsx",
+    "frontend\\tests\\f1-grid-render-performance.test.tsx"
+  ],
+  "onlyHeaderCommitBindingRenderGetterAndMemoComparatorChanged": true,
+  "headerInnerMarkupStylesMenusResizeFilterAndPublicPropsIdentical": true,
+  "rowAndCellRefRegistrationUnchanged": true,
+  "originalTestsBytePreserved": true,
+  "addedRegressionAndPreservationTests": 2,
+  "f1GridDocumentationUpdated": true,
+  "runtimeRed": {
+    "failed": 1,
+    "cause": "Pending Suspense callback used by committed header DOM"
+  },
+  "renderAndMemoPreservationPassedBeforeChange": true,
+  "baselineTests": {
+    "files": 3,
+    "passed": 272
+  },
+  "relatedTests": {
+    "files": 3,
+    "passed": 274
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 86,
+    "after": 85,
+    "removed": 1,
+    "added": 0
+  },
+  "gridHeaderRefDiagnostics": 0
+}

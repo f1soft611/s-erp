@@ -1,0 +1,60 @@
+{
+  "actualF1Grid": true,
+  "actualNativeRowCheckboxes": true,
+  "transport": "All fetch blocked; no transport attempted",
+  "storage": "Tab memory only; no persistent reads or writes",
+  "widths": [
+    {
+      "width": 375,
+      "initialLayoutSelection": [
+        "one",
+        "two"
+      ],
+      "nativeUserClearsBothCheckboxes": true,
+      "sameKeyCommitKeepsClearedSelection": true,
+      "newKeyLayoutSelection": [
+        "three"
+      ],
+      "checkboxAndRefAgree": true,
+      "documentWidth": 375
+    },
+    {
+      "width": 768,
+      "initialLayoutSelection": [
+        "one",
+        "two"
+      ],
+      "nativeUserClearsBothCheckboxes": true,
+      "sameKeyCommitKeepsClearedSelection": true,
+      "newKeyLayoutSelection": [
+        "three"
+      ],
+      "checkboxAndRefAgree": true,
+      "documentWidth": 768
+    },
+    {
+      "width": 1280,
+      "initialLayoutSelection": [
+        "one",
+        "two"
+      ],
+      "nativeUserClearsBothCheckboxes": true,
+      "sameKeyCommitKeepsClearedSelection": true,
+      "newKeyLayoutSelection": [
+        "three"
+      ],
+      "checkboxAndRefAgree": true,
+      "documentWidth": 1280
+    }
+  ],
+  "unknownRequests": 0,
+  "limitations": "Synthetic multi-select grid browser fixture. Single-select initial-commit behavior is additionally covered by the parameterized actual-grid tests; actual API data and saves are not exercised.",
+  "images": [
+    "selected-375.png",
+    "changed-375.png",
+    "selected-768.png",
+    "changed-768.png",
+    "selected-1280.png",
+    "changed-1280.png"
+  ]
+}

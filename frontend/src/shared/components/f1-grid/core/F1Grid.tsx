@@ -17,9 +17,9 @@ import {
 import { Box, Divider, Menu, MenuItem, useMediaQuery } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { AppLoadingSpinner } from '../../AppLoadingSpinner';
-import { useOptionalDisplayScale } from '../../../context/AppSettingsContext';
+import { useOptionalDisplayScale } from '../../../context/appSettings';
 import { GridHeader } from './GridHeader';
-import { usePolicyDecimalRule } from './GridDecimalPolicy';
+import { usePolicyDecimalRule } from './gridDecimalPolicyContext';
 import { GridBody } from './GridBody';
 import { GridSummary } from './GridSummary';
 import { F1GridFormModal } from '../form/F1GridFormModal';
@@ -95,7 +95,7 @@ import {
 } from '../columns/GridColumnManagement';
 import { toggleGridSort, sortGridRows } from '../sorting/GridSort';
 import { applyGridFilters } from '../filter/GridFilter';
-import { normalizeDateInput } from '../editing/DateEditor';
+import { normalizeDateInput } from '../editing/dateInput';
 import { normalizeF1GridInput } from '../editing/inputFormat';
 import {
   getGridColumnPinOffsets,
@@ -256,7 +256,7 @@ function F1GridInner<T extends object>(
   };
   const onChangesChangeRef = useRef(onChangesChange);
   const onSelectionChangeRef = useRef(onSelectionChange);
-  const restoredSelectionKeyRef = useRef<string | undefined>(undefined);
+  const [restoredSelectionKey, setRestoredSelectionKey] = useState<string>();
   const [rowSelectionState, setRowSelection] = useState<F1GridRowSelection>(
     createGridRowSelection,
   );
@@ -274,6 +274,17 @@ function F1GridInner<T extends object>(
     width: number;
     height: number;
   } | null>(null);
+  const [previousSelectionMode, setPreviousSelectionMode] = useState(selectionMode);
+  if (previousSelectionMode !== selectionMode) {
+    setPreviousSelectionMode(selectionMode);
+    setCellSelection(undefined);
+    setCopiedCellRange(undefined);
+    setIsCellSelectionDragging(false);
+    setRangeOverlay(null);
+  }
+  if (!copiedCellRange && !cellSelection && rangeOverlay !== null) {
+    setRangeOverlay(null);
+  }
   const cellSelectionRef = useRef(cellSelection);
   const copiedCellRangeRef = useRef(copiedCellRange);
   const cellRangeDragRef = useRef<F1GridCellRange | null>(null);
@@ -573,7 +584,7 @@ function F1GridInner<T extends object>(
     () => rowProjection?.(activeRows).rows ?? activeRows,
     [activeRows, rowProjection],
   );
-  async function loadDataSourcePage(offset: number, append: boolean) {
+  const loadDataSourcePage = useCallback(async (offset: number, append: boolean) => {
     if (!dataSource || dataSourceLoadingRef.current) return;
 
     const requestId = ++dataSourceRequestRef.current;
@@ -603,7 +614,7 @@ function F1GridInner<T extends object>(
         setDataSourceLoading(false);
       }
     }
-  }
+  }, [dataSource, filterState, onDataSourceError, sortState]);
 
   useEffect(() => {
     if (!dataSource) return;
@@ -611,7 +622,7 @@ function F1GridInner<T extends object>(
     dataSourceLoadingRef.current = false;
     setServerRows([]);
     void loadDataSourcePage(0, false);
-  }, [dataSource, filterState, onDataSourceError, sortState]);
+  }, [dataSource, filterState, loadDataSourcePage, onDataSourceError, sortState]);
 
   useEffect(() => () => dataSourceControllerRef.current.dispose(), []);
   const queryWorkerEligible =
@@ -943,6 +954,7 @@ function F1GridInner<T extends object>(
     bodyScrollMetrics.viewportHeight,
     defaultRowHeight,
     fixedRowHeightThreshold,
+    rowHeights,
     rowHeightsById,
     rowKey,
     rowOverscan,
@@ -1349,24 +1361,25 @@ function F1GridInner<T extends object>(
     onSelectionChangeRef.current?.(selectedIds);
   }, [selectedIds]);
 
-  useEffect(() => {
-    if (!initialSelectedRowIds || initialSelectedRowIds.length === 0) return;
+  if (initialSelectedRowIds && initialSelectedRowIds.length > 0) {
     const selectionKey = initialSelectedRowIds.map(String).join('|');
-    if (restoredSelectionKeyRef.current === selectionKey) return;
-    const selectedKeys = new Set(
-      initialSelectedRowIds.map((rowId) => String(rowId)),
-    );
-    const nextIds = visibleRowIds.filter((rowId) =>
-      selectedKeys.has(String(rowId)),
-    );
-    if (nextIds.length === 0) return;
-    setRowSelection({
-      allSelected: false,
-      includedIds: new Set(multiSelect ? nextIds : nextIds.slice(0, 1)),
-      excludedIds: new Set(),
-    });
-    restoredSelectionKeyRef.current = selectionKey;
-  }, [initialSelectedRowIds, multiSelect, visibleRowIds]);
+    if (restoredSelectionKey !== selectionKey) {
+      const selectedKeys = new Set(
+        initialSelectedRowIds.map((rowId) => String(rowId)),
+      );
+      const nextIds = visibleRowIds.filter((rowId) =>
+        selectedKeys.has(String(rowId)),
+      );
+      if (nextIds.length > 0) {
+        setRowSelection({
+          allSelected: false,
+          includedIds: new Set(multiSelect ? nextIds : nextIds.slice(0, 1)),
+          excludedIds: new Set(),
+        });
+        setRestoredSelectionKey(selectionKey);
+      }
+    }
+  }
 
   useEffect(() => {
     cellSelectionRef.current = cellSelection;
@@ -1377,13 +1390,10 @@ function F1GridInner<T extends object>(
   }, [copiedCellRange]);
 
   useEffect(() => {
-    setCellSelection(undefined);
     cellSelectionRef.current = undefined;
-    setCopiedCellRange(undefined);
     copiedCellRangeRef.current = undefined;
     cellRangeDragRef.current = null;
     dragSelectionStateRef.current = { active: false, previousCell: null };
-    setIsCellSelectionDragging(false);
   }, [selectionMode]);
 
   useEffect(() => {
@@ -1397,11 +1407,18 @@ function F1GridInner<T extends object>(
     clearCellSelectionRange();
   }, [isGridLoading]);
 
+  const resolveDraggedCell = useCallback(resolvePointerCell, [
+    rowIndexById,
+    rowKey,
+    visibleColumns.length,
+    visibleRows,
+  ]);
+
   useEffect(() => {
     if (!isCellSelectionDragging) return;
 
     function handlePointerMove(event: PointerEvent) {
-      const nextCell = resolvePointerCell(event.clientX, event.clientY);
+      const nextCell = resolveDraggedCell(event.clientX, event.clientY);
       if (!nextCell) return;
 
       const previousCell = dragSelectionStateRef.current.previousCell;
@@ -1440,7 +1457,7 @@ function F1GridInner<T extends object>(
         pendingCellSelectionFrameRef.current = undefined;
       }
     };
-  }, [isCellSelectionDragging, rowIndexById, rowKey, visibleRows]);
+  }, [isCellSelectionDragging, resolveDraggedCell, rowIndexById, rowKey, visibleRows]);
 
   function getCell(
     rowId: F1GridRowId,
@@ -1745,7 +1762,7 @@ function F1GridInner<T extends object>(
             ? null
             : Number(draftText)
           : column.type === 'date'
-            ? normalizeDateInput(draftText) || draftText
+            ? normalizeDateInput(draftText)
             : (matchedAutocompleteOption?.value ??
               matchedSelectOption?.value ??
               (column.type === 'select' &&
@@ -1758,6 +1775,8 @@ function F1GridInner<T extends object>(
       column &&
       row &&
       column.type !== 'code' &&
+      // 잘못된 날짜 형식은 반영하지 않고 기존 값을 유지한다.
+      !(column.type === 'date' && draftText.trim() !== '' && value === '') &&
       ((column.type !== 'number' &&
         column.type !== 'decimal' &&
         column.type !== 'currency') ||
@@ -1882,13 +1901,13 @@ function F1GridInner<T extends object>(
 
     if (event.key === 'Insert') {
       event.preventDefault();
-      handleAddRow();
+      if (allowAddRowInContextMenu) handleAddRow();
       return;
     }
 
     if (event.ctrlKey && event.key.toLowerCase() === 'd') {
       event.preventDefault();
-      handleDuplicateSelectedRows();
+      if (allowDuplicateRowInContextMenu) handleDuplicateSelectedRows();
       return;
     }
 
@@ -1905,7 +1924,7 @@ function F1GridInner<T extends object>(
           );
         }
       } else if (selectedCount > 0) {
-        handleDeleteSelectedRows();
+        if (allowDeleteRowInContextMenu) handleDeleteSelectedRows();
       } else {
         if (row && column && isCellEditable(column, row)) {
           setData((current) =>
@@ -2836,7 +2855,7 @@ function F1GridInner<T extends object>(
     typeof minHeight === 'number' ? `${minHeight}px` : (minHeight ?? '0');
   const resolvedMaxHeight =
     typeof maxHeight === 'number' ? `${maxHeight}px` : (maxHeight ?? 'none');
-  function updateRangeOverlay() {
+  const updateRangeOverlay = useCallback(() => {
     const range = copiedCellRange ?? cellSelection;
     if (!range || !bodyScrollRef.current) {
       setRangeOverlay((current) => (current ? null : current));
@@ -2911,15 +2930,14 @@ function F1GridInner<T extends object>(
       }
       return next;
     });
-  }
+  }, [cellSelection, copiedCellRange, rowIndexById, rowKey, visibleRows]);
 
   useEffect(() => {
     if (!copiedCellRange && !cellSelection) {
-      setRangeOverlay(null);
       return;
     }
     updateRangeOverlay();
-  }, [copiedCellRange, cellSelection, rowIndexById, rowKey]);
+  }, [copiedCellRange, cellSelection, rowIndexById, rowKey, updateRangeOverlay]);
 
   useEffect(() => {
     const bodyScroll = bodyScrollRef.current;
@@ -2935,7 +2953,7 @@ function F1GridInner<T extends object>(
       bodyScroll.removeEventListener('scroll', handleScrollOrResize);
       window.removeEventListener('resize', handleScrollOrResize);
     };
-  }, [copiedCellRange, cellSelection, rowIndexById, rowKey]);
+  }, [copiedCellRange, cellSelection, rowIndexById, rowKey, updateRangeOverlay]);
 
   const summaryDock = features?.find((feature) => feature.ftype === 'summary')?.dock;
 

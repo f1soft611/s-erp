@@ -1,12 +1,14 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from '@testing-library/react';
+import { startTransition, Suspense } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { ThemeProvider } from '@mui/material/styles';
+import { alpha, ThemeProvider } from '@mui/material/styles';
 import { createAppTheme } from '../src/theme/theme';
 import { FeedCard } from '../src/shared/components/feed/FeedCard';
 import { FeedCommentsSection } from '../src/shared/components/feed/FeedCommentsSection';
@@ -16,12 +18,77 @@ import { AttachmentList } from '../src/shared/components/feed/AttachmentList';
 import { getAttachmentIconMeta } from '../src/shared/components/feed/attachmentIconMeta';
 import {
   CommentThread,
-  isCommentSubmitKey,
 } from '../src/shared/components/feed/CommentThread';
+import { isCommentSubmitKey } from '../src/shared/components/feed/commentThreadUtils';
 import { PostDetailPanel } from '../src/shared/components/feed/PostDetailPanel';
 import { getApprovalSystemEventPresentation } from '../src/pages/groupware/documents/write/data/documentPresentation';
 
 describe('shared feed components', () => {
+  it('keeps the committed keyboard submit callback while a later render suspends', async () => {
+    const committed = vi.fn();
+    const next = vi.fn();
+    const attempted = vi.fn();
+    const pending = new Promise<void>(() => undefined);
+    function SuspendUpdate({ blocked }: { blocked: boolean }) {
+      if (blocked) {
+        attempted();
+        throw pending;
+      }
+      return null;
+    }
+    const view = (useNext = false, blocked = false) => (
+      <Suspense fallback={<span>Updating comment</span>}>
+        <CommentThread comments={[]} onSubmitComment={useNext ? next : committed} />
+        <SuspendUpdate blocked={blocked} />
+      </Suspense>
+    );
+    const { rerender } = render(view());
+    const editor = screen.getByRole('textbox', { name: '댓글 입력' });
+    fireEvent.input(editor, { target: { innerHTML: '<p>Committed draft</p>' } });
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => {
+      startTransition(() => rerender(view(true, true)));
+    });
+    expect(attempted).toHaveBeenCalled();
+    expect(screen.queryByText('Updating comment')).not.toBeInTheDocument();
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    expect(next).not.toHaveBeenCalled();
+    await waitFor(() => expect(committed).toHaveBeenCalledWith('<p>Committed draft</p>', []));
+    rerender(view(true));
+    fireEvent.input(editor, { target: { innerHTML: '<p>Latest draft</p>' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    await waitFor(() => expect(next).toHaveBeenCalledWith('<p>Latest draft</p>', []));
+    expect(committed).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps selected files when the input clears before queued updates run', async () => {
+    const onSubmitComment = vi.fn();
+    const first = new File(['first'], 'first.txt', { type: 'text/plain' });
+    const second = new File(['second'], 'second.txt', { type: 'text/plain' });
+    render(<CommentThread comments={[]} onSubmitComment={onSubmitComment} />);
+    const input = screen.getByLabelText('댓글 첨부파일 선택');
+    let selected: File[] = [];
+    // Model the live FileList being cleared together with the native input.
+    Object.defineProperty(input, 'files', { configurable: true, get: () => selected });
+    Object.defineProperty(input, 'value', {
+      configurable: true,
+      get: () => '',
+      set: () => { selected = []; },
+    });
+    act(() => {
+      selected = [first];
+      fireEvent.change(input);
+      selected = [second];
+      fireEvent.change(input);
+    });
+    const editor = screen.getByRole('textbox', { name: '댓글 입력' });
+    fireEvent.input(editor, { target: { innerHTML: '<p>Queued files</p>' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    await waitFor(() => {
+      expect(onSubmitComment).toHaveBeenCalledWith('<p>Queued files</p>', [first, second]);
+    });
+  });
+
   it('shows comment actions only when ownership explicitly allows editing', () => {
     render(
       <CommentThread
@@ -534,7 +601,7 @@ describe('shared feed components', () => {
     expect(badge).toHaveTextContent(label);
     expect(badge).toHaveClass(`MuiChip-color${color[0].toUpperCase()}${color.slice(1)}`);
     expect(badge).toHaveClass(`MuiChip-${variant}`);
-    expect(badge).toHaveStyle({ borderRadius: '8px', height: '20px' });
+    expect(badge).toHaveStyle({ borderRadius: '6px', height: '20px' });
     expect(badgeLabel).toHaveStyle({
       fontSize: '0.75rem',
       paddingLeft: '6px',
@@ -552,15 +619,29 @@ describe('shared feed components', () => {
   it.each(['SUBMISSION_CANCELED', 'APPROVAL_CANCELED'])(
     'renders both the border and text red for %s',
     (eventType) => {
-      render(<CommentThread comments={[{
-        id: eventType, author: '시스템', time: '방금', content: '취소 처리',
-        isSystemEvent: true,
-        systemEventBadge: getApprovalSystemEventPresentation(eventType),
-      }]} showComposer={false} />);
+      const theme = createAppTheme('light');
+      render(
+        <ThemeProvider theme={theme}>
+          <CommentThread
+            comments={[{
+              id: eventType,
+              author: '시스템',
+              time: '방금',
+              content: '취소 처리',
+              isSystemEvent: true,
+              systemEventBadge: getApprovalSystemEventPresentation(eventType),
+            }]}
+            showComposer={false}
+          />
+        </ThemeProvider>,
+      );
       const badge = screen.getByTestId('system-event-badge');
       expect(badge).toHaveClass('MuiChip-colorError', 'MuiChip-outlined');
-      expect(badge).toHaveStyle({ borderColor: 'rgba(211, 47, 47, 0.7)', borderRadius: '8px' });
-      expect(badge).toHaveStyle({ color: '#d32f2f' });
+      expect(badge).toHaveStyle({
+        borderColor: alpha(theme.palette.error.main, 0.7),
+        borderRadius: '6px',
+        color: theme.palette.error.main,
+      });
     },
   );
 

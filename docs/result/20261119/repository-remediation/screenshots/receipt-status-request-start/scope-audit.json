@@ -1,0 +1,45 @@
+{
+  "baseline": "aa3b694b421f973f61d4a771723f2d7ad4cbb643",
+  "changed": [
+    "frontend\\src\\pages\\materials\\receipt\\status\\hooks\\useMaterialReceiptStatus.ts",
+    "frontend\\tests\\material-receipt-status.test.tsx"
+  ],
+  "onlyBoundedListAndDetailRequestGuardsAndExistingStartSettersChanged": true,
+  "searchDefaultsSessionHookBytePreserved": true,
+  "quietFilterChangeAndPausedLastStartedVersionPreserved": true,
+  "activeAndCancelledCleanupUnchanged": true,
+  "renderRefReadsOrWritesAdded": false,
+  "servicesApiTypesUiJsxCssSearchEditorCancelClosingAndEventCallbacksUnchanged": true,
+  "originalTestsBytePreserved": true,
+  "addedTests": 3,
+  "runtimeRed": {
+    "failed": 3,
+    "cause": "First list commits exposed non-loading initialLoad/loading; first detail commit exposed non-loading state"
+  },
+  "baselineTests": {
+    "files": 1,
+    "passed": 11
+  },
+  "relatedTests": {
+    "files": 3,
+    "passed": 56,
+    "statusPassed": 14
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 71,
+    "after": 69,
+    "removed": 2,
+    "added": 0,
+    "removedTokens": [
+      "setHasLoaded",
+      "setLoading"
+    ],
+    "retainedSearchToken": "setKeyword",
+    "otherDiagnosticsUnchangedIncludingLabels": true,
+    "retainedSearchOnlySourceOffsetShiftedByUnusedImportRemoval": true
+  },
+  "remainingRefs": 0,
+  "remainingStateInEffect": 69
+}

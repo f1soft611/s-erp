@@ -38,10 +38,14 @@ import type {
   CommonCodeGroupRow,
   CommonCodeItemRow,
 } from '../types/commonCodeManagement.types';
+import type { CommonCodeModuleOption } from '../types/commonCodeManagement.types';
 import {
-  COMMON_CODE_MODULE_COMMON_OPTION,
-  type CommonCodeModuleOption,
-} from '../types/commonCodeManagement.types';
+  buildGroupColumns,
+  getGroupDeleteBlockedMessage,
+  getItemCodeValidationMessage,
+  normalizeRowId,
+  resolveCreatedGroupIdMap,
+} from '../data/commonCodeManagementGrid';
 
 type CommonCodeManagementPanelProps = {
   groups: CommonCodeGroupRow[];
@@ -97,117 +101,6 @@ function reconcileSavedRows<T extends { id: string }>(
   });
 }
 
-function normalizeRowId(value: unknown): string {
-  return String(value ?? '').trim();
-}
-
-export function getItemCodeValidationMessage(
-  itemCode: unknown,
-  canAutoGenerate: boolean,
-): string | null {
-  if (!String(itemCode ?? '').trim() && !canAutoGenerate) {
-    return '상세코드는 필수입니다.';
-  }
-  return null;
-}
-
-export function getGroupDeleteBlockedMessage({
-  blockedGroupIds,
-  groups,
-  itemRows,
-  deletedGroupIds = [],
-  deletedItemIds = [],
-}: {
-  blockedGroupIds: Array<string | number>;
-  groups: CommonCodeGroupRow[];
-  itemRows: CommonCodeItemRow[];
-  deletedGroupIds?: Array<string | number>;
-  deletedItemIds?: Array<string | number>;
-}): string | null {
-  const blockedIdSet = new Set(
-    blockedGroupIds.map((value) => normalizeRowId(value)),
-  );
-  const deletedGroupIdSet = new Set(
-    deletedGroupIds.map((value) => normalizeRowId(value)),
-  );
-  const deletedItemIdSet = new Set(
-    deletedItemIds.map((value) => normalizeRowId(value)),
-  );
-
-  const hasChildGroup = groups.some((group) => {
-    const parentGroupId = normalizeRowId(group.parentGroupId);
-    const groupId = normalizeRowId(group.id);
-
-    return (
-      parentGroupId &&
-      blockedIdSet.has(parentGroupId) &&
-      !deletedGroupIdSet.has(groupId)
-    );
-  });
-
-  const hasDetailItems = itemRows.some((item) => {
-    const itemGroupId = normalizeRowId(item.groupId);
-    const itemId = normalizeRowId(item.id);
-
-    return blockedIdSet.has(itemGroupId) && !deletedItemIdSet.has(itemId);
-  });
-
-  if (hasChildGroup || hasDetailItems) {
-    return '하위 그룹 또는 상세코드가 있는 그룹은 삭제할 수 없습니다.';
-  }
-
-  return null;
-}
-
-export function resolveCreatedGroupId(response: unknown): string | null {
-  const candidate = (response as { item?: unknown } | null)?.item ?? response;
-  if (!candidate || typeof candidate !== 'object') {
-    return null;
-  }
-
-  const source = candidate as Record<string, unknown>;
-  for (const field of ['commonCodeGroupId', 'groupId', 'id']) {
-    const value = source[field];
-    const normalized = normalizeRowId(value);
-    if (normalized) {
-      return normalized;
-    }
-  }
-
-  return null;
-}
-
-export function resolveCreatedGroupIdMap(
-  response: unknown,
-  tempGroupIds: Array<string | number | null | undefined>,
-): Map<string, string> {
-  const candidate = (response as { item?: unknown } | null)?.item ?? response;
-  if (!candidate || typeof candidate !== 'object') {
-    return new Map();
-  }
-
-  const source = candidate as Record<string, unknown>;
-  const savedGroups = Array.isArray(source.groups)
-    ? (source.groups as Array<Record<string, unknown>>)
-    : [];
-  const tempIds = tempGroupIds
-    .map((value) => normalizeRowId(value))
-    .filter((value) => value.startsWith('new-common-group-'));
-
-  const result = new Map<string, string>();
-  tempIds.forEach((tempId, index) => {
-    const persistedGroup = savedGroups[index];
-    const persistedId = persistedGroup
-      ? resolveCreatedGroupId(persistedGroup)
-      : null;
-    if (persistedId) {
-      result.set(tempId, persistedId);
-    }
-  });
-
-  return result;
-}
-
 const createGroupRow = (): CommonCodeGroupRow => ({
   id: `new-common-group-${Date.now()}-${Math.random().toString(16).slice(2)}`,
   groupCode: '',
@@ -233,51 +126,8 @@ const createItemRow = (groupId: string): CommonCodeItemRow => ({
 
 const EMPTY_MODULE_OPTIONS: CommonCodeModuleOption[] = [];
 
-export const buildGroupColumns = (
-  moduleOptions: CommonCodeModuleOption[] = [],
-): F1GridColumn<CommonCodeGroupRow>[] => [
-  {
-    field: 'groupCode',
-    headerName: '그룹코드',
-    editable: true,
-    required: true,
-    width: 120,
-    highlightSearch: true,
-  },
-  {
-    field: 'groupNm',
-    headerName: '그룹명',
-    editable: true,
-    required: true,
-    pinned: 'left',
-    highlightSearch: true,
-    flex: 1,
-  },
-  {
-    field: 'moduleCd',
-    headerName: '모듈',
-    type: 'select',
-    options: [COMMON_CODE_MODULE_COMMON_OPTION, ...moduleOptions],
-    editable: true,
-    align: 'center',
-    width: 90,
-    search: { label: '모듈', order: 0 },
-  },
-  {
-    field: 'groupDc',
-    headerName: '그룹 설명',
-    editable: true,
-    search: { span: 2 },
-    highlightSearch: true,
-    flex: 1,
-  },
-];
-
 const itemColumns = (
-  onOpenParentPicker?: (
-    row: CommonCodeItemRow,
-    applyPatch: (changes: Partial<CommonCodeItemRow>) => void,
-  ) => void,
+  parentPickerEnabled: boolean,
 ): F1GridColumn<CommonCodeItemRow>[] => [
   {
     field: 'id',
@@ -306,14 +156,10 @@ const itemColumns = (
   {
     field: 'parentItemNm',
     headerName: '상위코드명',
-    editable: () => Boolean(onOpenParentPicker),
+    editable: () => parentPickerEnabled,
     width: 150,
     type: 'code',
-    onOpenCodePicker: onOpenParentPicker
-      ? (row, applyPatch) => {
-          onOpenParentPicker(row, applyPatch);
-        }
-      : undefined,
+    onOpenCodePicker: undefined,
   },
   {
     field: 'useAt',
@@ -324,7 +170,7 @@ const itemColumns = (
     align: 'center',
     headerAlign: 'center',
     onValueChange: (_row, value) => ({
-      useAt: Boolean(value) ? 'Y' : 'N',
+      useAt: value ? 'Y' : 'N',
     }),
   },
   {
@@ -356,7 +202,6 @@ export const CommonCodeManagementPanel = forwardRef<
   {
     groups,
     moduleOptions = EMPTY_MODULE_OPTIONS,
-    searchQuery = '',
     highlightKeyword,
     canExportExcel = false,
     onGroupsSaved,
@@ -395,6 +240,8 @@ export const CommonCodeManagementPanel = forwardRef<
   >([]);
   const [groupGridDirty, setGroupGridDirty] = useState(false);
   const [itemGridDirty, setItemGridDirty] = useState(false);
+  const [deletedGroupIds, setDeletedGroupIds] = useState<string[]>([]);
+  const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
   const [pendingGroupId, setPendingGroupId] = useState<string>();
   const [groupSwitchDialogOpen, setGroupSwitchDialogOpen] = useState(false);
 
@@ -427,7 +274,7 @@ export const CommonCodeManagementPanel = forwardRef<
     return savedGroupBaseline?.source === groups
       ? savedGroupBaseline.rows
       : groups;
-  }, [groups, savedGroupBaseline, searchQuery]);
+  }, [groups, savedGroupBaseline]);
 
   useEffect(() => {
     if (!groupSelectionRestoredRef.current) {
@@ -517,25 +364,18 @@ export const CommonCodeManagementPanel = forwardRef<
     [onError],
   );
 
-  useEffect(() => {
-    if (groupsLoading) {
-      return;
-    }
+  if (!groupsLoading) {
     if (!filteredGroups.length) {
-      setSelectedGroupId('');
-      return;
-    }
-    if (selectedGroupId.startsWith('new-common-group-')) {
-      return;
-    }
-    if (
+      if (selectedGroupId !== '') setSelectedGroupId('');
+    } else if (
+      !selectedGroupId.startsWith('new-common-group-') &&
       !filteredGroups.some(
         (group) => normalizeRowId(group.id) === normalizeRowId(selectedGroupId),
       )
     ) {
       setSelectedGroupId(String(filteredGroups[0].id));
     }
-  }, [filteredGroups, groupsLoading, selectedGroupId]);
+  }
 
   const selectedGroup = filteredGroups.find(
     (group) => normalizeRowId(group.id) === normalizeRowId(selectedGroupId),
@@ -566,6 +406,13 @@ export const CommonCodeManagementPanel = forwardRef<
           changes.updatedRows.length > 0 ||
           changes.deletedRows.length > 0,
       );
+      const deletedIds = changes.deletedRows.map((row) => normalizeRowId(row.id));
+      setDeletedGroupIds((current) =>
+        current.length === deletedIds.length &&
+        current.every((id, index) => id === deletedIds[index])
+          ? current
+          : deletedIds,
+      );
     },
     [],
   );
@@ -578,6 +425,13 @@ export const CommonCodeManagementPanel = forwardRef<
         changes.deletedRows.length > 0;
       itemGridDirtyRef.current = dirty;
       setItemGridDirty(dirty);
+      const deletedIds = changes.deletedRows.map((row) => normalizeRowId(row.id));
+      setDeletedItemIds((current) =>
+        current.length === deletedIds.length &&
+        current.every((id, index) => id === deletedIds[index])
+          ? current
+          : deletedIds,
+      );
     },
     [],
   );
@@ -595,20 +449,22 @@ export const CommonCodeManagementPanel = forwardRef<
         ) ?? null)
       : null;
 
+  const parentGroupId = parentGroup ? String(parentGroup.id) : null;
+
   const openParentPicker = useCallback(
     async (
       row: CommonCodeItemRow,
       applyPatch: (changes: Partial<CommonCodeItemRow>) => void,
     ) => {
       if (saving || saveInFlightRef.current) return;
-      if (!parentGroup) {
+      if (parentGroupId === null) {
         setParentPickerOpen(false);
         return;
       }
 
       parentPickerApplyRef.current = applyPatch;
       try {
-        const parentItems = await fetchCommonCodeItems(String(parentGroup.id));
+        const parentItems = await fetchCommonCodeItems(parentGroupId);
         if (saveInFlightRef.current) return;
         setParentPickerOptions(
           parentItems.filter(
@@ -616,16 +472,27 @@ export const CommonCodeManagementPanel = forwardRef<
           ),
         );
         setParentPickerOpen(true);
-      } catch (error) {
+      } catch {
         onError?.('상위 그룹의 상세코드를 불러오지 못했습니다.');
       }
     },
-    [onError, parentGroup, saving],
+    [onError, parentGroupId, saving],
   );
 
-  const itemGridColumns = itemColumns(
-    parentGroup && !saving ? openParentPicker : undefined,
-  ).map((column) => (saving ? { ...column, editable: false } : column));
+  const parentPickerEnabled = Boolean(parentGroup && !saving);
+  const itemGridColumns = itemColumns(parentPickerEnabled).map((column) => {
+    const boundColumn: F1GridColumn<CommonCodeItemRow> = column.field === 'parentItemNm'
+      ? {
+          ...column,
+          onOpenCodePicker: parentPickerEnabled
+            ? (row, applyPatch) => {
+                void openParentPicker(row, applyPatch);
+              }
+            : undefined,
+        }
+      : column;
+    return saving ? { ...boundColumn, editable: false } : boundColumn;
+  });
   const groupGridColumns = useMemo(
     () =>
       buildGroupColumns(moduleOptions).map((column) =>
@@ -1022,7 +889,17 @@ export const CommonCodeManagementPanel = forwardRef<
                 disableContextMenu={saving}
                 deleteMenuDisabled={
                   saving ||
-                  Boolean(selectedGroup && isGroupDeleteDisabled(selectedGroup))
+                  Boolean(
+                    selectedGroup &&
+                      normalizeRowId(selectedGroup.id) &&
+                      getGroupDeleteBlockedMessage({
+                        blockedGroupIds: [selectedGroup.id],
+                        groups: filteredGroups,
+                        itemRows,
+                        deletedGroupIds,
+                        deletedItemIds,
+                      }),
+                  )
                 }
                 ariaLabel="공통코드 그룹 트리"
                 initialSelectedRowIds={

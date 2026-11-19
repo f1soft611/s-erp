@@ -1,0 +1,35 @@
+{
+  "baseline": "196700ff39dfb62960f7dff7f6198ae8a1cf8d7a",
+  "changed": [
+    "frontend\\src\\pages\\f1-grid-docs\\F1-GRID.md",
+    "frontend\\src\\shared\\components\\f1-grid\\core\\GridCell.tsx",
+    "frontend\\tests\\f1-grid-render-performance.test.tsx"
+  ],
+  "onlyCellEventRefImportAndCommitUpdateChanged": true,
+  "innerMarkupStylesMemoAndDomRegistrationUnchanged": true,
+  "userAnchorAndEditorsUnchanged": true,
+  "rowRegistrationUnchanged": true,
+  "originalTestsBytePreserved": true,
+  "addedActualCellSuspenseRegression": 1,
+  "runtimeRed": {
+    "failed": 1,
+    "cause": "Pending checkbox callback used by committed cell DOM"
+  },
+  "baselineTests": {
+    "files": 3,
+    "passed": 275
+  },
+  "relatedTests": {
+    "files": 3,
+    "passed": 276
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 84,
+    "after": 83,
+    "removed": 1,
+    "added": 0
+  },
+  "remainingRefs": 1
+}

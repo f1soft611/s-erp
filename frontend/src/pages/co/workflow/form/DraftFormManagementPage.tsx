@@ -34,9 +34,9 @@ import type {
   DraftFormRow,
 } from './types/draftFormManagement.types';
 import {
-  createDraftFormColumns,
   DraftFormGrid,
 } from './components/DraftFormGrid';
+import { createDraftFormColumns } from './data/draftFormGridData';
 import { DraftFormTemplateDialog } from './components/DraftFormTemplateDialog';
 import { useDraftFormManagement } from './hooks/useDraftFormManagement';
 

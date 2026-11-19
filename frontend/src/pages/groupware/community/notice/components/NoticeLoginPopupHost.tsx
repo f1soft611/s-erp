@@ -9,7 +9,7 @@ import { AppSaveButton } from '../../../../../shared/components/AppSaveButton';
 import { AttachmentList } from '../../../../../shared/components/feed/AttachmentList';
 import { getStoredAuth, subscribeAuthChange } from '../../../../../shared/services/authService';
 import { ApiResponseError } from '../../../../../shared/services/apiClient';
-import { useNotification } from '../../../../../shared/context/NotificationContext';
+import { useNotification } from '../../../../../shared/context/notification';
 import { fetchLoginPopups, fetchLoginPopupDetail, dismissLoginPopupToday } from '../services/noticeLoginPopupService';
 import { downloadNoticeAttachment } from '../services/noticeBoardService';
 import type { NoticeBoardPostApi } from '../types/community.types';

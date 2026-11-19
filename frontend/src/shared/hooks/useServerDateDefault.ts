@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { getSystemDate } from '../services/systemDateService';
 
 type UseServerDateDefaultOptions = {
@@ -25,8 +25,11 @@ export function useServerDateDefault({ enabled, onDate, onError }: UseServerDate
   const onDateRef = useRef(onDate);
   const onErrorRef = useRef(onError);
   const mountedRef = useRef(true);
-  onDateRef.current = onDate;
-  onErrorRef.current = onError;
+
+  useLayoutEffect(() => {
+    onDateRef.current = onDate;
+    onErrorRef.current = onError;
+  }, [onDate, onError]);
 
   useEffect(() => {
     mountedRef.current = true;

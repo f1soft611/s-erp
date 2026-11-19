@@ -26,7 +26,8 @@ import type {
   ModuleItem,
   PageContent,
 } from '../../../dashboard/types/dashboard';
-import { WarehouseGrid, createWarehouseColumns } from './components/WarehouseGrid';
+import { WarehouseGrid } from './components/WarehouseGrid';
+import { createWarehouseColumns } from './data/warehouseGridData';
 import { useWarehouseManagement } from './hooks/useWarehouseManagement';
 import type {
   WarehouseFilters,

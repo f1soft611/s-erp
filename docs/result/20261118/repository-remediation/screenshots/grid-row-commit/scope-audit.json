@@ -1,0 +1,38 @@
+{
+  "baseline": "b32f93914629d088a223bdf93f89b3218b99ee86",
+  "changed": [
+    "frontend\\src\\pages\\f1-grid-docs\\F1-GRID.md",
+    "frontend\\src\\shared\\components\\f1-grid\\core\\GridRow.tsx",
+    "frontend\\tests\\f1-grid-render-performance.test.tsx"
+  ],
+  "onlyRowEventCommitAndRawDomCallbacksChanged": true,
+  "innerMarkupStylesAndComparatorUnchanged": true,
+  "cellAnchorEditorsGridBodyAndRootRegistrationUnchanged": true,
+  "originalTestsBytePreserved": true,
+  "addedTests": 2,
+  "runtimeRed": {
+    "failed": 1,
+    "cause": "Pending row selection callback used by committed DOM"
+  },
+  "currentChildRegistrationPassedBeforeChange": true,
+  "naiveLayoutMoveFailsCurrentRegistration": true,
+  "naiveWorkspaceRestoredAndParityChecked": true,
+  "baselineTests": {
+    "files": 3,
+    "passed": 276
+  },
+  "relatedTests": {
+    "files": 3,
+    "passed": 278
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 83,
+    "after": 82,
+    "removed": 1,
+    "added": 0
+  },
+  "remainingRefs": 0,
+  "remainingStateInEffect": 82
+}

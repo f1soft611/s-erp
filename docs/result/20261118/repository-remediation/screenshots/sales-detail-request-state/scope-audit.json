@@ -1,0 +1,40 @@
+{
+  "baseline": "6bb5fa134fcce82c9a07675710df9ef1950c27b4",
+  "changed": [
+    "frontend\\src\\pages\\sales\\order\\status\\hooks\\useSalesOrderStatusDetail.ts",
+    "frontend\\src\\pages\\sales\\quotation\\status\\hooks\\useQuotationStatusDetail.ts",
+    "frontend\\tests\\quotation-status-page.test.tsx",
+    "frontend\\tests\\sales-order-status-page.test.tsx"
+  ],
+  "onlyBoundedRequestIdentityGuardsAndEffectStartSettersChanged": true,
+  "servicesApiTypesUiJsxCssActiveCancellationEventHandlersAndEditorModesUnchanged": true,
+  "originalTestsBytePreserved": true,
+  "addedTests": 2,
+  "runtimeRed": {
+    "failed": 2,
+    "cause": "Both hooks committed a selected ID with loading=false before the passive effect"
+  },
+  "baselineTests": {
+    "files": 2,
+    "passed": 24
+  },
+  "relatedTests": {
+    "files": 2,
+    "passed": 26
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 77,
+    "after": 75,
+    "removed": 2,
+    "added": 0,
+    "removedTokens": [
+      "setLoading",
+      "setLoading"
+    ],
+    "otherDiagnosticsUnchangedIncludingLabels": true
+  },
+  "remainingRefs": 0,
+  "remainingStateInEffect": 75
+}

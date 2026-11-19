@@ -1,29 +1,19 @@
 import {
-  createContext,
-  useContext,
   useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
-import type { AppThemeMode } from '../../theme/theme';
 import { createAppTheme } from '../../theme/theme';
 import { CssBaseline, ThemeProvider } from '@mui/material';
+import {
+  AppSettingsContext,
+  DEFAULT_DISPLAY_SCALE,
+} from './appSettings';
+import type { AppThemeMode } from '../../theme/theme';
 
 const THEME_STORAGE_KEY = 'erp-theme';
 const DISPLAY_SCALE_STORAGE_KEY = 'erp-display-scale';
-const DEFAULT_DISPLAY_SCALE = 0.9;
-
-type AppSettingsContextValue = {
-  themeMode: AppThemeMode;
-  setThemeMode: (mode: AppThemeMode) => void;
-  displayScale: number;
-  setDisplayScale: (scale: number) => void;
-};
-
-export const AppSettingsContext = createContext<AppSettingsContextValue | null>(
-  null,
-);
 
 function getStoredThemeMode(): AppThemeMode {
   const value = window.localStorage.getItem(THEME_STORAGE_KEY);
@@ -95,21 +85,4 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       </ThemeProvider>
     </AppSettingsContext.Provider>
   );
-}
-
-export function useOptionalAppSettings() {
-  return useContext(AppSettingsContext);
-}
-
-export function useAppSettings() {
-  const context = useOptionalAppSettings();
-  if (!context) {
-    throw new Error('useAppSettings must be used inside AppSettingsProvider');
-  }
-  return context;
-}
-
-export function useOptionalDisplayScale(): number {
-  const context = useOptionalAppSettings();
-  return context?.displayScale ?? DEFAULT_DISPLAY_SCALE;
 }

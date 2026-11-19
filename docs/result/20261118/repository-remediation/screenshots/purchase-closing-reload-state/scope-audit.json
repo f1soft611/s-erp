@@ -1,0 +1,40 @@
+{
+  "baseline": "f15bcd6c3cfd0ea32d0241ab17c44e506f95c2c9",
+  "changed": [
+    "frontend\\src\\pages\\materials\\receipt\\closing\\MaterialReceiptClosingPage.tsx",
+    "frontend\\tests\\material-receipt-closing.test.tsx"
+  ],
+  "onlyPreviousDataStateAndBoundedExistingResetChanged": true,
+  "initialApplicationIdentityPolicyAndGridKeyIncrementsPreserved": true,
+  "jsxCssServicesHooksPayloadsAmountsPermissionsAndSplitterUnchanged": true,
+  "originalTestsBytePreserved": true,
+  "profilerHelperOnlyRunsWhenRequested": true,
+  "addedTests": 1,
+  "runtimeRed": {
+    "failed": 1,
+    "cause": "First fresh response commit still exposed the previous selected supplier"
+  },
+  "baselineTests": {
+    "files": 1,
+    "passed": 13
+  },
+  "closingTests": {
+    "files": 1,
+    "passed": 14
+  },
+  "relatedTests": {
+    "files": 3,
+    "passed": 53
+  },
+  "sourceFiles": 891,
+  "byteMismatches": 0,
+  "lint": {
+    "before": 79,
+    "after": 78,
+    "removed": 1,
+    "added": 0,
+    "unchangedOtherDiagnosticsIncludingLabels": true
+  },
+  "remainingRefs": 0,
+  "remainingStateInEffect": 78
+}

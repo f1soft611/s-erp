@@ -1,0 +1,31 @@
+{
+  "jsxPreserved": true,
+  "publicPropsPreserved": true,
+  "originalStateAndEventAndValidationDeclarationsPreserved": true,
+  "focusEffectPreserved": true,
+  "sameOpenResetStatementsAsOldEffect": true,
+  "renderGuardsWithoutRefAccess": 1,
+  "existingTestsPreserved": true,
+  "addedTests": 2,
+  "sourceFiles": 890,
+  "mismatches": [],
+  "changed": [
+    "frontend/src/pages/f1-grid-docs/F1-GRID.md",
+    "frontend/src/shared/components/f1-grid/form/F1GridFormModal.tsx",
+    "frontend/tests/f1-grid-form-modal.test.tsx"
+  ],
+  "lint": {
+    "before": 110,
+    "after": 109,
+    "removed": 1,
+    "added": 0
+  },
+  "red": {
+    "passed": 58,
+    "failed": 2
+  },
+  "tests": {
+    "files": 6,
+    "passed": 351
+  }
+}

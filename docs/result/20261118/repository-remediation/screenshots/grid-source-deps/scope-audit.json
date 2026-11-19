@@ -1,0 +1,32 @@
+{
+  "baseline": "bcaedbdf9949f44f5b3c1eea0874552734e1ea3b",
+  "changed": [
+    "frontend/src/pages/f1-grid-docs/F1-GRID.md",
+    "frontend/src/shared/components/f1-grid/core/F1Grid.tsx"
+  ],
+  "onlyLoaderBindingAndOneDependencyChanged": true,
+  "loaderBodyAndAllRequestControllerGenerationGuardSetterLocationsPreserved": true,
+  "unchangedEffectsAfterDependencyNormalization": 24,
+  "publicPropsQueryContractsMarkupStylesAndLocalModeUnchanged": true,
+  "canonicalDocumentationUpdated": true,
+  "sourceFiles": 890,
+  "byteMismatches": 0,
+  "red": {
+    "expectedTargetWarnings": 0,
+    "actualBefore": 1
+  },
+  "baselineTests": {
+    "files": 3,
+    "passed": 204
+  },
+  "relatedTests": {
+    "files": 3,
+    "passed": 204
+  },
+  "lint": {
+    "before": 95,
+    "after": 94,
+    "added": 0,
+    "removed": 1
+  }
+}

@@ -7,7 +7,7 @@ import {
   type F1GridColumn,
   type F1GridRef,
 } from '../src/shared/components/f1-grid';
-import { createDocumentStatusColumns } from '../src/pages/groupware/documents/status/components/DocumentStatusGrid';
+import { createDocumentStatusColumns } from '../src/pages/groupware/documents/status/data/documentStatusColumns';
 import { getGridDateValue } from '../src/shared/components/f1-grid/utils/grid.utils';
 
 type Row = { id: string; date: string | Date | null | undefined };

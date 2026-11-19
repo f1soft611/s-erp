@@ -1,0 +1,80 @@
+{
+  "component": "Actual ArchiveBoardPage, hooks and service adapters with synthetic transport only",
+  "actualStoredValuesReadOrWritten": false,
+  "productionRequestFallback": false,
+  "beforeServerDate": {
+    "fileRequests": 0,
+    "searchDisabled": true
+  },
+  "serverDate": "2024-02-29",
+  "initialFilters": {
+    "fileType": "ALL",
+    "folderCode": "",
+    "keyword": "",
+    "uploadedFrom": "2023-02-28",
+    "uploadedTo": "2024-02-29"
+  },
+  "initialRequests": 1,
+  "totalSyntheticListRequests": 9,
+  "dateRequests": 1,
+  "unknownRequests": 0,
+  "loadingAndLoadedGrid": {
+    "y": 326.921875,
+    "height": 657.078125
+  },
+  "widths": [
+    {
+      "width": 375,
+      "documentWidth": 375,
+      "fileCounts": {
+        "initial": 3,
+        "searched": 1,
+        "cleared": 3
+      },
+      "preservedKeywordOnContextChange": "alpha",
+      "extraRequestsOnContextChange": 0
+    },
+    {
+      "width": 768,
+      "documentWidth": 768,
+      "fileCounts": {
+        "initial": 3,
+        "searched": 1,
+        "cleared": 3
+      },
+      "preservedKeywordOnContextChange": "alpha",
+      "extraRequestsOnContextChange": 0
+    },
+    {
+      "width": 1280,
+      "documentWidth": 1280,
+      "fileCounts": {
+        "initial": 3,
+        "searched": 1,
+        "cleared": 3
+      },
+      "preservedKeywordOnContextChange": "alpha",
+      "extraRequestsOnContextChange": 0
+    }
+  ],
+  "folder": {
+    "code": "GUIDE",
+    "files": 2,
+    "rootFiles": 3
+  },
+  "screenshots": [
+    "loading-375.png",
+    "loaded-375.png",
+    "search-375.png",
+    "search-768.png",
+    "search-1280.png",
+    "folder-1280.png"
+  ],
+  "nativeActions": [
+    "click",
+    "fill",
+    "keypress Enter"
+  ],
+  "scopeLimit": "Preservation checks, not a full archive or all-screen visual regression",
+  "separateObservation": "375px file metadata partially meets the row-height clipping boundary; no before-browser comparison or cause attribution"
+}

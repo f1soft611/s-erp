@@ -41,6 +41,12 @@ export function useSalesStatementStatus(props: StatementPageProps) {
   const [detailRefresh, setDetailRefresh] = useState(0);
   const request = useRef(0);
   const canRead = Boolean(props.selectedMenuPermissions?.read);
+  const [previousListRequest, setPreviousListRequest] = useState<{
+    canRead: boolean; applied: Values; appliedKeyword: string; refresh: number;
+  } | null>(null);
+  const [previousDetailRequest, setPreviousDetailRequest] = useState({
+    id: selectedId, refresh: detailRefresh,
+  });
   const createPermissions = registrationPermissions(props.selectedModule.tree);
   const detailPermissions: MenuPermission = { read: canRead, create: false,
     update: Boolean(createPermissions?.update), delete: Boolean(createPermissions?.delete), excel: false };
@@ -51,12 +57,28 @@ export function useSalesStatementStatus(props: StatementPageProps) {
     if (!validStatementDate(from) || !validStatementDate(to) || from > to) { setError('명세일 기간의 시작일과 종료일을 확인해 주세요.'); return; }
     setError(''); setValues(next); setApplied(next); setAppliedKeyword(keyword); setRefresh((value) => value + 1);
   }, [keyword, values]);
+  if (!previousListRequest || previousListRequest.canRead !== canRead ||
+    previousListRequest.applied !== applied || previousListRequest.appliedKeyword !== appliedKeyword ||
+    previousListRequest.refresh !== refresh) {
+    setPreviousListRequest({ canRead, applied, appliedKeyword, refresh });
+    const period = applied.statementDt;
+    if (canRead && typeof period === 'object' && period) {
+      setLoading(true);
+      setError('');
+    }
+  }
+  if (previousDetailRequest.id !== selectedId || previousDetailRequest.refresh !== detailRefresh) {
+    setPreviousDetailRequest({ id: selectedId, refresh: detailRefresh });
+    if (selectedId) {
+      setDetailLoading(true);
+      setDetailError('');
+    }
+  }
   useEffect(() => {
     if (!canRead) return;
     const period = applied.statementDt;
     if (typeof period !== 'object' || !period) return;
     const token = ++request.current;
-    setLoading(true); setError('');
     getStatementStatus(period.from ?? '', period.to ?? '', appliedKeyword)
       .then((items) => { if (token === request.current) { setRows(items); setLoaded(true); } })
       .catch((cause) => { if (token === request.current) setError(cause instanceof Error ? cause.message : '현황 조회에 실패했습니다.'); })
@@ -66,7 +88,6 @@ export function useSalesStatementStatus(props: StatementPageProps) {
   useEffect(() => {
     if (!selectedId) return;
     let active = true;
-    setDetailLoading(true); setDetailError('');
     getStatement(selectedId).then((value) => { if (active) setDetail(value); })
       .catch((cause) => { if (active) setDetailError(cause instanceof Error ? cause.message : '상세 조회에 실패했습니다.'); })
       .finally(() => { if (active) setDetailLoading(false); });

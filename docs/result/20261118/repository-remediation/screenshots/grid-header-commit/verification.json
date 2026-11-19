@@ -1,0 +1,44 @@
+{
+  "actualGridHeader": true,
+  "transport": "All fetch blocked; no transport attempted",
+  "storage": "Tab-only memory storage; no persistent reads or writes",
+  "native": "Owned reset/transition/promise resolution, row and data-column checkbox clicks, ascending sort menu",
+  "checkboxHitTesting": "Native hover first, then animation-frame layout settlement and fresh accessibility ref. Existing hover padding shifts the data checkbox; no forced click or product CSS change.",
+  "limitations": "Header component fixture records callbacks and supplies synthetic row props; integrated real F1Grid behavior is covered by the related 274 tests, not by a live API request.",
+  "widths": [
+    {
+      "width": 375,
+      "pendingAttemptObserved": true,
+      "committedCallbackRetainedDuringPending": true,
+      "currentRowsCheckboxRenderedAfterCommit": true,
+      "latestRowColumnAndSortEvents": true,
+      "documentWidth": 375
+    },
+    {
+      "width": 768,
+      "pendingAttemptObserved": true,
+      "committedCallbackRetainedDuringPending": true,
+      "currentRowsCheckboxRenderedAfterCommit": true,
+      "latestRowColumnAndSortEvents": true,
+      "documentWidth": 768
+    },
+    {
+      "width": 1280,
+      "pendingAttemptObserved": true,
+      "committedCallbackRetainedDuringPending": true,
+      "currentRowsCheckboxRenderedAfterCommit": true,
+      "latestRowColumnAndSortEvents": true,
+      "documentWidth": 1280
+    }
+  ],
+  "callbackCalls": 12,
+  "unknownRequests": 0,
+  "images": [
+    "pending-375.png",
+    "committed-375.png",
+    "pending-768.png",
+    "committed-768.png",
+    "pending-1280.png",
+    "committed-1280.png"
+  ]
+}

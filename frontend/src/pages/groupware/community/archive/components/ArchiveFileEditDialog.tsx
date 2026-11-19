@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { AppSaveButton } from '../../../../../shared/components/AppSaveButton';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import {
@@ -35,15 +35,17 @@ export function ArchiveFileEditDialog({
   onClose,
   onSave,
 }: ArchiveFileEditDialogProps) {
-  const [fileName, setFileName] = useState('');
-  const [folderCode, setFolderCode] = useState('');
+  const [fileName, setFileName] = useState(file?.fileName ?? '');
+  const [folderCode, setFolderCode] = useState(file?.categoryCode ?? '');
   const [error, setError] = useState('');
+  const [previousFile, setPreviousFile] = useState(file);
 
-  useEffect(() => {
+  if (previousFile !== file) {
+    setPreviousFile(file);
     setFileName(file?.fileName ?? '');
     setFolderCode(file?.categoryCode ?? '');
     setError('');
-  }, [file]);
+  }
 
   const handleSave = async () => {
     if (!file) return;

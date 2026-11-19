@@ -1,0 +1,35 @@
+{
+  "baseline": "5d90f4cd1247a196b8f84789416732c2da6cb473",
+  "changed": [
+    "frontend/src/pages/groupware/community/notice/components/NoticeComposerDialog.tsx",
+    "frontend/tests/notice-composer-dialog-theme.test.tsx"
+  ],
+  "onlyPureFieldEffectReplacedByOpenDebugStateGuard": true,
+  "resetSetterStatementsPreserved": 9,
+  "guardCallsOnlyLocalRawSetters": true,
+  "renderRefReadsOrWrites": 0,
+  "remainingEditorDomImageCleanupEffectsUnchanged": 3,
+  "allOtherInitializersHandlersMarkupStylesPublicAndBackendContractsUnchanged": true,
+  "existingTestsPreserved": 11,
+  "focusedDraftReopenAndDebugTestsAdded": 2,
+  "sourceFiles": 890,
+  "byteMismatches": 0,
+  "red": {
+    "expectedTargetWarnings": 0,
+    "actualBefore": 2
+  },
+  "baselineTests": {
+    "files": 4,
+    "passed": 83
+  },
+  "relatedTests": {
+    "files": 4,
+    "passed": 83
+  },
+  "lint": {
+    "before": 94,
+    "after": 92,
+    "removed": 2,
+    "added": 0
+  }
+}

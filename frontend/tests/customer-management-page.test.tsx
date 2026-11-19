@@ -14,7 +14,7 @@ import type { F1GridSavedRow } from '../src/shared/components/f1-grid';
 import {
   createCustomerColumns,
   createCustomerRow,
-} from '../src/pages/co/master/customers/components/CustomerGrid';
+} from '../src/pages/co/master/customers/data/customerGridData';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { buildGridFormSections } from '../src/shared/components/f1-grid/form/GridFormModel';
 import { toPageSearchFields } from '../src/shared/components/page-search/searchFields';

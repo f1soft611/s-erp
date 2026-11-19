@@ -10,7 +10,7 @@ import type { Editor } from '@tiptap/react';
 import type { JSONContent } from '@tiptap/core';
 import dayjs from 'dayjs';
 import { useTheme } from '@mui/material/styles';
-import { useNotification } from '../../../../../shared/context/NotificationContext';
+import { useNotification } from '../../../../../shared/context/notification';
 import {
   fetchDraftFormOptions,
   fetchDraftForms,

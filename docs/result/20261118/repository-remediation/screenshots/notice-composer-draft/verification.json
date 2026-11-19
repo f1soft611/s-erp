@@ -1,0 +1,48 @@
+{
+  "actualNoticeComposerCommonDialogAndRichTextEditor": true,
+  "transport": "All fetch blocked; no production API fallback",
+  "storage": "Tab-only memory replacement; no persisted storage reads or writes",
+  "widths": [
+    {
+      "width": 375,
+      "metadataRevision": 2,
+      "metadataAndThemePreserveTitleBodyCategoryPopupDateAndAttachmentDeletion": true,
+      "cancelCloses": true,
+      "reopenAppliesLatestDefaults": true,
+      "editorResetsOnReopenOnly": true,
+      "documentWidth": 375
+    },
+    {
+      "width": 768,
+      "metadataRevision": 3,
+      "metadataAndThemePreserveTitleBodyCategoryPopupDateAndAttachmentDeletion": true,
+      "cancelCloses": true,
+      "reopenAppliesLatestDefaults": true,
+      "editorResetsOnReopenOnly": true,
+      "documentWidth": 768
+    },
+    {
+      "width": 1280,
+      "metadataRevision": 4,
+      "metadataAndThemePreserveTitleBodyCategoryPopupDateAndAttachmentDeletion": true,
+      "cancelCloses": true,
+      "reopenAppliesLatestDefaults": true,
+      "editorResetsOnReopenOnly": true,
+      "documentWidth": 1280
+    }
+  ],
+  "opens": 6,
+  "closes": 6,
+  "submits": 0,
+  "unknownRequests": 0,
+  "ownedDialogClosed": true,
+  "debugTransition": "Covered by the focused Vitest regression; not claimed as browser coverage",
+  "images": [
+    "draft-375.png",
+    "reopened-375.png",
+    "draft-768.png",
+    "reopened-768.png",
+    "draft-1280.png",
+    "reopened-1280.png"
+  ]
+}

@@ -1,4 +1,4 @@
-import { createRef, Profiler, useState } from 'react';
+import { createRef, Profiler, useLayoutEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import {
@@ -7,6 +7,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import { Dialog } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
@@ -53,12 +54,12 @@ import {
   type F1GridRef,
   type F1GridSort,
 } from '../src/shared/components/f1-grid';
-import { normalizeDateInput } from '../src/shared/components/f1-grid/editing/DateEditor';
-import { getGridCellBottomBorder } from '../src/shared/components/f1-grid/core/GridCell';
+import { normalizeDateInput } from '../src/shared/components/f1-grid/editing/dateInput';
+import { getGridCellBottomBorder } from '../src/shared/components/f1-grid/core/gridCellUtils';
 import {
   getActiveMergeGroupStartKeys,
   getMergeGroupStartIndex,
-} from '../src/shared/components/f1-grid/core/GridRow';
+} from '../src/shared/components/f1-grid/core/gridRowUtils';
 import { NumberEditor } from '../src/shared/components/f1-grid/editing/NumberEditor';
 import { normalizeGridNumberInput } from '../src/shared/components/f1-grid/utils/grid.utils';
 import { SelectEditor } from '../src/shared/components/f1-grid/editing/SelectEditor';
@@ -938,6 +939,81 @@ describe('F1-GRID loading overlay', () => {
       expect(overlay).not.toBeNull();
     });
   });
+
+  it.each(['column growth', 'same-count metadata'] as const)(
+    'uses current border hit-testing and preserves pending range frames during %s',
+    (change) => {
+      const sampleRows = [{ id: 'range-row', code: 'RANGE-CODE', name: 'RANGE-NAME' }];
+      const grid = (expanded: boolean) => (
+        <F1Grid
+          rows={sampleRows}
+          columns={expanded
+            ? [
+                { field: 'code', headerName: 'Code', width: 120 },
+                { field: 'name', headerName: 'Name', width: 120 },
+              ]
+            : [{ field: 'code', headerName: 'Code', width: 120 }]}
+          rowKey="id"
+          height={180}
+          disableFiltering
+          disableSorting
+        />
+      );
+      const { rerender } = render(grid(change === 'same-count metadata'));
+      const bodyScroll = screen.getByTestId('f1-grid-body-scroll');
+      let startCell = screen.getByRole('gridcell', { name: 'RANGE-CODE' });
+      let nextCell = screen.queryByRole('gridcell', { name: 'RANGE-NAME' });
+      const measurement = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockImplementation(function () {
+          if (this === startCell) return new DOMRect(10, 90, 120, 30);
+          if (this === nextCell) return new DOMRect(130, 90, 120, 30);
+          if (this === bodyScroll) return new DOMRect(0, 0, 260, 180);
+          return new DOMRect();
+        });
+      const originalHitTest = Object.getOwnPropertyDescriptor(document, 'elementsFromPoint');
+      Object.defineProperty(document, 'elementsFromPoint', {
+        configurable: true,
+        value: () => [bodyScroll],
+      });
+      fireEvent.mouseDown(startCell, { clientX: 20, clientY: 100 });
+      const frames = new Map<number, FrameRequestCallback>();
+      let frameId = 1_000_000;
+      const schedule = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+        frames.set(++frameId, callback);
+        return frameId;
+      });
+      const cancel = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => {
+        frames.delete(id);
+      });
+
+      try {
+        if (change === 'column growth') {
+          rerender(grid(true));
+          startCell = screen.getByRole('gridcell', { name: 'RANGE-CODE' });
+          nextCell = screen.getByRole('gridcell', { name: 'RANGE-NAME' });
+        }
+        fireEvent.pointerMove(window, { clientX: 125, clientY: 105 });
+        if (change === 'same-count metadata') rerender(grid(true));
+
+        expect(frames.size).toBe(1);
+        act(() => {
+          const pending = [...frames.values()];
+          frames.clear();
+          pending.forEach((callback) => callback(0));
+        });
+        const overlay = document.querySelector<HTMLElement>('[data-range-overlay="drag"]');
+        expect(overlay).toBeInTheDocument();
+        expect(Number.parseFloat(getComputedStyle(overlay!).width)).toBeGreaterThan(120);
+      } finally {
+        fireEvent.pointerUp(window);
+        schedule.mockRestore();
+        cancel.mockRestore();
+        measurement.mockRestore();
+        if (originalHitTest) Object.defineProperty(document, 'elementsFromPoint', originalHitTest);
+        else Reflect.deleteProperty(document, 'elementsFromPoint');
+      }
+    },
+  );
 
   it('renders only viewport columns while keeping pinned columns mounted', () => {
     type WideRow = { id: string } & Record<string, string>;
@@ -2041,6 +2117,123 @@ describe('F1-GRID column management', () => {
 });
 
 describe('F1-GRID cell range selection', () => {
+  it.each(['drag', 'copy'] as const)('removes a cleared %s overlay from the first Escape commit and preserves row state', (kind) => {
+    const rangeRows = [{ id: 'one', code: 'A' }, { id: 'two', code: 'B' }];
+    const rangeColumns: F1GridColumn<(typeof rangeRows)[number]>[] = [
+      { field: 'code', headerName: 'Code', editable: true },
+    ];
+    const gridRef = createRef<F1GridRef<(typeof rangeRows)[number]>>();
+    const commits: Array<string | null> = [];
+    render(
+      <Profiler id="range-escape" onRender={() => {
+        commits.push(document.querySelector('[data-range-overlay]')?.getAttribute('data-range-overlay') ?? null);
+      }}>
+        <F1Grid ref={gridRef} rows={rangeRows} columns={rangeColumns} rowKey="id" initialSelectedRowIds={['one']} />
+      </Profiler>,
+    );
+    act(() => { gridRef.current?.setCellValue('one', 'code', 'A-UPDATED'); });
+    const changes = gridRef.current?.getChanges();
+    expect(changes?.updatedRows).toEqual([{ id: 'one', code: 'A-UPDATED' }]);
+    const first = screen.getByRole('gridcell', { name: 'A-UPDATED' });
+    const last = screen.getByRole('gridcell', { name: 'B' });
+    fireEvent.mouseDown(first);
+    fireEvent.mouseEnter(last);
+    fireEvent.mouseUp(last);
+    if (kind === 'copy') {
+      fireEvent.copy(screen.getByRole('grid', { name: 'F1-GRID' }), {
+        clipboardData: { getData: vi.fn(() => 'A-UPDATED\nB'), setData: vi.fn() },
+      });
+    }
+    expect(document.querySelector(`[data-range-overlay="${kind}"]`)).toBeInTheDocument();
+    commits.length = 0;
+    fireEvent.keyDown(first, { key: 'Escape' });
+    expect(commits[0]).toBeNull();
+    expect(commits.every((value) => value === null)).toBe(true);
+    expect(gridRef.current?.getSelectedRowIds()).toEqual(['one']);
+    expect(gridRef.current?.getChanges()).toEqual(changes);
+    fireEvent.mouseDown(first);
+    fireEvent.mouseEnter(last);
+    fireEvent.mouseUp(last);
+    expect(document.querySelector('[data-range-overlay="drag"]')).toBeInTheDocument();
+  });
+
+  it.each([true, false])('restores initial row ids before the first layout commit and keeps user clearing (multiSelect=%s)', (multiSelect) => {
+    const selectionRows = [{ id: 'one', code: 'A' }, { id: 'two', code: 'B' }];
+    const selectionColumns: F1GridColumn<(typeof selectionRows)[number]>[] = [
+      { field: 'code', headerName: 'Code' },
+    ];
+    const gridRef = createRef<F1GridRef<(typeof selectionRows)[number]>>();
+    const commits: Array<Array<string | number>> = [];
+    function ObservedGrid({ ids, revision }: { ids: string[]; revision: number }) {
+      useLayoutEffect(() => {
+        commits.push(gridRef.current?.getSelectedRowIds() ?? []);
+      }, [ids, revision]);
+      return <F1Grid ref={gridRef} rows={selectionRows} columns={selectionColumns} rowKey="id"
+        initialSelectedRowIds={ids} multiSelect={multiSelect} />;
+    }
+    const expected = multiSelect ? ['one', 'two'] : ['one'];
+    const { rerender } = render(<ObservedGrid ids={['two', 'one']} revision={0} />);
+    expect(commits).toEqual([expected]);
+    for (const id of expected) {
+      fireEvent.click(within(screen.getByLabelText(`${id} 행 선택`)).getByRole('checkbox'));
+    }
+    expect(gridRef.current?.getSelectedRowIds()).toEqual([]);
+    commits.length = 0;
+    rerender(<ObservedGrid ids={['two', 'one']} revision={1} />);
+    expect(commits).toEqual([[]]);
+    expect(gridRef.current?.getSelectedRowIds()).toEqual([]);
+    commits.length = 0;
+    rerender(<ObservedGrid ids={['two']} revision={2} />);
+    expect(commits).toEqual([['two']]);
+    expect(within(screen.getByLabelText('two 행 선택')).getByRole('checkbox')).toBeChecked();
+  });
+
+  it.each(['drag', 'copy'] as const)('clears a %s range before the selection-mode commit without losing row edits or selection', (kind) => {
+    const rangeRows = [{ id: 'one', code: 'A' }, { id: 'two', code: 'B' }];
+    const rangeColumns: F1GridColumn<(typeof rangeRows)[number]>[] = [
+      { field: 'code', headerName: 'Code', editable: true },
+    ];
+    const gridRef = createRef<F1GridRef<(typeof rangeRows)[number]>>();
+    const commits: Array<string | null> = [];
+    function ObservedGrid({ mode, revision }: { mode: 'cell' | 'row'; revision: number }) {
+      useLayoutEffect(() => {
+        commits.push(document.querySelector('[data-range-overlay]')?.getAttribute('data-range-overlay') ?? null);
+      }, [mode, revision]);
+      return <F1Grid ref={gridRef} rows={rangeRows} columns={rangeColumns} rowKey="id"
+        selectionMode={mode} initialSelectedRowIds={['one']} />;
+    }
+    const { rerender } = render(<ObservedGrid mode="cell" revision={0} />);
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'A' }));
+    fireEvent.change(screen.getByDisplayValue('A'), { target: { value: 'A-UPDATED' } });
+    fireEvent.keyDown(screen.getByDisplayValue('A-UPDATED'), { key: 'Enter' });
+    const changes = gridRef.current?.getChanges();
+    expect(changes?.updatedRows).toEqual([{ id: 'one', code: 'A-UPDATED' }]);
+    const first = screen.getByRole('gridcell', { name: 'A-UPDATED' });
+    const last = screen.getByRole('gridcell', { name: 'B' });
+    fireEvent.mouseDown(first);
+    fireEvent.mouseEnter(last);
+    fireEvent.mouseUp(last);
+    if (kind === 'copy') {
+      fireEvent.copy(screen.getByRole('grid', { name: 'F1-GRID' }), {
+        clipboardData: { getData: vi.fn(() => 'A-UPDATED\nB'), setData: vi.fn() },
+      });
+    }
+    expect(document.querySelector(`[data-range-overlay="${kind}"]`)).toBeInTheDocument();
+    commits.length = 0;
+    rerender(<ObservedGrid mode="cell" revision={1} />);
+    expect(commits).toEqual([kind]);
+    commits.length = 0;
+    rerender(<ObservedGrid mode="row" revision={2} />);
+    expect(commits).toEqual([null]);
+    expect(gridRef.current?.getSelectedRowIds()).toEqual(['one']);
+    expect(gridRef.current?.getChanges()).toEqual(changes);
+    commits.length = 0;
+    rerender(<ObservedGrid mode="cell" revision={3} />);
+    expect(commits).toEqual([null]);
+    expect(gridRef.current?.getSelectedRowIds()).toEqual(['one']);
+    expect(gridRef.current?.getChanges()).toEqual(changes);
+  });
+
   it('clears cell range and drag state when loading starts', () => {
     const gridRef = createRef<F1GridRef<{ id: string; code: string }>>();
     const rangeRows = [
@@ -3093,6 +3286,21 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
     { id: 'line-1', itemCode: 'ITEM-001', itemName: '기존 품목', qty: 1 },
   ];
 
+  it('ignores invalid dates and normalizes valid dates when pasting', () => {
+    const gridRef = createRef<F1GridRef<MenuRow>>();
+    render(<F1Grid ref={gridRef} rows={rows} columns={columns} rowKey="id" />);
+
+    const dateCell = screen.getByRole('gridcell', { name: '2026-08-27' });
+    fireEvent.click(dateCell);
+    fireEvent.paste(dateCell, { clipboardData: { getData: () => '2026-13-45' } });
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([]);
+
+    fireEvent.paste(dateCell, { clipboardData: { getData: () => '20260901' } });
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([
+      expect.objectContaining({ id: 'dashboard', startDate: '2026-09-01' }),
+    ]);
+  });
+
   it('pastes TSV from the focused cell and adds overflow rows as inserted', () => {
     const gridRef = createRef<F1GridRef<ItemRow>>();
     let nextId = 2;
@@ -3177,6 +3385,57 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
       'data-grid-error',
       '품목코드은(는) 필수입니다.',
     );
+  });
+
+  it.each([
+    ['Delete', { key: 'Delete' }, { allowDeleteRowInContextMenu: false }],
+    ['Insert', { key: 'Insert' }, { allowAddRowInContextMenu: false }],
+    ['Ctrl+D', { key: 'd', ctrlKey: true }, { allowDuplicateRowInContextMenu: false }],
+  ] as const)('blocks the %s row shortcut when its action is disabled', (_name, key, props) => {
+    const gridRef = createRef<F1GridRef<ItemRow>>();
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={itemRows}
+        columns={itemColumns}
+        rowKey="id"
+        createRow={() => ({ ...itemRows[0], id: 'added' })}
+        createDuplicate={(row) => ({ ...row, id: 'duplicate' })}
+        {...props}
+      />,
+    );
+
+    const codeCell = screen.getByRole('gridcell', { name: 'ITEM-001' });
+    fireEvent.click(codeCell);
+    act(() => {
+      gridRef.current?.clearSelection();
+    });
+    fireEvent.click(screen.getByLabelText('line-1 행 선택'));
+    fireEvent.keyDown(codeCell, key);
+
+    expect(gridRef.current?.getChanges()).toMatchObject({
+      insertedRows: [],
+      updatedRows: [],
+      deletedRows: [],
+    });
+    expect(screen.getByRole('gridcell', { name: 'ITEM-001' })).toBeVisible();
+  });
+
+  it('deletes the selected row with Delete by default', () => {
+    const gridRef = createRef<F1GridRef<ItemRow>>();
+    render(
+      <F1Grid ref={gridRef} rows={itemRows} columns={itemColumns} rowKey="id" />,
+    );
+
+    const codeCell = screen.getByRole('gridcell', { name: 'ITEM-001' });
+    fireEvent.click(codeCell);
+    act(() => {
+      gridRef.current?.clearSelection();
+    });
+    fireEvent.click(screen.getByLabelText('line-1 행 선택'));
+    fireEvent.keyDown(codeCell, { key: 'Delete' });
+
+    expect(gridRef.current?.getChanges().deletedRows).toEqual([itemRows[0]]);
   });
 
   it('uses Home, End, Insert, and Ctrl+D while leaving Backspace to the editor', () => {
@@ -4154,6 +4413,20 @@ describe('F1-GRID interaction', () => {
     expect(gridRef.current?.getChanges().updatedRows).toEqual([
       expect.objectContaining({ id: 'dashboard', startDate: expectedDate }),
     ]);
+  });
+
+  it('rejects an invalid date and keeps the previous value', () => {
+    const gridRef = createRef<F1GridRef<MenuRow>>();
+
+    render(<F1Grid ref={gridRef} rows={rows} columns={columns} rowKey="id" />);
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '2026-08-27' }));
+    const dateInput = screen.getByDisplayValue('2026-08-27');
+    fireEvent.change(dateInput, { target: { value: '2026-13-45' } });
+    fireEvent.keyDown(dateInput, { key: 'Enter' });
+
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([]);
+    expect(screen.getByRole('gridcell', { name: '2026-08-27' })).toBeTruthy();
   });
 
   it('keeps compact date text while the date cell is still being edited', () => {
