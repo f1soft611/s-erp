@@ -66,6 +66,7 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - `F1GridProps.showCheckbox`: 행 선택용 체크박스 컬럼 전체 표시 여부
 - `F1GridColumn.headerCheckbox`: `type: 'checkbox'` 컬럼에서 헤더 전체 선택 토글 허용
 - `F1TreeProps.treeCheckbox`: 트리 노드용 체크박스 선택 토글
+- `F1TreeProps.treeNodeIcon`: 트리 컬럼의 펼침 화살표 뒤·텍스트 앞에 노드 아이콘을 그리는 선택 옵션이다. `({ row, rowId, depth, expanded, hasChildren }) => ReactNode`를 받으며, 부서 트리처럼 하위 있음·열림은 열린 폴더, 하위 있음·닫힘은 닫힌 폴더, 하위 없음은 문서 아이콘으로 구분할 때 쓴다. 지정하지 않으면 기존 화면과 동일하다.
 
 즉, `showCheckbox`는 Row Selector를 제어하고, `headerCheckbox`는 데이터 셀의 boolean 값을 편집하는 컬럼 동작을 제어한다.
 이 둘을 혼동하면 동일한 "체크박스" 이름 때문에 문서가 헷갈리기 쉽다.
@@ -138,7 +139,7 @@ const columns: F1GridColumn<Row>[] = [
 ### 트리 계층 표시 및 우클릭 메뉴 (2026-11-12)
 
 - 루트가 아닌 행에는 ㄴ 형태 연결선을 표시한다. 자식이 없는 행에서는 이름 앞에, 자식이 있는 행에서는 펼침 버튼 앞에 표시한다.
-- F1Tree `treeContextMenu`로 루트·하위 추가 라벨, 비활성화 조건과 콜백을 지정할 수 있다. 생략하면 기존 루트 추가·행 추가 동작을 유지한다.
+- F1Tree `treeContextMenu`로 루트·하위 추가 라벨, 비활성화 조건과 콜백을 지정할 수 있다. 생략하면 기존 루트 추가·행 추가 동작을 유지한다. `treeContextMenu.items`(`{ key, label, disabled?(rowId), onClick(rowId) }[]`)를 주면 추가 항목 뒤에 우클릭한 행 대상의 사용자 정의 항목(예: 부서 트리의 "편집", "사용안함")을 그린다. 항목을 누르면 메뉴를 닫고 우클릭한 행 id로 `onClick`을 호출하며, 지정하지 않으면 메뉴는 이전과 같다.
 
 ### 고정 병합 셀의 사용자 정의 콘텐츠 클릭 (2026-10-27)
 

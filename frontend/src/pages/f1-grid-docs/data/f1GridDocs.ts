@@ -992,7 +992,7 @@ const detailValues = {
           [
             'treeContextMenu',
             'F1GridContextMenuTreeConfig',
-            'F1Tree가 내부적으로 주입하는 트리 전용 콜백',
+            'F1Tree가 내부적으로 주입하는 트리 전용 콜백. items로 우클릭한 행 대상 사용자 정의 메뉴 항목 추가',
           ],
         ],
       },
@@ -1036,6 +1036,11 @@ const detailValues = {
             '초기 펼침 대상 지정',
           ],
           ['treeCheckbox', 'boolean', '트리 노드 체크박스 활성화'],
+          [
+            'treeNodeIcon',
+            '(node) => ReactNode',
+            '펼침 화살표 뒤 노드 아이콘(폴더 등). node: row, rowId, depth, expanded, hasChildren',
+          ],
           [
             'syncWithTreeCheckbox',
             'boolean (컬럼 옵션, 기본 true)',

@@ -1,0 +1,353 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="EmployeeDAO">
+
+    <resultMap id="employeeMap" type="egovframework.let.hr.employee.domain.model.EmployeeVO">
+        <result property="userId" column="user_id"/>
+        <result property="employeeNo" column="employee_no"/>
+        <result property="userNm" column="user_nm"/>
+        <result property="englishNm" column="english_nm"/>
+        <result property="departmentId" column="department_id"/>
+        <result property="departmentNm" column="department_nm"/>
+        <result property="positionCode" column="position_code"/>
+        <result property="positionNm" column="position_nm"/>
+        <result property="levelId" column="level_id"/>
+        <result property="levelNm" column="level_nm"/>
+        <result property="genderCode" column="gender_code"/>
+        <result property="genderNm" column="gender_nm"/>
+        <result property="employmentTypeCode" column="employment_type_code"/>
+        <result property="employmentTypeNm" column="employment_type_nm"/>
+        <result property="nativeTypeCode" column="native_type_code"/>
+        <result property="nativeTypeNm" column="native_type_nm"/>
+        <result property="nationalityCode" column="nationality_code"/>
+        <result property="nationalityNm" column="nationality_nm"/>
+        <result property="birthCalendarCode" column="birth_calendar_code"/>
+        <result property="birthDt" column="birth_dt"/>
+        <result property="joinDt" column="join_dt"/>
+        <result property="retireDt" column="retire_dt"/>
+        <result property="suspendDt" column="suspend_dt"/>
+        <result property="backDt" column="back_dt"/>
+        <result property="workEndDt" column="work_end_dt"/>
+        <result property="admissionDt" column="admission_dt"/>
+        <result property="stayFromDt" column="stay_from_dt"/>
+        <result property="stayToDt" column="stay_to_dt"/>
+        <result property="contractFromDt" column="contract_from_dt"/>
+        <result property="contractToDt" column="contract_to_dt"/>
+        <result property="residentNoMasked" column="resident_no_masked"/>
+        <result property="mobileNo" column="mobile_no"/>
+        <result property="homePhoneNo" column="home_phone_no"/>
+        <result property="emailAddr" column="email_addr"/>
+        <result property="postalCode" column="postal_code"/>
+        <result property="address" column="address"/>
+        <result property="addressDetail" column="address_detail"/>
+        <result property="realUserAt" column="real_user_at"/>
+        <result property="loginId" column="login_id"/>
+        <result property="loginCode" column="login_code"/>
+        <result property="loginUseAt" column="login_use_at"/>
+        <result property="photoImage" column="photo_image"/>
+        <result property="employmentStatus" column="employment_status"/>
+        <result property="departmentManagerYn" column="department_manager_yn"/>
+    </resultMap>
+
+    <!-- 사원 조회. 날짜는 yyyy-MM-dd 문자열, 재직상태는 퇴사일·휴직일·복직일로 계산한다. 주민등록번호는 마스킹 값만 읽는다. -->
+    <sql id="employeeSelect">
+        SELECT
+            u.user_id,
+            u.employee_no,
+            u.user_nm,
+            u.english_nm,
+            u.department_id,
+            d.department_nm,
+            u.position_code,
+            pi.item_nm AS position_nm,
+            u.level_id,
+            li.item_nm AS level_nm,
+            u.gender_code,
+            gi.item_nm AS gender_nm,
+            u.employment_type_code,
+            ei.item_nm AS employment_type_nm,
+            u.native_type_code,
+            ni.item_nm AS native_type_nm,
+            u.nationality_code,
+            ci.item_nm AS nationality_nm,
+            u.birth_calendar_code,
+            to_char(u.birth_dt, 'YYYY-MM-DD') AS birth_dt,
+            to_char(u.join_dt, 'YYYY-MM-DD') AS join_dt,
+            to_char(u.retire_dt, 'YYYY-MM-DD') AS retire_dt,
+            to_char(u.suspend_dt, 'YYYY-MM-DD') AS suspend_dt,
+            to_char(u.back_dt, 'YYYY-MM-DD') AS back_dt,
+            to_char(u.work_end_dt, 'YYYY-MM-DD') AS work_end_dt,
+            to_char(u.admission_dt, 'YYYY-MM-DD') AS admission_dt,
+            to_char(u.stay_from_dt, 'YYYY-MM-DD') AS stay_from_dt,
+            to_char(u.stay_to_dt, 'YYYY-MM-DD') AS stay_to_dt,
+            to_char(u.contract_from_dt, 'YYYY-MM-DD') AS contract_from_dt,
+            to_char(u.contract_to_dt, 'YYYY-MM-DD') AS contract_to_dt,
+            u.resident_no_masked,
+            u.mobile_no,
+            u.home_phone_no,
+            u.email_addr,
+            u.postal_code,
+            u.address,
+            u.address_detail,
+            u.real_user_at,
+            u.login_id,
+            la.login_code,
+            la.use_at AS login_use_at,
+            u.photo_image,
+            CASE
+                WHEN u.retire_dt IS NOT NULL AND u.retire_dt &lt;= CURRENT_DATE THEN 'RETIRED'
+                WHEN u.suspend_dt IS NOT NULL AND u.suspend_dt &lt;= CURRENT_DATE
+                     AND (u.back_dt IS NULL OR u.back_dt &gt; CURRENT_DATE) THEN 'LEAVE'
+                ELSE 'ACTIVE'
+            END AS employment_status,
+            CASE WHEN EXISTS (
+                SELECT 1 FROM tb_department md
+                WHERE md.manager_user_id = u.user_id
+                  AND md.tenant_id = u.tenant_id
+                  AND md.use_at = 'Y'
+            ) THEN 'Y' ELSE 'N' END AS department_manager_yn
+        FROM tb_user u
+        LEFT JOIN tb_department d
+          ON d.department_id = u.department_id
+         AND d.tenant_id = u.tenant_id
+        LEFT JOIN tb_common_code_item li
+          ON li.common_code_item_id = u.level_id
+         AND li.tenant_id = u.tenant_id
+        LEFT JOIN tb_login_account la
+          ON la.login_id = u.login_id
+         AND la.tenant_id = u.tenant_id
+        LEFT JOIN tb_common_code_group pg
+          ON pg.tenant_id = u.tenant_id AND pg.group_code = 'POSITION'
+        LEFT JOIN tb_common_code_item pi
+          ON pi.group_id = pg.common_code_group_id AND pi.item_code = u.position_code
+        LEFT JOIN tb_common_code_group gg
+          ON gg.tenant_id = u.tenant_id AND gg.group_code = 'GENDER'
+        LEFT JOIN tb_common_code_item gi
+          ON gi.group_id = gg.common_code_group_id AND gi.item_code = u.gender_code
+        LEFT JOIN tb_common_code_group eg
+          ON eg.tenant_id = u.tenant_id AND eg.group_code = 'EMPLOYMENT_TYPE'
+        LEFT JOIN tb_common_code_item ei
+          ON ei.group_id = eg.common_code_group_id AND ei.item_code = u.employment_type_code
+        LEFT JOIN tb_common_code_group ng
+          ON ng.tenant_id = u.tenant_id AND ng.group_code = 'NATIVE_TYPE'
+        LEFT JOIN tb_common_code_item ni
+          ON ni.group_id = ng.common_code_group_id AND ni.item_code = u.native_type_code
+        LEFT JOIN tb_common_code_group cg
+          ON cg.tenant_id = u.tenant_id AND cg.group_code = 'COUNTRY'
+        LEFT JOIN tb_common_code_item ci
+          ON ci.group_id = cg.common_code_group_id AND ci.item_code = u.nationality_code
+    </sql>
+
+    <select id="selectEmployeeList" parameterType="map" resultMap="employeeMap">
+        <include refid="employeeSelect"/>
+        WHERE u.tenant_id = #{tenantId}
+          AND u.use_at = 'Y'
+        <if test="status == 'ACTIVE'">
+          AND NOT (u.retire_dt IS NOT NULL AND u.retire_dt &lt;= CURRENT_DATE)
+        </if>
+        <if test="status == 'RETIRED'">
+          AND (u.retire_dt IS NOT NULL AND u.retire_dt &lt;= CURRENT_DATE)
+        </if>
+        <if test="departmentId != null">
+          AND u.department_id = #{departmentId}
+        </if>
+        <if test="keyword != null">
+          AND (
+                u.user_nm ILIKE '%' || #{keyword} || '%'
+             OR u.english_nm ILIKE '%' || #{keyword} || '%'
+             OR u.employee_no ILIKE '%' || #{keyword} || '%'
+             OR d.department_nm ILIKE '%' || #{keyword} || '%'
+             OR pi.item_nm ILIKE '%' || #{keyword} || '%'
+             OR la.login_code ILIKE '%' || #{keyword} || '%'
+             OR u.mobile_no ILIKE '%' || #{keyword} || '%'
+             OR u.home_phone_no ILIKE '%' || #{keyword} || '%'
+             OR u.email_addr ILIKE '%' || #{keyword} || '%'
+          )
+        </if>
+        ORDER BY d.sort_order ASC NULLS LAST, d.department_nm ASC NULLS LAST,
+                 pi.sort_order ASC NULLS LAST, u.employee_no ASC NULLS LAST, u.user_id ASC
+    </select>
+
+    <select id="selectEmployeeById" parameterType="map" resultMap="employeeMap">
+        <include refid="employeeSelect"/>
+        WHERE u.tenant_id = #{tenantId}
+          AND u.user_id = #{userId}
+          AND u.use_at = 'Y'
+    </select>
+
+    <select id="countEmployeeNo" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM tb_user
+        WHERE tenant_id = #{tenantId}
+          AND employee_no = #{employeeNo}
+        <if test="excludeUserId != null">
+          AND user_id != #{excludeUserId}
+        </if>
+    </select>
+
+    <select id="countEmail" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM tb_user
+        WHERE tenant_id = #{tenantId}
+          AND email_addr = #{emailAddr}
+        <if test="excludeUserId != null">
+          AND user_id != #{excludeUserId}
+        </if>
+    </select>
+
+    <select id="countResidentHash" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM tb_user
+        WHERE tenant_id = #{tenantId}
+          AND resident_no_hash = #{residentNoHash}
+        <if test="excludeUserId != null">
+          AND user_id != #{excludeUserId}
+        </if>
+    </select>
+
+    <select id="countLoginCode" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM tb_login_account
+        WHERE tenant_id = #{tenantId}
+          AND login_code = #{loginCode}
+    </select>
+
+    <select id="existsActiveDepartment" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM tb_department
+            WHERE tenant_id = #{tenantId}
+              AND department_id = #{departmentId}
+              AND use_at = 'Y'
+        )
+    </select>
+
+    <select id="existsCommonCodeItem" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM tb_common_code_item i
+            JOIN tb_common_code_group g ON g.common_code_group_id = i.group_id
+            WHERE g.tenant_id = #{tenantId}
+              AND g.group_code = #{groupCode}
+              AND g.use_at = 'Y'
+              AND i.item_code = #{itemCode}
+              AND i.use_at = 'Y'
+        )
+    </select>
+
+    <select id="existsLevel" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM tb_common_code_item i
+            JOIN tb_common_code_group g ON g.common_code_group_id = i.group_id
+            WHERE g.tenant_id = #{tenantId}
+              AND g.group_code = 'LEVEL'
+              AND g.use_at = 'Y'
+              AND i.common_code_item_id = #{levelId}
+              AND i.use_at = 'Y'
+        )
+    </select>
+
+    <select id="insertEmployee" parameterType="map" resultType="long">
+        INSERT INTO tb_user (
+            tenant_id, login_id, user_nm, email_addr, department_id, mobile_no, level_id, use_at,
+            employee_no, english_nm, position_code, gender_code, employment_type_code, native_type_code,
+            nationality_code, birth_calendar_code, birth_dt, join_dt, retire_dt, suspend_dt, back_dt,
+            work_end_dt, admission_dt, stay_from_dt, stay_to_dt, contract_from_dt, contract_to_dt,
+            resident_no_enc, resident_no_key_version, resident_no_hash, resident_no_masked,
+            home_phone_no, postal_code, address, address_detail, real_user_at, photo_image,
+            created_by, updated_by
+        ) VALUES (
+            #{tenantId}, #{loginId,jdbcType=BIGINT}, #{userNm}, #{emailAddr,jdbcType=VARCHAR},
+            #{departmentId}, #{mobileNo,jdbcType=VARCHAR}, #{levelId,jdbcType=BIGINT}, 'Y',
+            #{employeeNo}, #{englishNm,jdbcType=VARCHAR}, #{positionCode}, #{genderCode,jdbcType=VARCHAR},
+            #{employmentTypeCode}, #{nativeTypeCode,jdbcType=VARCHAR},
+            #{nationalityCode,jdbcType=VARCHAR}, #{birthCalendarCode,jdbcType=VARCHAR},
+            #{birthDt,jdbcType=DATE}, #{joinDt,jdbcType=DATE}, #{retireDt,jdbcType=DATE},
+            #{suspendDt,jdbcType=DATE}, #{backDt,jdbcType=DATE},
+            #{workEndDt,jdbcType=DATE}, #{admissionDt,jdbcType=DATE}, #{stayFromDt,jdbcType=DATE},
+            #{stayToDt,jdbcType=DATE}, #{contractFromDt,jdbcType=DATE}, #{contractToDt,jdbcType=DATE},
+            #{residentNoEnc,jdbcType=BINARY}, #{residentNoKeyVersion,jdbcType=VARCHAR},
+            #{residentNoHash,jdbcType=VARCHAR}, #{residentNoMasked,jdbcType=VARCHAR},
+            #{homePhoneNo,jdbcType=VARCHAR}, #{postalCode,jdbcType=VARCHAR}, #{address,jdbcType=VARCHAR},
+            #{addressDetail,jdbcType=VARCHAR}, #{realUserAt}, #{photoImage,jdbcType=VARCHAR},
+            #{createdBy,jdbcType=BIGINT}, #{updatedBy,jdbcType=BIGINT}
+        )
+        RETURNING user_id
+    </select>
+
+    <update id="updateEmployee" parameterType="map">
+        UPDATE tb_user
+        SET user_nm = #{userNm},
+            email_addr = #{emailAddr,jdbcType=VARCHAR},
+            department_id = #{departmentId},
+            mobile_no = #{mobileNo,jdbcType=VARCHAR},
+            level_id = #{levelId,jdbcType=BIGINT},
+            employee_no = #{employeeNo},
+            english_nm = #{englishNm,jdbcType=VARCHAR},
+            position_code = #{positionCode},
+            gender_code = #{genderCode,jdbcType=VARCHAR},
+            employment_type_code = #{employmentTypeCode},
+            native_type_code = #{nativeTypeCode,jdbcType=VARCHAR},
+            nationality_code = #{nationalityCode,jdbcType=VARCHAR},
+            birth_calendar_code = #{birthCalendarCode,jdbcType=VARCHAR},
+            birth_dt = #{birthDt,jdbcType=DATE},
+            join_dt = #{joinDt,jdbcType=DATE},
+            retire_dt = #{retireDt,jdbcType=DATE},
+            suspend_dt = #{suspendDt,jdbcType=DATE},
+            back_dt = #{backDt,jdbcType=DATE},
+            work_end_dt = #{workEndDt,jdbcType=DATE},
+            admission_dt = #{admissionDt,jdbcType=DATE},
+            stay_from_dt = #{stayFromDt,jdbcType=DATE},
+            stay_to_dt = #{stayToDt,jdbcType=DATE},
+            contract_from_dt = #{contractFromDt,jdbcType=DATE},
+            contract_to_dt = #{contractToDt,jdbcType=DATE},
+            home_phone_no = #{homePhoneNo,jdbcType=VARCHAR},
+            postal_code = #{postalCode,jdbcType=VARCHAR},
+            address = #{address,jdbcType=VARCHAR},
+            address_detail = #{addressDetail,jdbcType=VARCHAR},
+            real_user_at = #{realUserAt},
+            login_id = COALESCE(#{loginId,jdbcType=BIGINT}, login_id),
+        <if test="residentNoProvided">
+            resident_no_enc = #{residentNoEnc,jdbcType=BINARY},
+            resident_no_key_version = #{residentNoKeyVersion,jdbcType=VARCHAR},
+            resident_no_hash = #{residentNoHash,jdbcType=VARCHAR},
+            resident_no_masked = #{residentNoMasked,jdbcType=VARCHAR},
+        </if>
+        <if test="photoProvided">
+            photo_image = #{photoImage,jdbcType=VARCHAR},
+        </if>
+            updated_by = #{updatedBy,jdbcType=BIGINT},
+            updated_at = now()
+        WHERE user_id = #{userId}
+          AND tenant_id = #{tenantId}
+    </update>
+
+    <!-- 비밀번호 변경 시각을 비워 두면 초기 비밀번호(최초 로그인 시 변경 대상) 상태이다. -->
+    <select id="insertLoginAccount" parameterType="map" resultType="long">
+        INSERT INTO tb_login_account (
+            tenant_id, login_code, password_hash, profile_image, password_changed_at, use_at
+        ) VALUES (
+            #{tenantId}, #{loginCode}, #{passwordHash}, #{profileImage,jdbcType=VARCHAR}, NULL, 'Y'
+        )
+        RETURNING login_id
+    </select>
+
+    <insert id="insertDefaultRole" parameterType="map">
+        INSERT INTO tb_login_account_role (login_id, role_id)
+        SELECT #{loginId}, r.role_id
+        FROM tb_role r
+        WHERE r.tenant_id = #{tenantId}
+          AND r.role_code = #{roleCode}
+          AND r.use_at = 'Y'
+        ON CONFLICT (login_id, role_id) DO NOTHING
+    </insert>
+
+    <update id="updateLoginProfileImage" parameterType="map">
+        UPDATE tb_login_account
+        SET profile_image = #{profileImage,jdbcType=VARCHAR},
+            updated_at = now()
+        WHERE login_id = #{loginId}
+          AND tenant_id = #{tenantId}
+    </update>
+</mapper>

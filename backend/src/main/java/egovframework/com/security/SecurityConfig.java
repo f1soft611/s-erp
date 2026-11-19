@@ -47,7 +47,7 @@ public class SecurityConfig {
             + "frame-ancestors 'none'; "
             + "object-src 'none'; "
             + "img-src 'self' https: data:; "
-            + "script-src 'self' 'unsafe-inline'; "
+            + "script-src 'self' 'unsafe-inline' https://t1.kakaocdn.net; "
             + "style-src 'self' 'unsafe-inline'; "
             + "font-src 'self' https: data:; "
             + "connect-src 'self' https: http:;";

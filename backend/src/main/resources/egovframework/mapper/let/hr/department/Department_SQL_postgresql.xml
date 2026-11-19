@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="DepartmentDAO">
+
+    <resultMap id="departmentMap" type="egovframework.let.hr.department.domain.model.DepartmentVO">
+        <result property="departmentId" column="department_id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="parentDepartmentId" column="parent_department_id"/>
+        <result property="departmentNm" column="department_nm"/>
+        <result property="managerUserId" column="manager_user_id"/>
+        <result property="managerUserNm" column="manager_user_nm"/>
+        <result property="departmentDc" column="department_dc"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="useAt" column="use_at"/>
+        <result property="childCount" column="child_count"/>
+        <result property="userCount" column="user_count"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedBy" column="updated_by"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <resultMap id="departmentUserMap" type="egovframework.let.hr.department.domain.model.DepartmentUserVO">
+        <result property="userId" column="user_id"/>
+        <result property="userNm" column="user_nm"/>
+        <result property="levelNm" column="level_nm"/>
+        <result property="loginCode" column="login_code"/>
+        <result property="mobileNo" column="mobile_no"/>
+        <result property="emailAddr" column="email_addr"/>
+        <result property="managerYn" column="manager_yn"/>
+        <result property="employeeNo" column="employee_no"/>
+        <result property="positionNm" column="position_nm"/>
+        <result property="employmentStatus" column="employment_status"/>
+    </resultMap>
+
+    <!-- 소속 사원 조회가 공통으로 쓰는 사번·직위·재직상태 컬럼과 조인(알리아스 u = tb_user) -->
+    <sql id="memberColumns">
+            u.employee_no,
+            pi.item_nm AS position_nm,
+            CASE
+                WHEN u.retire_dt IS NOT NULL AND u.retire_dt &lt;= CURRENT_DATE THEN 'RETIRED'
+                WHEN u.suspend_dt IS NOT NULL AND u.suspend_dt &lt;= CURRENT_DATE
+                     AND (u.back_dt IS NULL OR u.back_dt &gt; CURRENT_DATE) THEN 'LEAVE'
+                ELSE 'ACTIVE'
+            END AS employment_status
+    </sql>
+
+    <sql id="memberJoins">
+        LEFT JOIN tb_common_code_group pg
+          ON pg.tenant_id = u.tenant_id AND pg.group_code = 'POSITION'
+        LEFT JOIN tb_common_code_item pi
+          ON pi.group_id = pg.common_code_group_id AND pi.item_code = u.position_code
+    </sql>
+
+    <!-- 재직/퇴직 구분: ACTIVE(기본, 퇴직 제외·휴직 포함), RETIRED(퇴직만), ALL -->
+    <sql id="memberStatusFilter">
+        <if test="status == null or status == 'ACTIVE'">
+          AND NOT (u.retire_dt IS NOT NULL AND u.retire_dt &lt;= CURRENT_DATE)
+        </if>
+        <if test="status == 'RETIRED'">
+          AND (u.retire_dt IS NOT NULL AND u.retire_dt &lt;= CURRENT_DATE)
+        </if>
+    </sql>
+
+    <sql id="departmentSelect">
+        SELECT
+            d.department_id,
+            d.tenant_id,
+            d.parent_department_id,
+            d.department_nm,
+            d.manager_user_id,
+            mu.user_nm AS manager_user_nm,
+            d.department_dc,
+            d.sort_order,
+            d.use_at,
+            (SELECT COUNT(*) FROM tb_department c
+              WHERE c.parent_department_id = d.department_id
+                AND c.tenant_id = d.tenant_id
+                AND c.use_at = 'Y') AS child_count,
+            (SELECT COUNT(*) FROM tb_user u
+              WHERE u.department_id = d.department_id
+                AND u.tenant_id = d.tenant_id
+                AND u.use_at = 'Y'
+                AND NOT (u.retire_dt IS NOT NULL AND u.retire_dt &lt;= CURRENT_DATE)) AS user_count,
+            d.created_by,
+            d.created_at,
+            d.updated_by,
+            d.updated_at
+        FROM tb_department d
+        LEFT JOIN tb_user mu
+          ON mu.user_id = d.manager_user_id
+         AND mu.tenant_id = d.tenant_id
+    </sql>
+
+    <select id="selectDepartmentList" parameterType="map" resultMap="departmentMap">
+        <include refid="departmentSelect"/>
+        WHERE d.tenant_id = #{tenantId}
+        <if test="!includeInactive">
+          AND d.use_at = 'Y'
+        </if>
+        ORDER BY d.sort_order ASC, d.department_nm ASC, d.department_id ASC
+    </select>
+
+    <select id="selectDepartmentById" parameterType="map" resultMap="departmentMap">
+        <include refid="departmentSelect"/>
+        WHERE d.tenant_id = #{tenantId}
+          AND d.department_id = #{departmentId}
+    </select>
+
+    <select id="insertDepartment" parameterType="map" resultType="long">
+        INSERT INTO tb_department (
+            tenant_id,
+            parent_department_id,
+            department_nm,
+            manager_user_id,
+            department_dc,
+            sort_order,
+            use_at,
+            created_by,
+            updated_by
+        ) VALUES (
+            #{tenantId},
+            #{parentDepartmentId,jdbcType=BIGINT},
+            #{departmentNm},
+            #{managerUserId,jdbcType=BIGINT},
+            #{departmentDc,jdbcType=VARCHAR},
+            #{sortOrder},
+            'Y',
+            #{createdBy,jdbcType=BIGINT},
+            #{updatedBy,jdbcType=BIGINT}
+        )
+        RETURNING department_id
+    </select>
+
+    <update id="updateDepartment" parameterType="map">
+        UPDATE tb_department
+        SET parent_department_id = #{parentDepartmentId,jdbcType=BIGINT},
+            department_nm = #{departmentNm},
+            manager_user_id = #{managerUserId,jdbcType=BIGINT},
+            department_dc = #{departmentDc,jdbcType=VARCHAR},
+            sort_order = #{sortOrder},
+            updated_by = #{updatedBy,jdbcType=BIGINT},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE department_id = #{departmentId}
+          AND tenant_id = #{tenantId}
+    </update>
+
+    <update id="updateDepartmentUse" parameterType="map">
+        UPDATE tb_department
+        SET use_at = #{useAt},
+            updated_by = #{updatedBy,jdbcType=BIGINT},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE department_id = #{departmentId}
+          AND tenant_id = #{tenantId}
+    </update>
+
+    <select id="countSiblingName" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM tb_department
+        WHERE tenant_id = #{tenantId}
+          AND parent_department_id IS NOT DISTINCT FROM #{parentDepartmentId,jdbcType=BIGINT}
+          AND department_nm = #{departmentNm}
+        <if test="excludeDepartmentId != null">
+          AND department_id != #{excludeDepartmentId}
+        </if>
+    </select>
+
+    <select id="countActiveChildren" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM tb_department
+        WHERE tenant_id = #{tenantId}
+          AND parent_department_id = #{departmentId}
+          AND use_at = 'Y'
+    </select>
+
+    <select id="countActiveUsers" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM tb_user u
+        WHERE u.tenant_id = #{tenantId}
+          AND u.department_id = #{departmentId}
+          AND u.use_at = 'Y'
+          AND NOT (u.retire_dt IS NOT NULL AND u.retire_dt &lt;= CURRENT_DATE)
+    </select>
+
+    <select id="existsActiveMember" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM tb_user u
+            WHERE u.tenant_id = #{tenantId}
+              AND u.user_id = #{userId}
+              AND u.department_id = #{departmentId}
+              AND u.use_at = 'Y'
+              AND NOT (u.retire_dt IS NOT NULL AND u.retire_dt &lt;= CURRENT_DATE)
+        )
+    </select>
+
+    <select id="selectDepartmentUsers" parameterType="map" resultMap="departmentUserMap">
+        SELECT
+            u.user_id,
+            u.user_nm,
+            li.item_nm AS level_nm,
+            la.login_code,
+            u.mobile_no,
+            u.email_addr,
+            CASE WHEN d.manager_user_id = u.user_id THEN 'Y' ELSE 'N' END AS manager_yn,
+            <include refid="memberColumns"/>
+        FROM tb_user u
+        JOIN tb_department d
+          ON d.department_id = u.department_id
+         AND d.tenant_id = u.tenant_id
+        LEFT JOIN tb_login_account la
+          ON la.login_id = u.login_id
+         AND la.tenant_id = u.tenant_id
+        LEFT JOIN tb_common_code_item li
+          ON li.common_code_item_id = u.level_id
+         AND li.tenant_id = u.tenant_id
+         AND li.use_at = 'Y'
+        <include refid="memberJoins"/>
+        WHERE u.tenant_id = #{tenantId}
+          AND u.department_id = #{departmentId}
+          AND u.use_at = 'Y'
+        <include refid="memberStatusFilter"/>
+        ORDER BY CASE WHEN d.manager_user_id = u.user_id THEN 0 ELSE 1 END, u.user_nm ASC, u.user_id ASC
+    </select>
+
+    <select id="selectCompanyName" parameterType="long" resultType="string">
+        SELECT tenant_nm FROM tb_tenant WHERE tenant_id = #{value}
+    </select>
+
+    <select id="selectUnassignedUsers" parameterType="map" resultMap="departmentUserMap">
+        SELECT
+            u.user_id,
+            u.user_nm,
+            li.item_nm AS level_nm,
+            la.login_code,
+            u.mobile_no,
+            u.email_addr,
+            'N' AS manager_yn,
+            <include refid="memberColumns"/>
+        FROM tb_user u
+        LEFT JOIN tb_login_account la
+          ON la.login_id = u.login_id
+         AND la.tenant_id = u.tenant_id
+        LEFT JOIN tb_common_code_item li
+          ON li.common_code_item_id = u.level_id
+         AND li.tenant_id = u.tenant_id
+         AND li.use_at = 'Y'
+        <include refid="memberJoins"/>
+        WHERE u.tenant_id = #{tenantId}
+          AND u.department_id IS NULL
+          AND u.use_at = 'Y'
+        <include refid="memberStatusFilter"/>
+        ORDER BY u.user_nm ASC, u.user_id ASC
+    </select>
+</mapper>

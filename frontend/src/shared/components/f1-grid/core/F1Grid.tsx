@@ -2842,8 +2842,10 @@ function F1GridInner<T extends object>(
     sortState.length > 0 || filterState.length > 0;
   const showDuplicateRowInContextMenu = allowDuplicateRowInContextMenu ?? true;
   const showDeleteRowInContextMenu = allowDeleteRowInContextMenu ?? true;
+  const treeContextMenuItems = treeContextMenu?.items ?? [];
   const hasRowContextMenuActions =
     (treeContextMenu !== undefined && showAddRootInContextMenu) ||
+    treeContextMenuItems.length > 0 ||
     showAddRowInContextMenu ||
     showDuplicateRowInContextMenu ||
     showDeleteRowInContextMenu;
@@ -3314,6 +3316,19 @@ function F1GridInner<T extends object>(
             {treeContextMenu?.addChildLabel ?? '행 추가'}
           </MenuItem>
         ) : null}
+        {treeContextMenuItems.map((item) => (
+          <MenuItem
+            key={item.key}
+            disabled={item.disabled?.(contextMenu?.rowId)}
+            onClick={() => {
+              const targetRowId = contextMenu?.rowId;
+              closeContextMenu();
+              item.onClick(targetRowId);
+            }}
+          >
+            {item.label}
+          </MenuItem>
+        ))}
         {!treeContextMenu &&
         showAddRowInContextMenu &&
         contextMenu?.rowId !== undefined ? (

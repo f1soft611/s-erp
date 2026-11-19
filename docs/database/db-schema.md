@@ -108,12 +108,29 @@
 | use_at        | char      | 사용 여부             |
 | created_at    | timestamp | 생성 일시             |
 | updated_at    | timestamp | 수정 일시             |
+| employee_no | varchar(20) | 사번(직접 입력 또는 입사년월 YYMM+순번, 등록 후 수정 불가, 테넌트 내 유일) |
+| english_nm | varchar(60) | 영문이름 |
+| position_code | varchar(30) | 직위(공통코드 `POSITION` item_code) |
+| gender_code | varchar(30) | 성별(`GENDER`) |
+| employment_type_code | varchar(30) | 근무형태(`EMPLOYMENT_TYPE`) |
+| native_type_code | varchar(30) | 내/외국인(`NATIVE_TYPE`) |
+| nationality_code | varchar(30) | 국적(`COUNTRY`, ISO alpha-3) |
+| birth_calendar_code | varchar(30) | 생일 음력/양력(`BIRTH_CALENDAR`) |
+| birth_dt, join_dt, retire_dt, suspend_dt, back_dt | date | 생일, 입사일, 퇴사일, 휴직일, 복직일(휴직은 최신 값만) |
+| work_end_dt, admission_dt, stay_from_dt, stay_to_dt, contract_from_dt, contract_to_dt | date | 취업기간만료일, 입국일, 체류기간, 근로계약기간 |
+| resident_no_enc, resident_no_key_version, resident_no_hash, resident_no_masked | bytea, varchar | 주민등록번호 AES-GCM 암호문, 키 버전, 중복 검사용 HMAC 해시, 마스킹 표시값(평문 저장 없음) |
+| home_phone_no, postal_code, address, address_detail | varchar | 자택전화, 우편번호, 주소, 상세주소 |
+| real_user_at | char | 실사용자(시스템 사용) 여부, 기본 N. Y이면 로그인 계정 발급 대상 |
+| photo_image | text | 사원 사진(데이터 URL), 계정이 있으면 `tb_login_account.profile_image`에도 기록 |
+| created_by, updated_by | bigint | 등록자, 수정자 |
 
 역할:
 
 - 사용자 프로필정보
 - 로그인 계정과 사용자 실명/부서/직급 연결
 - `level_id`는 `tb_common_code_item.common_code_item_id`를 참조하며 `LEVEL` 그룹 항목만 사용
+- 사원 인사 기본 정보(인사관리 2-1단계 사원등록, 20261119_004). 재직상태는 컬럼 없이 `retire_dt`·`suspend_dt`·`back_dt`로 계산한다
+- 유일 부분 인덱스 `ux_user_employee_no(tenant_id, employee_no)`, `ux_user_resident_no_hash(tenant_id, resident_no_hash)`와 CHECK `ck_user_real_user_at`, `ck_user_retire_after_join`, `ck_user_back_after_suspend`
 
 ### 2-6. tb_department
 
@@ -127,11 +144,17 @@
 | use_at               | char      | 사용 여부              |
 | created_at           | timestamp | 생성 일시              |
 | updated_at           | timestamp | 수정 일시              |
+| manager_user_id      | bigint    | 부서장 `tb_user` FK(null 허용, ON DELETE SET NULL) |
+| department_dc        | varchar   | 부서 설명              |
+| created_by           | bigint    | 등록자 `tb_user.user_id` |
+| updated_by           | bigint    | 수정자 `tb_user.user_id` |
 
 역할:
 
 - 테넌트별 부서 조직도 관리
 - `tb_user.department_id`가 참조하는 대상
+- 같은 상위 부서 아래 동일 부서명 금지: 최상위 `ux_department_root_name(tenant_id, department_nm)`, 하위 `ux_department_child_name(tenant_id, parent_department_id, department_nm)` 부분 유일 인덱스(사용안함 부서도 이름 점유)
+- 삭제하지 않고 `use_at='N'`으로 숨긴다. 하위 부서·소속 사원이 있으면 사용안함 처리가 차단된다(20261119_002, 인사관리 1단계)
 
 ### 2-6-1. tb_common_code_item 직급 참조
 
@@ -1402,6 +1425,8 @@ PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 
 - 2026-09-16: 공통 첨부/댓글 스키마 추가로 `tb_common_file`, `tb_common_comment` 신규 테이블 생성. 공통 서비스는 `owner_type + owner_id` 기준으로 notice, board, approval, feed를 모두 재사용할 수 있도록 정리. 적용 스크립트는 [backend/DATABASE/20260916](../../backend/DATABASE/20260916) 및 [docs/database/2026-09-16](2026-09-16) 참고.
 - 2026-09-18: 공지사항 본문 이미지와 일반 첨부파일을 구분하기 위해 `tb_common_file.file_usage_type` 컬럼 및 허용값 제약을 추가. 적용 스크립트는 [backend/DATABASE/20260918](../../backend/DATABASE/20260918) 및 [docs/database/20260918](20260918) 참고.
 - 2026-09-16: 공지사항 본문은 `contents_html`/`contents_json`/`contents_text` 3중 저장 구조로 정교화하고, MinIO 첨부 메타 연동을 위해 `tb_board_file` 및 `tb_board_post` 보강, NOTICE 타입 보장. 적용 스크립트는 [backend/DATABASE/20260916](../../backend/DATABASE/20260916) 및 [docs/database/2026-09-16](2026-09-16) 참고.
+- 2026-11-19: 인사관리 2-1단계(사원등록)로 `tb_user`에 사번·직위·성별·근무형태·내외국인·국적·생일·입사/퇴사/휴직/복직일·외국인 체류·근로계약일·주민등록번호 암호문/해시·연락처·주소·실사용자·사진·감사 컬럼 31개와 사번·주민번호 해시 유일 인덱스를 추가하고 `HR_INFO_EMPLOYEE` 메뉴를 등록했다(20261119_004). 공통코드 `GENDER`·`NATIVE_TYPE`·`EMPLOYMENT_TYPE`·`BIRTH_CALENDAR`·`POSITION`과 `COUNTRY` ISO 249개국(alpha-3 코드, 기존 KR·JP는 KOR·JPN으로 변경)을 시드했다(20261119_005). 스크립트 작성, 적용 전. [backend/DATABASE/20261119](../../backend/DATABASE/20261119) 참고.
+- 2026-11-19: 인사관리 1단계(부서관리)로 `tb_department`에 `manager_user_id`, `department_dc`, `created_by`, `updated_by`와 동일 상위 부서명 유일 인덱스를 추가하고 `HR` 모듈·메뉴를 등록하고(20261119_002 적용) 메뉴를 그룹 "인사정보"(`HR_INFO`) 아래 "부서관리"(`HR_INFO_DEPARTMENT`)로 이름 통합했다(20261119_003, 적용 전). 스크립트는 [backend/DATABASE/20261119](../../backend/DATABASE/20261119) 및 [docs/database/20261119](20261119) 참고.
 - 2026-09-18: 공지사항 구분 코드와 게시글/댓글 최신 행위자 감사 컬럼을 추가했다. 적용 스크립트는 [backend/DATABASE/20260918](../../backend/DATABASE/20260918) 및 [docs/database/20260918](20260918) 참고.
 - 2026-09-21: 공지사항 사용자별 최초 조회수 중복 방지를 위해 `tb_board_post_view_history`를 추가했다. 적용 스크립트는 [backend/DATABASE/20260921](../../backend/DATABASE/20260921) 및 [docs/database/20260921](20260921) 참고.
 - 2026-09-15: 그룹웨어 커뮤니티 게시판 스키마 추가로 `tb_board_type`, `tb_board_post`, `tb_board_file` 신규 테이블 생성. 적용 스크립트는 [backend/DATABASE/20260915](../../backend/DATABASE/20260915) 및 [docs/database/2026-09-15](2026-09-15) 참고.
