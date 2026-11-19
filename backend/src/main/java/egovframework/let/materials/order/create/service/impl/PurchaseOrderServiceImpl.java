@@ -703,7 +703,13 @@ public class PurchaseOrderServiceImpl extends EgovAbstractServiceImpl implements
                     || !"N".equals(confirmRow.getOrderCloseAt())) {
                 throw itemsChanged();
             }
-            String rowCurrency = confirmRow.getCurrencyCode() == null ? DEFAULT_CURRENCY : confirmRow.getCurrencyCode();
+            // 저장 전에 이미 확정수량이 모두 발주된 행은 담을 수 없다(동시 등록 시 나중 요청을 막는다).
+            // 잔량이 남은 행에 잔량보다 많이 주문하는 것은 허용하고 저장 후 경고만 한다.
+            if (confirmRow.getConfirmQty() != null && confirmRow.getOrderedQty() != null
+                    && confirmRow.getOrderedQty().compareTo(confirmRow.getConfirmQty()) >= 0) {
+                throw itemsChanged();
+            }
+            String rowCurrency =confirmRow.getCurrencyCode() == null ? DEFAULT_CURRENCY : confirmRow.getCurrencyCode();
             if (currencyCode == null) {
                 currencyCode = rowCurrency;
             } else if (!currencyCode.equals(rowCurrency)) {

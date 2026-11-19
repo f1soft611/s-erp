@@ -128,6 +128,26 @@ class PurchaseOrderServiceImplTest {
     }
 
     @Test
+    void rejectsConfirmRowsAlreadyFullyOrderedBeforeThisSave() throws Exception {
+        // 다른 사용자가 먼저 저장해 확정수량을 모두 발주한 행은 새 발주로 담을 수 없다(동시 등록 방지).
+        doReturn(Arrays.asList(confirmRow(51L, "10", "10"), confirmRow(61L, "5", "0")))
+                .when(orderDAO).selectConfirmRows(anyMap());
+        assertStatus(() -> service.createOrder(TENANT, USER, confirmPayload(
+                confirmLine(51L, "1", "1"), confirmLine(61L, "1", "1"))), HttpStatus.CONFLICT);
+        verify(orderDAO, never()).insertOrderHeader(anyMap());
+    }
+
+    @Test
+    void allowsPartiallyOrderedConfirmRowsAndOrderingMoreThanTheRemainder() throws Exception {
+        doReturn(
+                Arrays.asList(confirmRow(51L, "10", "6"), confirmRow(61L, "5", "0")),
+                Arrays.asList(confirmRow(51L, "10", "16"), confirmRow(61L, "5", "1"))).when(orderDAO).selectConfirmRows(anyMap());
+        PurchaseOrderVO result = service.createOrder(TENANT, USER, confirmPayload(
+                confirmLine(51L, "10", "1"), confirmLine(61L, "1", "1")));
+        assertThat(result.getOverOrderedLineNos()).containsExactly(1);
+    }
+
+    @Test
     void rejectsClosedCanceledOrMissingConfirmRows() throws Exception {
         PurchaseOrderConfirmRowVO closed = confirmRow(51L, "10", "0");
         closed.setOrderCloseAt("Y");
