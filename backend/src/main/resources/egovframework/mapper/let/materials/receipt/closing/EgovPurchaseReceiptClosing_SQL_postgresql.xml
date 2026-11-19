@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="PurchaseReceiptClosingDAO">
+
+    <!-- 구매처별 요약. 기간 내 정상 입고 행과, 선택한 마감월로 마감된 행(입고일 무관)을 함께 집계한다. -->
+    <select id="selectSuppliers" parameterType="map"
+            resultType="egovframework.let.materials.receipt.closing.domain.model.PurchaseReceiptClosingSupplierVO">
+        SELECT rh.supplier_id AS supplierId,
+               c.customer_code AS supplierCode,
+               c.customer_name AS supplierName,
+               c.business_no AS businessNo,
+               count(*) FILTER (WHERE rh.receipt_dt BETWEEN CAST(#{receiptFrom} AS date) AND CAST(#{receiptTo} AS date))
+                   AS receiptCount,
+               COALESCE(sum(COALESCE(rd.closing_total_amt, rd.total_amt))
+                   FILTER (WHERE rh.receipt_dt BETWEEN CAST(#{receiptFrom} AS date) AND CAST(#{receiptTo} AS date)), 0)
+                   AS receiptAmount,
+               count(*) FILTER (WHERE rd.closing_month = #{closingMonth}) AS monthClosedCount,
+               COALESCE(sum(rd.closing_total_amt) FILTER (WHERE rd.closing_month = #{closingMonth}), 0)
+                   AS monthClosedAmount,
+               count(*) FILTER (WHERE rh.receipt_dt BETWEEN CAST(#{receiptFrom} AS date) AND CAST(#{receiptTo} AS date)
+                                  AND rd.closing_month IS NULL) AS openCount
+        FROM tb_purchase_receipt_hd rh
+        JOIN tb_purchase_receipt_dt rd
+          ON rd.purchase_receipt_id = rh.purchase_receipt_id
+         AND rd.tenant_id = rh.tenant_id
+        LEFT JOIN tb_customer_info c
+          ON c.customer_id = rh.supplier_id
+         AND c.tenant_id = rh.tenant_id
+        LEFT JOIN tb_material_info m
+          ON m.material_id = rd.material_id
+         AND m.tenant_id = rd.tenant_id
+        WHERE rh.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND rh.use_at = 'Y'
+          AND (rh.receipt_dt BETWEEN CAST(#{receiptFrom} AS date) AND CAST(#{receiptTo} AS date)
+               OR rd.closing_month = #{closingMonth})
+        <if test="keyword != null">
+          AND (m.material_code ILIKE '%' || #{keyword} || '%'
+               OR m.material_name ILIKE '%' || #{keyword} || '%')
+        </if>
+        GROUP BY rh.supplier_id, c.customer_code, c.customer_name, c.business_no
+        ORDER BY c.customer_name, rh.supplier_id
+    </select>
+
+    <!-- 입고 행 목록. 마감 행은 마감 값, 미마감 행은 입고 값을 보여 준다.
+         closeType: ALL = 기간 내 전체, OPEN = 기간 내 미마감, CLOSED = 선택 마감월로 마감된 행(기간 무관). -->
+    <select id="selectRows" parameterType="map"
+            resultType="egovframework.let.materials.receipt.closing.domain.model.PurchaseReceiptClosingRowVO">
+        SELECT rh.purchase_receipt_id AS purchaseReceiptId,
+               rd.purchase_receipt_detail_id AS purchaseReceiptDetailId,
+               rh.receipt_no AS receiptNo,
+               rh.receipt_dt AS receiptDt,
+               rh.use_at AS useAt,
+               rh.supplier_id AS supplierId,
+               c.customer_name AS supplierName,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.material_spec AS materialSpec,
+               m.unit AS unit,
+               oh.order_no AS orderNo,
+               rd.inspection_no AS inspectionNo,
+               rd.receipt_qty AS receiptQty,
+               COALESCE(rd.closing_unit_price, rd.unit_price) AS unitPrice,
+               COALESCE(rd.closing_tax_type, rh.tax_type) AS taxType,
+               COALESCE(rd.closing_vat_included_at, rh.vat_included_at) AS vatIncludedAt,
+               COALESCE(rd.closing_supply_amt, rd.supply_amt) AS supplyAmt,
+               COALESCE(rd.closing_vat_amt, rd.vat_amt) AS vatAmt,
+               COALESCE(rd.closing_total_amt, rd.total_amt) AS totalAmt,
+               w.warehouse_name AS warehouseName,
+               rd.remark AS remark,
+               rd.closing_month AS closingMonth,
+               rd.closed_at AS closedAt,
+               rd.closed_by AS closedBy,
+               (rd.closing_month IS NOT NULL) AS closed
+        FROM tb_purchase_receipt_hd rh
+        JOIN tb_purchase_receipt_dt rd
+          ON rd.purchase_receipt_id = rh.purchase_receipt_id
+         AND rd.tenant_id = rh.tenant_id
+        JOIN tb_purchase_order_dt od
+          ON od.purchase_order_detail_id = rd.purchase_order_detail_id
+        JOIN tb_purchase_order_hd oh
+          ON oh.purchase_order_id = od.purchase_order_id
+         AND oh.tenant_id = od.tenant_id
+        LEFT JOIN tb_customer_info c
+          ON c.customer_id = rh.supplier_id
+         AND c.tenant_id = rh.tenant_id
+        LEFT JOIN tb_material_info m
+          ON m.material_id = rd.material_id
+         AND m.tenant_id = rd.tenant_id
+        LEFT JOIN tb_warehouse w
+          ON w.warehouse_id = rd.warehouse_id
+        WHERE rh.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND rh.use_at = 'Y'
+        <if test="closeType == 'CLOSED'">
+          AND rd.closing_month = #{closingMonth}
+        </if>
+        <if test="closeType != 'CLOSED'">
+          AND rh.receipt_dt BETWEEN CAST(#{receiptFrom} AS date) AND CAST(#{receiptTo} AS date)
+        </if>
+        <if test="closeType == 'OPEN'">
+          AND rd.closing_month IS NULL
+        </if>
+        <if test="supplierId != null">
+          AND rh.supplier_id = #{supplierId, jdbcType=BIGINT}
+        </if>
+        <if test="orderNo != null">
+          AND oh.order_no ILIKE '%' || #{orderNo} || '%'
+        </if>
+        <if test="keyword != null">
+          AND (m.material_code ILIKE '%' || #{keyword} || '%'
+               OR m.material_name ILIKE '%' || #{keyword} || '%')
+        </if>
+        ORDER BY rd.closing_month NULLS FIRST, rh.receipt_dt, m.material_name, rh.receipt_no, rd.line_no
+    </select>
+
+    <!-- 마감·해제 대상 행을 입고 헤더 → 상세 순서로 잠근다(입고 수정·취소가 헤더를 먼저 잠그므로 같은 순서). -->
+    <select id="selectRowsForUpdate" parameterType="map"
+            resultType="egovframework.let.materials.receipt.closing.domain.model.PurchaseReceiptClosingRowVO">
+        SELECT rd.purchase_receipt_detail_id AS purchaseReceiptDetailId,
+               rh.purchase_receipt_id AS purchaseReceiptId,
+               rh.receipt_no AS receiptNo,
+               rh.use_at AS useAt,
+               rd.receipt_qty AS receiptQty,
+               rd.closing_month AS closingMonth
+        FROM tb_purchase_receipt_hd rh
+        JOIN tb_purchase_receipt_dt rd
+          ON rd.purchase_receipt_id = rh.purchase_receipt_id
+         AND rd.tenant_id = rh.tenant_id
+        WHERE rh.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND rd.purchase_receipt_detail_id IN
+        <foreach collection="detailIds" item="detailId" open="(" separator="," close=")">
+            #{detailId, jdbcType=BIGINT}
+        </foreach>
+        ORDER BY rh.purchase_receipt_id, rd.purchase_receipt_detail_id
+        FOR UPDATE OF rh, rd
+    </select>
+
+    <update id="closeRow" parameterType="map">
+        UPDATE tb_purchase_receipt_dt
+        SET closing_month = #{closingMonth},
+            closed_at = now(),
+            closed_by = #{closedBy},
+            closing_unit_price = #{unitPrice, jdbcType=NUMERIC},
+            closing_tax_type = #{taxType},
+            closing_vat_included_at = #{vatIncludedAt},
+            closing_supply_amt = #{supplyAmt, jdbcType=NUMERIC},
+            closing_vat_amt = #{vatAmt, jdbcType=NUMERIC},
+            closing_total_amt = #{totalAmt, jdbcType=NUMERIC},
+            updated_by = #{closedBy},
+            updated_at = now()
+        WHERE purchase_receipt_detail_id = #{purchaseReceiptDetailId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND closing_month IS NULL
+    </update>
+
+    <update id="releaseRow" parameterType="map">
+        UPDATE tb_purchase_receipt_dt
+        SET closing_month = NULL,
+            closed_at = NULL,
+            closed_by = NULL,
+            closing_unit_price = NULL,
+            closing_tax_type = NULL,
+            closing_vat_included_at = NULL,
+            closing_supply_amt = NULL,
+            closing_vat_amt = NULL,
+            closing_total_amt = NULL,
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE purchase_receipt_detail_id = #{purchaseReceiptDetailId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND closing_month IS NOT NULL
+    </update>
+</mapper>

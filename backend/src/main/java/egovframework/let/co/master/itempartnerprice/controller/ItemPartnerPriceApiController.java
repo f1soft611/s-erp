@@ -22,7 +22,10 @@ import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceBatchSaveRequestVO;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceImportPreflightRequestVO;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceSearchCondition;
+import egovframework.let.co.master.itempartnerprice.domain.model.ItemPriceCustomerOverviewCondition;
+import egovframework.let.co.master.itempartnerprice.domain.model.ItemPriceOverviewCondition;
 import egovframework.let.co.master.itempartnerprice.service.ItemPartnerPriceBatchService;
+import egovframework.let.co.master.itempartnerprice.service.ItemPartnerPriceOverviewService;
 import egovframework.let.co.master.itempartnerprice.service.ItemPartnerPriceService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,6 +39,19 @@ public class ItemPartnerPriceApiController {
     private final ResultVoHelper resultVoHelper;
     private final ItemPartnerPriceService service;
     private final ItemPartnerPriceBatchService batchService;
+    private final ItemPartnerPriceOverviewService overviewService;
+
+    @GetMapping("/overview")
+    public ResultVO listOverview(@ModelAttribute ItemPriceOverviewCondition condition,
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
+        return result("resultList", overviewService.listOverview(tenant(user), condition));
+    }
+
+    @GetMapping("/customer-overview")
+    public ResultVO listCustomerOverview(@ModelAttribute ItemPriceCustomerOverviewCondition condition,
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
+        return result("resultList", overviewService.listCustomerOverview(tenant(user), condition));
+    }
 
     @GetMapping
     public ResultVO listPrices(@ModelAttribute ItemPartnerPriceSearchCondition condition,

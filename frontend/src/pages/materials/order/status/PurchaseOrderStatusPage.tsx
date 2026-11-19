@@ -221,7 +221,7 @@ export function PurchaseOrderStatusPage({
                 highlightKeyword={search.appliedFilters?.keyword}
                 ariaLabel="발주현황 목록"
                 columns={columns}
-                storageKey="materialsPurchaseOrderStatusGrid"
+                storageKey="materialsPurchaseOrderStatusGrid-v2"
                 rowKey="purchaseOrderDetailId"
                 rows={list.rows}
                 loading={list.loading}

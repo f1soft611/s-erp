@@ -194,6 +194,11 @@ export type F1GridColumn<T extends object> = {
   userOptions?: F1GridUserOption[];
   selectOptionIcon?: (option: F1GridOption) => ReactNode;
   required?: boolean;
+  /**
+   * 헤더와 행 폼 라벨에 필수 표시(*)만 보여 주고 검증은 하지 않는다.
+   * 행마다 조건부로 필수인 칸(예: 단가를 입력할 때만 적용일이 필수)처럼 `required`를 쓰면 빈 행이 모두 검증 오류가 되는 경우에 쓴다.
+   */
+  requiredMark?: boolean;
   validation?: { unique?: boolean | 'digits' };
   inputFormat?: F1GridInputFormat;
   sanitizeInput?: (value: string) => string;

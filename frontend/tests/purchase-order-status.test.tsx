@@ -16,6 +16,9 @@ import {
   toPurchaseOrderStatusFilters,
 } from '../src/pages/materials/order/status/services/purchaseOrderStatus.service';
 import { PurchaseOrderStatusPage } from '../src/pages/materials/order/status/PurchaseOrderStatusPage';
+import { createPurchaseOrderStatusColumns } from '../src/pages/materials/order/status/data/purchaseOrderStatusColumns';
+import { createPurchaseOrderColumns } from '../src/pages/materials/order/create/data/purchaseOrderColumns';
+import { toPageSearchFields } from '../src/shared/components/page-search/searchFields';
 import type {
   PurchaseOrderDetailItem,
   PurchaseOrderItem,
@@ -97,6 +100,27 @@ describe('purchase order status service', () => {
     expect(toPurchaseOrderStatusFilters('', { status: 'ALL' }).status).toBe('ALL');
   });
 
+  it('passes the receipt close condition (미마감/마감) and leaves it out when empty', () => {
+    expect(toPurchaseOrderStatusFilters('', { receiptCloseType: 'OPEN' }).receiptCloseType).toBe('OPEN');
+    expect(toPurchaseOrderStatusFilters('', { receiptCloseType: 'CLOSED' }).receiptCloseType).toBe('CLOSED');
+    expect(toPurchaseOrderStatusFilters('', { receiptCloseType: '' })).not.toHaveProperty('receiptCloseType');
+    expect(toPurchaseOrderStatusFilters('', {})).not.toHaveProperty('receiptCloseType');
+  });
+
+  it('shows arrived and remaining quantity after the order quantity and offers a receipt close search', () => {
+    const columns = createPurchaseOrderStatusColumns();
+    const visible = columns.filter((column) => !column.hidden).map((column) => column.headerName);
+    const qtyAt = visible.indexOf('발주수량');
+    expect(visible.slice(qtyAt, qtyAt + 3)).toEqual(['발주수량', '가입고수량', '입고잔량']);
+    expect(visible).toContain('입고대기마감');
+    const search = toPageSearchFields(columns).find((field) => field.field === 'receiptCloseType');
+    expect(search).toMatchObject({ label: '입고대기마감', searchSpan: 1, group: '선택' });
+    expect(search?.options).toEqual([
+      { value: 'OPEN', label: '미마감' },
+      { value: 'CLOSED', label: '마감' },
+    ]);
+  });
+
   it('calls get, update and cancel endpoints', async () => {
     apiGetMock.mockResolvedValue({ item: orderItem('Y') });
     await getPurchaseOrder(700);
@@ -120,6 +144,28 @@ describe('purchase order status service', () => {
     });
     expect(buildReceiptClosePayload(baseline, baseline)).toEqual({ details: [] });
     expect(buildReceiptClosePayload([{ ...baseline[0], receiptClosed: false }], baseline).details).toEqual([]);
+  });
+
+  it('carries the arrived quantity of a saved detail into the grid row (0 when there is none)', () => {
+    expect(detailToRow({ ...detail(11, 'a'), arrivedQty: 4 }, 4).arrivedQty).toBe(4);
+    expect(detailToRow(detail(12, 'b'), 4).arrivedQty).toBe(0);
+  });
+
+  it('keeps rows that have an arrival read-only for quantity, price, delivery, warehouse, inspect and tax amount', () => {
+    const columns = createPurchaseOrderColumns({
+      editable: true, showReceiptClose: true, taxType: 'TAXABLE', vatIncluded: false, supplierId: 4, warehouseOptions: [],
+    });
+    const arrived = detailToRow({ ...detail(11, 'a'), arrivedQty: 4 }, 4);
+    const free = detailToRow(detail(12, 'b'), 4);
+    for (const field of ['orderQty', 'unitPrice', 'deliveryDt', 'warehouseId', 'inspectAt', 'vatAmt']) {
+      const column = columns.find((item) => item.field === field);
+      const editable = column?.editable;
+      expect(typeof editable, field).toBe('function');
+      expect((editable as (row: typeof arrived) => boolean)(arrived), `${field} arrived`).toBe(false);
+      expect((editable as (row: typeof arrived) => boolean)(free), `${field} free`).toBe(true);
+    }
+    // 비고는 가입고가 있어도 고칠 수 있다
+    expect(columns.find((item) => item.field === 'remark')?.editable).toBe(true);
   });
 
   it('turns a saved detail into a grid row with the confirm comparison', () => {
@@ -404,6 +450,145 @@ describe('PurchaseOrderStatusPage', () => {
     expect(payload.details.map((line) => line.purchaseOrderDetailId)).toEqual([11]);
     expect(payload).toMatchObject({ sourceType: 'CONFIRM', supplierId: 4, taxType: 'TAXABLE', vatIncludedAt: 'N' });
     expect(await within(dialog).findByText(/발주를 수정했습니다/)).toBeInTheDocument();
+  });
+
+  it('locks the header and the rows that have an arrival in the edit dialog and explains why', async () => {
+    current = { ...orderItem('Y'), details: [{ ...detail(11, 'a'), arrivedQty: 4 }, detail(12, 'b')] };
+    await openDetail();
+    fireEvent.click(screen.getByRole('button', { name: '발주 더보기' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+    const dialog = await screen.findByRole('dialog', { name: '발주 수정' });
+    const grid = await within(dialog).findByRole('grid', { name: '발주 상세 목록' });
+    await within(grid).findByText('품목 11');
+    expect(within(dialog).getByText(/가입고가 있는 행 1건은 수량·단가·납기·창고·검사대상을 바꿀 수 없습니다/)).toBeInTheDocument();
+    // 발주일·부가세 설정은 잠기고 비고는 고칠 수 있다
+    expect(within(dialog).getByRole('textbox', { name: /^발주일/ })).toBeDisabled();
+    expect(within(dialog).getByRole('combobox', { name: /부가세구분/ })).toHaveAttribute('aria-disabled', 'true');
+    expect(within(dialog).getByRole('textbox', { name: /^비고/ })).toBeEnabled();
+    // 가입고가 있는 행은 뺄 수 없다
+    fireEvent.click(within(grid).getByLabelText('order-11 행 선택'));
+    fireEvent.click(within(dialog).getByRole('button', { name: '선택 행 빼기' }));
+    expect(await within(dialog).findByText(/가입고가 있는 행은 뺄 수 없습니다/)).toBeInTheDocument();
+    expect(within(grid).getByText('품목 11')).toBeInTheDocument();
+  });
+
+  it('does not lock anything when no row has an arrival', async () => {
+    await openDetail();
+    fireEvent.click(screen.getByRole('button', { name: '발주 더보기' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+    const dialog = await screen.findByRole('dialog', { name: '발주 수정' });
+    await within(dialog).findByRole('grid', { name: '발주 상세 목록' });
+    expect(within(dialog).queryByText(/가입고가 있는 행/)).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('textbox', { name: /^발주일/ })).toBeEnabled();
+    expect(within(dialog).getByRole('combobox', { name: /부가세구분/ })).not.toHaveAttribute('aria-disabled', 'true');
+  });
+
+  async function openEditDialog() {
+    await openDetail();
+    fireEvent.click(screen.getByRole('button', { name: '발주 더보기' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+    const dialog = await screen.findByRole('dialog', { name: '발주 수정' });
+    const grid = await within(dialog).findByRole('grid', { name: '발주 상세 목록' });
+    await within(grid).findByText('품목 11');
+    return { dialog, grid };
+  }
+
+  it('warns about an already printed order in the edit dialog and asks before saving without blocking', async () => {
+    current = { ...orderItem('Y'), printAt: 'Y' };
+    const { dialog, grid } = await openEditDialog();
+    expect(within(dialog).getByText(/이미 출력된 발주서입니다\. 내용을 바꾸면 출력본과 달라집니다/)).toBeInTheDocument();
+
+    fireEvent.click(within(grid).getByLabelText('order-12 행 선택'));
+    fireEvent.click(within(dialog).getByRole('button', { name: '선택 행 빼기' }));
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: '저장' })).toBeEnabled());
+
+    // 취소하면 저장하지 않는다
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    const confirmDialog = await screen.findByRole('dialog', { name: '확인' });
+    expect(within(confirmDialog).getByText(/저장하면 출력본과 내용이 달라집니다/)).toBeInTheDocument();
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '취소' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '확인' })).not.toBeInTheDocument());
+    expect(apiPutMock).not.toHaveBeenCalled();
+
+    // 확인하면 저장한다(막지 않는다)
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    const again = await screen.findByRole('dialog', { name: '확인' });
+    fireEvent.click(within(again).getByRole('button', { name: '확인' }));
+    await waitFor(() => expect(apiPutMock).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not warn or ask when the order has not been printed', async () => {
+    const { dialog, grid } = await openEditDialog();
+    expect(within(dialog).queryByText(/이미 출력된 발주서입니다/)).not.toBeInTheDocument();
+    fireEvent.click(within(grid).getByLabelText('order-12 행 선택'));
+    fireEvent.click(within(dialog).getByRole('button', { name: '선택 행 빼기' }));
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: '저장' })).toBeEnabled());
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(apiPutMock).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('dialog', { name: '확인' })).not.toBeInTheDocument();
+  });
+
+  it('does not ask about the printout when only the receipt-close value is saved', async () => {
+    simulateWideViewport();
+    current = { ...orderItem('Y'), printAt: 'Y' };
+    await openDetail();
+    fireEvent.click(screen.getByRole('button', { name: '발주 더보기' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '입고대기마감' }));
+    const dialog = await screen.findByRole('dialog', { name: '입고대기마감' });
+    const grid = await within(dialog).findByRole('grid', { name: '발주 상세 목록' });
+    await within(grid).findByText('품목 11');
+    expect(within(dialog).queryByText(/이미 출력된 발주서입니다/)).not.toBeInTheDocument();
+    fireEvent.click(within(grid).getByLabelText('입고대기마감 order-12'));
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: '저장' })).toBeEnabled());
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(apiPutMock).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('dialog', { name: '확인' })).not.toBeInTheDocument();
+  });
+
+  it('clears the previous error as soon as the user edits a value again', async () => {
+    const { dialog } = await openEditDialog();
+    const remark = within(dialog).getByRole('textbox', { name: /^비고/ });
+    fireEvent.change(remark, { target: { value: '첫 수정' } });
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: '저장' })).toBeEnabled());
+    apiPutMock.mockRejectedValueOnce(new Error('저장 실패: 서버 오류'));
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    expect(await within(dialog).findByText('저장 실패: 서버 오류')).toBeInTheDocument();
+
+    fireEvent.change(remark, { target: { value: '다시 입력' } });
+    await waitFor(() => expect(within(dialog).queryByText('저장 실패: 서버 오류')).not.toBeInTheDocument());
+  });
+
+  it('shows only the latest result: the success notice and the over-order warning go away on the next edit', async () => {
+    const { dialog } = await openEditDialog();
+    const remark = within(dialog).getByRole('textbox', { name: /^비고/ });
+    fireEvent.change(remark, { target: { value: '수정' } });
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: '저장' })).toBeEnabled());
+    apiPutMock.mockResolvedValueOnce({ item: { ...orderItem('Y'), overOrderedLineNos: [1] } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    expect(await within(dialog).findByText(/발주를 수정했습니다/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/확정수량을 넘겨 발주한 행이 있습니다/)).toBeInTheDocument();
+
+    fireEvent.change(within(dialog).getByRole('textbox', { name: /^비고/ }), { target: { value: '또 수정' } });
+    await waitFor(() => expect(within(dialog).queryByText(/발주를 수정했습니다/)).not.toBeInTheDocument());
+    expect(within(dialog).queryByText(/확정수량을 넘겨 발주한 행이 있습니다/)).not.toBeInTheDocument();
+  });
+
+  it('keeps state-based notices (printed order, locked rows) while clearing the transient messages', async () => {
+    current = { ...orderItem('Y'), printAt: 'Y', details: [{ ...detail(11, 'a'), arrivedQty: 4 }, detail(12, 'b')] };
+    const { dialog } = await openEditDialog();
+    const remark = within(dialog).getByRole('textbox', { name: /^비고/ });
+    fireEvent.change(remark, { target: { value: '수정' } });
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: '저장' })).toBeEnabled());
+    apiPutMock.mockRejectedValueOnce(new Error('저장 실패: 서버 오류'));
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    const confirmDialog = await screen.findByRole('dialog', { name: '확인' });
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '확인' }));
+    expect(await within(dialog).findByText('저장 실패: 서버 오류')).toBeInTheDocument();
+
+    fireEvent.change(remark, { target: { value: '수정 다시' } });
+    await waitFor(() => expect(within(dialog).queryByText('저장 실패: 서버 오류')).not.toBeInTheDocument());
+    expect(within(dialog).getByText(/이미 출력된 발주서입니다\. 내용을 바꾸면/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/가입고가 있는 행 1건은/)).toBeInTheDocument();
   });
 
   it('offers the receipt-close menu only for active orders', async () => {

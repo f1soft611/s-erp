@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { toPageSearchFields } from '../src/shared/components/page-search/searchFields';
-import { createClosingSearchColumns } from '../src/pages/materials/receipt/closing/data/materialReceiptClosingColumns';
-import { createMaterialArrivalStatusColumns } from '../src/pages/materials/arrival/status/data/materialArrivalStatusColumns';
-import { createMaterialReceiptStatusColumns } from '../src/pages/materials/receipt/status/data/materialReceiptStatusColumns';
+import { createClosingSearchColumns } from '../src/pages/materials/receipt/closing/data/purchaseReceiptClosingColumns';
+import { createPurchaseArrivalStatusColumns } from '../src/pages/materials/arrival/status/data/purchaseArrivalStatusColumns';
+import { createPurchaseReceiptStatusColumns } from '../src/pages/materials/receipt/status/data/purchaseReceiptStatusColumns';
 import { createPurchaseOrderStatusColumns } from '../src/pages/materials/order/status/data/purchaseOrderStatusColumns';
 import { createPurchaseRequestStatusColumns } from '../src/pages/materials/request/status/data/purchaseRequestStatusColumns';
-import { createMaterialInspectionStatusColumns } from '../src/pages/quality/inspect/status/data/materialInspectionStatusColumns';
+import { createQualityInspectionStatusColumns } from '../src/pages/quality/inspect/status/data/qualityInspectionStatusColumns';
 import { createSalesOrderStatusColumns } from '../src/pages/sales/order/status/data/salesOrderStatusColumns';
 
 type Layout = Array<[label: string, span: number, group: string]>;
@@ -36,13 +36,13 @@ describe('purchase status search fields follow the sales order status layout', (
     expect(layoutOf(createPurchaseOrderStatusColumns())).toEqual([
       ['발주일', 2, '발주일'],
       ['발주번호', 1, '텍스트'], ['구매처', 1, '텍스트'], ['품목', 1, '텍스트'],
-      ['상태', 1, '선택'], ['출처', 1, '선택'],
+      ['상태', 1, '선택'], ['출처', 1, '선택'], ['입고대기마감', 1, '선택'],
       ['납기일', 2, '부가날짜'],
     ]);
   });
 
   it('arrival status', () => {
-    expect(layoutOf(createMaterialArrivalStatusColumns())).toEqual([
+    expect(layoutOf(createPurchaseArrivalStatusColumns())).toEqual([
       ['가입고일', 2, '가입고일'],
       ['가입고번호', 1, '텍스트'], ['구매처', 1, '텍스트'], ['발주번호', 1, '텍스트'], ['품목', 1, '텍스트'],
       ['상태', 1, '선택'],
@@ -50,7 +50,7 @@ describe('purchase status search fields follow the sales order status layout', (
   });
 
   it('receipt status', () => {
-    expect(layoutOf(createMaterialReceiptStatusColumns())).toEqual([
+    expect(layoutOf(createPurchaseReceiptStatusColumns())).toEqual([
       ['입고일', 2, '입고일'],
       ['입고번호', 1, '텍스트'], ['구매처', 1, '텍스트'], ['가입고번호', 1, '텍스트'], ['발주번호', 1, '텍스트'],
       ['품목', 1, '텍스트'],
@@ -59,7 +59,7 @@ describe('purchase status search fields follow the sales order status layout', (
   });
 
   it('inspection status', () => {
-    expect(layoutOf(createMaterialInspectionStatusColumns())).toEqual([
+    expect(layoutOf(createQualityInspectionStatusColumns())).toEqual([
       ['검사일', 2, '검사일'],
       ['검사번호', 1, '텍스트'], ['검사자', 1, '텍스트'], ['가입고번호', 1, '텍스트'], ['구매처', 1, '텍스트'],
       ['발주번호', 1, '텍스트'], ['품목', 1, '텍스트'],
@@ -78,8 +78,8 @@ describe('purchase status search fields follow the sales order status layout', (
   it('keeps the required, default and empty-choice settings of the status and date fields', () => {
     const fieldsOf = (columns: unknown[]) => toPageSearchFields(columns as never[]);
     for (const columns of [
-      createPurchaseOrderStatusColumns(), createMaterialArrivalStatusColumns(),
-      createMaterialReceiptStatusColumns(), createMaterialInspectionStatusColumns(),
+      createPurchaseOrderStatusColumns(), createPurchaseArrivalStatusColumns(),
+      createPurchaseReceiptStatusColumns(), createQualityInspectionStatusColumns(),
     ]) {
       const status = fieldsOf(columns).find((field) => field.label === '상태');
       expect(status).toMatchObject({ required: true, allowEmpty: false });

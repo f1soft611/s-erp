@@ -1,0 +1,319 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="QualityInspectionDAO">
+
+    <!-- 가입고 행별 유효(정상) 검사의 합격·불합격 합. excludeInspectionId가 있으면 그 검사는 뺀다. -->
+    <sql id="inspectedQtySubquery">
+        (SELECT idt.purchase_arrival_detail_id AS purchase_arrival_detail_id,
+                sum(idt.pass_qty) AS pass_qty,
+                sum(idt.fail_qty) AS fail_qty
+         FROM tb_quality_inspection_dt idt
+         JOIN tb_quality_inspection_hd ih
+           ON ih.quality_inspection_id = idt.quality_inspection_id
+          AND ih.tenant_id = idt.tenant_id
+         WHERE ih.tenant_id = #{tenantId, jdbcType=BIGINT}
+           AND ih.use_at = 'Y'
+           AND idt.purchase_arrival_detail_id IS NOT NULL
+        <if test="excludeInspectionId != null">
+           AND ih.quality_inspection_id &lt;&gt; #{excludeInspectionId, jdbcType=BIGINT}
+        </if>
+         GROUP BY idt.purchase_arrival_detail_id)
+    </sql>
+
+    <!-- 검사 대상(inspect_at='Y') 가입고 행 중 정상 가입고이며 검사 대기량이 남은 행 -->
+    <sql id="candidateFrom">
+        FROM tb_purchase_arrival_dt ad
+        JOIN tb_purchase_arrival_hd ah
+          ON ah.purchase_arrival_id = ad.purchase_arrival_id
+         AND ah.tenant_id = ad.tenant_id
+        JOIN tb_purchase_order_dt od
+          ON od.purchase_order_detail_id = ad.purchase_order_detail_id
+        JOIN tb_purchase_order_hd oh
+          ON oh.purchase_order_id = od.purchase_order_id
+         AND oh.tenant_id = od.tenant_id
+        LEFT JOIN tb_customer_info c
+          ON c.customer_id = ah.supplier_id
+         AND c.tenant_id = ah.tenant_id
+        LEFT JOIN tb_material_info m
+          ON m.material_id = ad.material_id
+         AND m.tenant_id = ad.tenant_id
+        LEFT JOIN <include refid="inspectedQtySubquery"/> ins
+          ON ins.purchase_arrival_detail_id = ad.purchase_arrival_detail_id
+        WHERE ad.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND ad.inspect_at = 'Y'
+          AND ah.use_at = 'Y'
+          AND ad.arrival_qty - COALESCE(ins.pass_qty, 0) - COALESCE(ins.fail_qty, 0) &gt; 0
+    </sql>
+
+    <select id="selectCandidates" parameterType="map"
+            resultType="egovframework.let.quality.inspect.create.domain.model.QualityInspectionCandidateVO">
+        SELECT ad.purchase_arrival_detail_id AS purchaseArrivalDetailId,
+               ah.purchase_arrival_id AS purchaseArrivalId,
+               ah.arrival_no AS arrivalNo,
+               ah.arrival_dt AS arrivalDt,
+               c.customer_name AS supplierName,
+               ad.purchase_order_detail_id AS purchaseOrderDetailId,
+               oh.order_no AS orderNo,
+               ad.material_id AS materialId,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.material_spec AS materialSpec,
+               m.unit AS unit,
+               ad.arrival_qty AS arrivalQty,
+               COALESCE(ins.pass_qty, 0) + COALESCE(ins.fail_qty, 0) AS inspectedQty,
+               COALESCE(ins.pass_qty, 0) AS passQty,
+               COALESCE(ins.fail_qty, 0) AS failQty,
+               ad.arrival_qty - COALESCE(ins.pass_qty, 0) - COALESCE(ins.fail_qty, 0) AS waitQty
+        <include refid="candidateFrom"/>
+        <if test="fromDt != null">
+          AND ah.arrival_dt &gt;= CAST(#{fromDt} AS date)
+        </if>
+        <if test="toDt != null">
+          AND ah.arrival_dt &lt;= CAST(#{toDt} AS date)
+        </if>
+        <if test="supplierKeyword != null">
+          AND (c.customer_name ILIKE '%' || #{supplierKeyword} || '%'
+               OR c.customer_code ILIKE '%' || #{supplierKeyword} || '%')
+        </if>
+        <if test="materialKeyword != null">
+          AND (m.material_code ILIKE '%' || #{materialKeyword} || '%'
+               OR m.material_name ILIKE '%' || #{materialKeyword} || '%'
+               OR m.material_spec ILIKE '%' || #{materialKeyword} || '%')
+        </if>
+        <if test="keyword != null">
+          AND (ah.arrival_no ILIKE '%' || #{keyword} || '%'
+               OR oh.order_no ILIKE '%' || #{keyword} || '%'
+               OR c.customer_name ILIKE '%' || #{keyword} || '%'
+               OR m.material_code ILIKE '%' || #{keyword} || '%'
+               OR m.material_name ILIKE '%' || #{keyword} || '%')
+        </if>
+        ORDER BY ah.arrival_dt DESC, ah.arrival_no DESC, ad.line_no
+        LIMIT 500
+    </select>
+
+    <!-- 조회 조건과 무관한 검사 대기 행의 전체 건수(등록 화면의 "검사 대기 N건" 안내용) -->
+    <select id="countWaitingCandidates" parameterType="map" resultType="integer">
+        SELECT count(*)
+        <include refid="candidateFrom"/>
+    </select>
+
+    <!-- 검사 저장 전에 가입고 행을 ID 순서로 조회·잠금한다. 잠근 뒤 forUpdate=false로 다시 읽어 최신 검사량을 쓴다. -->
+    <select id="selectArrivalRows" parameterType="map"
+            resultType="egovframework.let.quality.inspect.create.domain.model.QualityInspectionArrivalRowVO">
+        SELECT ad.purchase_arrival_detail_id AS purchaseArrivalDetailId,
+               ad.purchase_arrival_id AS purchaseArrivalId,
+               ah.arrival_no AS arrivalNo,
+               ah.use_at AS arrivalUseAt,
+               ad.inspect_at AS inspectAt,
+               ad.purchase_order_detail_id AS purchaseOrderDetailId,
+               ad.material_id AS materialId,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               ad.arrival_qty AS arrivalQty,
+               COALESCE(ins.pass_qty, 0) + COALESCE(ins.fail_qty, 0) AS inspectedQty
+        FROM tb_purchase_arrival_dt ad
+        JOIN tb_purchase_arrival_hd ah
+          ON ah.purchase_arrival_id = ad.purchase_arrival_id
+         AND ah.tenant_id = ad.tenant_id
+        LEFT JOIN tb_material_info m
+          ON m.material_id = ad.material_id
+         AND m.tenant_id = ad.tenant_id
+        LEFT JOIN <include refid="inspectedQtySubquery"/> ins
+          ON ins.purchase_arrival_detail_id = ad.purchase_arrival_detail_id
+        WHERE ad.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND ad.purchase_arrival_detail_id IN
+          <foreach collection="detailIds" item="id" open="(" separator="," close=")">#{id, jdbcType=BIGINT}</foreach>
+        ORDER BY ad.purchase_arrival_detail_id
+        <if test="forUpdate">
+        FOR UPDATE OF ad
+        </if>
+    </select>
+
+    <select id="selectInspector" parameterType="map"
+            resultType="egovframework.let.materials.request.create.domain.model.PurchaseRequestRequesterVO">
+        SELECT u.user_id AS userId,
+               u.department_id AS departmentId
+        FROM tb_user u
+        WHERE u.user_id = #{userId, jdbcType=BIGINT}
+          AND u.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND u.use_at = 'Y'
+    </select>
+
+    <!-- RETURNING을 쓰는 INSERT는 select로 선언되므로 flushCache로 같은 트랜잭션의 조회 캐시를 비운다. -->
+    <select id="insertInspectionHeader" parameterType="map" resultType="long" flushCache="true">
+        INSERT INTO tb_quality_inspection_hd (
+            tenant_id, inspection_no, inspection_dt, inspector_id, inspector_dept_id, remark, created_by
+        )
+        SELECT t.tenant_id, #{inspectionNo}, CAST(#{inspectionDt} AS date), #{inspectorId, jdbcType=BIGINT},
+               #{inspectorDeptId, jdbcType=BIGINT}, #{remark}, #{createdBy}
+        FROM tb_tenant t
+        WHERE t.tenant_id = #{tenantId, jdbcType=BIGINT}
+        RETURNING quality_inspection_id
+    </select>
+
+    <select id="insertInspectionDetail" parameterType="map" resultType="long" flushCache="true">
+        INSERT INTO tb_quality_inspection_dt (
+            quality_inspection_id, tenant_id, line_no, purchase_arrival_detail_id, arrival_no,
+            purchase_order_detail_id, material_id, pass_qty, fail_qty, remark, created_by
+        ) VALUES (
+            #{qualityInspectionId, jdbcType=BIGINT}, #{tenantId, jdbcType=BIGINT}, #{lineNo},
+            #{purchaseArrivalDetailId, jdbcType=BIGINT}, #{arrivalNo},
+            #{purchaseOrderDetailId, jdbcType=BIGINT}, #{materialId, jdbcType=BIGINT},
+            #{passQty, jdbcType=NUMERIC}, #{failQty, jdbcType=NUMERIC}, #{remark}, #{createdBy}
+        )
+        RETURNING quality_inspection_detail_id
+    </select>
+
+    <!-- 수정·취소 전에 검사 헤더를 잠근다. 없으면 null. -->
+    <select id="selectInspectionForUpdate" parameterType="map"
+            resultType="egovframework.let.quality.inspect.create.domain.model.QualityInspectionVO">
+        SELECT ih.quality_inspection_id AS qualityInspectionId,
+               ih.inspection_no AS inspectionNo,
+               ih.inspection_dt AS inspectionDt,
+               ih.inspector_id AS inspectorId,
+               ih.use_at AS useAt
+        FROM tb_quality_inspection_hd ih
+        WHERE ih.quality_inspection_id = #{qualityInspectionId, jdbcType=BIGINT}
+          AND ih.tenant_id = #{tenantId, jdbcType=BIGINT}
+        FOR UPDATE OF ih
+    </select>
+
+    <update id="updateInspectionHeader" parameterType="map">
+        UPDATE tb_quality_inspection_hd
+        SET inspection_dt = CAST(#{inspectionDt} AS date),
+            inspector_id = #{inspectorId, jdbcType=BIGINT},
+            inspector_dept_id = #{inspectorDeptId, jdbcType=BIGINT},
+            remark = #{remark},
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE quality_inspection_id = #{qualityInspectionId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND use_at = 'Y'
+    </update>
+
+    <update id="updateInspectionDetail" parameterType="map">
+        UPDATE tb_quality_inspection_dt
+        SET line_no = #{lineNo},
+            pass_qty = #{passQty, jdbcType=NUMERIC},
+            fail_qty = #{failQty, jdbcType=NUMERIC},
+            remark = #{remark},
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE quality_inspection_detail_id = #{qualityInspectionDetailId, jdbcType=BIGINT}
+          AND quality_inspection_id = #{qualityInspectionId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+    </update>
+
+    <delete id="deleteInspectionDetail" parameterType="map">
+        DELETE FROM tb_quality_inspection_dt
+        WHERE quality_inspection_detail_id = #{qualityInspectionDetailId, jdbcType=BIGINT}
+          AND quality_inspection_id = #{qualityInspectionId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+    </delete>
+
+    <update id="cancelInspectionHeader" parameterType="map">
+        UPDATE tb_quality_inspection_hd
+        SET use_at = 'N',
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE quality_inspection_id = #{qualityInspectionId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND use_at = 'Y'
+    </update>
+
+    <select id="selectInspection" parameterType="map"
+            resultType="egovframework.let.quality.inspect.create.domain.model.QualityInspectionVO">
+        SELECT ih.quality_inspection_id AS qualityInspectionId,
+               ih.inspection_no AS inspectionNo,
+               ih.inspection_dt AS inspectionDt,
+               ih.inspector_id AS inspectorId,
+               u.user_nm AS inspectorName,
+               ih.remark AS remark,
+               ih.use_at AS useAt,
+               CASE WHEN ih.use_at = 'Y' THEN 'ACTIVE' ELSE 'CANCELED' END AS status,
+               ih.created_by AS createdBy,
+               ih.created_at AS createdAt,
+               ih.updated_by AS updatedBy,
+               ih.updated_at AS updatedAt
+        FROM tb_quality_inspection_hd ih
+        LEFT JOIN tb_user u
+          ON u.user_id = ih.inspector_id
+        WHERE ih.quality_inspection_id = #{qualityInspectionId, jdbcType=BIGINT}
+          AND ih.tenant_id = #{tenantId, jdbcType=BIGINT}
+    </select>
+
+    <select id="selectInspectionDetails" parameterType="map"
+            resultType="egovframework.let.quality.inspect.create.domain.model.QualityInspectionDetailVO">
+        SELECT idt.quality_inspection_detail_id AS qualityInspectionDetailId,
+               idt.line_no AS lineNo,
+               idt.purchase_arrival_detail_id AS purchaseArrivalDetailId,
+               ad.purchase_arrival_id AS purchaseArrivalId,
+               (ah.use_at = 'Y') AS arrivalLinked,
+               idt.arrival_no AS arrivalNo,
+               c.customer_name AS supplierName,
+               idt.purchase_order_detail_id AS purchaseOrderDetailId,
+               oh.order_no AS orderNo,
+               idt.material_id AS materialId,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.material_spec AS materialSpec,
+               m.unit AS unit,
+               ad.arrival_qty AS arrivalQty,
+               COALESCE(oth.inspected_qty, 0) AS otherInspectedQty,
+               ad.arrival_qty - COALESCE(oth.inspected_qty, 0) AS maxQty,
+               idt.pass_qty AS passQty,
+               idt.fail_qty AS failQty,
+               idt.pass_qty + idt.fail_qty AS inspectQty,
+               COALESCE((SELECT sum(rd.receipt_qty)
+                           FROM tb_purchase_receipt_dt rd
+                           JOIN tb_purchase_receipt_hd rh
+                             ON rh.purchase_receipt_id = rd.purchase_receipt_id
+                            AND rh.tenant_id = rd.tenant_id
+                          WHERE rd.quality_inspection_detail_id = idt.quality_inspection_detail_id
+                            AND rh.tenant_id = #{tenantId, jdbcType=BIGINT}
+                            AND rh.use_at = 'Y'), 0) AS receivedQty,
+               (SELECT rh.receipt_no
+                  FROM tb_purchase_receipt_dt rd
+                  JOIN tb_purchase_receipt_hd rh
+                    ON rh.purchase_receipt_id = rd.purchase_receipt_id
+                   AND rh.tenant_id = rd.tenant_id
+                 WHERE rd.quality_inspection_detail_id = idt.quality_inspection_detail_id
+                   AND rh.tenant_id = #{tenantId, jdbcType=BIGINT}
+                   AND rh.use_at = 'Y'
+                 ORDER BY rh.purchase_receipt_id DESC
+                 LIMIT 1) AS receiptNo,
+               idt.remark AS remark
+        FROM tb_quality_inspection_dt idt
+        LEFT JOIN tb_purchase_arrival_dt ad
+          ON ad.purchase_arrival_detail_id = idt.purchase_arrival_detail_id
+        LEFT JOIN tb_purchase_arrival_hd ah
+          ON ah.purchase_arrival_id = ad.purchase_arrival_id
+         AND ah.tenant_id = ad.tenant_id
+        LEFT JOIN tb_customer_info c
+          ON c.customer_id = ah.supplier_id
+         AND c.tenant_id = ah.tenant_id
+        JOIN tb_purchase_order_dt od
+          ON od.purchase_order_detail_id = idt.purchase_order_detail_id
+        JOIN tb_purchase_order_hd oh
+          ON oh.purchase_order_id = od.purchase_order_id
+         AND oh.tenant_id = od.tenant_id
+        LEFT JOIN tb_material_info m
+          ON m.material_id = idt.material_id
+         AND m.tenant_id = idt.tenant_id
+        LEFT JOIN (SELECT o.purchase_arrival_detail_id AS purchase_arrival_detail_id,
+                          sum(o.pass_qty + o.fail_qty) AS inspected_qty
+                   FROM tb_quality_inspection_dt o
+                   JOIN tb_quality_inspection_hd oi
+                     ON oi.quality_inspection_id = o.quality_inspection_id
+                    AND oi.tenant_id = o.tenant_id
+                   WHERE oi.tenant_id = #{tenantId, jdbcType=BIGINT}
+                     AND oi.use_at = 'Y'
+                     AND o.quality_inspection_id &lt;&gt; #{qualityInspectionId, jdbcType=BIGINT}
+                     AND o.purchase_arrival_detail_id IS NOT NULL
+                   GROUP BY o.purchase_arrival_detail_id) oth
+          ON oth.purchase_arrival_detail_id = idt.purchase_arrival_detail_id
+        WHERE idt.quality_inspection_id = #{qualityInspectionId, jdbcType=BIGINT}
+          AND idt.tenant_id = #{tenantId, jdbcType=BIGINT}
+        ORDER BY idt.line_no
+    </select>
+</mapper>

@@ -44,9 +44,16 @@ class ItemPartnerPriceBatchServiceImplTest {
     @Test
     void rejectsDeletedRowsAndDuplicateRequestBusinessKeysBeforeWriting() {
         ItemPartnerPriceBatchSaveRequestVO request = request();
-        request.getPrices().setDeletedRows(request.getPrices().getInsertedRows());
+        ItemPartnerPriceChangeVO sameAsUpdated = new ItemPartnerPriceChangeVO();
+        sameAsUpdated.setPriceId("12");
+        request.getPrices().setDeletedRows(Collections.singletonList(sameAsUpdated));
         assertThatThrownBy(() -> batch.saveBatch(9L, "101", request))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("삭제");
+        ItemPartnerPriceChangeVO deleted = new ItemPartnerPriceChangeVO();
+        deleted.setPriceId("77");
+        request.getPrices().setDeletedRows(Arrays.asList(deleted, deleted));
+        assertThatThrownBy(() -> batch.saveBatch(9L, "101", request))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("중복");
         request.getPrices().setDeletedRows(Collections.emptyList());
         ItemPartnerPriceChangeVO repeated = row("new-price-2");
         request.getPrices().setInsertedRows(Arrays.asList(request.getPrices().getInsertedRows().get(0), repeated));
@@ -54,6 +61,43 @@ class ItemPartnerPriceBatchServiceImplTest {
         assertThatThrownBy(() -> batch.saveBatch(9L, "101", request))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("중복");
         verifyNoInteractions(service);
+    }
+
+    @Test
+    void deletesFirstThenUpdatesThenInserts() throws Exception {
+        ItemPartnerPriceVO inserted = new ItemPartnerPriceVO();
+        inserted.setPriceId(44L);
+        ItemPartnerPriceVO updated = new ItemPartnerPriceVO();
+        updated.setPriceId(12L);
+        when(service.createPrice(eq(9L), eq("101"), any())).thenReturn(inserted);
+        when(service.updatePrice(eq(9L), eq("101"), eq(12L), any())).thenReturn(updated);
+        ItemPartnerPriceBatchSaveRequestVO request = request();
+        ItemPartnerPriceChangeVO deleted = new ItemPartnerPriceChangeVO();
+        deleted.setPriceId("77");
+        request.getPrices().setDeletedRows(Collections.singletonList(deleted));
+
+        batch.saveBatch(9L, "101", request);
+
+        org.mockito.InOrder order = inOrder(service);
+        order.verify(service).deletePrice(9L, "101", 77L);
+        order.verify(service).updatePrice(eq(9L), eq("101"), eq(12L), any());
+        order.verify(service).createPrice(eq(9L), eq("101"), any());
+    }
+
+    @Test
+    void acceptsADeleteOnlyRequest() throws Exception {
+        ItemPartnerPriceBatchSaveRequestVO request = new ItemPartnerPriceBatchSaveRequestVO();
+        ItemPartnerPriceBatchChangeSetVO changes = new ItemPartnerPriceBatchChangeSetVO();
+        ItemPartnerPriceChangeVO deleted = new ItemPartnerPriceChangeVO();
+        deleted.setPriceId("77");
+        changes.setInsertedRows(Collections.emptyList());
+        changes.setUpdatedRows(Collections.emptyList());
+        changes.setDeletedRows(Collections.singletonList(deleted));
+        request.setPrices(changes);
+
+        batch.saveBatch(9L, "101", request);
+
+        verify(service).deletePrice(9L, "101", 77L);
     }
 
     @Test

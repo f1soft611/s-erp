@@ -41,13 +41,13 @@ import { PurchaseRequestCreatePage } from '../../materials/request/create/Purcha
 import { PurchaseRequestStatusPage } from '../../materials/request/status/PurchaseRequestStatusPage';
 import { PurchaseOrderCreatePage } from '../../materials/order/create/PurchaseOrderCreatePage';
 import { PurchaseOrderStatusPage } from '../../materials/order/status/PurchaseOrderStatusPage';
-import { MaterialArrivalCreatePage } from '../../materials/arrival/create/MaterialArrivalCreatePage';
-import { MaterialArrivalStatusPage } from '../../materials/arrival/status/MaterialArrivalStatusPage';
-import { MaterialReceiptClosingPage } from '../../materials/receipt/closing/MaterialReceiptClosingPage';
-import { MaterialReceiptCreatePage } from '../../materials/receipt/create/MaterialReceiptCreatePage';
-import { MaterialInspectionCreatePage } from '../../quality/inspect/create/MaterialInspectionCreatePage';
-import { MaterialInspectionStatusPage } from '../../quality/inspect/status/MaterialInspectionStatusPage';
-import { MaterialReceiptStatusPage } from '../../materials/receipt/status/MaterialReceiptStatusPage';import { PurchaseRequestConfirmPage } from '../../materials/request/confirm/PurchaseRequestConfirmPage';
+import { PurchaseArrivalCreatePage } from '../../materials/arrival/create/PurchaseArrivalCreatePage';
+import { PurchaseArrivalStatusPage } from '../../materials/arrival/status/PurchaseArrivalStatusPage';
+import { PurchaseReceiptClosingPage } from '../../materials/receipt/closing/PurchaseReceiptClosingPage';
+import { PurchaseReceiptCreatePage } from '../../materials/receipt/create/PurchaseReceiptCreatePage';
+import { QualityInspectionCreatePage } from '../../quality/inspect/create/QualityInspectionCreatePage';
+import { QualityInspectionStatusPage } from '../../quality/inspect/status/QualityInspectionStatusPage';
+import { PurchaseReceiptStatusPage } from '../../materials/receipt/status/PurchaseReceiptStatusPage';import { PurchaseRequestConfirmPage } from '../../materials/request/confirm/PurchaseRequestConfirmPage';
 import { DraftFormManagementPage } from '../../co/workflow/form/DraftFormManagementPage';
 import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
 import { F1GridDocsPage } from '../../f1-grid-docs/F1GridDocsPage';
@@ -314,25 +314,25 @@ export function DashboardContent({
   }
 
   if (selectedModule.id === 'materials' && (currentPageKey === 'arrival-create' || currentPageKey === 'arrival-status')) {
-    const MaterialArrivalPage = currentPageKey === 'arrival-create' ? MaterialArrivalCreatePage : MaterialArrivalStatusPage;
-    return <MaterialArrivalPage selectedModule={selectedModule} currentMenuName={currentMenuName}
+    const PurchaseArrivalPage = currentPageKey === 'arrival-create' ? PurchaseArrivalCreatePage : PurchaseArrivalStatusPage;
+    return <PurchaseArrivalPage selectedModule={selectedModule} currentMenuName={currentMenuName}
       content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
   }
 
   if (selectedModule.id === 'materials' && currentPageKey === 'receipt-closing') {
-    return <MaterialReceiptClosingPage selectedModule={selectedModule} currentMenuName={currentMenuName}
+    return <PurchaseReceiptClosingPage selectedModule={selectedModule} currentMenuName={currentMenuName}
       content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
   }
 
   if (selectedModule.id === 'materials' && (currentPageKey === 'receipt-create' || currentPageKey === 'receipt-status')) {
-    const MaterialReceiptPage = currentPageKey === 'receipt-create' ? MaterialReceiptCreatePage : MaterialReceiptStatusPage;
-    return <MaterialReceiptPage selectedModule={selectedModule} currentMenuName={currentMenuName}
+    const PurchaseReceiptPage = currentPageKey === 'receipt-create' ? PurchaseReceiptCreatePage : PurchaseReceiptStatusPage;
+    return <PurchaseReceiptPage selectedModule={selectedModule} currentMenuName={currentMenuName}
       content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
   }
 
   if (selectedModule.id === 'quality' && (currentPageKey === 'inspect-create' || currentPageKey === 'inspect-status')) {
-    const MaterialInspectionPage = currentPageKey === 'inspect-create' ? MaterialInspectionCreatePage : MaterialInspectionStatusPage;
-    return <MaterialInspectionPage selectedModule={selectedModule} currentMenuName={currentMenuName}
+    const QualityInspectionPage = currentPageKey === 'inspect-create' ? QualityInspectionCreatePage : QualityInspectionStatusPage;
+    return <QualityInspectionPage selectedModule={selectedModule} currentMenuName={currentMenuName}
       content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
   }
 

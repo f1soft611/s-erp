@@ -24,6 +24,10 @@ export type PurchaseOrderStatusRow = {
   materialSpec: string | null;
   unit: string | null;
   orderQty: number;
+  /** 가입고수량: 유효 가입고 합 − 유효 수입검사 불합격 합 */
+  arrivedQty: number;
+  /** 입고잔량: 발주수량 − 가입고수량(0 미만이면 0) */
+  remainQty: number;
   unitPrice: number | null;
   deliveryDt: string | null;
   warehouseName: string | null;
@@ -46,6 +50,8 @@ export type PurchaseOrderStatusFilters = {
   supplierKeyword?: string;
   status?: string;
   sourceType?: string;
+  /** OPEN 입고대기 미마감, CLOSED 마감. 없으면 전체 */
+  receiptCloseType?: string;
   materialKeyword?: string;
   deliveryDtFrom?: string;
   deliveryDtTo?: string;

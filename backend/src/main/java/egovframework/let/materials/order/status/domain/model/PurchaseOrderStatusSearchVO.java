@@ -49,4 +49,7 @@ public class PurchaseOrderStatusSearchVO implements Serializable {
 
     @Schema(description = "CONFIRM / DIRECT", example = "CONFIRM")
     private String sourceType;
+
+    @Schema(description = "입고대기마감 조건. OPEN 미마감, CLOSED 마감. 값이 없으면 전체", example = "OPEN")
+    private String receiptCloseType;
 }

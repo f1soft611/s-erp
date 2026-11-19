@@ -49,6 +49,7 @@ public class PurchaseRequestConfirmServiceImpl extends EgovAbstractServiceImpl
 
     static final String STATUS_REQUESTED = "REQUESTED";
     static final String DEFAULT_CURRENCY = "KRW";
+    static final String DEFAULT_TAX_TYPE = "TAXABLE";
     static final String CONFIRM_NO_GENERATOR_KEY = "MATERIAL_CONFIRM_NO";
     static final int MAX_DETAILS_PER_CONFIRM = 200;
     private static final int CONFIRM_NO_MAX_LENGTH = 30;
@@ -67,10 +68,14 @@ public class PurchaseRequestConfirmServiceImpl extends EgovAbstractServiceImpl
     }
 
     @Override
-    public List<PurchaseRequestConfirmCandidateVO> listCandidates(Long tenantId, String keyword) throws Exception {
+    public List<PurchaseRequestConfirmCandidateVO> listCandidates(Long tenantId, String keyword, LocalDate fromDt,
+            LocalDate toDt) throws Exception {
         requireTenant(tenantId);
+        requireOrderedRange(fromDt, toDt);
         Map<String, Object> params = tenantParams(tenantId);
         params.put("keyword", normalize(keyword));
+        params.put("fromDt", fromDt);
+        params.put("toDt", toDt);
         return confirmDAO.selectCandidates(params);
     }
 
@@ -86,13 +91,16 @@ public class PurchaseRequestConfirmServiceImpl extends EgovAbstractServiceImpl
     }
 
     @Override
-    public List<PurchaseConfirmListItemVO> listConfirms(Long tenantId, String keyword, String status)
-            throws Exception {
+    public List<PurchaseConfirmListItemVO> listConfirms(Long tenantId, String keyword, String status, LocalDate fromDt,
+            LocalDate toDt) throws Exception {
         requireTenant(tenantId);
+        requireOrderedRange(fromDt, toDt);
         String normalized = normalize(status);
         normalized = normalized == null ? "ACTIVE" : normalized.toUpperCase(Locale.ROOT);
         Map<String, Object> params = tenantParams(tenantId);
         params.put("keyword", normalize(keyword));
+        params.put("fromDt", fromDt);
+        params.put("toDt", toDt);
         if ("ACTIVE".equals(normalized)) {
             params.put("useAt", "Y");
         } else if ("CANCELED".equals(normalized)) {
@@ -270,7 +278,21 @@ public class PurchaseRequestConfirmServiceImpl extends EgovAbstractServiceImpl
         params.put("supplierId", supplierId);
         params.put("baseDt", baseDt);
         PurchaseUnitPriceVO price = confirmDAO.selectDefaultUnitPrice(params);
-        if (price != null && !StringUtils.hasText(price.getCurrency())) {
+        if (price == null) {
+            return null;
+        }
+        if (!StringUtils.hasText(price.getTaxType())) {
+            price.setTaxType(DEFAULT_TAX_TYPE);
+        }
+        if (!StringUtils.hasText(price.getVatIncludedAt())) {
+            price.setVatIncludedAt("N");
+        }
+        if (price.getUnitPrice() == null && price.getForeignUnitPrice() != null) {
+            // 외화단가만 등록된 단가는 외화통화 + 외화단가를 기본으로 설정한다.
+            price.setUnitPrice(price.getForeignUnitPrice());
+            price.setCurrency(StringUtils.hasText(price.getForeignCurrency())
+                    ? price.getForeignCurrency() : DEFAULT_CURRENCY);
+        } else {
             price.setCurrency(DEFAULT_CURRENCY);
         }
         return price;
@@ -308,6 +330,19 @@ public class PurchaseRequestConfirmServiceImpl extends EgovAbstractServiceImpl
         } else if (!CURRENCY_PATTERN.matcher(currencyCode).matches()) {
             throw badRequest("통화 코드가 올바르지 않습니다.");
         }
+        String taxType = normalize(detail.getTaxType());
+        if (taxType == null) {
+            taxType = DEFAULT_TAX_TYPE;
+        }
+        String vatIncludedAt = normalize(detail.getVatIncludedAt());
+        if (vatIncludedAt == null) {
+            vatIncludedAt = "N";
+        } else if (!"Y".equals(vatIncludedAt) && !"N".equals(vatIncludedAt)) {
+            throw badRequest("부가세 포함 여부는 Y 또는 N이어야 합니다.");
+        }
+        if ("Y".equals(vatIncludedAt) && !DEFAULT_TAX_TYPE.equals(taxType)) {
+            throw badRequest("부가세 포함은 과세일 때만 선택할 수 있습니다.");
+        }
         String confirmRemark = normalize(detail.getConfirmRemark());
         if (confirmRemark != null && confirmRemark.length() > REMARK_MAX_LENGTH) {
             throw badRequest("확정비고는 " + REMARK_MAX_LENGTH + "자 이내로 입력해 주세요.");
@@ -317,6 +352,9 @@ public class PurchaseRequestConfirmServiceImpl extends EgovAbstractServiceImpl
         }
         if (!confirmDAO.existsOrderType(referenceParams(tenantId, "code", orderType))) {
             throw badRequest("사용할 수 없는 발주구분입니다.");
+        }
+        if (!confirmDAO.existsTaxType(referenceParams(tenantId, "code", taxType))) {
+            throw badRequest("사용할 수 없는 부가세구분입니다.");
         }
         if (!confirmDAO.existsSupplier(referenceParams(tenantId, "id", detail.getSupplierId()))) {
             throw badRequest("사용할 수 없는 구매처입니다.");
@@ -336,6 +374,8 @@ public class PurchaseRequestConfirmServiceImpl extends EgovAbstractServiceImpl
         values.put("supplierId", detail.getSupplierId());
         values.put("unitPrice", unitPrice);
         values.put("currencyCode", currencyCode);
+        values.put("taxType", taxType);
+        values.put("vatIncludedAt", vatIncludedAt);
         values.put("amount", amount);
         values.put("confirmRemark", confirmRemark);
         return values;
@@ -467,6 +507,13 @@ public class PurchaseRequestConfirmServiceImpl extends EgovAbstractServiceImpl
     private ResponseStatusException itemsChanged() {
         return new ResponseStatusException(HttpStatus.CONFLICT,
                 "이미 확정되었거나 삭제된 구매요청 품목이 있습니다. 다시 불러와 주세요.");
+    }
+
+    /** 시작일이 종료일보다 늦으면 400. 한쪽만 있거나 둘 다 없으면 허용한다. */
+    private void requireOrderedRange(LocalDate fromDt, LocalDate toDt) {
+        if (fromDt != null && toDt != null && fromDt.isAfter(toDt)) {
+            throw badRequest("시작일이 종료일보다 늦습니다.");
+        }
     }
 
     private ResponseStatusException badRequest(String message) {

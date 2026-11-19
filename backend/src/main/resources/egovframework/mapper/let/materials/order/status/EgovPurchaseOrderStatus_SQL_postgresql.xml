@@ -27,6 +27,8 @@
                m.material_spec AS materialSpec,
                m.unit AS unit,
                od.order_qty AS orderQty,
+               COALESCE(a.arrived_qty, 0) AS arrivedQty,
+               GREATEST(od.order_qty - COALESCE(a.arrived_qty, 0), 0) AS remainQty,
                od.unit_price AS unitPrice,
                od.delivery_dt AS deliveryDt,
                w.warehouse_name AS warehouseName,
@@ -61,6 +63,25 @@
          AND m.tenant_id = od.tenant_id
         LEFT JOIN tb_warehouse w
           ON w.warehouse_id = od.warehouse_id
+        <!-- 가입고수량: 가입고 대상 조회(PurchaseArrivalCreate arrivedQtySubquery)와 같은 정의.
+             유효 가입고 합 - 유효 수입검사 불합격 합. 불합격분은 다시 가입고할 수 있으므로 뺀다. -->
+        LEFT JOIN (SELECT ad.purchase_order_detail_id AS purchase_order_detail_id,
+                          sum(ad.arrival_qty) - COALESCE((SELECT sum(fd.fail_qty)
+                                                            FROM tb_quality_inspection_dt fd
+                                                            JOIN tb_quality_inspection_hd ih
+                                                              ON ih.quality_inspection_id = fd.quality_inspection_id
+                                                             AND ih.tenant_id = fd.tenant_id
+                                                           WHERE fd.purchase_order_detail_id = ad.purchase_order_detail_id
+                                                             AND ih.tenant_id = #{tenantId, jdbcType=BIGINT}
+                                                             AND ih.use_at = 'Y'), 0) AS arrived_qty
+                     FROM tb_purchase_arrival_dt ad
+                     JOIN tb_purchase_arrival_hd ah
+                       ON ah.purchase_arrival_id = ad.purchase_arrival_id
+                      AND ah.tenant_id = ad.tenant_id
+                    WHERE ah.tenant_id = #{tenantId, jdbcType=BIGINT}
+                      AND ah.use_at = 'Y'
+                    GROUP BY ad.purchase_order_detail_id) a
+          ON a.purchase_order_detail_id = od.purchase_order_detail_id
         LEFT JOIN tb_common_code_group tcg
           ON tcg.tenant_id = oh.tenant_id
          AND tcg.group_code = 'PURCHASE_TAX_TYPE'
@@ -88,6 +109,12 @@
         </if>
         <if test="sourceType != null">
           AND oh.source_type = #{sourceType}
+        </if>
+        <if test="receiptCloseType == 'OPEN'">
+          AND od.receipt_close_at = 'N'
+        </if>
+        <if test="receiptCloseType == 'CLOSED'">
+          AND od.receipt_close_at = 'Y'
         </if>
         <if test="keyword != null">
           AND (oh.order_no ILIKE '%' || #{keyword} || '%'

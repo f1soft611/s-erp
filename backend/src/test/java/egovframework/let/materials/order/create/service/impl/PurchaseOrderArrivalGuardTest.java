@@ -31,7 +31,10 @@ import egovframework.let.materials.order.create.domain.repository.PurchaseOrderD
 import egovframework.let.materials.request.confirm.domain.repository.PurchaseRequestConfirmDAO;
 import egovframework.let.materials.request.create.domain.repository.PurchaseRequestDAO;
 
-/** 가입고가 있는 발주 행은 삭제·수량 축소·검사대상 변경·발주 취소를 할 수 없다(409). */
+/**
+ * 가입고가 있는 발주 행은 값(수량·단가·납기·창고·검사대상)을 바꾸거나 삭제할 수 없고, 가입고가 하나라도 있으면
+ * 발주일·부가세 설정도 바꿀 수 없다(비고만 가능). 발주 취소도 불가하다(모두 409).
+ */
 class PurchaseOrderArrivalGuardTest {
 
     private static final Long TENANT = 1L;
@@ -77,26 +80,57 @@ class PurchaseOrderArrivalGuardTest {
     }
 
     @Test
-    void rejectsReducingTheQuantityBelowTheArrivedQuantity() throws Exception {
+    void rejectsChangingAnyValueOfARowThatHasAnArrival() throws Exception {
+        // 11(가입고 4): 수량 축소·증가, 단가, 납기, 창고, 검사대상 모두 거부
         assertConflict(() -> service.updateOrder(TENANT, USER, ORDER_ID,
                 payload(line(11L, "3.99", "1000", null), line(12L, "5", "2000", null))));
+        assertConflict(() -> service.updateOrder(TENANT, USER, ORDER_ID,
+                payload(line(11L, "12", "1000", null), line(12L, "5", "2000", null))));
+        assertConflict(() -> service.updateOrder(TENANT, USER, ORDER_ID,
+                payload(line(11L, "10", "1100", null), line(12L, "5", "2000", null))));
+        PurchaseOrderDetailSaveRequestVO delivery = line(11L, "10", "1000", null);
+        delivery.setDeliveryDt(LocalDate.of(2026, 12, 1));
+        assertConflict(() -> service.updateOrder(TENANT, USER, ORDER_ID, payload(delivery, line(12L, "5", "2000", null))));
+        PurchaseOrderDetailSaveRequestVO warehouse = line(11L, "10", "1000", null);
+        warehouse.setWarehouseId(31L);
+        assertConflict(() -> service.updateOrder(TENANT, USER, ORDER_ID, payload(warehouse, line(12L, "5", "2000", null))));
+        assertConflict(() -> service.updateOrder(TENANT, USER, ORDER_ID,
+                payload(line(11L, "10", "1000", "Y"), line(12L, "5", "2000", null))));
         verify(orderDAO, never()).updateOrderHeader(anyMap());
+        verify(orderDAO, never()).updateOrderDetail(anyMap());
     }
 
     @Test
-    void allowsTheArrivedQuantityExactlyAndRowsWithoutArrival() throws Exception {
-        service.updateOrder(TENANT, USER, ORDER_ID,
-                payload(line(11L, "4", "1000", null), line(12L, "1", "2000", null)));
+    void allowsEditingRowsWithoutArrivalAndTheRemarkWhileAnArrivedRowStaysUnchanged() throws Exception {
+        PurchaseOrderDetailSaveRequestVO arrivedRow = line(11L, "10", "1000", null);
+        arrivedRow.setRemark("행 비고만 변경");
+        PurchaseOrderSaveRequestVO request = payload(arrivedRow, line(12L, "1", "2100", "Y"));
+        request.setRemark("헤더 비고만 변경");
+        service.updateOrder(TENANT, USER, ORDER_ID, request);
         verify(orderDAO).updateOrderHeader(anyMap());
     }
 
     @Test
-    void rejectsChangingInspectAtOfARowThatHasAnArrival() throws Exception {
-        assertConflict(() -> service.updateOrder(TENANT, USER, ORDER_ID,
-                payload(line(11L, "10", "1000", "Y"), line(12L, "5", "2000", null))));
-        // 가입고가 없는 행은 검사대상을 바꿀 수 있다
-        service.updateOrder(TENANT, USER, ORDER_ID,
-                payload(line(11L, "10", "1000", "N"), line(12L, "5", "2000", "Y")));
+    void rejectsChangingTheHeaderDateOrTaxSettingWhenAnyRowHasAnArrival() throws Exception {
+        PurchaseOrderSaveRequestVO date = payload(line(11L, "10", "1000", null), line(12L, "5", "2000", null));
+        date.setOrderDt(LocalDate.of(2026, 11, 14));
+        assertConflict(() -> service.updateOrder(TENANT, USER, ORDER_ID, date));
+        PurchaseOrderSaveRequestVO tax = payload(line(11L, "10", "1000", null), line(12L, "5", "2000", null));
+        tax.setTaxType("EXEMPT");
+        assertConflict(() -> service.updateOrder(TENANT, USER, ORDER_ID, tax));
+        PurchaseOrderSaveRequestVO vat = payload(line(11L, "10", "1000", null), line(12L, "5", "2000", null));
+        vat.setVatIncludedAt("Y");
+        assertConflict(() -> service.updateOrder(TENANT, USER, ORDER_ID, vat));
+        verify(orderDAO, never()).updateOrderHeader(anyMap());
+    }
+
+    @Test
+    void allowsChangingTheHeaderWhenNoRowHasAnArrival() throws Exception {
+        when(orderDAO.selectArrivedQtyByOrderDetail(anyMap()))
+                .thenReturn(Collections.<PurchaseOrderArrivalQtyVO>emptyList());
+        PurchaseOrderSaveRequestVO date = payload(line(11L, "9", "1000", null), line(12L, "5", "2000", null));
+        date.setOrderDt(LocalDate.of(2026, 11, 14));
+        service.updateOrder(TENANT, USER, ORDER_ID, date);
         verify(orderDAO).updateOrderHeader(anyMap());
     }
 
@@ -108,6 +142,16 @@ class PurchaseOrderArrivalGuardTest {
                 .thenReturn(Collections.<PurchaseOrderArrivalQtyVO>emptyList());
         service.cancelOrder(TENANT, USER, ORDER_ID);
         verify(orderDAO).cancelOrderHeader(anyMap());
+    }
+
+    @Test
+    void getOrderReportsTheArrivedQuantityPerRowSoTheScreenCanLockThem() throws Exception {
+        PurchaseOrderVO order = lockedOrder();
+        when(orderDAO.selectOrder(anyMap())).thenReturn(order);
+        PurchaseOrderVO loaded = service.getOrder(TENANT, ORDER_ID);
+        assertThat(loaded.getDetails()).extracting(PurchaseOrderDetailVO::getArrivedQty)
+                .usingElementComparator(java.util.Comparator.nullsFirst(BigDecimal::compareTo))
+                .containsExactly(new BigDecimal("4"), new BigDecimal("0"));
     }
 
     private PurchaseOrderArrivalQtyVO arrived(Long detailId, String qty) {
@@ -126,6 +170,7 @@ class PurchaseOrderArrivalGuardTest {
         order.setTaxType("TAXABLE");
         order.setVatIncludedAt("N");
         order.setUseAt("Y");
+        order.setOrderDt(LocalDate.of(2026, 11, 13));
         return order;
     }
 

@@ -66,6 +66,7 @@ class PurchaseRequestConfirmServiceImplTest {
         when(dao.selectUserId(anyMap())).thenReturn(7L);
         when(dao.existsWarehouse(anyMap())).thenReturn(true);
         when(dao.existsOrderType(anyMap())).thenReturn(true);
+        when(dao.existsTaxType(anyMap())).thenReturn(true);
         when(dao.existsSupplier(anyMap())).thenReturn(true);
         when(dao.insertConfirmHeader(anyMap())).thenReturn(CONFIRM_ID);
         when(dao.updateDetailConfirm(anyMap())).thenReturn(1);
@@ -183,22 +184,100 @@ class PurchaseRequestConfirmServiceImplTest {
 
     @Test
     void listConfirmsMapsStatusToUseAt() throws Exception {
-        service.listConfirms(TENANT, null, null);
-        service.listConfirms(TENANT, " MC ", "canceled");
+        service.listConfirms(TENANT, null, null, null, null);
+        service.listConfirms(TENANT, " MC ", "canceled", null, null);
         ArgumentCaptor<Map<String, Object>> captor = mapCaptor();
         verify(dao, times(2)).selectConfirms(captor.capture());
         assertThat(captor.getAllValues().get(0)).containsEntry("useAt", "Y");
         assertThat(captor.getAllValues().get(1)).containsEntry("useAt", "N").containsEntry("keyword", "MC");
-        assertStatus(() -> service.listConfirms(TENANT, null, "DONE"), HttpStatus.BAD_REQUEST);
+        assertStatus(() -> service.listConfirms(TENANT, null, "DONE", null, null), HttpStatus.BAD_REQUEST);
     }
 
     @Test
-    void defaultUnitPriceFallsBackToKrwCurrency() throws Exception {
+    void candidateAndConfirmListsPassTheDateRangeToTheQuery() throws Exception {
+        java.time.LocalDate from = java.time.LocalDate.of(2026, 10, 18);
+        java.time.LocalDate to = java.time.LocalDate.of(2026, 11, 18);
+        service.listCandidates(TENANT, "k", from, to);
+        service.listConfirms(TENANT, null, null, from, to);
+        ArgumentCaptor<Map<String, Object>> candidate = mapCaptor();
+        verify(dao).selectCandidates(candidate.capture());
+        assertThat(candidate.getValue()).containsEntry("fromDt", from).containsEntry("toDt", to);
+        ArgumentCaptor<Map<String, Object>> list = mapCaptor();
+        verify(dao).selectConfirms(list.capture());
+        assertThat(list.getValue()).containsEntry("fromDt", from).containsEntry("toDt", to);
+        assertStatus(() -> service.listCandidates(TENANT, null, to, from), HttpStatus.BAD_REQUEST);
+        assertStatus(() -> service.listConfirms(TENANT, null, null, to, from), HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void defaultUnitPriceUsesKrwAndFillsTaxDefaultsWhenWonPriceExists() throws Exception {
         PurchaseUnitPriceVO price = new PurchaseUnitPriceVO();
         price.setUnitPrice(new BigDecimal("1500"));
+        price.setForeignUnitPrice(new BigDecimal("1.5"));
+        price.setForeignCurrency("USD");
         when(dao.selectDefaultUnitPrice(anyMap())).thenReturn(price);
-        assertThat(service.findDefaultUnitPrice(TENANT, 12L, 5L, LocalDate.of(2026, 11, 12)).getCurrency())
-                .isEqualTo("KRW");
+
+        PurchaseUnitPriceVO result = service.findDefaultUnitPrice(TENANT, 12L, 5L, LocalDate.of(2026, 11, 12));
+
+        assertThat(result.getCurrency()).isEqualTo("KRW");
+        assertThat(result.getUnitPrice()).isEqualByComparingTo("1500");
+        assertThat(result.getTaxType()).isEqualTo("TAXABLE");
+        assertThat(result.getVatIncludedAt()).isEqualTo("N");
+        assertThat(result.getForeignCurrency()).isEqualTo("USD");
+        assertThat(result.getForeignUnitPrice()).isEqualByComparingTo("1.5");
+    }
+
+    @Test
+    void defaultUnitPriceUsesForeignCurrencyAndPriceWhenOnlyForeignPriceExists() throws Exception {
+        PurchaseUnitPriceVO price = new PurchaseUnitPriceVO();
+        price.setForeignUnitPrice(new BigDecimal("7.25"));
+        price.setForeignCurrency("USD");
+        price.setTaxType("ZERO_RATED");
+        price.setVatIncludedAt("N");
+        when(dao.selectDefaultUnitPrice(anyMap())).thenReturn(price);
+
+        PurchaseUnitPriceVO result = service.findDefaultUnitPrice(TENANT, 12L, 5L, LocalDate.of(2026, 11, 12));
+
+        assertThat(result.getCurrency()).isEqualTo("USD");
+        assertThat(result.getUnitPrice()).isEqualByComparingTo("7.25");
+        assertThat(result.getTaxType()).isEqualTo("ZERO_RATED");
+    }
+
+    @Test
+    void defaultUnitPriceIsNullWhenNoPriceIsRegistered() throws Exception {
+        when(dao.selectDefaultUnitPrice(anyMap())).thenReturn(null);
+        assertThat(service.findDefaultUnitPrice(TENANT, 12L, 5L, LocalDate.of(2026, 11, 12))).isNull();
+    }
+
+    @Test
+    void storesTaxTypeAndVatIncludedOnTheConfirmedRowWithTaxableDefaults() throws Exception {
+        PurchaseRequestConfirmDetailRequestVO withTax = line(51L, "1", "100", "KRW");
+        withTax.setTaxType("TAXABLE");
+        withTax.setVatIncludedAt("Y");
+        service.createConfirm(TENANT, USER, payload(withTax, line(61L, "1", "100", "KRW")));
+
+        ArgumentCaptor<Map<String, Object>> details = mapCaptor();
+        verify(dao, times(2)).updateDetailConfirm(details.capture());
+        assertThat(details.getAllValues().get(0)).containsEntry("taxType", "TAXABLE").containsEntry("vatIncludedAt", "Y");
+        assertThat(details.getAllValues().get(1)).containsEntry("taxType", "TAXABLE").containsEntry("vatIncludedAt", "N");
+    }
+
+    @Test
+    void rejectsVatIncludedForNonTaxableUnknownTaxTypeAndInvalidFlag() throws Exception {
+        PurchaseRequestConfirmDetailRequestVO nonTaxable = line(51L, "1", "100", "KRW");
+        nonTaxable.setTaxType("EXEMPT");
+        nonTaxable.setVatIncludedAt("Y");
+        assertStatus(() -> service.createConfirm(TENANT, USER, payload(nonTaxable, line(61L, "1", "1", "KRW"))),
+                HttpStatus.BAD_REQUEST);
+
+        PurchaseRequestConfirmDetailRequestVO badFlag = line(51L, "1", "100", "KRW");
+        badFlag.setVatIncludedAt("X");
+        assertStatus(() -> service.createConfirm(TENANT, USER, payload(badFlag, line(61L, "1", "1", "KRW"))),
+                HttpStatus.BAD_REQUEST);
+
+        when(dao.existsTaxType(anyMap())).thenReturn(false);
+        assertStatus(() -> service.createConfirm(TENANT, USER, validPayload()), HttpStatus.BAD_REQUEST);
+        verify(dao, never()).insertConfirmHeader(anyMap());
     }
 
     private PurchaseRequestConfirmRequestVO validPayload() {
