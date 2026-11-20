@@ -101,6 +101,8 @@ export function normalizeItemPartnerPriceRow(source: ApiRecord): ItemPartnerPric
     vatIncludedAt,
     foreignUnitPrice: nullableNumber(source.foreignUnitPrice, '외화단가'),
     currency,
+    orderType: text(source.orderType, '발주구분'),
+    defaultSupplier: source.defaultSupplier === true,
     startDt,
     endDt,
     moq: nullableNumber(source.moq, '최소주문수량'),
@@ -109,6 +111,7 @@ export function normalizeItemPartnerPriceRow(source: ApiRecord): ItemPartnerPric
   if (result.unitPrice === null && result.foreignUnitPrice === null) throw new Error('단가 응답을 확인할 수 없습니다.');
   if (source.materialUnit != null) result.materialUnit = text(source.materialUnit, '단위');
   if (source.materialSpec != null) result.materialSpec = text(source.materialSpec, '규격');
+  if (source.orderTypeName != null) result.orderTypeName = text(source.orderTypeName, '발주구분명');
   if (priceStatus != null) result.priceStatus = priceStatus;
   if (source.tenantId != null) result.tenantId = positiveId(source.tenantId, '테넌트 ID');
   for (const field of ['createdBy', 'createdAt', 'updatedBy', 'updatedAt'] as const) {
@@ -164,7 +167,7 @@ function normalizeImportValidationRow(
   ] as const) {
     if (value[field] != null) result[field] = positiveId(value[field], label);
   }
-  for (const field of ['materialCode', 'materialName', 'customerCode', 'customerName'] as const) {
+  for (const field of ['materialCode', 'materialName', 'customerCode', 'customerName', 'orderType'] as const) {
     if (value[field] != null) result[field] = text(value[field], field);
   }
   if (!errors.length &&

@@ -49,6 +49,14 @@ public class EgovLoginApiController {
     @Autowired
     private EgovJwtTokenUtil jwtTokenUtil;
 
+    /** 로그인 실패 메시지. 잠금으로 거부된 경우만 구분해 안내하고 나머지는 기존 실패 문구를 쓴다. */
+    private String loginFailureMessage(LoginVO loginResultVO) {
+        if (loginResultVO != null && loginResultVO.isAccountLocked()) {
+            return "계정이 잠겼습니다. 관리자에게 문의해 주세요.";
+        }
+        return egovMessageSource.getMessage("fail.common.login");
+    }
+
     @Operation(summary = "일반 로그인", description = "일반 로그인 처리", tags = {"EgovLoginApiController"})
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "로그인 성공"),
@@ -67,7 +75,7 @@ public class EgovLoginApiController {
         } else {
             resultMap.put("resultVO", loginResultVO);
             resultMap.put("resultCode", "300");
-            resultMap.put("resultMessage", egovMessageSource.getMessage("fail.common.login"));
+            resultMap.put("resultMessage", loginFailureMessage(loginResultVO));
         }
         return resultMap;
     }
@@ -94,7 +102,7 @@ public class EgovLoginApiController {
         } else {
             resultMap.put("resultVO", loginResultVO);
             resultMap.put("resultCode", "300");
-            resultMap.put("resultMessage", egovMessageSource.getMessage("fail.common.login"));
+            resultMap.put("resultMessage", loginFailureMessage(loginResultVO));
         }
         return resultMap;
     }
@@ -121,7 +129,7 @@ public class EgovLoginApiController {
         } else {
             resultMap.put("resultVO", loginResultVO);
             resultMap.put("resultCode", "300");
-            resultMap.put("resultMessage", egovMessageSource.getMessage("fail.common.login"));
+            resultMap.put("resultMessage", loginFailureMessage(loginResultVO));
         }
         return resultMap;
     }
@@ -156,6 +164,15 @@ public class EgovLoginApiController {
                 return resultMap;
             }
 
+            // 미허용·퇴직 처리된 계정은 갱신 토큰이 남아 있어도 더 이상 이어서 쓰지 못하게 한다.
+            if (!loginService.isLoginable(loginVO.getTenantId(), loginVO.getId())) {
+                resultMap.put("resultCode", "401");
+                resultMap.put("resultMessage", "사용할 수 없는 계정입니다");
+                return resultMap;
+            }
+
+            loginVO.setPasswordChangeRequired(
+                    loginService.isPasswordChangeRequired(loginVO.getTenantId(), loginVO.getId()));
             String newAccessToken = jwtTokenUtil.generateToken(loginVO);
             resultMap.put("jToken", newAccessToken);
             resultMap.put("resultCode", "200");

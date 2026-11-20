@@ -38,4 +38,7 @@ public class PurchaseUnitPriceVO implements Serializable {
 
     @Schema(description = "외화단가의 통화", example = "USD")
     private String foreignCurrency;
+
+    @Schema(description = "선택된 단가 행의 발주구분 코드. 없으면 null")
+    private String orderType;
 }

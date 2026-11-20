@@ -17,6 +17,7 @@ import { DocumentWritePage } from '../../groupware/documents/write/DocumentWrite
 import { DocumentStatusPage } from '../../groupware/documents/status/DocumentStatusPage';
 import { MenuManagementPage } from '../../settings/system/menus/MenuManagementPage';
 import { ModuleManagementPage } from '../../settings/system/modules/ModuleManagementPage';
+import { AccountManagementPage } from '../../settings/system/accounts/AccountManagementPage';
 import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPage';
 import { SystemPolicyPage } from '../../settings/system/policies/SystemPolicyPage';
 import { CommonCodeManagementPage } from '../../co/master/common-code/CommonCodeManagementPage';
@@ -52,6 +53,7 @@ import { PurchaseReceiptStatusPage } from '../../materials/receipt/status/Purcha
 import { DraftFormManagementPage } from '../../co/workflow/form/DraftFormManagementPage';
 import { DepartmentManagePage } from '../../hr/department/DepartmentManagePage';
 import { EmployeeManagePage } from '../../hr/employee/EmployeeManagePage';
+import { OrderManagePage } from '../../hr/order/OrderManagePage';
 import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
 import { F1GridDocsPage } from '../../f1-grid-docs/F1GridDocsPage';
 import { PageHeader } from '../../../shared/components/PageHeader';
@@ -357,6 +359,12 @@ export function DashboardContent({
       isTenantAdmin={isTenantAdmin} />;
   }
 
+  if (selectedModule.id === 'hr' && currentPageKey === 'order-manage') {
+    return <OrderManagePage selectedModule={selectedModule} currentMenuName={currentMenuName}
+      content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions}
+      isTenantAdmin={isTenantAdmin} />;
+  }
+
   if (selectedModule.id === 'quality' && (currentPageKey === 'inspect-create' || currentPageKey === 'inspect-status')) {
     const QualityInspectionPage = currentPageKey === 'inspect-create' ? QualityInspectionCreatePage : QualityInspectionStatusPage;
     return <QualityInspectionPage selectedModule={selectedModule} currentMenuName={currentMenuName}
@@ -455,6 +463,12 @@ export function DashboardContent({
         selectedMenuPermissions={selectedMenuPermissions}
       />
     );
+  }
+
+  if (selectedModule.id === 'settings' && currentPageKey === 'accounts') {
+    return <AccountManagementPage selectedModule={selectedModule} currentMenuName={currentMenuName}
+      content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions}
+      isTenantAdmin={isTenantAdmin} />;
   }
 
   if (selectedModule.id === 'settings' && currentPageKey === 'menus') {

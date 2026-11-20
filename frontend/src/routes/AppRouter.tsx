@@ -3,11 +3,13 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { resolvePushNotificationPath } from '../shared/utils/notificationPath';
 import {
   isAuthenticated,
+  isPasswordChangeRequired,
   subscribeAuthChange,
 } from '../shared/services/authService';
 import { PwaInstallPrompt } from '../shared/components/PwaInstallPrompt';
 
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
+const ForcePasswordChangePage = lazy(() => import('../pages/auth/ForcePasswordChangePage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const ProfileSettingsPage = lazy(() =>
   import('../pages/dashboard/ProfileSettingsPage'),
@@ -34,6 +36,14 @@ function useAuthState() {
   );
 }
 
+function usePasswordChangeRequired() {
+  return useSyncExternalStore(
+    subscribeAuthChange,
+    isPasswordChangeRequired,
+    () => false,
+  );
+}
+
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const isAuthed = useAuthState();
   const location = useLocation();
@@ -46,6 +56,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthed = useAuthState();
+  const passwordChangeRequired = usePasswordChangeRequired();
   const location = useLocation();
   const pushIds = new URLSearchParams(location.search).getAll('pushNotificationId');
   const pushNotificationId = location.pathname === '/groupware/notifications'
@@ -58,6 +69,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     'path',
     window.location.pathname,
   );
+
+  if (isAuthed && passwordChangeRequired) {
+    // 임시 비밀번호 계정은 비밀번호를 바꾸기 전까지 다른 화면을 열 수 없다.
+    return <ForcePasswordChangePage />;
+  }
 
   return isAuthed ? <>{children}</>
     : <Navigate to="/login" state={{ pushNotificationId }} replace />;

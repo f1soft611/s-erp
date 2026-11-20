@@ -64,6 +64,8 @@ export function buildGridFormSections<T extends object>(
       if (column.type === 'rownumber') return false;
       if (column.form?.hidden === true) return false;
       if (column.hidden && column.form?.hidden !== false) return false;
+      const visible = column.form?.visible;
+      if (row !== undefined && visible !== undefined) return typeof visible === 'function' ? visible(row) : visible;
       if (row !== undefined && !isCellEditable(column, row)) return false;
       return true;
     });
@@ -75,13 +77,25 @@ export function buildGridFormSections<T extends object>(
     groups.set(field.group, sectionFields);
   });
 
-  return Array.from(groups, ([group, sectionFields]) => ({
-    group,
-    fields: sectionFields
-      .sort(
-        (left, right) =>
-          left.order - right.order || left.sourceIndex - right.sourceIndex,
-      )
-      .map(({ sourceIndex: _sourceIndex, ...field }) => field),
-  }));
+  // 섹션 순서: 기본은 처음 나온 칸의 컬럼 위치 순서. 섹션 안 칸에 `form.groupOrder`가 있으면 그 최솟값을 순번으로 쓴다.
+  return Array.from(groups, ([group, sectionFields], index) => {
+    const groupOrders = sectionFields
+      .map((field) => field.column.form?.groupOrder)
+      .filter((value): value is number => value !== undefined);
+    return {
+      rank: groupOrders.length > 0 ? Math.min(...groupOrders) : index,
+      index,
+      section: {
+        group,
+        fields: sectionFields
+          .sort(
+            (left, right) =>
+              left.order - right.order || left.sourceIndex - right.sourceIndex,
+          )
+          .map(({ sourceIndex: _sourceIndex, ...field }) => field),
+      },
+    };
+  })
+    .sort((left, right) => left.rank - right.rank || left.index - right.index)
+    .map(({ section }) => section);
 }

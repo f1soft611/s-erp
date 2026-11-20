@@ -34,4 +34,10 @@ public class ItemPartnerPriceImportRowVO {
     private String moq;
     @Schema(description = "사용여부 Y/N. 공백은 Y")
     private String useAt;
+
+    @Schema(description = "발주구분. 공통코드 PURCHASE_ORDER_TYPE의 코드 또는 이름. 공백 허용, 매입 행에서만")
+    private String orderType;
+
+    @Schema(description = "기본 거래처 여부 Y/N. 공백은 N, 거래처가 있는 매입 행에서만 Y")
+    private String defaultSupplier;
 }

@@ -34,4 +34,13 @@ public class ItemPriceOverviewRowVO {
     private ItemPriceOverviewSideVO purchase;
     @Schema(description = "매출 단가. 없으면 null")
     private ItemPriceOverviewSideVO sales;
+
+    @Schema(description = "부모 행: 품목의 매입 기본 거래처 ID. 없으면 null")
+    private Long defaultSupplierId;
+
+    @Schema(description = "부모 행: 매입 기본 거래처 코드")
+    private String defaultSupplierCode;
+
+    @Schema(description = "부모 행: 매입 기본 거래처명")
+    private String defaultSupplierName;
 }

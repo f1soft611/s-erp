@@ -25,7 +25,7 @@ class PurchaseRequestConfirmMapperTest {
                 "selectDetailsByIds", "selectDetailsByConfirm", "selectConfirms", "selectConfirm",
                 "selectConfirmUseAtForUpdate", "selectUserId", "existsWarehouse", "existsOrderType", "existsSupplier",
                 "insertConfirmHeader", "updateDetailConfirm", "refreshRequestStatuses", "updateDetailOrderClose",
-                "selectRequestIdsByConfirm", "clearDetailsByConfirm", "cancelConfirmHeader", "selectDefaultUnitPrice")) {
+                "selectRequestIdsByConfirm", "clearDetailsByConfirm", "cancelConfirmHeader")) {
             assertThat(sql(configuration, id)).as(id).containsPattern("tenant_id = \\?|tenant_id, confirm_no");
         }
     }
@@ -71,14 +71,11 @@ class PurchaseRequestConfirmMapperTest {
     void confirmListAndPriceQueries() throws Exception {
         Configuration configuration = parse();
         assertThat(sql(configuration, "selectConfirms")).contains("pc.use_at = ?", "ORDER BY pc.confirm_dt DESC", "LIMIT 200");
-        assertThat(sql(configuration, "selectDefaultUnitPrice")).contains("trade_type = '매입'", "use_at = 'Y'",
-                "p.customer_id IS NULL", "ORDER BY (p.customer_id IS NULL), p.start_dt DESC, p.price_id DESC", "LIMIT 1");
-        assertThat(sql(configuration, "selectDefaultUnitPrice")).contains("p.tax_type", "p.vat_included_at",
-                "p.foreign_unit_price");
+        assertThat(configuration.hasStatement("selectDefaultUnitPrice")).isFalse();
         assertThat(sql(configuration, "existsTaxType")).contains("PURCHASE_TAX_TYPE");
         assertThat(sql(configuration, "updateDetailConfirm")).contains("tax_type =", "vat_included_at =");
         assertThat(sql(configuration, "clearDetailsByConfirm")).contains("tax_type = NULL", "vat_included_at = NULL");
-        assertThat(sql(configuration, "existsWarehouse")).contains("disuse_at = 'N'");
+        assertThat(sql(configuration, "existsWarehouse")).contains("disuse_at = 'N'", "use_at = 'Y'");
     }
 
     private String sql(Configuration configuration, String id) {

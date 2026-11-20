@@ -37,6 +37,8 @@ class EmployeeServiceImplTest {
     private EmployeeDAO employeeDAO;
     @Mock
     private IdSequenceService idSequenceService;
+    @Mock
+    private egovframework.let.hr.order.service.HrOrderHistoryRecorder historyRecorder;
 
     private ResidentNumberCipher cipher;
     private EmployeeServiceImpl service;
@@ -51,7 +53,7 @@ class EmployeeServiceImplTest {
     void setUp() throws Exception {
         MockitoAnnotations.openMocks(this);
         cipher = new ResidentNumberCipher(key(), "v1");
-        service = new EmployeeServiceImpl(employeeDAO, idSequenceService, cipher);
+        service = new EmployeeServiceImpl(employeeDAO, idSequenceService, cipher, historyRecorder);
         when(employeeDAO.existsActiveDepartment(anyMap())).thenReturn(true);
         when(employeeDAO.existsCommonCodeItem(anyMap())).thenReturn(true);
         when(employeeDAO.existsLevel(anyMap())).thenReturn(true);
@@ -99,6 +101,33 @@ class EmployeeServiceImplTest {
     private static void assertConflict(Throwable error) {
         assertThat(error).isInstanceOfSatisfying(ResponseStatusException.class,
                 ex -> assertThat(ex.getStatus()).isEqualTo(HttpStatus.CONFLICT));
+    }
+
+    // ---- 인사명령 이력 연동 ----
+
+    @Test
+    void creatingAnEmployeeRecordsAJoinHistoryInTheSameService() throws Exception {
+        service.createEmployee(TENANT, ADMIN, payload());
+
+        org.mockito.Mockito.verify(historyRecorder).recordJoin(org.mockito.ArgumentMatchers.eq(TENANT),
+                org.mockito.ArgumentMatchers.eq(ADMIN), org.mockito.ArgumentMatchers.any(EmployeeVO.class));
+    }
+
+    @Test
+    void aDirectEditRecordsTheChangeAndTheOrderPathCanSkipIt() throws Exception {
+        EmployeeVO existing = employee(100L);
+        existing.setDepartmentId(3L);
+        existing.setJoinDt("2026-11-05");
+        when(employeeDAO.selectEmployeeById(anyMap())).thenReturn(existing);
+
+        service.updateEmployee(TENANT, ADMIN, 100L, payload());
+        org.mockito.Mockito.verify(historyRecorder).recordDirectEdit(TENANT, ADMIN, existing, existing);
+
+        org.mockito.Mockito.clearInvocations(historyRecorder);
+        service.updateEmployee(TENANT, ADMIN, 100L, payload(), false);
+        org.mockito.Mockito.verify(historyRecorder, org.mockito.Mockito.never())
+                .recordDirectEdit(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     // ---- 사번 ----
@@ -157,18 +186,30 @@ class EmployeeServiceImplTest {
     // ---- 필수·코드·날짜 ----
 
     @Test
-    void requiresNameDepartmentPositionEmploymentTypeAndJoinDate() throws Exception {
-        for (int field = 0; field < 5; field++) {
+    void requiresNameDepartmentPositionAndJoinDate() throws Exception {
+        for (int field = 0; field < 4; field++) {
             EmployeeSaveRequestVO request = payload();
             if (field == 0) request.setUserNm("   ");
             if (field == 1) request.setDepartmentId(null);
             if (field == 2) request.setPositionCode(null);
-            if (field == 3) request.setEmploymentTypeCode("");
-            if (field == 4) request.setJoinDt(null);
+            if (field == 3) request.setJoinDt(null);
             assertThatThrownBy(() -> service.createEmployee(TENANT, ADMIN, request))
                     .isInstanceOf(IllegalArgumentException.class);
         }
         verify(employeeDAO, never()).insertEmployee(anyMap());
+    }
+
+    @Test
+    void employmentTypeIsOptionalAndSavedAsNullWhenBlank() throws Exception {
+        for (String blank : new String[] {null, "", "   "}) {
+            org.mockito.Mockito.clearInvocations(employeeDAO);
+            EmployeeSaveRequestVO request = payload();
+            request.setEmploymentTypeCode(blank);
+
+            service.createEmployee(TENANT, ADMIN, request);
+
+            org.assertj.core.api.Assertions.assertThat(captureInsert().get("employmentTypeCode")).as(String.valueOf(blank)).isNull();
+        }
     }
 
     @Test
@@ -259,7 +300,7 @@ class EmployeeServiceImplTest {
 
     @Test
     void residentNumberIsBlockedWithServiceUnavailableWhenTheKeyIsMissingButOtherSavesStillWork() throws Exception {
-        service = new EmployeeServiceImpl(employeeDAO, idSequenceService, new ResidentNumberCipher("", ""));
+        service = new EmployeeServiceImpl(employeeDAO, idSequenceService, new ResidentNumberCipher("", ""), historyRecorder);
         EmployeeSaveRequestVO withResidentNo = payload();
         withResidentNo.setResidentNo("9001011234567");
 

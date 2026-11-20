@@ -9,14 +9,13 @@ import {
 import type { CommonCodeItemRow } from '../../common-code/types/commonCodeManagement.types';
 import {
   fetchWarehouses,
-  fetchWarehouseUserOptions,
   saveWarehouseRows,
 } from '../services/warehouseManagement.service';
+import { DEFAULT_WAREHOUSE_FILTERS } from '../data/warehouseSearch';
 import type {
   WarehouseFilters,
   WarehousePayload,
   WarehouseRow,
-  WarehouseUserOption,
 } from '../types/warehouseManagement.types';
 
 const WAREHOUSE_TYPE_GROUP_CODE = 'WAREHOUSE_TYPE';
@@ -32,6 +31,7 @@ function toPayload(row: WarehouseRow, isNew: boolean): WarehousePayload {
   }
   const ynFields: Array<[string, string]> = [
     ['삭제불가여부', row.deleteLockAt],
+    ['사용여부', row.useAt],
     ['불용창고여부', row.disuseAt],
     ['현재고표시여부', row.stockQtyDispAt],
     ['수불처리여부', row.stockIoAt],
@@ -50,6 +50,7 @@ function toPayload(row: WarehouseRow, isNew: boolean): WarehousePayload {
     warehouseType: row.warehouseType.trim(),
     deleteLockAt: row.deleteLockAt,
     disuseAt: row.disuseAt,
+    useAt: row.useAt,
     stockQtyDispAt: row.stockQtyDispAt,
     stockIoAt: row.stockIoAt,
     safetyStockAlertAt: row.safetyStockAlertAt,
@@ -65,11 +66,10 @@ function toPayload(row: WarehouseRow, isNew: boolean): WarehousePayload {
   };
 }
 
-export function useWarehouseManagement(initialFilters: WarehouseFilters = {}) {
+export function useWarehouseManagement(initialFilters: WarehouseFilters = DEFAULT_WAREHOUSE_FILTERS) {
   const { showSuccess } = useNotification();
   const initialFiltersRef = useRef(initialFilters);
   const [rows, setRows] = useState<WarehouseRow[]>([]);
-  const [userOptions, setUserOptions] = useState<WarehouseUserOption[]>([]);
   const [warehouseTypeItems, setWarehouseTypeItems] = useState<CommonCodeItemRow[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -89,10 +89,9 @@ export function useWarehouseManagement(initialFilters: WarehouseFilters = {}) {
       start();
       setError('');
       try {
-        const [nextRows, groups, nextUserOptions] = await Promise.all([
+        const [nextRows, groups] = await Promise.all([
           fetchWarehouses(filters),
           fetchCommonCodeGroups(),
-          fetchWarehouseUserOptions(),
         ]);
         if (version !== loadVersion.current) return false;
         const warehouseTypeGroup = groups.find(
@@ -103,7 +102,6 @@ export function useWarehouseManagement(initialFilters: WarehouseFilters = {}) {
           : [];
         if (version !== loadVersion.current) return false;
         setRows(nextRows);
-        setUserOptions(nextUserOptions);
         setWarehouseTypeItems(items.filter((item) => item.useAt === 'Y'));
         succeed();
         reconciliationRequired.current = false;
@@ -175,7 +173,7 @@ export function useWarehouseManagement(initialFilters: WarehouseFilters = {}) {
       setError('');
       try {
         if (changes.deletedRows.length) {
-          throw new Error('창고는 삭제할 수 없습니다. 불용창고로 변경해 주세요.');
+          throw new Error('창고는 삭제할 수 없습니다. 미사용으로 변경해 주세요.');
         }
         const insertedRows = changes.insertedRows.map((row) => ({
           ...toPayload(row, true),
@@ -216,7 +214,6 @@ export function useWarehouseManagement(initialFilters: WarehouseFilters = {}) {
   return {
     initialLoad,
     rows,
-    userOptions,
     warehouseTypeItems,
     error,
     setError,

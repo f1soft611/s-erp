@@ -35,6 +35,9 @@ public class WarehouseVO implements Serializable {
     @Schema(description = "불용창고여부", allowableValues = { "Y", "N" }, example = "N")
     private String disuseAt;
 
+    @Schema(description = "사용여부(Y=사용, N=미사용). 미사용은 삭제가 아니라 상태 변경", allowableValues = { "Y", "N" }, example = "Y")
+    private String useAt;
+
     @Schema(description = "현재고표시여부", allowableValues = { "Y", "N" }, example = "Y")
     private String stockQtyDispAt;
 

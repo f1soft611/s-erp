@@ -21,4 +21,7 @@ public class WarehouseSearchCondition implements Serializable {
 
     @Schema(description = "불용창고여부. 미입력 시 전체 조회", allowableValues = { "Y", "N" }, example = "N")
     private String disuseAt;
+
+    @Schema(description = "사용여부(Y=사용, N=미사용). 미입력 시 전체 조회", allowableValues = { "Y", "N" }, example = "Y")
+    private String useAt;
 }

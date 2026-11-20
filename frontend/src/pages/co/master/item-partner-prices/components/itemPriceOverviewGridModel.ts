@@ -28,6 +28,9 @@ export function createItemPriceChildRow(parent: ItemPriceOverviewRow): ItemPrice
     [`${side}StartDt`]: '',
     [`${side}EndDt`]: null,
     [`${side}Status`]: '',
+    [`${side}OrderType`]: '',
+    [`${side}OrderTypeName`]: '',
+    [`${side}DefaultSupplier`]: false,
   });
   return {
     rowId: `${NEW_CHILD_PREFIX}${crypto.randomUUID()}`,
@@ -43,10 +46,15 @@ export function createItemPriceChildRow(parent: ItemPriceOverviewRow): ItemPrice
     displayName: '(거래처를 선택하세요)',
     specialCount: 0,
     specialLabel: '',
+    defaultSupplierId: null,
+    defaultSupplierName: '',
     ...empty('purchase'),
     ...empty('sales'),
   } as ItemPriceOverviewRow;
 }
+
+const hasPurchasePrice = (row: ItemPriceOverviewRow) =>
+  row.purchaseUnitPrice != null || row.purchaseForeignUnitPrice != null;
 
 function validateAmount(value: unknown, label: string): string | true {
   if (value == null || value === '') return true;
@@ -157,13 +165,48 @@ function sideColumns(
         && !String(value ?? '').trim() ? `${title} 외화단가를 입력하면 통화를 선택해 주세요.` : true,
       search: { hidden: true },
     },
+    ...(side === 'purchase' ? [
+      {
+        field: field('OrderType'),
+        headerName: `${title} 발주구분`,
+        type: 'select' as const,
+        width: 105,
+        align: 'center' as const,
+        options: codeOptions?.orderTypes ?? [],
+        form: form(6),
+        editable,
+        search: { hidden: true },
+      },
+      {
+        field: field('DefaultSupplier'),
+        headerName: '기본 거래처',
+        type: 'checkbox' as const,
+        width: 100,
+        align: 'center' as const,
+        headerCheckbox: false,
+        syncWithTreeCheckbox: false,
+        // 거래처 칸의 오른쪽(품목 그룹)에 둔다. 거래처 행에서만 보이고, 매입 단가가 있어야 체크할 수 있다.
+        form: {
+          group: '품목',
+          order: 2.5,
+          visible: (row: ItemPriceOverviewRow) => row.parentId !== null,
+          readOnly: (row: ItemPriceOverviewRow) => !canEdit || !hasPurchasePrice(row),
+        },
+        // 거래처 행이고 매입 단가가 있어야 체크할 수 있다.
+        editable: (row: ItemPriceOverviewRow) => canEdit && row.parentId !== null && hasPurchasePrice(row),
+        // 같은 품목의 다른 거래처 행 체크 해제는 변경이 반영된 뒤 트리(ItemPriceOverviewTree)가 처리한다(폼 취소 시 영향이 없도록).
+        onValueChange: (_row: ItemPriceOverviewRow, checked: unknown) =>
+          ({ purchaseDefaultSupplier: Boolean(checked) } as Partial<ItemPriceOverviewRow>),
+        search: { hidden: true },
+      },
+    ] : []),
     {
       field: startField,
       headerName: `${title} 적용일`,
       type: 'date',
       width: 125,
       requiredMark: true,
-      form: form(6),
+      form: form(8),
       editable,
       search: { hidden: true },
     },
@@ -188,7 +231,8 @@ export function createItemPriceOverviewColumns(options: ColumnOptions): F1GridCo
       width: 280,
       editable: false,
       pinned: 'left',
-      form: { group: '품목', order: 1 },
+      // 품목(부모) 행의 폼에서만 보인다. 거래처(자식) 행은 아래 거래처 칸이 같은 자리에 보인다.
+      form: { group: '품목', order: 1, visible: (row) => row.parentId === null, readOnly: true },
       search: { hidden: true },
     },
     {
@@ -197,7 +241,8 @@ export function createItemPriceOverviewColumns(options: ColumnOptions): F1GridCo
       type: 'code',
       width: 170,
       requiredMark: true,
-      form: { group: '품목', order: 2, readOnly: (row) => !isNewChildRow(row) },
+      // 수정 폼에서도 거래처 정보를 비활성(읽기 전용)으로 보여 주고, 신규 특별단가 행만 선택할 수 있다.
+      form: { group: '품목', order: 2, visible: (row) => row.parentId !== null, readOnly: (row) => !isNewChildRow(row) },
       editable: (row) => options.canEdit && isNewChildRow(row),
       getValue: (row) => row.customerCode ? `${row.customerCode} · ${row.customerName}` : '',
       onOpenCodePicker: (row, applyPatch) => {
@@ -210,6 +255,10 @@ export function createItemPriceOverviewColumns(options: ColumnOptions): F1GridCo
     { field: 'materialSpec', headerName: '규격', width: 130, editable: false, form: { group: '품목', order: 3 }, search: { hidden: true } },
     { field: 'materialUnit', headerName: '단위', width: 70, align: 'center', editable: false, form: { group: '품목', order: 4 }, search: { hidden: true } },
     { field: 'specialLabel', headerName: '특별단가', width: 90, align: 'center', editable: false, form: { hidden: true }, search: { hidden: true } },
+    {
+      field: 'defaultSupplierName', headerName: '매입 기본 거래처', width: 150, editable: false,
+      form: { group: '품목', order: 5 }, search: { hidden: true },
+    },
     ...sideColumns('purchase', '매입', options),
     ...sideColumns('sales', '매출', options),
   ];

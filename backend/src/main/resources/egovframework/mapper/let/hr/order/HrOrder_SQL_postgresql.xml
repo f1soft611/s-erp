@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="HrOrderDAO">
+
+    <!-- 인사명령 이력은 추가만 한다(수정·삭제 SQL 없음). -->
+    <select id="insertOrderHd" parameterType="map" resultType="long">
+        INSERT INTO tb_hr_order_hd (
+            tenant_id, order_dt, order_type, order_source, remark, created_by
+        ) VALUES (
+            #{tenantId}, #{orderDt}, #{orderType}, #{orderSource},
+            #{remark,jdbcType=VARCHAR}, #{createdBy,jdbcType=BIGINT}
+        )
+        RETURNING order_id
+    </select>
+
+    <insert id="insertOrderDt" parameterType="map">
+        INSERT INTO tb_hr_order_dt (
+            order_id, tenant_id, user_id, field_code, pre_value, pre_name, post_value, post_name
+        ) VALUES (
+            #{orderId}, #{tenantId}, #{userId}, #{fieldCode},
+            #{preValue,jdbcType=VARCHAR}, #{preName,jdbcType=VARCHAR},
+            #{postValue,jdbcType=VARCHAR}, #{postName,jdbcType=VARCHAR}
+        )
+    </insert>
+
+    <select id="selectHistory" parameterType="map" resultType="egovframework.let.hr.order.domain.model.HrOrderHistoryVO">
+        SELECT
+            h.order_id AS orderId,
+            d.order_dt_id AS orderDtId,
+            to_char(h.created_at, 'YYYY-MM-DD HH24:MI') AS createdAt,
+            to_char(h.order_dt, 'YYYY-MM-DD') AS orderDt,
+            h.order_type AS orderType,
+            h.order_source AS source,
+            d.user_id AS userId,
+            u.user_nm AS userNm,
+            u.employee_no AS employeeNo,
+            d.field_code AS fieldCode,
+            d.pre_name AS preName,
+            d.post_name AS postName,
+            h.remark AS remark,
+            cu.user_nm AS createdByName
+        FROM tb_hr_order_dt d
+        JOIN tb_hr_order_hd h ON h.order_id = d.order_id
+        LEFT JOIN tb_user u ON u.user_id = d.user_id AND u.tenant_id = d.tenant_id
+        LEFT JOIN tb_user cu ON cu.user_id = h.created_by AND cu.tenant_id = h.tenant_id
+        WHERE h.tenant_id = #{tenantId}
+        <if test="fromDt != null">
+          AND h.created_at &gt;= #{fromDt}
+        </if>
+        <if test="toDt != null">
+          AND h.created_at &lt; #{toDt}
+        </if>
+        <if test="keyword != null">
+          AND (u.user_nm ILIKE '%' || #{keyword} || '%' OR u.employee_no ILIKE '%' || #{keyword} || '%')
+        </if>
+        <if test="orderType != null">
+          AND h.order_type = #{orderType}
+        </if>
+        <if test="source != null">
+          AND h.order_source = #{source}
+        </if>
+        ORDER BY h.created_at DESC, h.order_id DESC, d.order_dt_id ASC
+        LIMIT 500
+    </select>
+
+</mapper>

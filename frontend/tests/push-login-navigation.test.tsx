@@ -12,7 +12,9 @@ vi.mock('../src/shared/services/authService', () => ({
     auth.listeners.add(listener);
     return () => auth.listeners.delete(listener);
   },
+  isPasswordChangeRequired: () => false,
   readSessionNotice: () => null,
+  readSessionNoticeSeverity: () => 'error',
   setSessionNotice: vi.fn(),
 }));
 vi.mock('../src/pages/auth/hooks/useLoginForm', () => ({

@@ -10,6 +10,7 @@
         <result property="warehouseType" column="warehouse_type"/>
         <result property="deleteLockAt" column="delete_lock_at"/>
         <result property="disuseAt" column="disuse_at"/>
+        <result property="useAt" column="use_at"/>
         <result property="stockQtyDispAt" column="stock_qty_disp_at"/>
         <result property="stockIoAt" column="stock_io_at"/>
         <result property="safetyStockAlertAt" column="safety_stock_alert_at"/>
@@ -47,6 +48,7 @@
         warehouse_type,
         delete_lock_at,
         disuse_at,
+        use_at,
         stock_qty_disp_at,
         stock_io_at,
         safety_stock_alert_at,
@@ -89,6 +91,9 @@
         <if test="disuseAt != null and disuseAt != ''">
             AND disuse_at = #{disuseAt}
         </if>
+        <if test="useAt != null and useAt != ''">
+            AND use_at = #{useAt}
+        </if>
         ORDER BY warehouse_code ASC, warehouse_id ASC
     </select>
 
@@ -118,6 +123,7 @@
             warehouse_type,
             delete_lock_at,
             disuse_at,
+            use_at,
             stock_qty_disp_at,
             stock_io_at,
             safety_stock_alert_at,
@@ -139,6 +145,7 @@
             #{warehouseType},
             #{deleteLockAt},
             #{disuseAt},
+            #{useAt},
             #{stockQtyDispAt},
             #{stockIoAt},
             #{safetyStockAlertAt},
@@ -164,6 +171,7 @@
             warehouse_type = #{warehouseType},
             delete_lock_at = #{deleteLockAt},
             disuse_at = #{disuseAt},
+            use_at = #{useAt},
             stock_qty_disp_at = #{stockQtyDispAt},
             stock_io_at = #{stockIoAt},
             safety_stock_alert_at = #{safetyStockAlertAt},

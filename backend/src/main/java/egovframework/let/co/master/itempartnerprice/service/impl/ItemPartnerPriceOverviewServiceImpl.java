@@ -31,6 +31,7 @@ public class ItemPartnerPriceOverviewServiceImpl implements ItemPartnerPriceOver
         FILTERS.add("NO_PURCHASE");
         FILTERS.add("NO_SALES");
         FILTERS.add("HAS_SPECIAL");
+        FILTERS.add("NO_DEFAULT_SUPPLIER");
     }
 
     private static final Set<String> REGISTER_FILTERS = new HashSet<String>();
@@ -72,6 +73,13 @@ public class ItemPartnerPriceOverviewServiceImpl implements ItemPartnerPriceOver
         List<ItemPartnerPriceVO> prices = dao.selectOverviewPrices(params);
 
         Map<String, ItemPartnerPriceVO> reference = pickReferenceRows(prices, effectiveOn);
+        Map<Long, ItemPriceOverviewRowVO> defaultSuppliers = new HashMap<Long, ItemPriceOverviewRowVO>();
+        List<ItemPriceOverviewRowVO> defaultRows = dao.selectDefaultSuppliers(params);
+        if (defaultRows != null) {
+            for (ItemPriceOverviewRowVO defaultRow : defaultRows) {
+                defaultSuppliers.put(defaultRow.getMaterialId(), defaultRow);
+            }
+        }
         Map<Long, Map<Long, ItemPriceOverviewRowVO>> children = new HashMap<Long, Map<Long, ItemPriceOverviewRowVO>>();
         for (ItemPartnerPriceVO price : reference.values()) {
             if (price.getCustomerId() == null) continue;
@@ -98,6 +106,12 @@ public class ItemPartnerPriceOverviewServiceImpl implements ItemPartnerPriceOver
         for (ItemPriceOverviewRowVO parent : materials) {
             parent.setRowId("item-" + parent.getMaterialId());
             parent.setParentId(null);
+            ItemPriceOverviewRowVO defaultSupplier = defaultSuppliers.get(parent.getMaterialId());
+            if (defaultSupplier != null) {
+                parent.setDefaultSupplierId(defaultSupplier.getCustomerId());
+                parent.setDefaultSupplierCode(defaultSupplier.getCustomerCode());
+                parent.setDefaultSupplierName(defaultSupplier.getCustomerName());
+            }
             assignSide(parent, reference.get(key(parent.getMaterialId(), null, "매입")), effectiveOn);
             assignSide(parent, reference.get(key(parent.getMaterialId(), null, "매출")), effectiveOn);
             Map<Long, ItemPriceOverviewRowVO> byCustomer = children.get(parent.getMaterialId());
@@ -171,6 +185,13 @@ public class ItemPartnerPriceOverviewServiceImpl implements ItemPartnerPriceOver
         side.setForeignUnitPrice(price.getForeignUnitPrice());
         side.setCurrency(price.getCurrency());
         side.setMoq(price.getMoq());
+        if ("매입".equals(price.getTradeType())) {
+            side.setOrderType(price.getOrderType());
+            side.setOrderTypeName(price.getOrderTypeName());
+            if (price.getCustomerId() != null) {
+                side.setDefaultSupplier(Boolean.TRUE.equals(price.getDefaultSupplier()));
+            }
+        }
         side.setStartDt(price.getStartDt());
         side.setEndDt(price.getEndDt());
         side.setPriceStatus(LocalDate.parse(price.getStartDt()).isAfter(effectiveOn) ? "future" : "current");

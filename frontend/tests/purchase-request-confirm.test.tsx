@@ -152,6 +152,32 @@ describe('purchase request confirm service (batch)', () => {
     expect(payload.details.map((line) => line.purchaseRequestDetailId)).toEqual([51, 61]);
   });
 
+  it('sends the optional price base date with the request-details call', async () => {
+    apiGetMock.mockResolvedValue({ resultList: [] });
+    await fetchRequestDetails([51], '2026-11-20');
+    expect(apiGetMock).toHaveBeenLastCalledWith(
+      '/api/v1/materials/purchase-request-confirms/request-details?purchaseRequestDetailIds=51&baseDt=2026-11-20');
+  });
+
+  it('keeps the default supplier price, order type and foreign price the server filled into draft rows', () => {
+    const filled = {
+      ...detail(5, 51, false), supplierId: 4, supplierCode: 'S4', supplierName: '공급사4', unitPrice: 1200,
+      currencyCode: 'KRW', taxType: 'TAXABLE', vatIncludedAt: 'N', orderType: 'RAW_MATERIAL',
+      foreignUnitPrice: 1.2, foreignCurrency: 'USD',
+    } as PurchaseRequestConfirmDetail;
+    const foreignOnly = {
+      ...detail(6, 61, false), supplierId: 5, unitPrice: 7.25, currencyCode: 'USD', foreignUnitPrice: 7.25,
+      foreignCurrency: 'USD',
+    } as PurchaseRequestConfirmDetail;
+    const [won, foreign, blank] = toConfirmRows([filled, foreignOnly, detail(7, 71, false)], true);
+    expect(won).toMatchObject({
+      supplierId: 4, unitPrice: 1200, wonUnitPrice: 1200, foreignUnitPrice: 1.2, foreignCurrency: 'USD',
+      orderType: 'RAW_MATERIAL', amount: 24000,
+    });
+    expect(foreign).toMatchObject({ currencyCode: 'USD', wonUnitPrice: null, foreignUnitPrice: 7.25 });
+    expect(blank).toMatchObject({ supplierId: null, unitPrice: null, amount: 0, foreignUnitPrice: null, orderType: '' });
+  });
+
   it('detects mixed currencies and changed order-close rows', () => {
     const rows = toConfirmRows([detail(5, 51, true, 'KRW'), detail(6, 61, true, 'USD')], false);
     expect(distinctCurrencies(rows)).toEqual(['KRW', 'USD']);

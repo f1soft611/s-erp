@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="AccountDAO">
+
+    <resultMap id="accountMap" type="egovframework.let.system.accounts.domain.model.AccountVO">
+        <result property="loginId" column="login_id"/>
+        <result property="loginCode" column="login_code"/>
+        <result property="userId" column="user_id"/>
+        <result property="userNm" column="user_nm"/>
+        <result property="employeeNo" column="employee_no"/>
+        <result property="departmentNm" column="department_nm"/>
+        <result property="positionNm" column="position_nm"/>
+        <result property="useAt" column="use_at"/>
+        <result property="locked" column="locked"/>
+        <result property="retired" column="retired"/>
+        <result property="passwordChangeRequired" column="password_change_required"/>
+        <result property="passwordChangedAt" column="password_changed_at"/>
+        <result property="hasPhoto" column="has_photo"/>
+    </resultMap>
+
+    <resultMap id="accountRoleMap" type="egovframework.let.system.accounts.domain.model.AccountRoleVO">
+        <result property="loginId" column="login_id"/>
+        <result property="roleId" column="role_id"/>
+        <result property="roleCode" column="role_code"/>
+        <result property="roleNm" column="role_nm"/>
+    </resultMap>
+
+    <!-- 계정 조회. 비밀번호 해시와 이미지 본문은 읽지 않는다(사진은 유무만). 퇴직은 퇴직일이 오늘 이하인 사원이다. -->
+    <sql id="accountSelect">
+        SELECT
+            la.login_id,
+            la.login_code,
+            u.user_id,
+            u.user_nm,
+            u.employee_no,
+            d.department_nm,
+            pi.item_nm AS position_nm,
+            la.use_at,
+            (la.locked_at IS NOT NULL) AS locked,
+            (u.retire_dt IS NOT NULL AND u.retire_dt &lt;= CURRENT_DATE) AS retired,
+            (la.password_change_required = 'Y') AS password_change_required,
+            to_char(la.password_changed_at, 'YYYY-MM-DD HH24:MI') AS password_changed_at,
+            (u.photo_image IS NOT NULL OR la.profile_image IS NOT NULL) AS has_photo
+        FROM tb_login_account la
+        JOIN tb_user u
+          ON u.login_id = la.login_id
+         AND u.tenant_id = la.tenant_id
+        LEFT JOIN tb_department d
+          ON d.department_id = u.department_id
+         AND d.tenant_id = u.tenant_id
+        LEFT JOIN tb_common_code_group pg
+          ON pg.tenant_id = u.tenant_id AND pg.group_code = 'POSITION'
+        LEFT JOIN tb_common_code_item pi
+          ON pi.group_id = pg.common_code_group_id AND pi.item_code = u.position_code
+    </sql>
+
+    <select id="selectAccountList" parameterType="map" resultMap="accountMap">
+        <include refid="accountSelect"/>
+        WHERE la.tenant_id = #{tenantId}
+        <if test="status == 'ACTIVE'">
+          AND la.use_at = 'Y'
+          AND la.locked_at IS NULL
+          AND NOT (u.retire_dt IS NOT NULL AND u.retire_dt &lt;= CURRENT_DATE)
+        </if>
+        <if test="status == 'DISABLED'">
+          AND la.use_at = 'N'
+        </if>
+        <if test="status == 'LOCKED'">
+          AND la.use_at = 'Y'
+          AND la.locked_at IS NOT NULL
+        </if>
+        <if test="status == 'RETIRED'">
+          AND (u.retire_dt IS NOT NULL AND u.retire_dt &lt;= CURRENT_DATE)
+        </if>
+        <if test="keyword != null">
+          AND (
+                u.user_nm ILIKE '%' || #{keyword} || '%'
+             OR la.login_code ILIKE '%' || #{keyword} || '%'
+             OR u.employee_no ILIKE '%' || #{keyword} || '%'
+             OR d.department_nm ILIKE '%' || #{keyword} || '%'
+             OR pi.item_nm ILIKE '%' || #{keyword} || '%'
+          )
+        </if>
+        ORDER BY d.sort_order ASC NULLS LAST, d.department_nm ASC NULLS LAST,
+                 pi.sort_order ASC NULLS LAST, u.employee_no ASC NULLS LAST, la.login_id ASC
+    </select>
+
+    <select id="selectAccountById" parameterType="map" resultMap="accountMap">
+        <include refid="accountSelect"/>
+        WHERE la.tenant_id = #{tenantId}
+          AND la.login_id = #{loginId}
+    </select>
+
+    <select id="selectAccountRoles" parameterType="map" resultMap="accountRoleMap">
+        SELECT lr.login_id, r.role_id, r.role_code, r.role_nm
+        FROM tb_login_account_role lr
+        JOIN tb_login_account la
+          ON la.login_id = lr.login_id
+        JOIN tb_role r
+          ON r.role_id = lr.role_id
+         AND r.tenant_id = la.tenant_id
+        WHERE la.tenant_id = #{tenantId}
+        <if test="loginId != null">
+          AND lr.login_id = #{loginId}
+        </if>
+        ORDER BY lr.login_id, r.role_id
+    </select>
+
+    <!-- 대상 외에 로그인할 수 있는(허용·미퇴직) 관리자 역할 계정 수 -->
+    <select id="selectOtherAdminCount" parameterType="map" resultType="int">
+        SELECT COUNT(DISTINCT la.login_id)
+        FROM tb_login_account la
+        JOIN tb_user u
+          ON u.login_id = la.login_id
+         AND u.tenant_id = la.tenant_id
+        JOIN tb_login_account_role lr
+          ON lr.login_id = la.login_id
+        JOIN tb_role r
+          ON r.role_id = lr.role_id
+         AND r.tenant_id = la.tenant_id
+        WHERE la.tenant_id = #{tenantId}
+          AND la.login_id &lt;&gt; #{loginId}
+          AND la.use_at = 'Y'
+          AND COALESCE(u.use_at, 'Y') = 'Y'
+          AND NOT (u.retire_dt IS NOT NULL AND u.retire_dt &lt;= CURRENT_DATE)
+          AND r.use_at = 'Y'
+          AND r.role_code IN
+        <foreach collection="adminRoleCodes" item="code" open="(" separator="," close=")">
+            #{code}
+        </foreach>
+    </select>
+
+    <select id="selectUsableRoleCodes" parameterType="map" resultType="string">
+        SELECT role_code
+        FROM tb_role
+        WHERE tenant_id = #{tenantId}
+          AND use_at = 'Y'
+          AND role_id IN
+        <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">
+            #{roleId}
+        </foreach>
+    </select>
+
+    <update id="updateUseAt" parameterType="map">
+        UPDATE tb_login_account
+        SET use_at = #{useAt},
+            updated_at = now(),
+            updated_by = #{actorUserId}
+        WHERE tenant_id = #{tenantId}
+          AND login_id = #{loginId}
+    </update>
+
+    <!-- 초기화: 새 해시 저장, 다음 로그인에서 변경 강제, 잠금·실패 횟수 해제 -->
+    <update id="updatePasswordReset" parameterType="map">
+        UPDATE tb_login_account
+        SET password_hash = #{passwordHash},
+            password_change_required = 'Y',
+            login_attempt_count = 0,
+            locked_at = NULL,
+            updated_at = now(),
+            updated_by = #{actorUserId}
+        WHERE tenant_id = #{tenantId}
+          AND login_id = #{loginId}
+    </update>
+
+    <update id="updateUnlock" parameterType="map">
+        UPDATE tb_login_account
+        SET login_attempt_count = 0,
+            locked_at = NULL,
+            updated_at = now(),
+            updated_by = #{actorUserId}
+        WHERE tenant_id = #{tenantId}
+          AND login_id = #{loginId}
+    </update>
+
+    <update id="touchAccount" parameterType="map">
+        UPDATE tb_login_account
+        SET updated_at = now(),
+            updated_by = #{actorUserId}
+        WHERE tenant_id = #{tenantId}
+          AND login_id = #{loginId}
+    </update>
+
+    <delete id="deleteAccountRoles" parameterType="map">
+        DELETE FROM tb_login_account_role
+        WHERE login_id = #{loginId}
+          AND login_id IN (
+              SELECT login_id FROM tb_login_account WHERE tenant_id = #{tenantId}
+          )
+    </delete>
+
+    <insert id="insertAccountRole" parameterType="map">
+        INSERT INTO tb_login_account_role (login_id, role_id)
+        SELECT #{loginId}, r.role_id
+        FROM tb_role r
+        WHERE r.role_id = #{roleId}
+          AND r.tenant_id = #{tenantId}
+          AND r.use_at = 'Y'
+        ON CONFLICT (login_id, role_id) DO NOTHING
+    </insert>
+</mapper>

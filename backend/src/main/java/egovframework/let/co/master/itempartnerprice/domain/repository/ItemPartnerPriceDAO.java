@@ -6,6 +6,7 @@ import org.egovframe.rte.psl.dataaccess.EgovAbstractMapper;
 import org.springframework.stereotype.Repository;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceImportResolutionVO;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceVO;
+import egovframework.let.co.master.itempartnerprice.domain.model.ItemPriceLookupVO;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPriceCustomerOverviewRowVO;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPriceOverviewRowVO;
 
@@ -77,5 +78,41 @@ public class ItemPartnerPriceDAO extends EgovAbstractMapper {
 
     public int closePreviousOpenPrices(Map<String, Object> params) throws Exception {
         return update("ItemPartnerPriceDAO.closePreviousOpenPrices", params);
+    }
+
+    public List<ItemPriceOverviewRowVO> selectDefaultSuppliers(Map<String, Object> params) throws Exception {
+        return selectList("ItemPartnerPriceDAO.selectDefaultSuppliers", params);
+    }
+
+    public Boolean existsActivePurchasePrice(Map<String, Object> params) throws Exception {
+        return selectOne("ItemPartnerPriceDAO.existsActivePurchasePrice", params);
+    }
+
+    public int upsertDefaultSupplier(Map<String, Object> params) throws Exception {
+        return update("ItemPartnerPriceDAO.upsertDefaultSupplier", params);
+    }
+
+    public int deleteDefaultSupplier(Map<String, Object> params) throws Exception {
+        return delete("ItemPartnerPriceDAO.deleteDefaultSupplier", params);
+    }
+
+    public List<Long> deleteOrphanDefaultSuppliers(Map<String, Object> params) throws Exception {
+        return selectList("ItemPartnerPriceDAO.deleteOrphanDefaultSuppliers", params);
+    }
+
+    public List<Long> selectMaterialIdsByPriceIds(Map<String, Object> params) throws Exception {
+        return selectList("ItemPartnerPriceDAO.selectMaterialIdsByPriceIds", params);
+    }
+
+    public String selectOrderTypeCode(Map<String, Object> params) throws Exception {
+        return selectOne("ItemPartnerPriceDAO.selectOrderTypeCode", params);
+    }
+
+    public ItemPriceLookupVO selectLookupPrice(Map<String, Object> params) throws Exception {
+        return selectOne("ItemPartnerPriceDAO.selectLookupPrice", params);
+    }
+
+    public List<ItemPriceLookupVO> selectDefaultSupplierPrices(Map<String, Object> params) throws Exception {
+        return selectList("ItemPartnerPriceDAO.selectDefaultSupplierPrices", params);
     }
 }

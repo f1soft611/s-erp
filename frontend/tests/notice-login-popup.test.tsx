@@ -28,6 +28,22 @@ beforeEach(() => {
 afterEach(() => { cleanup(); localStorage.clear(); });
 
 describe('login popup queue', () => {
+  it('does not load or show login notices while the user must change the password first', async () => {
+    localStorage.setItem('s-erp-auth', JSON.stringify({ ...auth, passwordChangeRequired: true }));
+    host();
+    await act(async () => { await Promise.resolve(); });
+    expect(api.list).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    // 비밀번호를 바꾸고 다시 로그인하면(변경 필요 해제) 공지를 평소처럼 불러온다.
+    act(() => {
+      localStorage.setItem('s-erp-auth', JSON.stringify({ ...auth, popupSessionId: 'session-3' }));
+      window.dispatchEvent(new Event('s-erp-auth-change'));
+    });
+    expect(await screen.findByText('공지 2')).toBeInTheDocument();
+    expect(api.list).toHaveBeenCalledTimes(1);
+  });
+
   it('shows single-notice progress as a separate badge beside the heading outside the body', async () => {
     api.list.mockResolvedValue([{ postId: 2 }]);
     host();

@@ -7,26 +7,35 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceBatchChangeSetVO;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceBatchSaveRequestVO;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceBatchSaveResultVO;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceChangeVO;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceVO;
+import egovframework.let.co.master.itempartnerprice.service.ItemDefaultSupplierService;
 import egovframework.let.co.master.itempartnerprice.service.ItemPartnerPriceBatchService;
 import egovframework.let.co.master.itempartnerprice.service.ItemPartnerPriceService;
 
 @Service("itemPartnerPriceBatchService")
 public class ItemPartnerPriceBatchServiceImpl implements ItemPartnerPriceBatchService {
-    private final ItemPartnerPriceService service;
+    private static final String PURCHASE = "매입";
 
-    public ItemPartnerPriceBatchServiceImpl(ItemPartnerPriceService service) {
+    private final ItemPartnerPriceService service;
+    private final ItemDefaultSupplierService defaultSupplierService;
+
+    public ItemPartnerPriceBatchServiceImpl(ItemPartnerPriceService service,
+            ItemDefaultSupplierService defaultSupplierService) {
         this.service = service;
+        this.defaultSupplierService = defaultSupplierService;
     }
 
     @Override
@@ -50,6 +59,20 @@ public class ItemPartnerPriceBatchServiceImpl implements ItemPartnerPriceBatchSe
             throw new IllegalArgumentException("저장할 단가 변경 사항이 없습니다.");
         }
         validateRequestKeys(changes);
+        Map<Long, Long> setDefaults = validateDefaultSupplierRows(changes);
+
+        // 기본 거래처 정리 대상 품목: 삭제·수정되는 단가의 원래 품목과 요청에 담긴 품목
+        Set<Long> touchedMaterialIds = new LinkedHashSet<Long>();
+        List<Long> existingPriceIds = new ArrayList<Long>();
+        for (ItemPartnerPriceChangeVO row : changes.getDeletedRows()) existingPriceIds.add(parsePriceId(row.getPriceId()));
+        for (ItemPartnerPriceChangeVO row : changes.getUpdatedRows()) existingPriceIds.add(parsePriceId(row.getPriceId()));
+        touchedMaterialIds.addAll(defaultSupplierService.findMaterialIdsByPriceIds(tenantId, existingPriceIds));
+        for (ItemPartnerPriceChangeVO row : changes.getInsertedRows()) {
+            if (row.getMaterialId() != null) touchedMaterialIds.add(row.getMaterialId());
+        }
+        for (ItemPartnerPriceChangeVO row : changes.getUpdatedRows()) {
+            if (row.getMaterialId() != null) touchedMaterialIds.add(row.getMaterialId());
+        }
 
         ItemPartnerPriceBatchSaveResultVO result = new ItemPartnerPriceBatchSaveResultVO();
         // 삭제를 가장 먼저 처리해 같은 키를 지우고 다시 등록하는 오등록 정정을 한 번의 저장으로 할 수 있게 한다.
@@ -83,7 +106,64 @@ public class ItemPartnerPriceBatchServiceImpl implements ItemPartnerPriceBatchSe
         }
         result.getPrices().addAll(insertedPrices.values());
         result.getPrices().addAll(updatedPrices);
+
+        applyDefaultSupplierChanges(tenantId, actor, changes, setDefaults);
+        result.getClearedDefaultMaterialIds().addAll(defaultSupplierService.clearOrphans(tenantId, touchedMaterialIds));
+        refreshDefaultSupplierFlags(tenantId, result.getPrices());
         return result;
+    }
+
+    /**
+     * 기본 거래처 지정 요청을 검증하고 품목별 지정 거래처를 돌려준다.
+     * true는 거래처가 있는 사용 중 매입 단가에서만, 한 품목에는 한 거래처만 허용한다.
+     */
+    private Map<Long, Long> validateDefaultSupplierRows(ItemPartnerPriceBatchChangeSetVO changes) {
+        Map<Long, Long> setDefaults = new LinkedHashMap<Long, Long>();
+        List<ItemPartnerPriceChangeVO> rows = new ArrayList<ItemPartnerPriceChangeVO>();
+        rows.addAll(changes.getInsertedRows());
+        rows.addAll(changes.getUpdatedRows());
+        for (ItemPartnerPriceChangeVO row : rows) {
+            if (!Boolean.TRUE.equals(row.getDefaultSupplier())) continue;
+            boolean purchase = row.getTradeType() != null && PURCHASE.equals(row.getTradeType().trim());
+            boolean active = !StringUtils.hasText(row.getUseAt()) || "Y".equals(row.getUseAt().trim());
+            if (!purchase || row.getCustomerId() == null || row.getMaterialId() == null || !active) {
+                throw new IllegalArgumentException("기본 거래처는 거래처가 있는 매입 단가에만 지정할 수 있습니다.");
+            }
+            Long previous = setDefaults.put(row.getMaterialId(), row.getCustomerId());
+            if (previous != null && !previous.equals(row.getCustomerId())) {
+                throw new IllegalArgumentException("품목당 기본 거래처는 하나만 지정할 수 있습니다.");
+            }
+        }
+        return setDefaults;
+    }
+
+    /** 단가 행 반영 뒤 기본 거래처를 지정하고, 해제 요청(현재 기본인 거래처만)을 처리한다. */
+    private void applyDefaultSupplierChanges(Long tenantId, String actor, ItemPartnerPriceBatchChangeSetVO changes,
+            Map<Long, Long> setDefaults) throws Exception {
+        for (Map.Entry<Long, Long> entry : setDefaults.entrySet()) {
+            defaultSupplierService.setDefault(tenantId, actor, entry.getKey(), entry.getValue());
+        }
+        List<ItemPartnerPriceChangeVO> rows = new ArrayList<ItemPartnerPriceChangeVO>();
+        rows.addAll(changes.getInsertedRows());
+        rows.addAll(changes.getUpdatedRows());
+        for (ItemPartnerPriceChangeVO row : rows) {
+            if (!Boolean.FALSE.equals(row.getDefaultSupplier())) continue;
+            if (row.getMaterialId() == null || row.getCustomerId() == null) continue;
+            if (setDefaults.containsKey(row.getMaterialId())) continue;
+            defaultSupplierService.clearIfCurrent(tenantId, row.getMaterialId(), row.getCustomerId());
+        }
+    }
+
+    /** 저장 결과 행의 기본 거래처 여부를 변경 반영 뒤의 값으로 갱신한다. */
+    private void refreshDefaultSupplierFlags(Long tenantId, List<ItemPartnerPriceVO> prices) throws Exception {
+        Set<Long> materialIds = new HashSet<Long>();
+        for (ItemPartnerPriceVO price : prices) materialIds.add(price.getMaterialId());
+        Map<Long, Long> defaults = defaultSupplierService.findDefaultSupplierIds(tenantId, materialIds);
+        for (ItemPartnerPriceVO price : prices) {
+            boolean isDefault = PURCHASE.equals(price.getTradeType()) && price.getCustomerId() != null
+                    && price.getCustomerId().equals(defaults.get(price.getMaterialId()));
+            price.setDefaultSupplier(isDefault);
+        }
     }
 
     private void validateRequestKeys(ItemPartnerPriceBatchChangeSetVO changes) {

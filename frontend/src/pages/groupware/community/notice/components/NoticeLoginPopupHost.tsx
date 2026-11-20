@@ -18,6 +18,8 @@ import { NoticePopupBody } from './NoticePopupBody';
 type Queue = { ids: number[]; index: number };
 const sessionKey = () => {
   const auth = getStoredAuth();
+  // 비밀번호를 먼저 바꿔야 하는 사용자는 서버가 다른 API를 막으므로 로그인 공지를 불러오지 않는다(오류 팝업이 변경 화면을 가린다).
+  if (auth?.passwordChangeRequired === true) return '';
   return auth ? `s-erp-notice-popups:${JSON.stringify([auth.tenantCode, auth.userId, auth.popupSessionId ?? 'legacy'])}` : '';
 };
 

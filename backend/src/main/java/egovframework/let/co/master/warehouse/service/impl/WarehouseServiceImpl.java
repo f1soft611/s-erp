@@ -55,6 +55,7 @@ public class WarehouseServiceImpl extends EgovAbstractServiceImpl implements War
             putSearchValue(params, "keyword", condition.getKeyword());
             putSearchValue(params, "warehouseType", condition.getWarehouseType());
             putSearchValue(params, "disuseAt", normalizeSearchFlag(condition.getDisuseAt()));
+            putSearchValue(params, "useAt", normalizeSearchFlag(condition.getUseAt()));
         }
         return warehouseDAO.selectWarehouseList(params);
     }
@@ -140,6 +141,11 @@ public class WarehouseServiceImpl extends EgovAbstractServiceImpl implements War
         params.put("warehouseType", normalizeText(payload.getWarehouseType()));
         params.put("deleteLockAt", normalizeFlag(payload.getDeleteLockAt(), "N"));
         params.put("disuseAt", normalizeFlag(payload.getDisuseAt(), "N"));
+        String useAt = normalizeFlag(payload.getUseAt(), "Y");
+        if ("N".equals(useAt) && "Y".equals(params.get("deleteLockAt"))) {
+            throw new IllegalArgumentException("삭제불가 창고는 미사용으로 변경할 수 없습니다.");
+        }
+        params.put("useAt", useAt);
         params.put("stockQtyDispAt", normalizeFlag(payload.getStockQtyDispAt(), "Y"));
         params.put("stockIoAt", normalizeFlag(payload.getStockIoAt(), "Y"));
         params.put("safetyStockAlertAt", normalizeFlag(payload.getSafetyStockAlertAt(), "N"));

@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -22,6 +23,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import egovframework.let.common.idsequence.service.IdSequenceService;
+import egovframework.let.co.master.itempartnerprice.domain.model.ItemPriceLookupVO;
+import egovframework.let.co.master.itempartnerprice.service.ItemPriceLookupService;
 import egovframework.let.materials.request.confirm.domain.model.PurchaseConfirmListItemVO;
 import egovframework.let.materials.request.confirm.domain.model.PurchaseConfirmVO;
 import egovframework.let.materials.request.confirm.domain.model.PurchaseRequestConfirmCandidateVO;
@@ -60,11 +63,13 @@ public class PurchaseRequestConfirmServiceImpl extends EgovAbstractServiceImpl
 
     private final PurchaseRequestConfirmDAO confirmDAO;
     private final IdSequenceService idSequenceService;
+    private final ItemPriceLookupService priceLookupService;
 
     public PurchaseRequestConfirmServiceImpl(PurchaseRequestConfirmDAO confirmDAO,
-            IdSequenceService idSequenceService) {
+            IdSequenceService idSequenceService, ItemPriceLookupService priceLookupService) {
         this.confirmDAO = confirmDAO;
         this.idSequenceService = idSequenceService;
+        this.priceLookupService = priceLookupService;
     }
 
     @Override
@@ -80,14 +85,49 @@ public class PurchaseRequestConfirmServiceImpl extends EgovAbstractServiceImpl
     }
 
     @Override
-    public List<PurchaseRequestConfirmDetailVO> loadRequestDetails(Long tenantId, List<Long> purchaseRequestDetailIds)
-            throws Exception {
+    public List<PurchaseRequestConfirmDetailVO> loadRequestDetails(Long tenantId, List<Long> purchaseRequestDetailIds,
+            LocalDate baseDt) throws Exception {
         requireTenant(tenantId);
         List<Long> ids = detailIds(purchaseRequestDetailIds);
         Map<String, Object> params = tenantParams(tenantId);
         params.put("detailIds", ids);
         requireAllUnconfirmed(confirmDAO.selectDetailLocks(params), ids);
-        return confirmDAO.selectDetailsByIds(params);
+        List<PurchaseRequestConfirmDetailVO> details = confirmDAO.selectDetailsByIds(params);
+        applyDefaultSupplierPrices(tenantId, details, baseDt == null ? LocalDate.now() : baseDt);
+        return details;
+    }
+
+    /** 확정되지 않은 행에 품목의 기본 거래처와 그 거래처의 기준일 단가·부가세·통화·발주구분을 채운다(공통 단가 조회 서비스). */
+    private void applyDefaultSupplierPrices(Long tenantId, List<PurchaseRequestConfirmDetailVO> details,
+            LocalDate baseDt) throws Exception {
+        Set<Long> materialIds = new LinkedHashSet<Long>();
+        for (PurchaseRequestConfirmDetailVO detail : details) {
+            if (detail.getConfirmQty() == null && detail.getMaterialId() != null) {
+                materialIds.add(detail.getMaterialId());
+            }
+        }
+        if (materialIds.isEmpty()) {
+            return;
+        }
+        Map<Long, ItemPriceLookupVO> defaults = priceLookupService.findDefaultSupplierPrices(tenantId, materialIds,
+                baseDt);
+        for (PurchaseRequestConfirmDetailVO detail : details) {
+            ItemPriceLookupVO found = detail.getConfirmQty() == null ? defaults.get(detail.getMaterialId()) : null;
+            if (found == null) {
+                continue;
+            }
+            detail.setSupplierId(found.getSupplierId());
+            detail.setSupplierCode(found.getSupplierCode());
+            detail.setSupplierName(found.getSupplierName());
+            detail.setUnitPrice(found.getUnitPrice());
+            detail.setCurrencyCode(found.getCurrency());
+            detail.setTaxType(found.getTaxType());
+            detail.setVatIncludedAt(found.getVatIncludedAt());
+            detail.setForeignUnitPrice(found.getForeignUnitPrice());
+            detail.setForeignCurrency(found.getForeignCurrency());
+            detail.setOrderType(found.getOrderType());
+            detail.setOrderTypeName(found.getOrderTypeName());
+        }
     }
 
     @Override
@@ -273,28 +313,18 @@ public class PurchaseRequestConfirmServiceImpl extends EgovAbstractServiceImpl
         if (materialId == null || materialId < 1L || supplierId == null || supplierId < 1L || baseDt == null) {
             throw badRequest("품목, 구매처, 기준일을 입력해 주세요.");
         }
-        Map<String, Object> params = tenantParams(tenantId);
-        params.put("materialId", materialId);
-        params.put("supplierId", supplierId);
-        params.put("baseDt", baseDt);
-        PurchaseUnitPriceVO price = confirmDAO.selectDefaultUnitPrice(params);
-        if (price == null) {
+        ItemPriceLookupVO found = priceLookupService.findPrice(tenantId, "매입", materialId, supplierId, baseDt);
+        if (found == null) {
             return null;
         }
-        if (!StringUtils.hasText(price.getTaxType())) {
-            price.setTaxType(DEFAULT_TAX_TYPE);
-        }
-        if (!StringUtils.hasText(price.getVatIncludedAt())) {
-            price.setVatIncludedAt("N");
-        }
-        if (price.getUnitPrice() == null && price.getForeignUnitPrice() != null) {
-            // 외화단가만 등록된 단가는 외화통화 + 외화단가를 기본으로 설정한다.
-            price.setUnitPrice(price.getForeignUnitPrice());
-            price.setCurrency(StringUtils.hasText(price.getForeignCurrency())
-                    ? price.getForeignCurrency() : DEFAULT_CURRENCY);
-        } else {
-            price.setCurrency(DEFAULT_CURRENCY);
-        }
+        PurchaseUnitPriceVO price = new PurchaseUnitPriceVO();
+        price.setUnitPrice(found.getUnitPrice());
+        price.setCurrency(found.getCurrency());
+        price.setTaxType(found.getTaxType());
+        price.setVatIncludedAt(found.getVatIncludedAt());
+        price.setForeignUnitPrice(found.getForeignUnitPrice());
+        price.setForeignCurrency(found.getForeignCurrency());
+        price.setOrderType(found.getOrderType());
         return price;
     }
 

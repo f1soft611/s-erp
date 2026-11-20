@@ -8,7 +8,7 @@ export type ItemPartnerPriceFilters = {
   useAt?: ItemPartnerPriceUseAt | '';
   /** true면 종료된 과거 단가도 조회한다. 기본은 현재 적용·예정 단가만. */
   includeHistory?: boolean;
-  /** 지정하면 그 거래처의 단가만(기본단가 제외) 조회한다. */
+  /** 지정하면 그 거래처의 단가만(공통단가 제외) 조회한다. */
   customerId?: number;
 };
 
@@ -21,7 +21,7 @@ export type ItemPartnerPriceRow = {
   materialId: number | null;
   materialCode: string;
   materialName: string;
-  /** null이면 품목 기본단가(거래처 공통). */
+  /** null이면 품목 공통단가(거래처 공통). */
   customerId: number | null;
   customerCode: string;
   customerName: string;
@@ -32,6 +32,11 @@ export type ItemPartnerPriceRow = {
   foreignUnitPrice: number | null;
   /** 외화단가의 통화. 외화단가가 없으면 빈 값. */
   currency: string;
+  /** 발주구분 코드(매입 단가만, 없으면 빈 값). */
+  orderType: string;
+  orderTypeName?: string;
+  /** 이 거래처가 품목의 매입 기본 거래처인지(매입·거래처 단가만 의미가 있다). */
+  defaultSupplier: boolean;
   materialUnit?: string;
   materialSpec?: string;
   priceStatus?: ItemPartnerPriceStatus;
@@ -45,11 +50,18 @@ export type ItemPartnerPriceRow = {
   updatedAt?: string;
 };
 
+/** defaultSupplier: true=기본 거래처로 지정, false=해제 요청(현재 기본일 때만), 생략=변경 없음. */
 export type ItemPartnerPricePayload = Pick<
   ItemPartnerPriceRow,
   'materialId' | 'customerId' | 'tradeType' | 'unitPrice' | 'currency'
   | 'taxType' | 'vatIncludedAt' | 'foreignUnitPrice' | 'startDt' | 'endDt' | 'moq' | 'useAt'
->;
+  | 'orderType'
+> & { defaultSupplier?: boolean };
+
+export type ItemPartnerPriceBatchSaveInfo = {
+  /** 서버가 매입 단가가 없어져 기본 거래처를 자동 해제한 품목 ID. */
+  clearedDefaultMaterialIds: number[];
+};
 
 export type ItemPartnerPriceBatchPayload = {
   prices: {
@@ -70,6 +82,9 @@ export type ItemPartnerPriceImportRow = {
   vatIncludedAt: string;
   foreignUnitPrice: string;
   currency: string;
+  orderType: string;
+  /** Y 또는 N. 비우면 기본 거래처를 바꾸지 않는다. */
+  defaultSupplier: string;
   startDt: string;
   endDt: string | null;
   moq: string | null;
@@ -97,6 +112,8 @@ export type ItemPartnerPriceImportValidationRow = {
   customerId?: number;
   customerCode?: string;
   customerName?: string;
+  /** 서버가 공통코드로 확인한 발주구분 코드. */
+  orderType?: string;
   errors: ItemPartnerPriceImportError[];
 };
 
@@ -117,6 +134,8 @@ export const itemPartnerPriceHeaders = [
   '적용종료일',
   '최소주문수량',
   '사용여부',
+  '발주구분',
+  '기본거래처',
 ] as const;
 
 export function emptyItemPartnerPricePayload(): ItemPartnerPricePayload {
@@ -129,6 +148,8 @@ export function emptyItemPartnerPricePayload(): ItemPartnerPricePayload {
     vatIncludedAt: 'N',
     foreignUnitPrice: null,
     currency: '',
+    orderType: '',
+    defaultSupplier: false,
     startDt: '',
     endDt: null,
     moq: null,

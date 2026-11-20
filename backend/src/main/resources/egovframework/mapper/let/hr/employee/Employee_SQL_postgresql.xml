@@ -138,7 +138,30 @@
           ON ci.group_id = cg.common_code_group_id AND ci.item_code = u.nationality_code
     </sql>
 
+    <!-- 사원 목록 정렬용 부서 트리 순서(dept_tree.path). 사원 목록·사원 선택 도움창이 같이 쓴다. #{tenantId} 필요. -->
+    <sql id="departmentTreeOrder">
+        <!-- 부서 정렬은 화면 부서 트리가 펼쳐진 순서다: 같은 부모 안에서 정렬순서→부서명→ID 순번을 매기고,
+             루트부터 순번을 이어 붙인 경로(path)로 정렬하면 상위 부서 바로 아래에 하위 부서가 온다. -->
+        WITH RECURSIVE dept_rank AS (
+            SELECT department_id, parent_department_id,
+                   ROW_NUMBER() OVER (PARTITION BY parent_department_id
+                                      ORDER BY sort_order ASC, department_nm ASC, department_id ASC) AS rn
+            FROM tb_department
+            WHERE tenant_id = #{tenantId}
+        ), dept_tree AS (
+            SELECT department_id, ARRAY[rn] AS path
+            FROM dept_rank
+            WHERE parent_department_id IS NULL
+            UNION ALL
+            SELECT r.department_id, t.path || r.rn
+            FROM dept_rank r
+            JOIN dept_tree t ON r.parent_department_id = t.department_id
+            WHERE cardinality(t.path) &lt; 20
+        )
+    </sql>
+
     <select id="selectEmployeeList" parameterType="map" resultMap="employeeMap">
+        <include refid="departmentTreeOrder"/>
         <include refid="employeeSelect"/>
         WHERE u.tenant_id = #{tenantId}
           AND u.use_at = 'Y'
@@ -164,8 +187,8 @@
              OR u.email_addr ILIKE '%' || #{keyword} || '%'
           )
         </if>
-        ORDER BY d.sort_order ASC NULLS LAST, d.department_nm ASC NULLS LAST,
-                 pi.sort_order ASC NULLS LAST, u.employee_no ASC NULLS LAST, u.user_id ASC
+        ORDER BY (SELECT dt.path FROM dept_tree dt WHERE dt.department_id = u.department_id) ASC NULLS LAST,
+                 pi.sort_order ASC NULLS LAST, u.user_nm ASC, u.user_id ASC
     </select>
 
     <select id="selectEmployeeById" parameterType="map" resultMap="employeeMap">
@@ -173,6 +196,44 @@
         WHERE u.tenant_id = #{tenantId}
           AND u.user_id = #{userId}
           AND u.use_at = 'Y'
+    </select>
+
+    <!-- 사원 선택 도움창: 선택에 필요한 항목만 읽는다(연락처·주민번호·주소·이메일·로그인 정보 제외). 퇴직자는 제외하고 휴직자는 포함한다. -->
+    <select id="selectPickerEmployees" parameterType="map" resultType="egovframework.let.hr.employee.domain.model.EmployeePickerVO">
+        <include refid="departmentTreeOrder"/>
+        SELECT
+            u.user_id AS userId,
+            u.employee_no AS employeeNo,
+            u.user_nm AS userNm,
+            u.department_id AS departmentId,
+            d.department_nm AS departmentNm,
+            u.position_code AS positionCode,
+            pi.item_nm AS positionNm,
+            u.photo_image AS photoImage
+        FROM tb_user u
+        LEFT JOIN tb_department d
+          ON d.department_id = u.department_id
+         AND d.tenant_id = u.tenant_id
+        LEFT JOIN tb_common_code_group pg
+          ON pg.tenant_id = u.tenant_id AND pg.group_code = 'POSITION'
+        LEFT JOIN tb_common_code_item pi
+          ON pi.group_id = pg.common_code_group_id AND pi.item_code = u.position_code
+        WHERE u.tenant_id = #{tenantId}
+          AND u.use_at = 'Y'
+          AND NOT (u.retire_dt IS NOT NULL AND u.retire_dt &lt;= CURRENT_DATE)
+        <if test="departmentId != null">
+          AND u.department_id = #{departmentId}
+        </if>
+        <if test="keyword != null">
+          AND (
+                u.user_nm ILIKE '%' || #{keyword} || '%'
+             OR u.employee_no ILIKE '%' || #{keyword} || '%'
+             OR pi.item_nm ILIKE '%' || #{keyword} || '%'
+             OR d.department_nm ILIKE '%' || #{keyword} || '%'
+          )
+        </if>
+        ORDER BY (SELECT dt.path FROM dept_tree dt WHERE dt.department_id = u.department_id) ASC NULLS LAST,
+                 pi.sort_order ASC NULLS LAST, u.user_nm ASC, u.user_id ASC
     </select>
 
     <select id="countEmployeeNo" parameterType="map" resultType="int">
@@ -261,7 +322,7 @@
             #{tenantId}, #{loginId,jdbcType=BIGINT}, #{userNm}, #{emailAddr,jdbcType=VARCHAR},
             #{departmentId}, #{mobileNo,jdbcType=VARCHAR}, #{levelId,jdbcType=BIGINT}, 'Y',
             #{employeeNo}, #{englishNm,jdbcType=VARCHAR}, #{positionCode}, #{genderCode,jdbcType=VARCHAR},
-            #{employmentTypeCode}, #{nativeTypeCode,jdbcType=VARCHAR},
+            #{employmentTypeCode,jdbcType=VARCHAR}, #{nativeTypeCode,jdbcType=VARCHAR},
             #{nationalityCode,jdbcType=VARCHAR}, #{birthCalendarCode,jdbcType=VARCHAR},
             #{birthDt,jdbcType=DATE}, #{joinDt,jdbcType=DATE}, #{retireDt,jdbcType=DATE},
             #{suspendDt,jdbcType=DATE}, #{backDt,jdbcType=DATE},
@@ -287,7 +348,7 @@
             english_nm = #{englishNm,jdbcType=VARCHAR},
             position_code = #{positionCode},
             gender_code = #{genderCode,jdbcType=VARCHAR},
-            employment_type_code = #{employmentTypeCode},
+            employment_type_code = #{employmentTypeCode,jdbcType=VARCHAR},
             native_type_code = #{nativeTypeCode,jdbcType=VARCHAR},
             nationality_code = #{nationalityCode,jdbcType=VARCHAR},
             birth_calendar_code = #{birthCalendarCode,jdbcType=VARCHAR},
@@ -326,9 +387,10 @@
     <!-- 비밀번호 변경 시각을 비워 두면 초기 비밀번호(최초 로그인 시 변경 대상) 상태이다. -->
     <select id="insertLoginAccount" parameterType="map" resultType="long">
         INSERT INTO tb_login_account (
-            tenant_id, login_code, password_hash, profile_image, password_changed_at, use_at
+            tenant_id, login_code, password_hash, profile_image, password_changed_at, use_at,
+            password_change_required
         ) VALUES (
-            #{tenantId}, #{loginCode}, #{passwordHash}, #{profileImage,jdbcType=VARCHAR}, NULL, 'Y'
+            #{tenantId}, #{loginCode}, #{passwordHash}, #{profileImage,jdbcType=VARCHAR}, NULL, 'Y', 'Y'
         )
         RETURNING login_id
     </select>

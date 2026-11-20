@@ -19,12 +19,14 @@ import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPric
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceBatchSaveResultVO;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceChangeVO;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceVO;
+import egovframework.let.co.master.itempartnerprice.service.ItemDefaultSupplierService;
 import egovframework.let.co.master.itempartnerprice.service.ItemPartnerPriceBatchService;
 import egovframework.let.co.master.itempartnerprice.service.ItemPartnerPriceService;
 
 class ItemPartnerPriceBatchServiceImplTest {
     private final ItemPartnerPriceService service = mock(ItemPartnerPriceService.class);
-    private final ItemPartnerPriceBatchServiceImpl batch = new ItemPartnerPriceBatchServiceImpl(service);
+    private final ItemDefaultSupplierService defaultSuppliers = mock(ItemDefaultSupplierService.class);
+    private final ItemPartnerPriceBatchServiceImpl batch = new ItemPartnerPriceBatchServiceImpl(service, defaultSuppliers);
 
     @Test
     void savesInsertedAndUpdatedRowsWithServerIdMappings() throws Exception {
@@ -120,6 +122,87 @@ class ItemPartnerPriceBatchServiceImplTest {
 
         verify(connection).rollback();
         verify(connection, never()).commit();
+    }
+
+    @Test
+    void setsDefaultSupplierAfterPriceRowsAndReportsClearedOrphans() throws Exception {
+        ItemPartnerPriceVO inserted = new ItemPartnerPriceVO();
+        inserted.setPriceId(44L);
+        inserted.setMaterialId(101L);
+        inserted.setCustomerId(201L);
+        inserted.setTradeType("매입");
+        ItemPartnerPriceVO updated = new ItemPartnerPriceVO();
+        updated.setPriceId(12L);
+        updated.setMaterialId(101L);
+        updated.setCustomerId(202L);
+        updated.setTradeType("매입");
+        when(service.createPrice(eq(9L), eq("101"), any())).thenReturn(inserted);
+        when(service.updatePrice(eq(9L), eq("101"), eq(12L), any())).thenReturn(updated);
+        when(defaultSuppliers.findMaterialIdsByPriceIds(eq(9L), any())).thenReturn(Collections.singletonList(300L));
+        when(defaultSuppliers.clearOrphans(eq(9L), any())).thenReturn(Collections.singletonList(300L));
+        when(defaultSuppliers.findDefaultSupplierIds(eq(9L), any())).thenReturn(Collections.singletonMap(101L, 201L));
+        ItemPartnerPriceBatchSaveRequestVO request = request();
+        request.getPrices().getInsertedRows().get(0).setDefaultSupplier(Boolean.TRUE);
+
+        ItemPartnerPriceBatchSaveResultVO result = batch.saveBatch(9L, "101", request);
+
+        org.mockito.InOrder order = inOrder(service, defaultSuppliers);
+        order.verify(service).createPrice(eq(9L), eq("101"), any());
+        order.verify(defaultSuppliers).setDefault(9L, "101", 101L, 201L);
+        order.verify(defaultSuppliers).clearOrphans(eq(9L), any());
+        assertThat(result.getClearedDefaultMaterialIds()).containsExactly(300L);
+        assertThat(inserted.getDefaultSupplier()).isTrue();
+        assertThat(updated.getDefaultSupplier()).isFalse();
+    }
+
+    @Test
+    void falseFlagClearsOnlyWhenNoOtherSupplierIsBeingSet() throws Exception {
+        when(service.createPrice(eq(9L), eq("101"), any())).thenReturn(new ItemPartnerPriceVO());
+        when(service.updatePrice(eq(9L), eq("101"), eq(12L), any())).thenReturn(new ItemPartnerPriceVO());
+        ItemPartnerPriceBatchSaveRequestVO request = request();
+        request.getPrices().getInsertedRows().get(0).setDefaultSupplier(Boolean.TRUE);
+        request.getPrices().getUpdatedRows().get(0).setMaterialId(101L);
+        request.getPrices().getUpdatedRows().get(0).setDefaultSupplier(Boolean.FALSE);
+
+        batch.saveBatch(9L, "101", request);
+
+        verify(defaultSuppliers).setDefault(9L, "101", 101L, 201L);
+        verify(defaultSuppliers, never()).clearIfCurrent(anyLong(), anyLong(), anyLong());
+
+        ItemPartnerPriceBatchSaveRequestVO clearOnly = request();
+        clearOnly.getPrices().getUpdatedRows().get(0).setMaterialId(101L);
+        clearOnly.getPrices().getUpdatedRows().get(0).setDefaultSupplier(Boolean.FALSE);
+        batch.saveBatch(9L, "101", clearOnly);
+        verify(defaultSuppliers).clearIfCurrent(9L, 101L, 202L);
+    }
+
+    @Test
+    void rejectsInvalidDefaultSupplierRequestsBeforeWriting() {
+        ItemPartnerPriceBatchSaveRequestVO common = request();
+        common.getPrices().getInsertedRows().get(0).setCustomerId(null);
+        common.getPrices().getInsertedRows().get(0).setDefaultSupplier(Boolean.TRUE);
+        assertThatThrownBy(() -> batch.saveBatch(9L, "101", common))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("기본 거래처");
+
+        ItemPartnerPriceBatchSaveRequestVO sales = request();
+        sales.getPrices().getInsertedRows().get(0).setTradeType("매출");
+        sales.getPrices().getInsertedRows().get(0).setDefaultSupplier(Boolean.TRUE);
+        assertThatThrownBy(() -> batch.saveBatch(9L, "101", sales))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("기본 거래처");
+
+        ItemPartnerPriceBatchSaveRequestVO inactive = request();
+        inactive.getPrices().getInsertedRows().get(0).setUseAt("N");
+        inactive.getPrices().getInsertedRows().get(0).setDefaultSupplier(Boolean.TRUE);
+        assertThatThrownBy(() -> batch.saveBatch(9L, "101", inactive))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("기본 거래처");
+
+        ItemPartnerPriceBatchSaveRequestVO two = request();
+        two.getPrices().getInsertedRows().get(0).setDefaultSupplier(Boolean.TRUE);
+        two.getPrices().getUpdatedRows().get(0).setMaterialId(101L);
+        two.getPrices().getUpdatedRows().get(0).setDefaultSupplier(Boolean.TRUE);
+        assertThatThrownBy(() -> batch.saveBatch(9L, "101", two))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("하나");
+        verifyNoInteractions(service);
     }
 
     private ItemPartnerPriceBatchSaveRequestVO request() {

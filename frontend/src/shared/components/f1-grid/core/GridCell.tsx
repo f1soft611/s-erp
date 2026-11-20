@@ -408,7 +408,9 @@ const GridCellInner = <T extends object>({
         />
       ) : column.type === 'image' ? (
         imageContent !== undefined ? imageContent
-          : <ImageField label={column.headerName} value={value} disabled={!editable} onChange={onSelectChange} cell />
+          : <ImageField label={column.headerName} value={value} disabled={!editable} onChange={onSelectChange} cell
+            shape={column.imageOptions?.shape} fallbackText={column.imageOptions?.fallbackText?.(row)}
+            compress={column.imageOptions?.compress} />
       ) : editing ? (
         <CellEditor
           column={column}

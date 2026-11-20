@@ -31,6 +31,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Autowired
     private EgovJwtTokenUtil jwtTokenUtil;
     public static final String HEADER_STRING = "Authorization";
+    public static final String PASSWORD_CHANGE_REQUIRED = "PASSWORD_CHANGE_REQUIRED";
+    private static final String PASSWORD_CHANGE_PATH = "/api/v1/users/me/password";
 
     @Override //로그인 이후 HttpServletRequest 요청할 때마다 실행(스프링의 AOP기능)
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
@@ -63,6 +65,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             logger.debug("jwtToken validated");
             logger.debug("===>>> loginVO.getUserSe() = "+loginVO.getUserSe());
 
+            // 비밀번호를 변경해야 하는 계정은 변경 API와 /auth 경로 외에는 쓸 수 없다.
+            if (loginVO.isPasswordChangeRequired() && !isAllowedWhilePasswordChangeRequired(req)) {
+                SecurityContextHolder.clearContext();
+                res.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                res.setContentType("application/json;charset=UTF-8");
+                res.getWriter().write("{\"resultCode\":\"" + PASSWORD_CHANGE_REQUIRED
+                        + "\",\"resultMessage\":\"비밀번호를 변경한 뒤에 이용할 수 있습니다.\"}");
+                return;
+            }
+
             String role = mapRoleCode(loginVO);
 
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
@@ -79,6 +91,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         chain.doFilter(req, res);
+    }
+
+    private boolean isAllowedWhilePasswordChangeRequired(HttpServletRequest req) {
+        String uri = req.getRequestURI() == null ? "" : req.getRequestURI();
+        String contextPath = req.getContextPath() == null ? "" : req.getContextPath();
+        String path = uri.startsWith(contextPath) ? uri.substring(contextPath.length()) : uri;
+        if (path.startsWith("/auth/")) {
+            return true;
+        }
+        return "PUT".equalsIgnoreCase(req.getMethod()) && PASSWORD_CHANGE_PATH.equals(path);
     }
 
     private String mapRoleCode(LoginVO loginVO) {

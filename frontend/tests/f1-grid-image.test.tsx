@@ -63,6 +63,71 @@ describe('F1Grid image column', () => {
     await waitFor(() => expect(ref.current?.getRows()[0].image).toMatch(new RegExp(`^data:${actualType};base64,`)));
   });
 
+  it('shows a round image or the fallback first letter when imageOptions.shape is circle', () => {
+    type PersonRow = { id: string; name: string; image: string };
+    const circleColumns: F1GridColumn<PersonRow>[] = [{
+      field: 'image', headerName: '사진', type: 'image', editable: true,
+      imageOptions: { shape: 'circle', fallbackText: (row) => row.name.charAt(0) },
+    }];
+    render(<F1Grid rows={[
+      { id: '1', name: '홍길동', image: '' },
+      { id: '2', name: '김철수', image: 'data:image/png;base64,abc' },
+    ]} rowKey="id" columns={circleColumns} />);
+    const empty = screen.getByLabelText('사진 없음');
+    expect(empty).toHaveTextContent('홍');
+    expect(empty).toHaveStyle({ width: '48px', height: '48px' });
+    expect(screen.getByRole('img', { name: '사진' })).toHaveStyle({ borderRadius: '50%' });
+  });
+
+  it('shows a large preview with select/delete buttons and the helper text in the row form when formSize is set', () => {
+    const onPatch = vi.fn();
+    const column: F1GridColumn<{ id: string; name: string; image: string }> = {
+      field: 'image', headerName: '사진', type: 'image', editable: true,
+      imageOptions: { shape: 'circle', formSize: 120, fallbackText: (row) => row.name.charAt(0), compress: { maxSide: 320, maxLength: 700 * 1024 } },
+      form: { helperText: '자동으로 줄여서 저장합니다.' },
+    };
+    const { rerender } = render(<GridFormField column={column} row={{ id: '1', name: '홍길동', image: '' }}
+      mode="edit" value="" readOnly={false} onPatch={onPatch} />);
+    expect(screen.getByLabelText('사진 없음')).toHaveStyle({ width: '120px', height: '120px' });
+    expect(screen.getByLabelText('사진 없음')).toHaveTextContent('홍');
+    expect(screen.getByRole('button', { name: '사진 선택' })).toBeInTheDocument();
+    expect(screen.getByText('자동으로 줄여서 저장합니다.')).toBeInTheDocument();
+    expect(screen.getByLabelText('사진 파일')).toHaveAttribute('accept', expect.stringContaining('image/webp'));
+    expect(screen.getByRole('button', { name: '사진 삭제' })).toBeDisabled();
+
+    rerender(<GridFormField column={column} row={{ id: '1', name: '홍길동', image: 'data:image/png;base64,abc' }}
+      mode="edit" value="data:image/png;base64,abc" readOnly={false} onPatch={onPatch} />);
+    expect(screen.getByRole('img', { name: '사진' })).toHaveStyle({ width: '120px', borderRadius: '50%' });
+    fireEvent.click(screen.getByRole('button', { name: '사진 삭제' }));
+    expect(onPatch).toHaveBeenCalledWith({ image: '' });
+  });
+
+  it('compresses a selected image instead of enforcing the 512KB limit when compress is set', async () => {
+    const resize = vi.spyOn(await import('../src/shared/components/f1-grid/editing/imageResize'), 'resizeImageToDataUrl')
+      .mockResolvedValue('data:image/jpeg;base64,small');
+    const onPatch = vi.fn();
+    const column: F1GridColumn<Row> = {
+      field: 'image', headerName: '사진', type: 'image', editable: true,
+      imageOptions: { formSize: 96, compress: { maxSide: 320, maxLength: 700 * 1024 } },
+    };
+    render(<GridFormField column={column} row={{ id: '1', image: '' }} mode="edit" value="" readOnly={false} onPatch={onPatch} />);
+    fireEvent.change(screen.getByLabelText('사진 파일'), {
+      target: { files: [new File([new Uint8Array(2 * 1024 * 1024)], 'big.webp', { type: 'image/webp' })] },
+    });
+    await waitFor(() => expect(onPatch).toHaveBeenCalledWith({ image: 'data:image/jpeg;base64,small' }));
+    expect(resize).toHaveBeenCalledWith(expect.any(File), { maxSide: 320, maxLength: 700 * 1024 });
+    resize.mockRestore();
+  });
+
+  it('fits images within the longest side and validates the compress input type and size', async () => {
+    const { fitWithin, validateCompressInput } = await import('../src/shared/components/f1-grid/editing/imageResize');
+    expect(fitWithin(1600, 800, 320)).toEqual({ width: 320, height: 160 });
+    expect(fitWithin(200, 100, 320)).toEqual({ width: 200, height: 100 });
+    expect(validateCompressInput({ type: 'image/webp', size: 1000 })).toBeNull();
+    expect(validateCompressInput({ type: 'image/gif', size: 1000 })).toContain('PNG, JPEG, WEBP');
+    expect(validateCompressInput({ type: 'image/png', size: 11 * 1024 * 1024 })).toContain('10MB');
+  });
+
   it('shows images in a read-only tree without editing controls', () => {
     type TreeRow = Row & { parentId: string | null; name: string };
     const treeColumns: F1GridColumn<TreeRow>[] = [

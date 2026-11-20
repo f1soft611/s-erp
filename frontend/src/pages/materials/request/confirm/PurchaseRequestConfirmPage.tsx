@@ -280,6 +280,8 @@ export function PurchaseRequestConfirmPage({
         wonUnitPrice: price && currencyCode === DEFAULT_CURRENCY ? unitPrice : null,
         foreignUnitPrice: price?.foreignUnitPrice == null ? null : Number(price.foreignUnitPrice),
         foreignCurrency: price?.foreignCurrency ?? '',
+        // 발주구분은 단가 행에 값이 있을 때만 덮어쓴다(없으면 사용자가 고른 값을 유지).
+        ...(price?.orderType ? { orderType: price.orderType } : {}),
         amount: calculateAmount(target.row.confirmQty, unitPrice),
       });
     } catch (priceError) {

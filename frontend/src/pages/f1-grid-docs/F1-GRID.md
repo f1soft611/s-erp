@@ -128,6 +128,7 @@ const columns: F1GridColumn<Row>[] = [
 ### 이미지 컬럼 (2026-11-12)
 
 - `type: 'image'` 셀은 60×60 이미지 또는 빈 이미지 아이콘을 표시한다. 행 높이는 화면에서 충분히 확보해야 한다.
+- 원형 표시(2026-11-20): 컬럼 `imageOptions: { shape: 'circle', fallbackText: (row) => string }`를 지정하면 셀을 48px 원형(`object-fit: cover`)으로, 행 폼 미리보기를 36px 원형으로 표시한다. 이미지가 없을 때는 `fallbackText`가 돌려준 글자(예: 이름 첫 글자)를 원 안에 보여 주고, 글자가 비어 있으면 빈 이미지 아이콘을 쓴다. 미지정이면 기존 네모(60×60) 표시 그대로다. 선택·삭제·검증 동작은 같다.
 - 편집 가능한 셀의 이미지를 클릭해 PNG/JPEG를 선택하고 셀 포커스 상태에서 Delete 키로 지운다. 행이 선택되어 있어도 이미지 셀에서는 행을 삭제하지 않으며, 읽기 전용 이미지도 Delete로 행을 삭제하지 않는다.
 - 터치용 행 폼은 파일 선택·삭제 버튼을 유지한다. 빈 파일과 512 KiB 초과 파일은 거부하고 PNG/JPEG 서명으로 데이터 URL MIME을 보정한다. 서버에서도 실제 이미지 내용·크기를 검증해야 한다.
 - 파일 선택 및 삭제는 기존 그리드 행 변경 추적에 반영된다. 이미지 컬럼의 `renderCell`이 `undefined`를 반환하면 기본 이미지 셀을, `null`을 반환하면 빈 셀을 표시한다.
@@ -994,6 +995,9 @@ type F1GridColumnFormOptions<T extends object> = {
   order?: number;
   span?: 1 | 2 | 3;
   multiple?: boolean;
+  inputType?: 'password';
+  helperText?: string | ((row: T) => string);
+  visible?: boolean | ((row: T) => boolean);
   targetField?: keyof T;
   targetLabel?: string;
 };
@@ -1029,6 +1033,10 @@ interface F1GridProps<T extends object> {
 - 행 폼의 읽기전용 또는 비활성 텍스트·숫자·날짜·선택·자동완성·사용자·코드·체크박스·이미지 입력은 현재 테마의 읽기전용 배경색으로 구분한다. 코드 입력은 직접 입력이 막혀도 선택 버튼을 사용할 수 있으면 편집 가능 배경을 유지한다.
 - `form.span`은 데스크톱 3열 기준 점유 폭이며 기본값은 `1`이다.
 - `type: 'select'`에서 `form.multiple: true`를 지정하면 row form은 선택값 배열을 보존한다. Grid 표시용 `getValue`가 요약 문자열을 반환해도 form 입력은 원본 row 배열을 사용한다.
+- 이미지 칸 옵션(2026-11-20): `imageOptions.formSize`(행 폼에서 큰 미리보기+"<이름> 선택/삭제" 버튼+`form.helperText` 안내를 나란히), `imageOptions.compress: { maxSide, maxLength }`(PNG·JPEG·WEBP 10MB 이하를 받아 브라우저에서 긴 변 `maxSide`px JPEG로 줄여 저장, 결과가 `maxLength`자를 넘으면 품질을 낮춤; 미지정이면 PNG·JPEG 512KB 이하). 컬럼은 목록 앞쪽에 두고 폼 섹션은 맨 아래로 보낼 때 `form.groupOrder`(섹션 순서, 기본은 칸이 처음 나온 순서)를 쓴다.
+- 행 폼의 `type: 'date'` 칸은 브라우저 기본 날짜 입력이 아니라 공통 한국어 달력(`DateEditor` 기반 `FormDateField`, 달력 버튼·`YYYY-MM-DD` 직접 입력·형식 오류 표시)으로 보여 준다(2026-11-20). 값은 `YYYY-MM-DD` 문자열 그대로다.
+- `form.helperText`(2026-11-20): 칸 아래에 안내 문구를 보여 준다(문자열 또는 행별 함수). 검증 오류가 있으면 오류가 우선하고 오류가 사라지면 다시 안내가 보인다. `form.visible`(2026-11-20): 지정하면 "수정 가능한 칸만 행 폼에 보인다"는 기본 규칙 대신 이 값(불리언 또는 행별 함수)으로 보일지 정한다. 수정할 수 없는 칸(사원의 사번·이미 발급된 로그인 아이디)을 읽기 전용으로 보여 줄 때 쓰며, 입력 가능 여부는 `editable`/`form.readOnly`가 따로 정한다.
+- `form.inputType: 'password'`는 행 폼의 텍스트 칸을 비밀번호 입력(`type="password"`)으로 가린다. 입력값은 일반 텍스트 칸과 같이 그리드 행 값에 반영되며 목록 셀 표시에는 영향이 없다(사원등록의 초기 비밀번호처럼 목록에는 숨김 컬럼으로 두고 행 폼에서만 입력받는 칸에 쓴다).
 - `form.targetField`와 `form.targetLabel`로 수정 모달 상단의 메타 정보(`예: 메뉴명: 홍길동`)를 재정의할 수 있으며, 기본값은 `rowKey`와 `대상`이다.
 - `text`, `number`, `decimal`, `currency`, `checkbox`, `date`, `datetime`, `time`, `select`, `autocomplete`, `code` 컬럼은 대응 입력으로 변환된다.
 - `rownumber`, 선택 체크박스, 합성 액션 열, 선언상 숨김 컬럼은 기본 제외한다. `form.hidden: false`이면 숨김 컬럼도 명시적으로 폼에 포함할 수 있다.
@@ -1089,7 +1097,7 @@ interface F1GridProps<T extends object> {
 
 출하등록의 상세 및 계획 선택 그리드와 출하현황 그리드는 일반 설명 텍스트를 왼쪽, 거래처/품목 코드와 명칭을 가운데, 수량·단가·금액을 오른쪽으로 정렬한다. 문서번호·일자·구분 및 행 식별 컬럼은 기존 가운데 정렬을 유지한다. 화면별 `F1GridColumn.align`으로 지정하며 공통 F1-Grid의 기본 정렬 동작은 변경하지 않는다.
 
-품목·거래처별 단가관리(`/co/master/item-partner-prices`)도 row form으로 단건 등록·수정한다. (20261118 개선) 화면은 "품목 기준"(F1Tree: 품목 부모 행 + 거래처 특별단가 자식 행, 매입·매출 기본단가를 셀에서 바로 입력, 엑셀 양식에 현재 단가 포함)과 세 탭은 조회조건 정의(`data/priceSearchFields.ts`: 통합검색 + 상세검색 "선택" 그룹의 단가 상태·단가 등록 여부·거래구분·사용여부·단가 이력)와 탭별 그리드 `storageKey`를 분리해 쓰며(컬럼 표시 설정 충돌 방지), 공통 상세검색의 날짜 필드는 항상 시작일~종료일 범위라 단일 기준일 조건은 두지 않는다. "거래처 기준"(좌측 거래처 F1Grid에서 행을 고르면 우측에서 그 거래처의 단가를 조회·입력하는 마스터-디테일, 한 행 = 품목+거래구분, 거래처가 고정되어 거래처·품목 코드/명 컬럼은 숨기고 `createItemPartnerPriceColumns(…, customerFixed=true)` 사용, 거래처 선택 변경·저장 후 재조회 시 빈 선택 이벤트는 무시하고 저장하지 않은 변경은 확인 창, 엑셀 업로드는 검증 후 확인 창을 거쳐 바로 저장)과 "단가 이력 조회"(조회 전용 평면 F1Grid, 종료된 과거 단가 포함, 입력·저장·엑셀 업로드 없음) 탭으로 나뉜다. 입력·정정은 "품목 기준" 탭에서만 하며, 조회 전용 그리드는 `createItemPartnerPriceColumns(…, markRequired=false)`로 헤더 필수 표시를 숨긴다. 품목 기준 그리드는 No 열을 두고, 단가 입력 시 필요한 원화단가·적용일·거래처(특별단가 행)에 `requiredMark`로 필수 표시(*)만 하며(빈 행을 검증 오류로 만들지 않기 위해 `required`는 쓰지 않음), 맨 오른쪽 "상세" 아이콘과 특별단가 추가는 행 폼(`rowFormPlugin`)으로 입력한다. 거래처를 비우면 품목 기본단가, 부가세구분·부가세포함·외화단가·통화 컬럼을 쓰며, 종료된 과거 단가 행과 적용 중 단가의 키(거래구분·품목·거래처·적용 시작일)는 `editable` 함수로 잠근다. 값이 없는 숫자 칸은 `renderCell`로 빈 칸으로 그린다(그리드 숫자 서식은 null을 0으로 표시). 품목·거래처는 공통 master picker로 내부 ID를 선택하고 코드·명을 표시하며, 거래구분·단가·통화·적용 시작/종료일·최소주문수량·사용여부를 같은 폼에서 검증한다. 삭제 대신 `useAt`을 변경한다. 엑셀 업로드는 F1-Grid 외부 미리보기에서 `.xlsx` 행을 수정하고 서버 사전검증을 거친 뒤에만 전체 행을 신규 draft로 stage한다. 오류가 한 건이라도 있으면 일부 행도 stage하지 않으며, 업로드는 기존 행을 수정하거나 upsert하지 않는다. 수기/엑셀 draft는 한 번의 `save-batch` 요청으로 저장하고, 서버 실패 시 grid dirty 상태를 보존한다. 템플릿 생성과 파싱 시 `exceljs`를 동적 import하여 초기 번들에서 분리한다.
+품목·거래처별 단가관리(`/co/master/item-partner-prices`)도 row form으로 단건 등록·수정한다. (20261118 개선) 화면은 "품목 기준"(F1Tree: 품목 부모 행 + 거래처 특별단가 자식 행, 매입·매출 공통단가를 셀에서 바로 입력, 엑셀 양식에 현재 단가 포함)과 세 탭은 조회조건 정의(`data/priceSearchFields.ts`: 통합검색 + 상세검색 "선택" 그룹의 단가 상태·단가 등록 여부·거래구분·사용여부·단가 이력)와 탭별 그리드 `storageKey`를 분리해 쓰며(컬럼 표시 설정 충돌 방지), 공통 상세검색의 날짜 필드는 항상 시작일~종료일 범위라 단일 기준일 조건은 두지 않는다. "거래처 기준"(좌측 거래처 F1Grid에서 행을 고르면 우측에서 그 거래처의 단가를 조회·입력하는 마스터-디테일, 한 행 = 품목+거래구분, 거래처가 고정되어 거래처·품목 코드/명 컬럼은 숨기고 `createItemPartnerPriceColumns(…, customerFixed=true)` 사용, 거래처 선택 변경·저장 후 재조회 시 빈 선택 이벤트는 무시하고 저장하지 않은 변경은 확인 창, 엑셀 업로드는 검증 후 확인 창을 거쳐 바로 저장)과 "단가 이력 조회"(조회 전용 평면 F1Grid, 종료된 과거 단가 포함, 입력·저장·엑셀 업로드 없음) 탭으로 나뉜다. 입력·정정은 "품목 기준" 탭에서만 하며, 조회 전용 그리드는 `createItemPartnerPriceColumns(…, markRequired=false)`로 헤더 필수 표시를 숨긴다. 품목 기준 그리드는 No 열을 두고, 단가 입력 시 필요한 원화단가·적용일·거래처(특별단가 행)에 `requiredMark`로 필수 표시(*)만 하며(빈 행을 검증 오류로 만들지 않기 위해 `required`는 쓰지 않음), 맨 오른쪽 "상세" 아이콘과 특별단가 추가는 행 폼(`rowFormPlugin`)으로 입력한다. 거래처를 비우면 품목 공통단가, 부가세구분·부가세포함·외화단가·통화 컬럼을 쓰며, 종료된 과거 단가 행과 적용 중 단가의 키(거래구분·품목·거래처·적용 시작일)는 `editable` 함수로 잠근다. 값이 없는 숫자 칸은 `renderCell`로 빈 칸으로 그린다(그리드 숫자 서식은 null을 0으로 표시). 품목·거래처는 공통 master picker로 내부 ID를 선택하고 코드·명을 표시하며, 거래구분·단가·통화·적용 시작/종료일·최소주문수량·사용여부를 같은 폼에서 검증한다. 삭제 대신 `useAt`을 변경한다. 엑셀 업로드는 F1-Grid 외부 미리보기에서 `.xlsx` 행을 수정하고 서버 사전검증을 거친 뒤에만 전체 행을 신규 draft로 stage한다. 오류가 한 건이라도 있으면 일부 행도 stage하지 않으며, 업로드는 기존 행을 수정하거나 upsert하지 않는다. 수기/엑셀 draft는 한 번의 `save-batch` 요청으로 저장하고, 서버 실패 시 grid dirty 상태를 보존한다. 템플릿 생성과 파싱 시 `exceljs`를 동적 import하여 초기 번들에서 분리한다. (20261120) 매입 단가에 발주구분(select)과 기본 거래처(`type: 'checkbox'`, 값은 boolean)를 추가했다. 품목 기준 F1Tree는 거래처(자식) 행에서 매입 단가가 있을 때만 체크할 수 있고, 체크하면 같은 품목의 다른 거래처 행 체크를 `setCellValue`로 해제한다(서버가 최종 보장). 기본 거래처 표시만 바뀐 행도 변경 행이 되며 값 필드는 그대로 보낸다. 엑셀 양식에는 선택 열 `발주구분`·`기본거래처`가 추가되었고 12열 양식도 읽는다. 그리드 `storageKey`는 컬럼 추가에 맞춰 v 번호를 올렸다.
 
 > 선택(select) 칸 셀 편집: `onValueChange`는 사용자·체크박스 칸뿐 아니라 선택 칸을 셀에서 바꿀 때도 호출되어, 돌려준 객체로 같은 행의 다른 칸도 함께 갱신한다(예: 통화 변경 시 단가 전환, 부가세구분 변경 시 부가세포함 되돌리기). `onValueChange`가 없으면 선택한 값만 반영한다.
 
@@ -2076,6 +2084,8 @@ F1GridColumn<T>;
 
 `F1GridRef.validate()`는 현재 구현된 API다. 명시적 저장 액션에서는 API 호출 전에 실행하고, `false`이면 저장을 중단해 셀 오류와 입력 안내를 표시한다. 컬럼의 `required`, `min`, `max`, `validate` 설정을 재사용한다.
 
+`validate({ changedOnly: true })`는 **추가·수정한 행만** 검증한다(변경하지 않은 행은 검증과 오류 표시에서 제외하고 `onValidationErrors`에도 전달하지 않는다). 저장 데이터가 불완전한 기존 행(예: 필수값이 비어 있는 이전 데이터)이 있는 화면에서 그 행들 때문에 다른 행의 저장이 막히는 것을 피할 때 쓴다. 옵션을 주지 않으면 기존처럼 보이는 모든 행을 검증한다. 사원등록이 이 옵션을 사용한다(서버 검증은 그대로 필요하다).
+
 ```typescript
 interface F1GridRef<T> {
   // Selection
@@ -2118,7 +2128,7 @@ interface F1GridRef<T> {
   resetLayout(): void;
 
   // Validation
-  validate(): boolean;
+  validate(options?: { changedOnly?: boolean }): boolean;
 }
 ```
 

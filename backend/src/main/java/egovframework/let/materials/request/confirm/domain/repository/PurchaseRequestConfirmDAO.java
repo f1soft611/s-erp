@@ -11,7 +11,6 @@ import egovframework.let.materials.request.confirm.domain.model.PurchaseConfirmV
 import egovframework.let.materials.request.confirm.domain.model.PurchaseRequestConfirmCandidateVO;
 import egovframework.let.materials.request.confirm.domain.model.PurchaseRequestConfirmDetailVO;
 import egovframework.let.materials.request.confirm.domain.model.PurchaseRequestDetailLockVO;
-import egovframework.let.materials.request.confirm.domain.model.PurchaseUnitPriceVO;
 
 /**
  * 구매요청 품목 행 묶음 확정·발주대기 마감·확정 취소를 위한 테넌트 범위 MyBatis 데이터 접근 클래스.
@@ -114,7 +113,4 @@ public class PurchaseRequestConfirmDAO extends EgovAbstractMapper {
         return update(NS + "cancelConfirmHeader", params);
     }
 
-    public PurchaseUnitPriceVO selectDefaultUnitPrice(Map<String, Object> params) throws Exception {
-        return selectOne(NS + "selectDefaultUnitPrice", params);
-    }
 }

@@ -26,6 +26,7 @@
         <result property="groupNm" column="groupNm"/>
         <result property="roleCode" column="roleCode"/>
         <result property="roleId" column="roleId"/>
+        <result property="passwordChangeRequired" column="passwordChangeRequired"/>
     </resultMap>
 
     <resultMap id="id" type="egovframework.com.cmm.LoginVO">
@@ -67,7 +68,8 @@
                 ELSE 'ROLE_USER'
             END AS groupNm,
             sr.role_code AS roleCode,
-            sr.role_id AS roleId
+            sr.role_id AS roleId,
+            (li.password_change_required = 'Y') AS passwordChangeRequired
         FROM tb_login_account li
         JOIN tb_user u
           ON u.login_id = li.login_id
@@ -126,6 +128,66 @@
           AND COALESCE(d.use_at, 'Y') = 'Y'
           AND COALESCE(t.use_at, 'Y') = 'Y'
           AND COALESCE(sr.use_at, 'Y') = 'Y'
+          AND NOT (u.retire_dt IS NOT NULL AND u.retire_dt &lt;= CURRENT_DATE)
+    </select>
+
+    <!-- 로그인 실패 잠금: 시도한 ID(로그인 코드 또는 이메일)의 계정 상태. 로그인 코드가 정확히 같은 계정을 우선한다 -->
+    <select id="selectLockState" parameterType="map" resultType="egovframework.let.uat.uia.domain.model.LoginLockStateVO">
+        SELECT
+            li.login_id AS loginId,
+            COALESCE(li.login_attempt_count, 0) AS attemptCount,
+            (li.locked_at IS NOT NULL) AS locked
+        FROM tb_login_account li
+        JOIN tb_user u
+          ON u.login_id = li.login_id
+         AND u.tenant_id = li.tenant_id
+        WHERE li.tenant_id = CAST(#{tenantId} AS bigint)
+          AND (li.login_code = #{id} OR u.email_addr = #{id})
+          AND COALESCE(li.use_at, 'Y') = 'Y'
+        ORDER BY (li.login_code = #{id}) DESC
+        LIMIT 1
+    </select>
+
+    <!-- 실패 횟수 +1, 기준 횟수에 도달하면 잠금 시각을 기록한다(이미 잠겼으면 시각 유지) -->
+    <update id="increaseFailedAttempt" parameterType="map">
+        UPDATE tb_login_account
+        SET login_attempt_count = COALESCE(login_attempt_count, 0) + 1,
+            locked_at = CASE
+                WHEN COALESCE(login_attempt_count, 0) + 1 &gt;= #{maxAttempts} THEN COALESCE(locked_at, now())
+                ELSE locked_at
+            END
+        WHERE tenant_id = CAST(#{tenantId} AS bigint)
+          AND login_id = #{loginId}
+    </update>
+
+    <update id="resetFailedAttempts" parameterType="long">
+        UPDATE tb_login_account
+        SET login_attempt_count = 0
+        WHERE login_id = #{loginId}
+          AND COALESCE(login_attempt_count, 0) &lt;&gt; 0
+    </update>
+
+    <!-- 토큰 갱신 시 비밀번호 변경 필요 여부(관리자가 로그인 중인 계정을 초기화한 경우를 반영한다) -->
+    <select id="selectPasswordChangeRequired" parameterType="map" resultType="boolean">
+        SELECT (li.password_change_required = 'Y')
+        FROM tb_login_account li
+        WHERE li.tenant_id = CAST(#{tenantId} AS bigint)
+          AND li.login_code = #{loginCode}
+        LIMIT 1
+    </select>
+
+    <!-- 토큰 갱신 시 계정 상태 확인: 허용된 계정이고 퇴직하지 않은 사원이어야 한다 -->
+    <select id="countLoginableAccount" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM tb_login_account li
+        JOIN tb_user u
+          ON u.login_id = li.login_id
+         AND u.tenant_id = li.tenant_id
+        WHERE li.tenant_id = CAST(#{tenantId} AS bigint)
+          AND li.login_code = #{loginCode}
+          AND COALESCE(li.use_at, 'Y') = 'Y'
+          AND COALESCE(u.use_at, 'Y') = 'Y'
+          AND NOT (u.retire_dt IS NOT NULL AND u.retire_dt &lt;= CURRENT_DATE)
     </select>
 
     <select id="searchId" resultMap="id">
@@ -199,7 +261,9 @@
             d.department_nm AS departmentName,
             lvl.item_nm AS levelName,
             li.profile_image AS profileImage,
-            li.stamp_image AS stampImage
+            li.stamp_image AS stampImage,
+            u.employee_no AS employeeNo,
+            pi.item_nm AS positionNm
         FROM tb_login_account li
         JOIN tb_user u
           ON u.login_id = li.login_id
@@ -207,6 +271,10 @@
         LEFT JOIN tb_department d
           ON d.department_id = u.department_id
          AND d.tenant_id = li.tenant_id
+        LEFT JOIN tb_common_code_group pg
+          ON pg.tenant_id = u.tenant_id AND pg.group_code = 'POSITION'
+        LEFT JOIN tb_common_code_item pi
+          ON pi.group_id = pg.common_code_group_id AND pi.item_code = u.position_code
         LEFT JOIN tb_common_code_group lg
           ON lg.tenant_id = li.tenant_id
          AND lg.group_code = 'LEVEL'
@@ -220,6 +288,7 @@
           AND li.login_code = #{loginCode}
           AND COALESCE(li.use_at, 'Y') = 'Y'
           AND COALESCE(u.use_at, 'Y') = 'Y'
+          AND NOT (u.retire_dt IS NOT NULL AND u.retire_dt &lt;= CURRENT_DATE)
         LIMIT 1
     </select>
 
@@ -243,6 +312,17 @@
           AND li.login_code = #{loginCode}
     </update>
 
+    <update id="updateUserPhoto" parameterType="map">
+        UPDATE tb_user u
+        SET photo_image = #{profileImage,jdbcType=VARCHAR},
+            updated_at = now()
+        FROM tb_login_account li
+        WHERE li.login_id = u.login_id
+          AND li.tenant_id = u.tenant_id
+          AND li.tenant_id = CAST(#{tenantId} AS bigint)
+          AND li.login_code = #{loginCode}
+    </update>
+
     <update id="updateLoginImages" parameterType="map">
         UPDATE tb_login_account
         SET profile_image = #{profileImage},
@@ -256,6 +336,7 @@
         UPDATE tb_login_account
         SET password_hash = #{password},
             password_changed_at = now(),
+            password_change_required = 'N',
             updated_at = now()
         WHERE tenant_id = CAST(#{tenantId} AS bigint)
           AND login_code = #{loginCode}

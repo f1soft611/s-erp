@@ -29,4 +29,13 @@ public class ItemPriceOverviewSideVO {
     private String endDt;
     @Schema(description = "적용 상태", allowableValues = {"current", "future"})
     private String priceStatus;
+
+    @Schema(description = "발주구분 코드(매입 단가만)")
+    private String orderType;
+
+    @Schema(description = "발주구분 이름(매입 단가만)")
+    private String orderTypeName;
+
+    @Schema(description = "자식 행: 이 거래처가 품목의 기본 거래처인지(매입 단가만)")
+    private Boolean defaultSupplier;
 }

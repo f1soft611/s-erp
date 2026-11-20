@@ -112,6 +112,12 @@ public class PurchaseRequestConfirmDetailVO implements Serializable {
     @Schema(description = "확정 시 설정한 부가세 포함 여부(없으면 미포함으로 취급)", example = "N")
     private String vatIncludedAt;
 
+    @Schema(description = "외화단가(요청 불러오기 때 기본 거래처 단가에서 채움)")
+    private BigDecimal foreignUnitPrice;
+
+    @Schema(description = "외화단가의 통화")
+    private String foreignCurrency;
+
     @Schema(description = "확정 금액(확정수량 × 확정단가)", example = "100000")
     private BigDecimal amount;
 

@@ -1,14 +1,15 @@
-import { apiGet, apiPost, apiPut } from '../../../../shared/services/apiClient';
+import { GridSaveReconciliationError, resolveSavedGridRows, type F1GridSavedRow } from '../../../../shared/components/f1-grid';
+import { apiGet, apiPost } from '../../../../shared/services/apiClient';
 import {
   fetchCommonCodeGroups,
   fetchCommonCodeItems,
 } from '../../../co/master/common-code/services/commonCodeManagement.service';
 import type { CommonCodeItemRow } from '../../../co/master/common-code/types/commonCodeManagement.types';
 import type {
+  EmployeeBatchPayload,
   EmployeeCodeOption,
   EmployeeCodeOptions,
   EmployeeFilters,
-  EmployeePayload,
   EmployeeRow,
   EmploymentStatus,
 } from '../types/employee.types';
@@ -35,13 +36,14 @@ function status(value: unknown): EmploymentStatus {
   return value === 'LEAVE' || value === 'RETIRED' ? value : 'ACTIVE';
 }
 
+/** 서버 사원을 그리드 행으로 바꾼다. 사원 ID는 그리드 행 ID라서 문자열로 다룬다. */
 export function normalizeEmployeeRow(source: ApiRow): EmployeeRow {
   const userId = Number(source.userId);
   if (!Number.isSafeInteger(userId) || userId <= 0) {
     throw new Error('사원 ID 응답을 확인할 수 없습니다.');
   }
   return {
-    userId,
+    userId: String(userId),
     employeeNo: text(source.employeeNo),
     userNm: text(source.userNm),
     englishNm: text(source.englishNm),
@@ -49,7 +51,7 @@ export function normalizeEmployeeRow(source: ApiRow): EmployeeRow {
     departmentNm: text(source.departmentNm),
     positionCode: text(source.positionCode),
     positionNm: text(source.positionNm),
-    levelId: nullableNumber(source.levelId),
+    levelId: source.levelId == null ? '' : String(source.levelId),
     levelNm: text(source.levelNm),
     genderCode: text(source.genderCode),
     genderNm: text(source.genderNm),
@@ -71,7 +73,6 @@ export function normalizeEmployeeRow(source: ApiRow): EmployeeRow {
     stayToDt: text(source.stayToDt),
     contractFromDt: text(source.contractFromDt),
     contractToDt: text(source.contractToDt),
-    residentNoMasked: text(source.residentNoMasked),
     mobileNo: text(source.mobileNo),
     homePhoneNo: text(source.homePhoneNo),
     emailAddr: text(source.emailAddr),
@@ -82,15 +83,11 @@ export function normalizeEmployeeRow(source: ApiRow): EmployeeRow {
     loginId: nullableNumber(source.loginId),
     loginCode: text(source.loginCode),
     loginUseAt: text(source.loginUseAt),
+    initialPassword: '',
     photoImage: text(source.photoImage),
     employmentStatus: status(source.employmentStatus),
     departmentManagerYn: source.departmentManagerYn === 'Y' ? 'Y' : 'N',
   };
-}
-
-function itemFromResponse(value: unknown): EmployeeRow {
-  if (!isApiRow(value)) throw new Error('사원 응답을 확인할 수 없습니다.');
-  return normalizeEmployeeRow(value);
 }
 
 export async function fetchEmployees(filters: EmployeeFilters): Promise<EmployeeRow[]> {
@@ -103,29 +100,31 @@ export async function fetchEmployees(filters: EmployeeFilters): Promise<Employee
   return result.resultList.map(normalizeEmployeeRow);
 }
 
-export async function createEmployee(payload: EmployeePayload): Promise<EmployeeRow> {
-  const result = await apiPost<{ item?: unknown }>(BASE_URL, payload);
-  return itemFromResponse(result.item);
-}
-
-export async function updateEmployee(userId: number, payload: EmployeePayload): Promise<EmployeeRow> {
-  const result = await apiPut<{ item?: unknown }>(`${BASE_URL}/${userId}`, payload);
-  return itemFromResponse(result.item);
-}
-
-/** 사번이 이미 쓰이는지 확인한다(수정 중인 사원 본인은 제외). */
-export async function checkEmployeeNoAvailable(employeeNo: string, userId: number | null): Promise<boolean> {
-  const query = new URLSearchParams({ employeeNo: employeeNo.trim() });
-  if (userId != null) query.set('userId', String(userId));
-  const result = await apiGet<{ available?: unknown }>(`${BASE_URL}/check-employee-no?${query.toString()}`);
-  return result.available === true;
-}
-
-/** 로그인 아이디가 이미 쓰이는지 확인한다. 형식이 맞지 않으면 오류 메시지를 던진다. */
-export async function checkLoginCodeAvailable(loginCode: string): Promise<boolean> {
-  const query = new URLSearchParams({ loginCode: loginCode.trim() });
-  const result = await apiGet<{ available?: unknown }>(`${BASE_URL}/check-login-code?${query.toString()}`);
-  return result.available === true;
+/**
+ * 사원을 일괄 저장한다(`POST /api/v1/hr/employees/save-batch`). 한 트랜잭션이라 하나라도 실패하면 전체가 취소되고
+ * 서버 메시지 앞에 사원명이 붙는다. 응답을 그리드가 요청 행과 맞춰 볼 수 있는 저장 행으로 돌려준다.
+ */
+export async function saveEmployeeRows(
+  payload: EmployeeBatchPayload,
+  requested: EmployeeRow[],
+): Promise<F1GridSavedRow<EmployeeRow>[]> {
+  const result = await apiPost<{ item?: { employees?: unknown; rowIdMappings?: unknown } }>(
+    `${BASE_URL}/save-batch`, payload,
+  );
+  try {
+    const employees = result.item?.employees;
+    if (!Array.isArray(employees) || !employees.every(isApiRow)) {
+      throw new Error('사원 일괄 저장 응답을 확인할 수 없습니다.');
+    }
+    return resolveSavedGridRows(
+      requested,
+      employees.map(normalizeEmployeeRow),
+      result.item?.rowIdMappings,
+      'userId',
+    );
+  } catch (cause) {
+    throw new GridSaveReconciliationError(cause);
+  }
 }
 
 function toOptions(items: CommonCodeItemRow[], valueOf: (item: CommonCodeItemRow) => string): EmployeeCodeOption[] {
@@ -145,7 +144,7 @@ const GROUPS = {
   level: 'LEVEL',
 } as const;
 
-/** 사원 팝업의 선택지(직위·성별·근무형태·내외국인·음력양력·국가·직급)를 공통코드에서 불러온다. */
+/** 사원 행 폼의 선택지(직위·성별·근무형태·내외국인·음력양력·국가·직급)를 공통코드에서 불러온다. */
 export async function fetchEmployeeCodeOptions(): Promise<EmployeeCodeOptions> {
   const groups = await fetchCommonCodeGroups();
   const entries = await Promise.all(

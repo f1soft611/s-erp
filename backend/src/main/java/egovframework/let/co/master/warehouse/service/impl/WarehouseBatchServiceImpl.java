@@ -38,7 +38,7 @@ public class WarehouseBatchServiceImpl extends EgovAbstractServiceImpl implement
         WarehouseBatchChangeSetVO changes = payload.getWarehouses() == null
                 ? new WarehouseBatchChangeSetVO() : payload.getWarehouses();
         if (!changes.getDeletedRows().isEmpty()) {
-            throw new IllegalArgumentException("창고는 삭제할 수 없습니다. 불용창고로 변경해 주세요.");
+            throw new IllegalArgumentException("창고는 삭제할 수 없습니다. 미사용으로 변경해 주세요.");
         }
         for (WarehouseChangeVO row : changes.getInsertedRows()) {
             validateWarehouseRow(row);

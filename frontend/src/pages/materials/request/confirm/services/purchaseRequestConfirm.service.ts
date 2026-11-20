@@ -6,7 +6,7 @@ import {
 } from '../../../../co/master/common-code/services/commonCodeManagement.service';
 import { fetchCustomers } from '../../../../co/master/customers/services/customerManagement.service';
 import { fetchWarehouses } from '../../../../co/master/warehouse/services/warehouseManagement.service';
-import type { PurchaseRequestConfirmRow } from '../data/purchaseRequestConfirmColumns';
+import { calculateAmount, type PurchaseRequestConfirmRow } from '../data/purchaseRequestConfirmColumns';
 import type {
   ConfirmSelectOption,
   PurchaseConfirmItem,
@@ -49,9 +49,16 @@ export async function searchConfirmCandidates(keyword: string, range?: DateRange
   return Array.isArray(result.resultList) ? result.resultList : [];
 }
 
-/** 고른 품목 행(상세 행 ID)의 상세 정보 */
-export async function fetchRequestDetails(purchaseRequestDetailIds: number[]): Promise<PurchaseRequestConfirmDetail[]> {
+/**
+ * 고른 품목 행(상세 행 ID)의 상세 정보. 확정되지 않은 행에는 서버가 품목의 기본 거래처와 그 단가·발주구분을 채워 준다.
+ * baseDt(단가 기준일)를 생략하면 서버 오늘 날짜를 쓴다.
+ */
+export async function fetchRequestDetails(
+  purchaseRequestDetailIds: number[],
+  baseDt?: string,
+): Promise<PurchaseRequestConfirmDetail[]> {
   const query = new URLSearchParams({ purchaseRequestDetailIds: purchaseRequestDetailIds.join(',') });
+  if (baseDt) query.set('baseDt', baseDt);
   const result = await apiGet<{ resultList?: PurchaseRequestConfirmDetail[] }>(`${CONFIRM_PATH}/request-details?${query}`);
   return Array.isArray(result.resultList) ? result.resultList : [];
 }
@@ -104,7 +111,7 @@ export async function fetchDefaultUnitPrice(
 }
 
 export async function fetchWarehouseOptions(): Promise<ConfirmSelectOption[]> {
-  const warehouses = await fetchWarehouses({ disuseAt: 'N' });
+  const warehouses = await fetchWarehouses({ disuseAt: 'N', useAt: 'Y' });
   return warehouses.map((warehouse) => ({
     value: String(warehouse.warehouseId),
     label: warehouse.warehouseName,
@@ -154,6 +161,7 @@ export function toConfirmRows(details: PurchaseRequestConfirmDetail[], draft: bo
   return details.map((detail) => {
     const confirmQty = detail.confirmQty ?? (draft ? Number(detail.requestQty) : null);
     const unitPrice = detail.unitPrice == null ? null : Number(detail.unitPrice);
+    const currencyCode = detail.currencyCode ?? DEFAULT_CURRENCY;
     return {
       rowId: String(detail.purchaseRequestDetailId),
       purchaseRequestId: detail.purchaseRequestId,
@@ -178,13 +186,14 @@ export function toConfirmRows(details: PurchaseRequestConfirmDetail[], draft: bo
       supplierCode: detail.supplierCode ?? '',
       supplierName: detail.supplierName ?? '',
       unitPrice,
-      currencyCode: detail.currencyCode ?? DEFAULT_CURRENCY,
+      currencyCode,
       taxType: detail.taxType || DEFAULT_TAX_TYPE,
       vatIncludedAt: detail.vatIncludedAt === 'Y' ? 'Y' : 'N',
-      wonUnitPrice: null,
-      foreignUnitPrice: null,
-      foreignCurrency: '',
-      amount: detail.amount == null ? 0 : Number(detail.amount),
+      // 요청 불러오기로 채운 기본 거래처 단가를 단가 선택(구매처 선택)과 같은 규칙으로 보관한다.
+      wonUnitPrice: draft && unitPrice != null && currencyCode === DEFAULT_CURRENCY ? unitPrice : null,
+      foreignUnitPrice: draft && detail.foreignUnitPrice != null ? Number(detail.foreignUnitPrice) : null,
+      foreignCurrency: draft ? detail.foreignCurrency ?? '' : '',
+      amount: draft ? calculateAmount(confirmQty, unitPrice) : detail.amount == null ? 0 : Number(detail.amount),
       confirmRemark: detail.confirmRemark ?? '',
       orderClosed: detail.orderCloseAt === 'Y',
     };

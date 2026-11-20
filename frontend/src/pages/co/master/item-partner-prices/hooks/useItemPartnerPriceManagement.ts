@@ -41,7 +41,7 @@ export function toItemPartnerPricePayload(row: ItemPartnerPriceRow): ItemPartner
   if (!Number.isSafeInteger(Number(row.materialId)) || Number(row.materialId) <= 0) {
     throw new Error('품목을 선택해 주세요.');
   }
-  // 거래처를 비우면 품목 기본단가(거래처 공통)로 저장한다.
+  // 거래처를 비우면 품목 공통단가(거래처 공통)로 저장한다.
   if (row.customerId != null &&
       (!Number.isSafeInteger(Number(row.customerId)) || Number(row.customerId) <= 0)) {
     throw new Error('거래처를 확인해 주세요.');
@@ -74,6 +74,12 @@ export function toItemPartnerPricePayload(row: ItemPartnerPriceRow): ItemPartner
   if (row.useAt !== 'Y' && row.useAt !== 'N') {
     throw new Error('사용여부는 Y 또는 N이어야 합니다.');
   }
+  const orderType = (row.orderType ?? '').trim();
+  if (orderType && row.tradeType !== '매입') throw new Error('발주구분은 매입 단가에만 입력할 수 있습니다.');
+  if (row.defaultSupplier && (row.tradeType !== '매입' || row.customerId == null || row.useAt !== 'Y')) {
+    throw new Error('기본 거래처는 거래처가 있는 사용 중 매입 단가에만 지정할 수 있습니다.');
+  }
+  const canFlag = row.tradeType === '매입' && row.customerId != null;
   return {
     materialId: Number(row.materialId),
     customerId: row.customerId == null ? null : Number(row.customerId),
@@ -87,6 +93,8 @@ export function toItemPartnerPricePayload(row: ItemPartnerPriceRow): ItemPartner
     endDt,
     moq,
     useAt: row.useAt,
+    orderType,
+    ...(canFlag ? { defaultSupplier: Boolean(row.defaultSupplier) } : {}),
   };
 }
 

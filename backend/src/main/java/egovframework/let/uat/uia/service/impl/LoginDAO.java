@@ -1,6 +1,7 @@
 package egovframework.let.uat.uia.service.impl;
 
 import egovframework.com.cmm.LoginVO;
+import egovframework.let.uat.uia.domain.model.LoginLockStateVO;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -36,6 +37,59 @@ public class LoginDAO extends EgovAbstractMapper {
 	 */
 	public LoginVO actionLogin(LoginVO vo) throws Exception {
 		return (LoginVO) selectOne("loginDAO.actionLogin", vo);
+	}
+
+	/**
+	 * 로그인 시도 계정의 실패 잠금 상태를 조회한다. 로그인 코드 또는 이메일로 찾으며 없으면 null.
+	 */
+	public LoginLockStateVO selectLockState(Long tenantId, String id) throws Exception {
+		Map<String, Object> params = new HashMap<String, Object>();
+		params.put("tenantId", tenantId);
+		params.put("id", id);
+		return selectOne("loginDAO.selectLockState", params);
+	}
+
+	/**
+	 * 로그인 실패 횟수를 1 올리고 기준 횟수에 도달하면 잠근다(한 문장으로 처리해 동시 시도에도 안전하다).
+	 */
+	public int increaseFailedAttempt(Long tenantId, Long loginId, int maxAttempts) throws Exception {
+		Map<String, Object> params = new HashMap<String, Object>();
+		params.put("tenantId", tenantId);
+		params.put("loginId", loginId);
+		params.put("maxAttempts", maxAttempts);
+		return update("loginDAO.increaseFailedAttempt", params);
+	}
+
+	/**
+	 * 로그인에 성공했을 때 쌓인 실패 횟수를 지운다.
+	 */
+	public int resetFailedAttempts(Long loginId) throws Exception {
+		return update("loginDAO.resetFailedAttempts", loginId);
+	}
+
+	/**
+	 * 계정이 비밀번호를 변경해야 하는 상태인지 조회한다(계정이 없으면 false).
+	 */
+	public boolean isPasswordChangeRequired(Long tenantId, String loginCode) throws Exception {
+		Map<String, Object> params = new HashMap<String, Object>();
+		params.put("tenantId", tenantId);
+		params.put("loginCode", loginCode);
+		Boolean required = selectOne("loginDAO.selectPasswordChangeRequired", params);
+		return Boolean.TRUE.equals(required);
+	}
+
+	/**
+	 * 계정이 아직 로그인할 수 있는 상태인지 확인한다(허용·사용 중 사원·미퇴직).
+	 * @param tenantId 테넌트 ID
+	 * @param loginCode 로그인 코드
+	 * @exception Exception
+	 */
+	public boolean isLoginable(Long tenantId, String loginCode) throws Exception {
+		Map<String, Object> params = new HashMap<String, Object>();
+		params.put("tenantId", tenantId);
+		params.put("loginCode", loginCode);
+		Integer count = selectOne("loginDAO.countLoginableAccount", params);
+		return count != null && count.intValue() > 0;
 	}
 
 	/**

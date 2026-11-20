@@ -65,13 +65,16 @@ public class WarehouseApiController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String warehouseType,
             @RequestParam(required = false) String disuseAt,
+            @RequestParam(required = false) String useAt,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         WarehouseSearchCondition condition = new WarehouseSearchCondition();
         condition.setKeyword(keyword);
         condition.setWarehouseType(warehouseType);
         condition.setDisuseAt(disuseAt);
+        condition.setUseAt(useAt);
         Map<String, Object> resultMap = new HashMap<>();
-        if (hasSearchValue(keyword) || hasSearchValue(warehouseType) || hasSearchValue(disuseAt)) {
+        if (hasSearchValue(keyword) || hasSearchValue(warehouseType) || hasSearchValue(disuseAt)
+                || hasSearchValue(useAt)) {
             resultMap.put("resultList", warehouseService.listWarehouses(user.getTenantId(), condition));
         } else {
             resultMap.put("resultList", warehouseService.listWarehouses(user.getTenantId()));

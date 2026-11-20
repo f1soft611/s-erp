@@ -1,6 +1,9 @@
 package egovframework.let.uat.uia.service.impl;
 
 import egovframework.com.cmm.LoginVO;
+import egovframework.let.system.policies.domain.model.LoginLockPolicyVO;
+import egovframework.let.system.policies.service.SystemPolicyService;
+import egovframework.let.uat.uia.domain.model.LoginLockStateVO;
 import egovframework.let.uat.uia.service.EgovLoginService;
 import egovframework.let.utl.fcc.service.EgovNumberUtil;
 import egovframework.let.utl.fcc.service.EgovStringUtil;
@@ -39,6 +42,9 @@ public class EgovLoginServiceImpl extends EgovAbstractServiceImpl implements Ego
 	@Resource(name = "loginDAO")
 	private LoginDAO loginDAO;
 
+	@Resource(name = "systemPolicyService")
+	private SystemPolicyService systemPolicyService;
+
 	/**
 	 * 일반 로그인을 처리한다
 	 * @param vo LoginVO
@@ -73,14 +79,63 @@ public class EgovLoginServiceImpl extends EgovAbstractServiceImpl implements Ego
 		String enpassword = EgovFileScrty.encryptPassword(plainPassword, vo.getId());
 		vo.setPassword(enpassword);
 
+		// 로그인 실패 잠금: 정책이 미사용이면 아래 조회·누적을 전혀 하지 않아 이전 동작과 같다.
+		LoginLockStateVO lockState = null;
+		LoginLockPolicyVO lockPolicy = loginLockPolicy(vo.getTenantId());
+		if (lockPolicy.isEnabled()) {
+			lockState = loginDAO.selectLockState(vo.getTenantId(), vo.getId());
+			if (lockState != null && lockState.isLocked()) {
+				log.warn("Login rejected: locked account userId={}", vo.getId());
+				LoginVO locked = new LoginVO();
+				locked.setAccountLocked(true);
+				return locked;
+			}
+		}
+
 		LoginVO loginVO = loginDAO.actionLogin(vo);
 		if (isValidLogin(loginVO)) {
+			if (lockState != null && lockState.getAttemptCount() > 0) {
+				loginDAO.resetFailedAttempts(lockState.getLoginId());
+			}
 			log.info("Login successful: userId={}", loginVO.getId());
 			return loginVO;
 		}
 
+		if (lockState != null) {
+			loginDAO.increaseFailedAttempt(vo.getTenantId(), lockState.getLoginId(), lockPolicy.getMaxAttempts());
+		}
 		log.warn("Login failed: userId={}", vo.getId());
 		return new LoginVO();
+	}
+
+	/** 정책을 읽지 못하거나 테넌트를 알 수 없으면 잠금을 쓰지 않는 것으로 본다(로그인을 막지 않는다). */
+	private LoginLockPolicyVO loginLockPolicy(Long tenantId) {
+		if (systemPolicyService == null || tenantId == null) {
+			return LoginLockPolicyVO.disabled();
+		}
+		try {
+			LoginLockPolicyVO policy = systemPolicyService.getLoginLockPolicy(tenantId);
+			return policy == null ? LoginLockPolicyVO.disabled() : policy;
+		} catch (Exception e) {
+			log.warn("Login lock policy could not be read: tenantId={}", tenantId, e);
+			return LoginLockPolicyVO.disabled();
+		}
+	}
+
+	@Override
+	public boolean isLoginable(Long tenantId, String loginCode) throws Exception {
+		if (tenantId == null || loginCode == null || loginCode.trim().isEmpty()) {
+			return false;
+		}
+		return loginDAO.isLoginable(tenantId, loginCode.trim());
+	}
+
+	@Override
+	public boolean isPasswordChangeRequired(Long tenantId, String loginCode) throws Exception {
+		if (tenantId == null || loginCode == null || loginCode.trim().isEmpty()) {
+			return false;
+		}
+		return loginDAO.isPasswordChangeRequired(tenantId, loginCode.trim());
 	}
 
 	private boolean isValidLogin(LoginVO loginVO) {

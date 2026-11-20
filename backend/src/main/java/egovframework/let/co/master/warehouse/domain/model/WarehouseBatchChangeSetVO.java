@@ -21,7 +21,7 @@ public class WarehouseBatchChangeSetVO implements Serializable {
     @Schema(description = "수정 행")
     private List<WarehouseChangeVO> updatedRows = new ArrayList<>();
 
-    @Schema(description = "삭제 행. 물리 삭제는 지원하지 않으므로 빈 배열만 허용하며 불용창고 여부로 상태 관리")
+    @Schema(description = "삭제 행. 물리 삭제는 지원하지 않으므로 빈 배열만 허용하며 사용여부(미사용)로 상태 관리")
     private List<WarehouseChangeVO> deletedRows = new ArrayList<>();
 
     public void setInsertedRows(List<WarehouseChangeVO> insertedRows) {

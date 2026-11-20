@@ -28,6 +28,8 @@ type SideValues = {
   startDt: string;
   endDt: string | null;
   status: 'current' | 'future' | '';
+  orderType: string;
+  defaultSupplier: boolean;
 };
 
 function sideValues(row: ItemPriceOverviewRow, side: ItemPriceSideKey): SideValues {
@@ -44,13 +46,15 @@ function sideValues(row: ItemPriceOverviewRow, side: ItemPriceSideKey): SideValu
     startDt: read<string>('StartDt'),
     endDt: read<string | null>('EndDt'),
     status: read<'current' | 'future' | ''>('Status'),
+    orderType: read<string>('OrderType') ?? '',
+    defaultSupplier: read<boolean>('DefaultSupplier') === true,
   };
 }
 
 function sameSide(left: SideValues, right: SideValues): boolean {
   return left.unitPrice === right.unitPrice && left.taxType === right.taxType &&
     left.vatIncludedAt === right.vatIncludedAt && left.foreignUnitPrice === right.foreignUnitPrice &&
-    left.currency === right.currency && left.startDt === right.startDt;
+    left.currency === right.currency && left.startDt === right.startDt && left.orderType === right.orderType;
 }
 
 function label(row: ItemPriceOverviewRow, tradeType: string): string {
@@ -66,12 +70,14 @@ function payload(
   endDt: string | null,
   priceId: string,
   useAt: 'Y' | 'N' = 'Y',
+  withFlag = true,
 ): PriceRow {
   const foreign = values.foreignUnitPrice;
   const currency = values.currency.trim();
   if (foreign !== null && !currency) {
     throw new Error(`${label(row, tradeType)}: 외화단가를 입력하면 통화를 선택해 주세요.`);
   }
+  const flag = tradeType === '매입' && row.customerId != null && withFlag;
   return {
     priceId,
     materialId: row.materialId,
@@ -86,6 +92,8 @@ function payload(
     endDt,
     moq,
     useAt,
+    orderType: tradeType === '매입' ? values.orderType.trim() : '',
+    ...(flag ? { defaultSupplier: values.defaultSupplier } : {}),
   };
 }
 
@@ -113,7 +121,14 @@ export function buildItemPriceBatch(
     for (const { side, tradeType } of SIDES) {
       const before = sideValues(original, side);
       const after = sideValues(row, side);
-      if (sameSide(before, after)) continue;
+      const flagChanged = tradeType === '매입' && row.customerId != null && before.defaultSupplier !== after.defaultSupplier;
+      if (sameSide(before, after)) {
+        // 기본 거래처 표시만 바뀐 경우: 단가 값은 그대로 보내고 서버가 단가 행을 갱신하지 않는다.
+        if (flagChanged && before.priceId !== null) {
+          updatedRows.push(payload(row, tradeType, after, before.startDt, before.moq, before.endDt, String(before.priceId)));
+        }
+        continue;
+      }
       if (after.unitPrice === null && after.foreignUnitPrice === null) {
         if (before.priceId === null) continue;
         throw new Error(`${label(row, tradeType)}: 단가를 지울 수 없습니다. 원화단가 또는 외화단가 중 하나는 있어야 합니다.`);
@@ -168,7 +183,7 @@ export function buildItemPriceRemoveBatch(
     if (mode === 'delete') {
       deletedRows.push({ priceId: String(values.priceId) });
     } else {
-      updatedRows.push(payload(row, tradeType, values, values.startDt, values.moq, values.endDt, String(values.priceId), 'N'));
+      updatedRows.push(payload(row, tradeType, values, values.startDt, values.moq, values.endDt, String(values.priceId), 'N', false));
     }
   }
   if (!deletedRows.length && !updatedRows.length) {

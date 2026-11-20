@@ -52,6 +52,26 @@ class EmployeeMapperTest {
     }
 
     @Test
+    void listIsOrderedByDepartmentThenPositionThenName() {
+        String list = sql("selectEmployeeList", params("tenantId", 1L, "status", "ALL"));
+
+        // 부서는 화면 트리가 펼쳐진 순서(상위 부서 바로 아래에 하위 부서, 같은 부모 안에서는 정렬순서→부서명→ID)다.
+        assertThat(list).contains("WITH RECURSIVE dept_rank AS", "PARTITION BY parent_department_id "
+                + "ORDER BY sort_order ASC, department_nm ASC, department_id ASC", "dept_tree AS");
+        assertThat(list).contains("ORDER BY (SELECT dt.path FROM dept_tree dt WHERE dt.department_id = u.department_id) ASC NULLS LAST, "
+                + "pi.sort_order ASC NULLS LAST, u.user_nm ASC, u.user_id ASC");
+    }
+
+    @Test
+    void pickerListUsesTheSameOrderAsTheEmployeeList() {
+        String picker = sql("selectPickerEmployees", params("tenantId", 1L));
+
+        assertThat(picker).contains("WITH RECURSIVE dept_rank AS", "dept_tree AS");
+        assertThat(picker).contains("ORDER BY (SELECT dt.path FROM dept_tree dt WHERE dt.department_id = u.department_id) ASC NULLS LAST, "
+                + "pi.sort_order ASC NULLS LAST, u.user_nm ASC, u.user_id ASC");
+    }
+
+    @Test
     void employmentStatusIsComputedFromRetireSuspendAndBackDates() {
         String sql = sql("selectEmployeeById", params("tenantId", 1L, "userId", 5L));
         assertThat(sql).contains("WHEN u.retire_dt IS NOT NULL AND u.retire_dt <= CURRENT_DATE THEN 'RETIRED'")
@@ -125,6 +145,8 @@ class EmployeeMapperTest {
         String account = sql("insertLoginAccount", params("tenantId", 1L));
         assertThat(account).contains("INSERT INTO tb_login_account").contains("password_changed_at, use_at")
                 .contains("NULL, 'Y'").endsWith("RETURNING login_id");
+        // 발급한 계정은 첫 로그인 때 비밀번호를 바꿔야 한다.
+        assertThat(account).contains("password_change_required").contains("NULL, 'Y', 'Y' )");
         String role = sql("insertDefaultRole", params("tenantId", 1L, "loginId", 2L, "roleCode", "DEFAULT_USER"));
         assertThat(role).contains("INSERT INTO tb_login_account_role (login_id, role_id)").contains("r.tenant_id = ?")
                 .contains("r.role_code = ?").contains("r.use_at = 'Y'");

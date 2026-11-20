@@ -283,6 +283,7 @@
             WHERE warehouse_id = #{id, jdbcType=BIGINT}
               AND tenant_id = #{tenantId, jdbcType=BIGINT}
               AND disuse_at = 'N'
+              AND use_at = 'Y'
         )
     </select>
 
@@ -432,25 +433,4 @@
           AND use_at = 'Y'
     </update>
 
-    <!-- 거래구분 매입 단가만 쓴다. trade_type은 단가관리 화면이 저장하는 값('매입')을 그대로 쓴다.
-         거래처 일치 단가를 우선하고, 없으면 거래처가 비어 있는 품목 기본단가를 쓴다.
-         unit_price(원화단가)와 외화단가·통화·부가세 정보를 함께 돌려주고, 기본 통화·단가 선택은 서비스가 한다. -->
-    <select id="selectDefaultUnitPrice" parameterType="map"
-            resultType="egovframework.let.materials.request.confirm.domain.model.PurchaseUnitPriceVO">
-        SELECT p.unit_price AS unitPrice,
-               p.tax_type AS taxType,
-               p.vat_included_at AS vatIncludedAt,
-               p.foreign_unit_price AS foreignUnitPrice,
-               p.currency AS foreignCurrency
-        FROM tb_item_partner_price p
-        WHERE p.tenant_id = #{tenantId, jdbcType=BIGINT}
-          AND p.material_id = #{materialId, jdbcType=BIGINT}
-          AND (p.customer_id = #{supplierId, jdbcType=BIGINT} OR p.customer_id IS NULL)
-          AND p.trade_type = '매입'
-          AND p.use_at = 'Y'
-          AND p.start_dt &lt;= CAST(#{baseDt} AS date)
-          AND (p.end_dt IS NULL OR p.end_dt &gt;= CAST(#{baseDt} AS date))
-        ORDER BY (p.customer_id IS NULL), p.start_dt DESC, p.price_id DESC
-        LIMIT 1
-    </select>
 </mapper>

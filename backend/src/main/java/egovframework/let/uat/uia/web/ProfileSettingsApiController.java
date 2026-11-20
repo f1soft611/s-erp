@@ -81,6 +81,9 @@ public class ProfileSettingsApiController {
         result.put("levelName", profile.getLevelName());
         result.put("profileImage", profile.getProfileImage());
         result.put("stampImage", profile.getStampImage());
+        result.put("employeeNo", profile.getEmployeeNo());
+        result.put("positionNm", profile.getPositionNm());
+        result.put("photoEditable", profile.isPhotoEditable());
         return result;
     }
 }

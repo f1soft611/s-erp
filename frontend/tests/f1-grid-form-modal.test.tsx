@@ -125,6 +125,38 @@ describe('F1-Grid form model', () => {
     expect(onValidationErrors).toHaveBeenLastCalledWith([]);
   });
 
+  it('validates only inserted and updated rows with changedOnly so incomplete existing rows do not block saving', () => {
+    const ref = createRef<F1GridRef<{ id: string; name: string }>>();
+    const onValidationErrors = vi.fn();
+    render(
+      <F1Grid
+        ref={ref}
+        rows={[{ id: 'legacy', name: '' }, { id: 'ok', name: '가' }]}
+        columns={[{ field: 'name', headerName: '이름', editable: true, required: true }]}
+        rowKey="id"
+        onValidationErrors={onValidationErrors}
+      />,
+    );
+
+    // 기본은 모든 행을 검사한다(기존 계약).
+    act(() => expect(ref.current?.validate()).toBe(false));
+    // 변경이 없으면 변경한 행만 검사하는 검증은 통과한다(저장 대상이 없다).
+    act(() => expect(ref.current?.validate({ changedOnly: true })).toBe(true));
+    expect(onValidationErrors).toHaveBeenLastCalledWith([]);
+
+    // 변경한 행이 잘못되면 그 행만 오류로 알린다(건드리지 않은 불완전한 행은 제외).
+    act(() => ref.current?.setCellValue('ok', 'name', ''));
+    act(() => expect(ref.current?.validate({ changedOnly: true })).toBe(false));
+    expect(onValidationErrors).toHaveBeenLastCalledWith([
+      { rowId: 'ok', field: 'name', message: '이름은(는) 필수입니다.' },
+    ]);
+
+    // 고치면 통과한다. 건드리지 않은 'legacy' 행은 여전히 비어 있지만 저장을 막지 않는다.
+    act(() => ref.current?.setCellValue('ok', 'name', '나'));
+    act(() => expect(ref.current?.validate({ changedOnly: true })).toBe(true));
+    expect(onValidationErrors).toHaveBeenLastCalledWith([]);
+  });
+
   it('builds form sections from editable fields only by default', () => {
     const columns: F1GridColumn<FormRow>[] = [
       { field: 'id', headerName: '번호', type: 'rownumber' },
@@ -329,6 +361,101 @@ describe('typed form field', () => {
 
     fireEvent.change(input, { target: { value: '변경 이름' } });
     expect(onPatch).toHaveBeenLastCalledWith({ name: '변경 이름' });
+  });
+
+  it('masks a text field in the row form when form.inputType is password and still patches the typed value', () => {
+    const onPatch = vi.fn();
+
+    render(
+      <GridFormField
+        column={{ field: 'secret', headerName: '초기 비밀번호', form: { inputType: 'password' } }}
+        row={typedRow}
+        mode="create"
+        value="abcd1234"
+        readOnly={false}
+        onPatch={onPatch}
+      />,
+    );
+
+    const input = screen.getByLabelText('초기 비밀번호');
+    expect(input).toHaveAttribute('type', 'password');
+    expect(input).toHaveValue('abcd1234');
+
+    fireEvent.change(input, { target: { value: 'new-secret-1' } });
+    expect(onPatch).toHaveBeenLastCalledWith({ secret: 'new-secret-1' });
+  });
+
+  it('shows form.helperText under a field and lets a validation error replace it', () => {
+    const column = { field: 'name', headerName: '사번', form: { helperText: (row: { name: string }) => `안내 ${row.name}` } };
+    const { rerender } = render(
+      <GridFormField column={column} row={typedRow} mode="edit" value="A" readOnly onPatch={() => {}} />,
+    );
+    expect(screen.getByText(/^안내/)).toBeInTheDocument();
+    rerender(<GridFormField column={column} row={typedRow} mode="edit" value="A" readOnly error="오류입니다" onPatch={() => {}} />);
+    expect(screen.getByText('오류입니다')).toBeInTheDocument();
+    expect(screen.queryByText(/^안내/)).toBeNull();
+  });
+
+  it('shows a non-editable column read-only in the row form only when form.visible allows it', async () => {
+    const { buildGridFormSections } = await import('../src/shared/components/f1-grid/form/GridFormModel');
+    type R = { id: string; no: string; extra: string };
+    const cols: F1GridColumn<R>[] = [
+      { field: 'no', headerName: '번호', editable: false, form: { visible: true } },
+      { field: 'extra', headerName: '추가', editable: false, form: { visible: (row) => row.id === '1' } },
+      { field: 'id', headerName: '아이디', editable: false },
+    ];
+    const names = (row: R) => buildGridFormSections(cols, row).flatMap((section) => section.fields.map((field) => field.label));
+    expect(names({ id: '1', no: 'a', extra: 'b' })).toEqual(['번호', '추가']);
+    expect(names({ id: '2', no: 'a', extra: 'b' })).toEqual(['번호']);
+  });
+
+  it('renders a date column in the row form with the common Korean calendar instead of the native date input', () => {
+    const onPatch = vi.fn();
+    render(
+      <GridFormField
+        column={{ field: 'joined', headerName: '입사일', type: 'date' }}
+        row={typedRow}
+        mode="edit"
+        value="2026-11-05"
+        readOnly={false}
+        onPatch={onPatch}
+      />,
+    );
+
+    const input = screen.getByLabelText('입사일');
+    expect(input).not.toHaveAttribute('type', 'date');
+    expect(input).toHaveValue('2026-11-05');
+    expect(screen.getByRole('button', { name: '입사일 달력 열기' })).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: '2026-11-20' } });
+    expect(onPatch).toHaveBeenLastCalledWith({ joined: '2026-11-20' });
+  });
+
+  it('orders row form sections by form.groupOrder instead of column position when given', async () => {
+    const { buildGridFormSections } = await import('../src/shared/components/f1-grid/form/GridFormModel');
+    type R = { a: string; b: string; c: string };
+    const cols: F1GridColumn<R>[] = [
+      { field: 'a', headerName: '첫째', form: { group: '아래', groupOrder: 99 } },
+      { field: 'b', headerName: '둘째', form: { group: '위' } },
+      { field: 'c', headerName: '셋째', form: { group: '아래', order: 2 } },
+    ];
+    expect(buildGridFormSections(cols).map((section) => section.group)).toEqual(['위', '아래']);
+    const plain = cols.map((column) => ({ ...column, form: { group: column.form?.group } }));
+    expect(buildGridFormSections(plain).map((section) => section.group)).toEqual(['아래', '위']);
+  });
+
+  it('keeps plain text fields as text when form.inputType is not set', () => {
+    render(
+      <GridFormField
+        column={{ field: 'name', headerName: '이름' }}
+        row={typedRow}
+        mode="edit"
+        value="홍길동"
+        readOnly={false}
+        onPatch={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('textbox', { name: '이름' })).toHaveAttribute('type', 'text');
   });
 
   it('patches non-empty numbers as numbers and empty numbers as an empty string', () => {

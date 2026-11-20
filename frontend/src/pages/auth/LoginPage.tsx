@@ -4,6 +4,7 @@ import { resolvePushNotificationPath } from '../../shared/utils/notificationPath
 import AuthLayout from '../../shared/components/layout/AuthLayout';
 import {
   readSessionNotice,
+  readSessionNoticeSeverity,
   setSessionNotice,
 } from '../../shared/services/authService';
 import { useLoginForm } from './hooks/useLoginForm';
@@ -13,6 +14,7 @@ function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const sessionNotice = readSessionNotice();
+  const sessionNoticeSeverity = readSessionNoticeSeverity();
   const {
     values,
     errors,
@@ -46,7 +48,7 @@ function LoginPage() {
   return (
     <AuthLayout>
       {sessionNotice ? (
-        <Alert severity="error" sx={{ width: '100%', maxWidth: 450, mb: 2 }}>
+        <Alert severity={sessionNoticeSeverity} sx={{ width: '100%', maxWidth: 450, mb: 2 }}>
           {sessionNotice}
         </Alert>
       ) : null}

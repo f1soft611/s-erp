@@ -1,4 +1,5 @@
 import SearchIcon from '@mui/icons-material/Search';
+import { FormDateField } from '../../FormDateField';
 import {
   Autocomplete,
   Box,
@@ -85,6 +86,9 @@ export function GridFormField<T extends object>({
   const options = column.options ?? [];
   const isRequired = Boolean(column.required);
   const showRequiredMark = isRequired || Boolean(column.requiredMark);
+  const hintOption = column.form?.helperText;
+  const hint = typeof hintOption === 'function' ? hintOption(row) : hintOption;
+  const helper = error || hint;
 
   const applyValue = (nextValue: unknown, normalizeString = true) => {
     const normalizedValue =
@@ -116,7 +120,7 @@ export function GridFormField<T extends object>({
     margin: 'none' as const,
     required: false,
     error: Boolean(error),
-    helperText: error,
+    helperText: helper,
     size: 'small' as const,
     sx: {
       '& .MuiInputBase-root': {
@@ -154,7 +158,7 @@ export function GridFormField<T extends object>({
       },
       htmlInput: {
         readOnly,
-        'aria-describedby': error ? helperTextId : undefined,
+        'aria-describedby': helper ? helperTextId : undefined,
         'aria-required': isRequired,
       },
       formHelperText: { id: helperTextId },
@@ -172,7 +176,9 @@ export function GridFormField<T extends object>({
             minHeight: 38,
           } : {}),
         }}>
-          <ImageField label={column.headerName} value={displayedValue} disabled={disabled || readOnly} onChange={applyValue} />
+          <ImageField label={column.headerName} value={displayedValue} disabled={disabled || readOnly} onChange={applyValue}
+            shape={column.imageOptions?.shape} fallbackText={column.imageOptions?.fallbackText?.(row)}
+            compress={column.imageOptions?.compress} formSize={column.imageOptions?.formSize} helperText={hint} />
         </Box>
         {error ? <FormHelperText>{error}</FormHelperText> : null}
       </FormControl>
@@ -219,7 +225,7 @@ export function GridFormField<T extends object>({
             />
           }
         />
-        {error && <FormHelperText id={helperTextId}>{error}</FormHelperText>}
+        {helper ? <FormHelperText id={helperTextId}>{helper}</FormHelperText> : null}
       </FormControl>
     );
   }
@@ -325,7 +331,7 @@ export function GridFormField<T extends object>({
             size="small"
             required={false}
             error={Boolean(error)}
-            helperText={error}
+            helperText={helper}
             sx={{
               '& .MuiInputBase-root': { minHeight: 38 },
               '& .MuiInputBase-input': { fontSize: '0.93rem' },
@@ -401,13 +407,29 @@ export function GridFormField<T extends object>({
     );
   }
 
+  if (column.type === 'date') {
+    // 브라우저 기본 날짜 입력 대신 프로젝트 공통 한국어 달력(DateEditor)을 쓴다. 표시는 YYYY-MM-DD 문자열이다.
+    return (
+      <FormDateField
+        label={column.headerName}
+        required={showRequiredMark}
+        disabled={disabled || readOnly}
+        value={displayedValue == null ? '' : String(displayedValue)}
+        onChange={(nextValue) => applyValue(nextValue, false)}
+        error={error}
+      />
+    );
+  }
+
   const inputType = isNumber
     ? 'number'
     : column.type === 'datetime'
       ? 'datetime-local'
-      : column.type === 'date' || column.type === 'time'
+      : column.type === 'time'
         ? column.type
-        : 'text';
+        : column.form?.inputType === 'password'
+          ? 'password'
+          : 'text';
   const normalizedDisplayValue =
     isNumber && displayedValue !== null && displayedValue !== undefined
       ? numberDraft.displayedValue
