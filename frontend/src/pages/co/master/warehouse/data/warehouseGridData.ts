@@ -1,9 +1,6 @@
 import type { F1GridColumn } from '../../../../../shared/components/f1-grid';
 import type { CommonCodeItemRow } from '../../common-code/types/commonCodeManagement.types';
-import type {
-  WarehouseRow,
-  WarehouseUserOption,
-} from '../types/warehouseManagement.types';
+import type { WarehouseRow } from '../types/warehouseManagement.types';
 import { sanitizeWarehouseNumberInput } from '../utils/warehouseNumberInput';
 
 const PLANT_OPTIONS = [
@@ -19,6 +16,7 @@ export function createWarehouseRow(): WarehouseRow {
     warehouseType: '',
     deleteLockAt: 'N',
     disuseAt: 'N',
+    useAt: 'Y',
     stockQtyDispAt: 'Y',
     stockIoAt: 'Y',
     safetyStockAlertAt: 'N',
@@ -38,9 +36,13 @@ export function createWarehouseRow(): WarehouseRow {
 
 export function createWarehouseColumns(
   canEdit: boolean,
-  userOptions: WarehouseUserOption[],
   warehouseTypeItems: CommonCodeItemRow[],
+  /** 담당자 선택 버튼을 누르면 호출된다. 페이지가 사원 선택 도움창을 열고 결과를 applyPatch로 적용한다. */
+  onOpenManagerPicker?: (row: WarehouseRow, applyPatch: (patch: Partial<WarehouseRow>) => void) => void,
 ): F1GridColumn<WarehouseRow>[] {
+  // 미사용 창고는 흐리게 보여 사용 중인 창고와 구분한다.
+  const dimUnused: F1GridColumn<WarehouseRow>['getCellStyle'] = ({ row }) =>
+    (row.useAt === 'N' ? { opacity: 0.5 } : undefined);
   const ynColumn = (
     field: keyof WarehouseRow,
     headerName: string,
@@ -80,6 +82,7 @@ export function createWarehouseColumns(
       editable: canEdit,
       pinned: 'left',
       highlightSearch: true,
+      getCellStyle: dimUnused,
       form: { group: '기본정보', order: 1 },
       search: { hidden: true },
     },
@@ -92,6 +95,7 @@ export function createWarehouseColumns(
       pinned: 'left',
       validation: { unique: true },
       highlightSearch: true,
+      getCellStyle: dimUnused,
       form: { group: '기본정보', order: 2 },
       search: { label: '창고명', order: 1 },
     },
@@ -108,6 +112,8 @@ export function createWarehouseColumns(
       form: { group: '기본정보', order: 3 },
       search: { label: '창고구분', order: 2 },
     },
+    // 사용(use_at): N이면 미사용(삭제하지 않고 상태만 변경). 불용창고(불용재고 보관·처분 창고)와는 다른 개념이다.
+    ynColumn('useAt', '사용', 0),
     ynColumn('deleteLockAt', '삭제불가', 1),
     ynColumn('disuseAt', '불용창고', 2),
     ynColumn('stockQtyDispAt', '현재고표시', 3),
@@ -129,25 +135,15 @@ export function createWarehouseColumns(
       field: 'managerUserId',
       headerName: '담당자',
       width: 140,
-      type: 'user',
-      userOptions: userOptions.map((user) => ({
-        value: user.userId,
-        label: user.userNm,
-        avatarUrl: user.profileImage,
-        positionName: user.levelNm,
-        departmentName: user.departmentNm,
-      })),
+      type: 'code',
       editable: canEdit,
-      onValueChange: (_row, value) => {
-        const selected = userOptions.find(
-          (user) => String(user.userId) === String(value),
-        );
-        return {
-          managerUserId: value === '' || value == null ? null : Number(value),
-          departmentId:
-            selected?.departmentId == null ? null : Number(selected.departmentId),
-          departmentName: selected?.departmentNm ?? '',
-        } as Partial<WarehouseRow>;
+      getValue: (row) => row.managerUserName ?? '',
+      onOpenCodePicker: (row, applyPatch) => {
+        onOpenManagerPicker?.(row, applyPatch);
+        return undefined;
+      },
+      onValueChange: () => {
+        throw new Error('사원 선택으로 담당자를 선택해 주세요.');
       },
       form: { group: '담당', order: 1 },
       search: { hidden: true },

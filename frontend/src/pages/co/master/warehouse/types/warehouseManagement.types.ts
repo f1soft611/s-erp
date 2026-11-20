@@ -6,6 +6,7 @@ export type WarehouseRow = {
   warehouseType: string;
   deleteLockAt: 'Y' | 'N';
   disuseAt: 'Y' | 'N';
+  useAt: 'Y' | 'N';
   stockQtyDispAt: 'Y' | 'N';
   stockIoAt: 'Y' | 'N';
   safetyStockAlertAt: 'Y' | 'N';
@@ -30,15 +31,7 @@ export type WarehouseFilters = {
   keyword?: string;
   warehouseType?: string;
   disuseAt?: 'Y' | 'N';
-};
-
-export type WarehouseUserOption = {
-  userId: string;
-  departmentId: string | null;
-  departmentNm: string;
-  userNm: string;
-  profileImage: string | null;
-  levelNm: string | null;
+  useAt?: 'Y' | 'N';
 };
 
 export type WarehouseChange = WarehousePayload & { warehouseId: string };
@@ -58,6 +51,7 @@ export type WarehousePayload = Pick<
   | 'warehouseType'
   | 'deleteLockAt'
   | 'disuseAt'
+  | 'useAt'
   | 'stockQtyDispAt'
   | 'stockIoAt'
   | 'safetyStockAlertAt'

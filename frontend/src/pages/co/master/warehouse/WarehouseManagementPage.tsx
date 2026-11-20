@@ -26,8 +26,17 @@ import type {
   ModuleItem,
   PageContent,
 } from '../../../dashboard/types/dashboard';
+import { EmployeePickerDialog } from '../../../../shared/components/employee-picker';
 import { WarehouseGrid } from './components/WarehouseGrid';
 import { createWarehouseColumns } from './data/warehouseGridData';
+import {
+  DEFAULT_WAREHOUSE_DETAIL_VALUES,
+  DEFAULT_WAREHOUSE_FILTERS,
+  WAREHOUSE_USE_FILTER_FIELD,
+  toWarehouseSearchFilters,
+  type WarehouseSearchSession,
+} from './data/warehouseSearch';
+import { toManagerPatch } from './data/warehouseManager';
 import { useWarehouseManagement } from './hooks/useWarehouseManagement';
 import type {
   WarehouseFilters,
@@ -36,11 +45,6 @@ import type {
 
 const WAREHOUSE_SEARCH_SESSION_KEY = 's-erp:page:warehouse-management';
 const WAREHOUSE_SEARCH_SESSION_VERSION = 1;
-
-type WarehouseSearchSession = {
-  keyword: string;
-  detailValues: Record<string, PageSearchFieldValue>;
-};
 
 type PendingWarehouseSearch = {
   filters: WarehouseFilters;
@@ -51,16 +55,6 @@ function isWarehouseSearchSession(value: unknown): value is WarehouseSearchSessi
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<WarehouseSearchSession>;
   return typeof candidate.keyword === 'string' && isPageSearchValues(candidate.detailValues);
-}
-
-function toWarehouseSearchFilters(session: WarehouseSearchSession): WarehouseFilters {
-  const selected = (value: PageSearchFieldValue | undefined) =>
-    value == null || typeof value === 'object' ? '' : String(value).trim();
-  const warehouseType = selected(session.detailValues.warehouseType);
-  return {
-    keyword: session.keyword.trim() || undefined,
-    warehouseType: warehouseType || undefined,
-  };
 }
 
 type WarehouseManagementPageProps = {
@@ -91,17 +85,21 @@ export function WarehouseManagementPage({
       },
     );
   const management = useWarehouseManagement(
-    searchSession ? toWarehouseSearchFilters(searchSession) : {},
+    searchSession ? toWarehouseSearchFilters(searchSession) : DEFAULT_WAREHOUSE_FILTERS,
   );
   useUnsavedChangesBeforeUnload(management.hasChanges);
   const gridRef = useRef<F1GridRef<WarehouseRow>>(null);
   const [searchQuery, setSearchQuery] = useState(searchSession?.keyword ?? '');
   const [detailValues, setDetailValues] = useState<
     Record<string, PageSearchFieldValue>
-  >(searchSession?.detailValues ?? {});
+  >(searchSession?.detailValues ?? DEFAULT_WAREHOUSE_DETAIL_VALUES);
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
   const [pendingSearch, setPendingSearch] =
     useState<PendingWarehouseSearch | null>(null);
+  // 담당자 선택 버튼(표 셀·행 폼)이 열어 둔 사원 선택 도움창. 선택 결과는 그 칸의 행에 적용한다.
+  const [managerPicker, setManagerPicker] = useState<{
+    apply: (patch: Partial<WarehouseRow>) => void;
+  } | null>(null);
 
   const pagePermissions = {
     read: Boolean(selectedMenuPermissions?.read),
@@ -114,12 +112,15 @@ export function WarehouseManagementPage({
     () =>
       createWarehouseColumns(
         canWrite && !management.saving,
-        management.userOptions,
         management.warehouseTypeItems,
+        (_row, apply) => setManagerPicker({ apply }),
       ),
-    [canWrite, management.saving, management.userOptions, management.warehouseTypeItems],
+    [canWrite, management.saving, management.warehouseTypeItems],
   );
-  const detailFields = useMemo(() => toPageSearchFields(columns), [columns]);
+  const detailFields = useMemo(
+    () => [...toPageSearchFields(columns), WAREHOUSE_USE_FILTER_FIELD],
+    [columns],
+  );
 
   const requestSearch = useCallback(
     (filters: WarehouseFilters, session: WarehouseSearchSession) => {
@@ -144,7 +145,7 @@ export function WarehouseManagementPage({
   const handleDefaultSearch = () => {
     const session = {
       keyword: searchQuery.trim(),
-      detailValues: searchSession?.detailValues ?? {},
+      detailValues: searchSession?.detailValues ?? DEFAULT_WAREHOUSE_DETAIL_VALUES,
     };
     requestSearch(toWarehouseSearchFilters(session), session);
   };
@@ -165,7 +166,7 @@ export function WarehouseManagementPage({
   const cancelPendingSearch = () => {
     setRefreshConfirmOpen(false);
     setPendingSearch(null);
-    setDetailValues(searchSession?.detailValues ?? {});
+    setDetailValues(searchSession?.detailValues ?? DEFAULT_WAREHOUSE_DETAIL_VALUES);
   };
 
   const confirmPendingSearch = () => {
@@ -283,7 +284,7 @@ export function WarehouseManagementPage({
         onDefaultSearch={handleDefaultSearch}
         detailFields={detailFields}
         detailValues={detailValues}
-        appliedDetailValues={searchSession?.detailValues ?? {}}
+        appliedDetailValues={searchSession?.detailValues ?? DEFAULT_WAREHOUSE_DETAIL_VALUES}
         onDetailValuesChange={setDetailValues}
         onDetailSearch={handleDetailSearch}
         detailLoading={management.loading}
@@ -307,6 +308,13 @@ export function WarehouseManagementPage({
           onValidationErrors={handleValidationErrors}
         />
       </Box>
+      <EmployeePickerDialog
+        open={managerPicker !== null}
+        title="담당자 선택"
+        onClose={() => setManagerPicker(null)}
+        onChange={(employee) => managerPicker?.apply(toManagerPatch(employee))}
+        onClear={() => managerPicker?.apply(toManagerPatch(null))}
+      />
       <UnsavedChangesConfirmDialog
         open={refreshConfirmOpen}
         title="저장하지 않은 변경사항"

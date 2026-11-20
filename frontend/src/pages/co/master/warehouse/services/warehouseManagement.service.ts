@@ -5,7 +5,6 @@ import type {
   WarehouseFilters,
   WarehousePayload,
   WarehouseRow,
-  WarehouseUserOption,
 } from '../types/warehouseManagement.types';
 
 type ApiRow = Record<string, unknown>;
@@ -48,6 +47,7 @@ export function normalizeWarehouseRow(source: ApiRow): WarehouseRow {
     warehouseType: toText(source.warehouseType),
     deleteLockAt: toYn(source.deleteLockAt, '삭제불가여부'),
     disuseAt: toYn(source.disuseAt, '불용창고여부'),
+    useAt: toYn(source.useAt, '사용여부'),
     stockQtyDispAt: toYn(source.stockQtyDispAt, '현재고표시여부'),
     stockIoAt: toYn(source.stockIoAt, '수불처리여부'),
     safetyStockAlertAt: toYn(source.safetyStockAlertAt, '안전재고미달알림여부'),
@@ -84,25 +84,12 @@ export async function fetchWarehouses(
   if (filters.warehouseType?.trim())
     query.set('warehouseType', filters.warehouseType.trim());
   if (filters.disuseAt) query.set('disuseAt', filters.disuseAt);
+  if (filters.useAt) query.set('useAt', filters.useAt);
   const queryString = query.toString();
   const result = await apiGet<{ resultList?: unknown }>(
     `/api/v1/co/master/warehouses${queryString ? `?${queryString}` : ''}`,
   );
   return rowsFromResponse(result.resultList);
-}
-
-export async function fetchWarehouseUserOptions(): Promise<WarehouseUserOption[]> {
-  const result = await apiGet<{ resultList?: ApiRow[] }>(
-    '/api/v1/co/master/warehouses/users',
-  );
-  return (result.resultList ?? []).map((user) => ({
-    userId: String(user.userId ?? ''),
-    departmentId: user.departmentId == null ? null : String(user.departmentId),
-    departmentNm: String(user.departmentNm ?? ''),
-    userNm: String(user.userNm ?? ''),
-    profileImage: user.profileImage == null ? null : String(user.profileImage),
-    levelNm: user.levelNm == null ? null : String(user.levelNm),
-  }));
 }
 
 export async function createWarehouse(

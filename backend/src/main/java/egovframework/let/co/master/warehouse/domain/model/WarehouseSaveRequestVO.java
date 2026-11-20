@@ -28,6 +28,9 @@ public class WarehouseSaveRequestVO implements Serializable {
     @Schema(description = "불용창고여부. 미입력 시 N", allowableValues = { "Y", "N" })
     private String disuseAt;
 
+    @Schema(description = "사용여부(Y=사용, N=미사용). 미입력 시 Y", allowableValues = { "Y", "N" })
+    private String useAt;
+
     @Schema(description = "현재고표시여부. 미입력 시 Y", allowableValues = { "Y", "N" })
     private String stockQtyDispAt;
 

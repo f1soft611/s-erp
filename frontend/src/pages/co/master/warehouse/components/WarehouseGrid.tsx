@@ -52,7 +52,7 @@ export function WarehouseGrid({
       key={gridKey}
       ref={gridRef}
       ariaLabel="창고 목록"
-      storageKey="co-master-warehouse-grid"
+      storageKey="co-master-warehouse-grid-v2"
       rows={rows}
       columns={columns}
       highlightKeyword={highlightKeyword}
