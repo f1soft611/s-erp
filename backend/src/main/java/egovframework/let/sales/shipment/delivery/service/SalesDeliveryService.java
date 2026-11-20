@@ -3,6 +3,7 @@ package egovframework.let.sales.shipment.delivery.service;
 import java.util.List;
 
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryRequestVO;
+import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliverySourceOrderSearchVO;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliverySourceOrderVO;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryStatusSearchVO;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryStatusVO;
@@ -19,7 +20,8 @@ public interface SalesDeliveryService {
 
     void deleteDelivery(Long tenantId, String userId, Long salesDeliveryId) throws Exception;
 
-    List<SalesDeliverySourceOrderVO> listSourceOrders(Long tenantId, String keyword) throws Exception;
+    List<SalesDeliverySourceOrderVO> listSourceOrders(Long tenantId, SalesDeliverySourceOrderSearchVO search)
+            throws Exception;
 
     List<SalesDeliveryStatusVO> listStatus(Long tenantId, String userId, SalesDeliveryStatusSearchVO search)
             throws Exception;

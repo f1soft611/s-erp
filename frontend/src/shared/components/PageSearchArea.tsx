@@ -116,6 +116,7 @@ function groupSearchFields(fields: PageSearchField[]): SearchRenderBlock[] {
 }
 
 export type PageSearchAreaProps = {
+  mode?: 'page' | 'dialog';
   children?: ReactNode;
   searchField?: ReactNode;
   onDefaultSearch?: () => void;
@@ -127,6 +128,7 @@ export type PageSearchAreaProps = {
   onDetailSearch?: (values: Record<string, PageSearchFieldValue>) => void;
   onDetailReset?: (values: Record<string, PageSearchFieldValue>) => void;
   onDetailClose?: () => void;
+  onDetailOpenChange?: (open: boolean) => void;
   detailLoading?: boolean;
 };
 
@@ -191,6 +193,7 @@ function areSearchValuesEqual(
 }
 
 export function PageSearchArea({
+  mode = 'page',
   children,
   searchField,
   onDefaultSearch,
@@ -202,6 +205,7 @@ export function PageSearchArea({
   onDetailSearch,
   onDetailReset,
   onDetailClose,
+  onDetailOpenChange,
   detailLoading = false,
 }: PageSearchAreaProps) {
   const [detailOpen, setDetailOpen] = useState(false);
@@ -319,6 +323,7 @@ export function PageSearchArea({
   const closeDetails = () => {
     quickDateRequestsRef.current.clear();
     setDetailOpen(false);
+    onDetailOpenChange?.(false);
     onDetailClose?.();
   };
 
@@ -577,6 +582,7 @@ export function PageSearchArea({
   };
 
   const searchRenderBlocks = groupSearchFields(detailFields);
+  const isDialogMode = mode === 'dialog';
   const activeDetailFilters = detailFields.flatMap((field) => {
     const value = appliedDetailValues[field.field];
     if (value === null || value === undefined) return [];
@@ -636,14 +642,16 @@ export function PageSearchArea({
       sx={(theme) => ({
         position: 'relative',
         zIndex: detailOpen ? 13 : 1,
-        px: 3,
-        py: 1.25,
-        borderBottom: `1px solid ${theme.palette.divider}`,
+        px: isDialogMode ? 0 : 3,
+        py: isDialogMode ? 0 : 1.25,
+        borderBottom: isDialogMode ? 0 : `1px solid ${theme.palette.divider}`,
         bgcolor:
-          theme.palette.mode === 'dark'
-            ? 'rgba(15, 23, 42, 0.72)'
-            : 'rgba(148, 163, 184, 0.03)',
-        backdropFilter: 'blur(8px)',
+          isDialogMode
+            ? 'transparent'
+            : theme.palette.mode === 'dark'
+              ? 'rgba(15, 23, 42, 0.72)'
+              : 'rgba(148, 163, 184, 0.03)',
+        backdropFilter: isDialogMode ? 'none' : 'blur(8px)',
         transition: 'background-color 0.2s ease',
       })}
     >
@@ -701,9 +709,9 @@ export function PageSearchArea({
               sx={{
                 display: 'flex',
                 alignItems: 'center',
-                flex: { xs: '1 1 100%', md: '1 1 220px' },
-                maxWidth: 360,
-                minWidth: { xs: '100%', md: 220 },
+                flex: isDialogMode ? '1 1 0%' : { xs: '1 1 100%', md: '1 1 220px' },
+                maxWidth: isDialogMode ? 'none' : 360,
+                minWidth: isDialogMode ? 0 : { xs: '100%', md: 220 },
                 order: 1,
                 height: 40,
               }}
@@ -753,9 +761,9 @@ export function PageSearchArea({
             sx={{
               display: 'flex',
               alignItems: 'center',
-              flex: { xs: '1 1 100%', md: '1 1 220px' },
-              maxWidth: 360,
-              minWidth: { xs: '100%', md: 220 },
+              flex: isDialogMode ? '1 1 0%' : { xs: '1 1 100%', md: '1 1 220px' },
+              maxWidth: isDialogMode ? 'none' : 360,
+              minWidth: isDialogMode ? 0 : { xs: '100%', md: 220 },
               height: 40,
             }}
           >
@@ -826,7 +834,9 @@ export function PageSearchArea({
               data-active={activeDetailFilters.length > 0}
               onClick={() => {
                 quickDateRequestsRef.current.clear();
-                setDetailOpen((current) => !current);
+                const nextOpen = !detailOpen;
+                setDetailOpen(nextOpen);
+                onDetailOpenChange?.(nextOpen);
               }}
               sx={{
                 flex: '0 0 auto',
@@ -1031,7 +1041,7 @@ export function PageSearchArea({
                 onClick={searchDetails}
                 disabled={detailLoading}
               >
-                조회
+                {isDialogMode ? '검색' : '조회'}
               </Button>
               <Button
                 type="button"
