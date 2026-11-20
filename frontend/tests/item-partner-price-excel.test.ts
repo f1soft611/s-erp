@@ -30,7 +30,7 @@ describe('item partner price Excel import', () => {
     const ExcelJS = await import('exceljs');
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(await blob.arrayBuffer());
-    expect(workbook.worksheets[0].getRow(1).values.slice(1)).toEqual(headers);
+    expect(workbook.worksheets[0].getRow(1).values.slice(1)).toEqual([...headers, '발주구분', '기본거래처']);
     expect(workbook.worksheets.some((sheet) => sheet.name === '사용 안내')).toBe(true);
   }, 20000);
 
@@ -53,6 +53,20 @@ describe('item partner price Excel import', () => {
       startDt: '2026-10-01',
       errors: [],
     });
+  });
+
+  it('reads the optional order type and default supplier columns and validates them', async () => {
+    const orderTypes = [{ value: 'DOMESTIC', label: '내수' }];
+    const file = await workbookFile([
+      [...headers, '발주구분', '기본거래처'],
+      ['매입', '101', '201', 1000, null, null, null, null, '2026-10-01', null, null, 'Y', '내수', 'y'],
+      ['매입', '102', null, 1000, null, null, null, null, '2026-10-01', null, null, 'Y', null, 'Y'],
+      ['매출', '103', '201', 1000, null, null, null, null, '2026-10-01', null, null, 'Y', '내수', null],
+    ]);
+    const parsed = await parseItemPartnerPriceWorkbook(file, { orderTypes });
+    expect(parsed[0]).toMatchObject({ orderType: 'DOMESTIC', defaultSupplier: 'Y', errors: [] });
+    expect(parsed[1].errors.join(' ')).toContain('기본 거래처');
+    expect(parsed[2].errors.join(' ')).toContain('발주구분');
   });
 
   it('treats a blank customer code as a default price and flags foreign price without currency', async () => {

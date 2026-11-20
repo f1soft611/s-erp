@@ -35,4 +35,10 @@ public class ItemPartnerPriceSaveRequestVO implements Serializable {
     private BigDecimal moq;
     @Schema(description = "사용여부", allowableValues = {"Y", "N"}, defaultValue = "Y")
     private String useAt;
+
+    @Schema(description = "발주구분(공통코드 PURCHASE_ORDER_TYPE 코드값). 매입 단가에서만 입력하며 비우면 지정하지 않는다")
+    private String orderType;
+
+    @Schema(description = "기본 거래처 지정. true는 거래처가 있는 사용 중 매입 단가에서만 허용, false는 이 거래처가 기본이면 해제, 생략하면 변경 없음")
+    private Boolean defaultSupplier;
 }

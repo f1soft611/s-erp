@@ -26,4 +26,10 @@ public class ItemPartnerPriceImportRowResultVO {
     private String customerName;
     @Schema(description = "행별 오류")
     private List<ItemPartnerPriceImportErrorVO> errors = new ArrayList<>();
+
+    @Schema(description = "확인된 발주구분 코드(입력이 이름이어도 코드로 변환). 없으면 null")
+    private String orderType;
+
+    @Schema(description = "기본 거래처 여부")
+    private Boolean defaultSupplier;
 }

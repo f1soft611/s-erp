@@ -9,6 +9,7 @@ import {
   buildItemPriceRemoveBatch,
   type ItemPriceRemoveMode,
 } from '../services/itemPriceOverviewChanges';
+import type { ItemPartnerPriceBatchSaveInfo } from '../types/itemPartnerPrice.types';
 import type {
   ItemPriceOverviewFilters,
   ItemPriceOverviewRow,
@@ -30,6 +31,15 @@ export function useItemPriceOverview(initialFilters: ItemPriceOverviewFilters = 
   const savingRef = useRef(false);
   const loadVersion = useRef(0);
   const { start, succeed, fail, ...initialLoad } = useInitialLoadState();
+
+  /** 서버가 매입 단가가 없어져 기본 거래처를 자동 해제한 품목이 있으면 저장 성공 메시지에 함께 안내한다. */
+  const savedMessage = useCallback((base: string, info: ItemPartnerPriceBatchSaveInfo) => {
+    const names = info.clearedDefaultMaterialIds
+      .map((id) => rowsRef.current.find((row) => row.parentId === null && row.materialId === id))
+      .map((row) => row?.materialName)
+      .filter(Boolean);
+    return names.length ? `${base} 기본 거래처가 해제되었습니다: ${names.join(', ')}` : base;
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -96,8 +106,8 @@ export function useItemPriceOverview(initialFilters: ItemPriceOverviewFilters = 
       if (!batch.prices.insertedRows.length && !batch.prices.updatedRows.length) {
         throw new Error('저장할 단가 변경 사항이 없습니다.');
       }
-      await saveItemPriceOverviewBatch(batch);
-      showSuccess('단가를 저장했습니다.');
+      const info = await saveItemPriceOverviewBatch(batch);
+      showSuccess(savedMessage('단가를 저장했습니다.', info));
       await loadRows(appliedFilters);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '단가를 저장하지 못했습니다.');
@@ -105,7 +115,7 @@ export function useItemPriceOverview(initialFilters: ItemPriceOverviewFilters = 
       savingRef.current = false;
       setSaving(false);
     }
-  }, [today, appliedFilters, loadRows, showSuccess]);
+  }, [today, appliedFilters, loadRows, showSuccess, savedMessage]);
 
   /** 선택한 행의 구분별 단가를 삭제(오등록 정정) 또는 미사용 처리하고 다시 조회한다. */
   const removePrices = useCallback(async (
@@ -119,8 +129,8 @@ export function useItemPriceOverview(initialFilters: ItemPriceOverviewFilters = 
     setError('');
     try {
       const batch = buildItemPriceRemoveBatch(row, sides, mode);
-      await saveItemPriceOverviewBatch(batch);
-      showSuccess(mode === 'delete' ? '단가를 삭제했습니다.' : '단가를 미사용 처리했습니다.');
+      const info = await saveItemPriceOverviewBatch(batch);
+      showSuccess(savedMessage(mode === 'delete' ? '단가를 삭제했습니다.' : '단가를 미사용 처리했습니다.', info));
       await loadRows(appliedFilters);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '단가를 처리하지 못했습니다.');
@@ -128,7 +138,7 @@ export function useItemPriceOverview(initialFilters: ItemPriceOverviewFilters = 
       savingRef.current = false;
       setSaving(false);
     }
-  }, [appliedFilters, loadRows, showSuccess]);
+  }, [appliedFilters, loadRows, showSuccess, savedMessage]);
 
   /** 엑셀 업로드로 값이 바뀐 품목 행을 같은 규칙으로 저장하고 다시 조회한다. */
   const applyImport = useCallback(async (updatedRows: ItemPriceOverviewRow[]) => {
@@ -140,8 +150,8 @@ export function useItemPriceOverview(initialFilters: ItemPriceOverviewFilters = 
       const batch = buildItemPriceBatch(
         { insertedRows: [], updatedRows, deletedRows: [] }, rowsRef.current, today,
       );
-      await saveItemPriceOverviewBatch(batch);
-      showSuccess(`엑셀의 단가 ${batch.prices.insertedRows.length + batch.prices.updatedRows.length}건을 저장했습니다.`);
+      const info = await saveItemPriceOverviewBatch(batch);
+      showSuccess(savedMessage(`엑셀의 단가 ${batch.prices.insertedRows.length + batch.prices.updatedRows.length}건을 저장했습니다.`, info));
       await loadRows(appliedFilters);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '엑셀 단가를 저장하지 못했습니다.');
@@ -149,7 +159,7 @@ export function useItemPriceOverview(initialFilters: ItemPriceOverviewFilters = 
       savingRef.current = false;
       setSaving(false);
     }
-  }, [today, appliedFilters, loadRows, showSuccess]);
+  }, [today, appliedFilters, loadRows, showSuccess, savedMessage]);
 
   return {
     applyImport,

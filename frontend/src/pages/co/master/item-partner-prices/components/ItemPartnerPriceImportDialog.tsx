@@ -53,6 +53,8 @@ const editableColumns = [
   ['endDt', '적용 종료일'],
   ['moq', '최소주문수량'],
   ['useAt', '사용여부'],
+  ['orderType', '발주구분'],
+  ['defaultSupplier', '기본거래처'],
 ] as const;
 
 function requestRows(rows: ItemPartnerPriceImportRow[]): ItemPartnerPriceImportRequestRow[] {
@@ -70,6 +72,8 @@ function requestRows(rows: ItemPartnerPriceImportRow[]): ItemPartnerPriceImportR
     endDt: row.endDt,
     moq: row.moq,
     useAt: row.useAt,
+    orderType: row.orderType,
+    defaultSupplier: row.defaultSupplier,
   }));
 }
 
@@ -180,6 +184,8 @@ function OpenItemPartnerPriceImportDialog({
         endDt: row.endDt,
         moq: row.moq ? Number(row.moq) : null,
         useAt: row.useAt as ItemPartnerPriceRow['useAt'],
+        orderType: verified.orderType ?? row.orderType,
+        defaultSupplier: row.defaultSupplier === 'Y',
       };
     });
     onStage(staged);

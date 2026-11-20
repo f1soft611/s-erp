@@ -16,6 +16,9 @@
         <result property="taxType" column="tax_type"/>
         <result property="vatIncludedAt" column="vat_included_at"/>
         <result property="foreignUnitPrice" column="foreign_unit_price"/>
+        <result property="orderType" column="order_type"/>
+        <result property="orderTypeName" column="order_type_name"/>
+        <result property="defaultSupplier" column="default_supplier"/>
         <result property="materialUnit" column="material_unit"/>
         <result property="materialSpec" column="material_spec"/>
         <result property="priceStatus" column="price_status"/>
@@ -32,12 +35,26 @@
     <sql id="priceColumns">
         p.price_id, p.tenant_id, p.material_id, m.material_code, m.material_name,
         p.customer_id, c.customer_code, c.customer_name, p.trade_type, p.unit_price,
-        p.currency, p.tax_type, p.vat_included_at, p.foreign_unit_price, m.unit AS material_unit, m.material_spec,
+        p.currency, p.tax_type, p.vat_included_at, p.foreign_unit_price,
+        p.order_type, oci.item_nm AS order_type_name,
+        (ds.customer_id IS NOT NULL) AS default_supplier,
+        m.unit AS material_unit, m.material_spec,
         CASE WHEN p.end_dt IS NOT NULL AND p.end_dt &lt; CURRENT_DATE THEN 'past'
              WHEN p.start_dt &gt; CURRENT_DATE THEN 'future'
              ELSE 'current' END AS price_status,
         p.start_dt, p.end_dt, p.moq, p.use_at,
         p.created_by, p.created_at, p.updated_by, p.updated_at
+    </sql>
+
+    <!-- 발주구분 이름과 기본 거래처 여부(그 거래처가 품목의 매입 기본 거래처인 행) 조인 -->
+    <sql id="priceExtraJoins">
+        LEFT JOIN tb_common_code_group ocg
+            ON ocg.tenant_id = p.tenant_id AND ocg.group_code = 'PURCHASE_ORDER_TYPE'
+        LEFT JOIN tb_common_code_item oci
+            ON oci.group_id = ocg.common_code_group_id AND oci.item_code = p.order_type
+        LEFT JOIN tb_item_default_supplier ds
+            ON ds.tenant_id = p.tenant_id AND ds.material_id = p.material_id
+            AND ds.customer_id = p.customer_id AND p.trade_type = '매입'
     </sql>
 
     <select id="selectItemPartnerPriceList" parameterType="map" resultMap="priceMap">
@@ -47,6 +64,7 @@
             ON m.material_id = p.material_id AND m.tenant_id = p.tenant_id
         LEFT JOIN tb_customer_info c
             ON c.customer_id = p.customer_id AND c.tenant_id = p.tenant_id
+        <include refid="priceExtraJoins"/>
         WHERE p.tenant_id = #{tenantId}
         <if test="keyword != null and keyword != ''">
             AND (m.material_code ILIKE '%' || #{keyword} || '%'
@@ -114,6 +132,7 @@
             ON m.material_id = p.material_id AND m.tenant_id = p.tenant_id
         LEFT JOIN tb_customer_info c
             ON c.customer_id = p.customer_id AND c.tenant_id = p.tenant_id
+        <include refid="priceExtraJoins"/>
         WHERE p.tenant_id = #{tenantId} AND p.price_id = #{priceId}
     </select>
 
@@ -169,6 +188,10 @@
                   AND p.customer_id IS NULL AND p.trade_type = '매출' AND p.use_at = 'Y'
                   AND (p.end_dt IS NULL OR p.end_dt &gt;= CAST(#{effectiveOn} AS DATE)))
         </if>
+        <if test="priceFilter == 'NO_DEFAULT_SUPPLIER'">
+            AND NOT EXISTS (SELECT 1 FROM tb_item_default_supplier ds
+                WHERE ds.tenant_id = m.tenant_id AND ds.material_id = m.material_id)
+        </if>
         <if test="priceFilter == 'HAS_SPECIAL'">
             AND EXISTS (SELECT 1 FROM tb_item_partner_price p
                 WHERE p.tenant_id = m.tenant_id AND p.material_id = m.material_id
@@ -223,6 +246,7 @@
             ON m.material_id = p.material_id AND m.tenant_id = p.tenant_id
         LEFT JOIN tb_customer_info c
             ON c.customer_id = p.customer_id AND c.tenant_id = p.tenant_id
+        <include refid="priceExtraJoins"/>
         WHERE p.tenant_id = #{tenantId}
           AND p.use_at = 'Y'
           AND (p.end_dt IS NULL OR p.end_dt &gt;= CAST(#{effectiveOn} AS DATE))
@@ -311,11 +335,12 @@
     <select id="insertItemPartnerPrice" parameterType="map" resultType="long">
         INSERT INTO tb_item_partner_price (
             tenant_id, material_id, customer_id, trade_type, unit_price,
-            currency, tax_type, vat_included_at, foreign_unit_price,
+            currency, tax_type, vat_included_at, foreign_unit_price, order_type,
             start_dt, end_dt, moq, use_at, created_by, created_at, updated_by, updated_at
         ) VALUES (
             #{tenantId}, #{materialId}, #{customerId,jdbcType=BIGINT}, #{tradeType}, #{unitPrice,jdbcType=NUMERIC},
             #{currency,jdbcType=VARCHAR}, #{taxType}, #{vatIncludedAt}, #{foreignUnitPrice,jdbcType=NUMERIC},
+            #{orderType,jdbcType=VARCHAR},
             CAST(#{startDt} AS DATE), CAST(#{endDt} AS DATE), #{moq,jdbcType=NUMERIC},
             #{useAt}, #{createdBy}, CURRENT_TIMESTAMP, #{updatedBy}, CURRENT_TIMESTAMP
         )
@@ -332,6 +357,7 @@
             tax_type = #{taxType},
             vat_included_at = #{vatIncludedAt},
             foreign_unit_price = #{foreignUnitPrice,jdbcType=NUMERIC},
+            order_type = #{orderType,jdbcType=VARCHAR},
             start_dt = CAST(#{startDt} AS DATE),
             end_dt = CAST(#{endDt} AS DATE),
             moq = #{moq,jdbcType=NUMERIC},
@@ -340,4 +366,144 @@
             updated_at = CURRENT_TIMESTAMP
         WHERE tenant_id = #{tenantId} AND price_id = #{priceId}
     </update>
+
+    <!-- 품목들의 매입 기본 거래처(부모 행 표시, 저장 후 기본 여부 갱신, 지정·해제 판단에 쓴다) -->
+    <select id="selectDefaultSuppliers" parameterType="map"
+            resultType="egovframework.let.co.master.itempartnerprice.domain.model.ItemPriceOverviewRowVO">
+        SELECT d.material_id AS "materialId", d.customer_id AS "customerId",
+               c.customer_code AS "customerCode", c.customer_name AS "customerName"
+        FROM tb_item_default_supplier d
+        JOIN tb_customer_info c ON c.customer_id = d.customer_id AND c.tenant_id = d.tenant_id
+        WHERE d.tenant_id = #{tenantId}
+          AND d.material_id IN
+        <foreach collection="materialIds" item="materialId" open="(" separator="," close=")">
+            #{materialId}
+        </foreach>
+    </select>
+
+    <!-- 그 거래처가 품목에 사용 중 매입 단가를 가지고 있는지(기간 무관). 기본 거래처 후보 조건 -->
+    <select id="existsActivePurchasePrice" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM tb_item_partner_price p
+            JOIN tb_customer_info c
+              ON c.customer_id = p.customer_id AND c.tenant_id = p.tenant_id AND c.use_at = 'Y'
+            WHERE p.tenant_id = #{tenantId} AND p.material_id = #{materialId}
+              AND p.customer_id = #{customerId} AND p.trade_type = '매입' AND p.use_at = 'Y'
+        )
+    </select>
+
+    <update id="upsertDefaultSupplier" parameterType="map">
+        INSERT INTO tb_item_default_supplier (tenant_id, material_id, customer_id, created_by)
+        VALUES (#{tenantId}, #{materialId}, #{customerId}, #{actor})
+        ON CONFLICT (tenant_id, material_id) DO UPDATE
+        SET customer_id = EXCLUDED.customer_id,
+            updated_by = #{actor},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tb_item_default_supplier.customer_id &lt;&gt; EXCLUDED.customer_id
+    </update>
+
+    <!-- 현재 기본 거래처가 지정한 거래처일 때만 해제한다 -->
+    <delete id="deleteDefaultSupplier" parameterType="map">
+        DELETE FROM tb_item_default_supplier
+        WHERE tenant_id = #{tenantId} AND material_id = #{materialId} AND customer_id = #{customerId}
+    </delete>
+
+    <!-- 기본 거래처의 사용 중 매입 단가가 하나도 남지 않은 품목의 기본 거래처를 해제하고 품목 ID를 돌려준다 -->
+    <select id="deleteOrphanDefaultSuppliers" parameterType="map" resultType="long">
+        DELETE FROM tb_item_default_supplier d
+        WHERE d.tenant_id = #{tenantId}
+          AND d.material_id IN
+        <foreach collection="materialIds" item="materialId" open="(" separator="," close=")">
+            #{materialId}
+        </foreach>
+          AND NOT EXISTS (
+              SELECT 1 FROM tb_item_partner_price p
+              WHERE p.tenant_id = d.tenant_id AND p.material_id = d.material_id
+                AND p.customer_id = d.customer_id AND p.trade_type = '매입' AND p.use_at = 'Y')
+        RETURNING d.material_id
+    </select>
+
+    <select id="selectMaterialIdsByPriceIds" parameterType="map" resultType="long">
+        SELECT DISTINCT p.material_id
+        FROM tb_item_partner_price p
+        WHERE p.tenant_id = #{tenantId}
+          AND p.price_id IN
+        <foreach collection="priceIds" item="priceId" open="(" separator="," close=")">
+            #{priceId}
+        </foreach>
+    </select>
+
+    <!-- 발주구분 입력(코드 또는 이름)을 사용 중 공통코드 코드로 바꾼다. 없으면 null -->
+    <select id="selectOrderTypeCode" parameterType="map" resultType="string">
+        SELECT i.item_code
+        FROM tb_common_code_item i
+        JOIN tb_common_code_group g ON g.common_code_group_id = i.group_id
+        WHERE g.tenant_id = #{tenantId} AND g.group_code = 'PURCHASE_ORDER_TYPE' AND g.use_at = 'Y'
+          AND i.use_at = 'Y' AND (i.item_code = #{text} OR i.item_nm = #{text})
+        ORDER BY (i.item_code = #{text}) DESC
+        LIMIT 1
+    </select>
+
+    <!--
+      단가 조회 서비스 전용. 거래처 지정 조회: 그 거래처의 기준일 유효 단가, 없으면 거래처 없는 공통단가.
+      같은 (품목, 거래처) 안에서는 시작일이 최신인 행, 가격 ID가 최신인 행 순으로 한 건을 고른다.
+    -->
+    <select id="selectLookupPrice" parameterType="map"
+            resultType="egovframework.let.co.master.itempartnerprice.domain.model.ItemPriceLookupVO">
+        SELECT p.unit_price AS "unitPrice", p.tax_type AS "taxType", p.vat_included_at AS "vatIncludedAt",
+               p.foreign_unit_price AS "foreignUnitPrice", p.currency AS "foreignCurrency",
+               p.order_type AS "orderType", oci.item_nm AS "orderTypeName"
+        FROM tb_item_partner_price p
+        LEFT JOIN tb_common_code_group ocg
+            ON ocg.tenant_id = p.tenant_id AND ocg.group_code = 'PURCHASE_ORDER_TYPE'
+        LEFT JOIN tb_common_code_item oci
+            ON oci.group_id = ocg.common_code_group_id AND oci.item_code = p.order_type
+        WHERE p.tenant_id = #{tenantId}
+          AND p.material_id = #{materialId}
+          AND (p.customer_id = #{customerId} OR p.customer_id IS NULL)
+          AND p.trade_type = #{tradeType}
+          AND p.use_at = 'Y'
+          AND p.start_dt &lt;= CAST(#{baseDt} AS DATE)
+          AND (p.end_dt IS NULL OR p.end_dt &gt;= CAST(#{baseDt} AS DATE))
+        ORDER BY (p.customer_id IS NULL), p.start_dt DESC, p.price_id DESC
+        LIMIT 1
+    </select>
+
+    <!--
+      단가 조회 서비스 전용. 기본 거래처 기준 일괄 조회(매입): 품목별 기본 거래처(사용 중 거래처)와 그 거래처의
+      기준일 유효 단가(없으면 공통단가). 기본 거래처가 없는 품목은 결과에 나오지 않는다.
+    -->
+    <select id="selectDefaultSupplierPrices" parameterType="map"
+            resultType="egovframework.let.co.master.itempartnerprice.domain.model.ItemPriceLookupVO">
+        SELECT d.material_id AS "materialId", d.customer_id AS "supplierId",
+               c.customer_code AS "supplierCode", c.customer_name AS "supplierName",
+               pr.unit_price AS "unitPrice", pr.tax_type AS "taxType", pr.vat_included_at AS "vatIncludedAt",
+               pr.foreign_unit_price AS "foreignUnitPrice", pr.currency AS "foreignCurrency",
+               pr.order_type AS "orderType", oci.item_nm AS "orderTypeName"
+        FROM tb_item_default_supplier d
+        JOIN tb_customer_info c
+          ON c.customer_id = d.customer_id AND c.tenant_id = d.tenant_id AND c.use_at = 'Y'
+        LEFT JOIN LATERAL (
+            SELECT p.unit_price, p.tax_type, p.vat_included_at, p.foreign_unit_price, p.currency, p.order_type
+            FROM tb_item_partner_price p
+            WHERE p.tenant_id = d.tenant_id
+              AND p.material_id = d.material_id
+              AND (p.customer_id = d.customer_id OR p.customer_id IS NULL)
+              AND p.trade_type = '매입'
+              AND p.use_at = 'Y'
+              AND p.start_dt &lt;= CAST(#{baseDt} AS DATE)
+              AND (p.end_dt IS NULL OR p.end_dt &gt;= CAST(#{baseDt} AS DATE))
+            ORDER BY (p.customer_id IS NULL), p.start_dt DESC, p.price_id DESC
+            LIMIT 1
+        ) pr ON TRUE
+        LEFT JOIN tb_common_code_group ocg
+          ON ocg.tenant_id = d.tenant_id AND ocg.group_code = 'PURCHASE_ORDER_TYPE'
+        LEFT JOIN tb_common_code_item oci
+          ON oci.group_id = ocg.common_code_group_id AND oci.item_code = pr.order_type
+        WHERE d.tenant_id = #{tenantId}
+          AND d.material_id IN
+        <foreach collection="materialIds" item="materialId" open="(" separator="," close=")">
+            #{materialId}
+        </foreach>
+    </select>
 </mapper>

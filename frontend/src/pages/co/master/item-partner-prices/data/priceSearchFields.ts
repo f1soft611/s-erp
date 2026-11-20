@@ -11,9 +11,10 @@ export const PRICE_STATUS_FIELD: PageSearchField = {
   field: 'priceFilter', label: '단가 상태', type: 'select', searchSpan: 1, group: GROUP, allowEmpty: false,
   options: [
     { value: 'ALL', label: '전체' },
-    { value: 'NO_PURCHASE', label: '매입 기본단가 미등록' },
-    { value: 'NO_SALES', label: '매출 기본단가 미등록' },
+    { value: 'NO_PURCHASE', label: '매입 공통단가 미등록' },
+    { value: 'NO_SALES', label: '매출 공통단가 미등록' },
     { value: 'HAS_SPECIAL', label: '특별단가 있는 품목' },
+    { value: 'NO_DEFAULT_SUPPLIER', label: '매입 기본 거래처 미지정' },
   ],
 };
 

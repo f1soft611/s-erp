@@ -156,6 +156,57 @@ class ItemPartnerPriceMapperTest {
         assertThat(delete).contains("DELETE FROM tb_item_partner_price", "tenant_id = ?", "price_id = ?");
     }
 
+    @org.junit.jupiter.api.Test
+    void defaultSupplierStatementsAreTenantScopedAndKeepOneRowPerMaterial() throws Exception {
+        Configuration configuration = loadConfiguration();
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 9L);
+        params.put("materialId", 101L);
+        params.put("customerId", 202L);
+        params.put("actor", "101");
+        params.put("materialIds", java.util.Arrays.asList(101L, 102L));
+        params.put("priceIds", java.util.Arrays.asList(1L, 2L));
+        params.put("text", "내수");
+        params.put("tradeType", "매입");
+        params.put("baseDt", "2026-11-20");
+        for (String id : java.util.Arrays.asList("selectDefaultSuppliers", "existsActivePurchasePrice",
+                "upsertDefaultSupplier", "deleteDefaultSupplier", "deleteOrphanDefaultSuppliers",
+                "selectMaterialIdsByPriceIds", "selectOrderTypeCode", "selectLookupPrice",
+                "selectDefaultSupplierPrices")) {
+            String sql = configuration.getMappedStatement("ItemPartnerPriceDAO." + id).getBoundSql(params).getSql()
+                    .replaceAll("\\s+", " ");
+            assertThat(sql).as(id).containsPattern("tenant_id = \\?|VALUES \\(\\?");
+        }
+        String upsert = configuration.getMappedStatement("ItemPartnerPriceDAO.upsertDefaultSupplier")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        assertThat(upsert).contains("ON CONFLICT (tenant_id, material_id) DO UPDATE");
+        String orphan = configuration.getMappedStatement("ItemPartnerPriceDAO.deleteOrphanDefaultSuppliers")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        assertThat(orphan).contains("NOT EXISTS", "p.trade_type = '매입'", "p.use_at = 'Y'", "RETURNING d.material_id");
+    }
+
+    @org.junit.jupiter.api.Test
+    void sharedLookupStatementsPickDefaultSupplierPriceBeforeCommonPrice() throws Exception {
+        Configuration configuration = loadConfiguration();
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 9L);
+        params.put("materialId", 101L);
+        params.put("customerId", 202L);
+        params.put("tradeType", "매입");
+        params.put("baseDt", "2026-11-20");
+        params.put("materialIds", java.util.Arrays.asList(101L, 102L));
+        for (String id : java.util.Arrays.asList("selectLookupPrice", "selectDefaultSupplierPrices")) {
+            String sql = configuration.getMappedStatement("ItemPartnerPriceDAO." + id).getBoundSql(params).getSql()
+                    .replaceAll("\\s+", " ");
+            assertThat(sql).as(id).contains("p.use_at = 'Y'", "p.customer_id IS NULL",
+                    "ORDER BY (p.customer_id IS NULL), p.start_dt DESC, p.price_id DESC", "LIMIT 1",
+                    "p.order_type", "p.foreign_unit_price");
+        }
+        String defaults = configuration.getMappedStatement("ItemPartnerPriceDAO.selectDefaultSupplierPrices")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        assertThat(defaults).contains("tb_item_default_supplier d", "c.use_at = 'Y'", "LEFT JOIN LATERAL");
+    }
+
     private Configuration loadConfiguration() throws Exception {
         Configuration configuration;
         try (InputStream input = Resources.getResourceAsStream(CONFIG)) {

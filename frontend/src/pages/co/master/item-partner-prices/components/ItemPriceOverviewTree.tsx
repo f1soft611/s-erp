@@ -46,6 +46,22 @@ export function ItemPriceOverviewTree({
     onPickCustomer: (_row, applyPatch) => setPicker({ applyPatch }),
   }), [canEdit, today, codeOptions]);
 
+  // 한 품목에는 기본 거래처가 하나뿐이다. 새로 체크된 행이 생기면 같은 품목의 다른 거래처 행 체크를 해제한다(서버가 최종 보장).
+  const handleChangesChange = (changes: F1GridChanges<ItemPriceOverviewRow>) => {
+    const tree = treeRef.current;
+    if (tree) {
+      const before = new Map(rows.map((row) => [row.rowId, row.purchaseDefaultSupplier]));
+      const active = tree.getActiveRows();
+      for (const row of active) {
+        if (row.parentId === null || !row.purchaseDefaultSupplier || before.get(row.rowId) === true) continue;
+        active
+          .filter((other) => other.parentId === row.parentId && other.rowId !== row.rowId && other.purchaseDefaultSupplier)
+          .forEach((other) => tree.setCellValue(other.rowId, 'purchaseDefaultSupplier', false));
+      }
+    }
+    onChangesChange(changes);
+  };
+
   const addSpecialPrice = (rowId: string | number | undefined) => {
     const tree = treeRef.current;
     if (!tree || rowId === undefined) return;
@@ -75,7 +91,7 @@ export function ItemPriceOverviewTree({
       <F1Tree
         key={gridKey}
         ref={treeRef}
-        storageKey="co-master-item-price-overview-v1"
+        storageKey="co-master-item-price-overview-v2"
         ariaLabel="품목 기준 단가"
         rows={rows}
         rowKey="rowId"
@@ -96,7 +112,7 @@ export function ItemPriceOverviewTree({
           : { enabled: false }}
         loading={loading}
         canExportExcel={canExportExcel}
-        onChangesChange={onChangesChange}
+        onChangesChange={handleChangesChange}
         onSelectionChange={onSelectionChange}
         treeContextMenu={{
           addRootLabel: '',

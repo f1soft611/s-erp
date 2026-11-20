@@ -35,4 +35,7 @@ public class ItemPartnerPriceVO extends ItemPartnerPriceSaveRequestVO {
     private String updatedBy;
     @Schema(description = "수정일시")
     private String updatedAt;
+
+    @Schema(description = "발주구분 이름(조회 전용)")
+    private String orderTypeName;
 }

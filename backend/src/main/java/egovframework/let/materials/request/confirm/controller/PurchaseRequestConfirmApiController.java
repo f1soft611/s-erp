@@ -64,7 +64,7 @@ public class PurchaseRequestConfirmApiController {
         return result("resultList", confirmService.listCandidates(user.getTenantId(), keyword, fromDt, toDt), null);
     }
 
-    @Operation(summary = "선택한 구매요청 품목 조회", description = "확정할 품목 행을 상세 행 ID로 조회한다. 확정됐거나 삭제된 요청의 행이 있으면 409",
+    @Operation(summary = "선택한 구매요청 품목 조회", description = "확정할 품목 행을 상세 행 ID로 조회하고 기본 거래처·단가·발주구분을 채운다(baseDt 선택). 확정됐거나 삭제된 요청의 행이 있으면 409",
             security = { @SecurityRequirement(name = "Authorization") }, tags = { TAG })
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
@@ -72,10 +72,11 @@ public class PurchaseRequestConfirmApiController {
     })
     @GetMapping("/request-details")
     public ResultVO loadRequestDetails(@RequestParam List<Long> purchaseRequestDetailIds,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate baseDt,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
-        return result("resultList", confirmService.loadRequestDetails(user.getTenantId(), purchaseRequestDetailIds),
-                null);
+        return result("resultList",
+                confirmService.loadRequestDetails(user.getTenantId(), purchaseRequestDetailIds, baseDt), null);
     }
 
     @Operation(summary = "기본 매입 단가 조회", description = "단가관리에서 품목·구매처·기준일에 유효한 매입 단가 1건을 조회한다",

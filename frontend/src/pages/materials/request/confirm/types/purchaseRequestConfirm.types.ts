@@ -50,6 +50,9 @@ export type PurchaseRequestConfirmDetail = {
   currencyCode: string | null;
   taxType?: string | null;
   vatIncludedAt?: string | null;
+  /** 요청 불러오기 때 기본 거래처 단가에서 채운 외화단가·통화. */
+  foreignUnitPrice?: number | null;
+  foreignCurrency?: string | null;
   amount: number | null;
   confirmRemark: string | null;
   orderCloseAt: string | null;
@@ -111,6 +114,8 @@ export type PurchaseUnitPrice = {
   vatIncludedAt?: string | null;
   foreignUnitPrice?: number | null;
   foreignCurrency?: string | null;
+  /** 선택된 단가 행의 발주구분 코드. 없으면 null. */
+  orderType?: string | null;
 };
 
 export type ConfirmSelectOption = { value: string; label: string };

@@ -53,7 +53,7 @@ function OpenItemPriceRemoveDialog({ row, onClose, onConfirm }: Omit<Props, 'row
   const toggle = (side: ItemPriceSideKey) => setSides((current) =>
     current.includes(side) ? current.filter((item) => item !== side) : [...current, side]);
   const target = row.parentId === null
-    ? `${row.displayName} 기본단가`
+    ? `${row.displayName} 공통단가`
     : `${row.materialCode} · ${row.materialName} / ${row.customerName} 특별단가`;
 
   return (

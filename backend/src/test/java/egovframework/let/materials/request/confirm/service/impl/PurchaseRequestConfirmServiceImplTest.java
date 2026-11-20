@@ -2,7 +2,9 @@ package egovframework.let.materials.request.confirm.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -13,7 +15,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -26,6 +30,8 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import egovframework.let.co.master.itempartnerprice.domain.model.ItemPriceLookupVO;
+import egovframework.let.co.master.itempartnerprice.service.ItemPriceLookupService;
 import egovframework.let.common.idsequence.service.IdSequenceService;
 import egovframework.let.materials.request.confirm.domain.model.PurchaseConfirmVO;
 import egovframework.let.materials.request.confirm.domain.model.PurchaseRequestConfirmDetailRequestVO;
@@ -49,12 +55,15 @@ class PurchaseRequestConfirmServiceImplTest {
     @Mock
     private IdSequenceService idSequenceService;
 
+    @Mock
+    private ItemPriceLookupService priceLookupService;
+
     private PurchaseRequestConfirmServiceImpl service;
 
     @BeforeEach
     void setUp() throws Exception {
         MockitoAnnotations.openMocks(this);
-        service = new PurchaseRequestConfirmServiceImpl(dao, idSequenceService);
+        service = new PurchaseRequestConfirmServiceImpl(dao, idSequenceService, priceLookupService);
         // 요청 5의 행 51·52(52는 이번에 고르지 않을 수 있음), 요청 6의 행 61
         when(dao.selectDetailLocksForUpdate(anyMap())).thenReturn(Arrays.asList(lock(51L, 5L, null), lock(61L, 6L, null)));
         when(dao.selectDetailLocks(anyMap())).thenReturn(Arrays.asList(lock(51L, 5L, null), lock(61L, 6L, null)));
@@ -177,9 +186,9 @@ class PurchaseRequestConfirmServiceImplTest {
 
     @Test
     void loadRequestDetailsRejectsConfirmedItems() throws Exception {
-        assertThat(service.loadRequestDetails(TENANT, Arrays.asList(61L, 51L))).hasSize(2);
+        assertThat(service.loadRequestDetails(TENANT, Arrays.asList(61L, 51L), null)).hasSize(2);
         when(dao.selectDetailLocks(anyMap())).thenReturn(Arrays.asList(lock(51L, 5L, 9L), lock(61L, 6L, null)));
-        assertStatus(() -> service.loadRequestDetails(TENANT, Arrays.asList(51L, 61L)), HttpStatus.CONFLICT);
+        assertStatus(() -> service.loadRequestDetails(TENANT, Arrays.asList(51L, 61L), null), HttpStatus.CONFLICT);
     }
 
     @Test
@@ -210,12 +219,16 @@ class PurchaseRequestConfirmServiceImplTest {
     }
 
     @Test
-    void defaultUnitPriceUsesKrwAndFillsTaxDefaultsWhenWonPriceExists() throws Exception {
-        PurchaseUnitPriceVO price = new PurchaseUnitPriceVO();
-        price.setUnitPrice(new BigDecimal("1500"));
-        price.setForeignUnitPrice(new BigDecimal("1.5"));
-        price.setForeignCurrency("USD");
-        when(dao.selectDefaultUnitPrice(anyMap())).thenReturn(price);
+    void defaultUnitPriceComesFromTheSharedLookupServiceIncludingOrderType() throws Exception {
+        ItemPriceLookupVO found = new ItemPriceLookupVO();
+        found.setUnitPrice(new BigDecimal("1500"));
+        found.setCurrency("KRW");
+        found.setTaxType("TAXABLE");
+        found.setVatIncludedAt("N");
+        found.setForeignUnitPrice(new BigDecimal("1.5"));
+        found.setForeignCurrency("USD");
+        found.setOrderType("DOMESTIC");
+        when(priceLookupService.findPrice(TENANT, "매입", 12L, 5L, LocalDate.of(2026, 11, 12))).thenReturn(found);
 
         PurchaseUnitPriceVO result = service.findDefaultUnitPrice(TENANT, 12L, 5L, LocalDate.of(2026, 11, 12));
 
@@ -225,28 +238,59 @@ class PurchaseRequestConfirmServiceImplTest {
         assertThat(result.getVatIncludedAt()).isEqualTo("N");
         assertThat(result.getForeignCurrency()).isEqualTo("USD");
         assertThat(result.getForeignUnitPrice()).isEqualByComparingTo("1.5");
-    }
-
-    @Test
-    void defaultUnitPriceUsesForeignCurrencyAndPriceWhenOnlyForeignPriceExists() throws Exception {
-        PurchaseUnitPriceVO price = new PurchaseUnitPriceVO();
-        price.setForeignUnitPrice(new BigDecimal("7.25"));
-        price.setForeignCurrency("USD");
-        price.setTaxType("ZERO_RATED");
-        price.setVatIncludedAt("N");
-        when(dao.selectDefaultUnitPrice(anyMap())).thenReturn(price);
-
-        PurchaseUnitPriceVO result = service.findDefaultUnitPrice(TENANT, 12L, 5L, LocalDate.of(2026, 11, 12));
-
-        assertThat(result.getCurrency()).isEqualTo("USD");
-        assertThat(result.getUnitPrice()).isEqualByComparingTo("7.25");
-        assertThat(result.getTaxType()).isEqualTo("ZERO_RATED");
+        assertThat(result.getOrderType()).isEqualTo("DOMESTIC");
     }
 
     @Test
     void defaultUnitPriceIsNullWhenNoPriceIsRegistered() throws Exception {
-        when(dao.selectDefaultUnitPrice(anyMap())).thenReturn(null);
+        when(priceLookupService.findPrice(eq(TENANT), eq("매입"), eq(12L), eq(5L), any(LocalDate.class))).thenReturn(null);
         assertThat(service.findDefaultUnitPrice(TENANT, 12L, 5L, LocalDate.of(2026, 11, 12))).isNull();
+        assertStatus(() -> service.findDefaultUnitPrice(TENANT, 12L, null, LocalDate.of(2026, 11, 12)), HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void loadRequestDetailsFillsDefaultSupplierPriceOnlyForUnconfirmedRows() throws Exception {
+        PurchaseRequestConfirmDetailVO withDefault = stored(5L, 51L);
+        withDefault.setMaterialId(100L);
+        PurchaseRequestConfirmDetailVO withoutDefault = stored(6L, 61L);
+        withoutDefault.setMaterialId(200L);
+        PurchaseRequestConfirmDetailVO alreadyConfirmed = stored(6L, 62L);
+        alreadyConfirmed.setMaterialId(300L);
+        alreadyConfirmed.setConfirmQty(BigDecimal.ONE);
+        when(dao.selectDetailsByIds(anyMap())).thenReturn(Arrays.asList(withDefault, withoutDefault, alreadyConfirmed));
+        ItemPriceLookupVO found = new ItemPriceLookupVO();
+        found.setMaterialId(100L);
+        found.setSupplierId(7L);
+        found.setSupplierCode("S7");
+        found.setSupplierName("공급사7");
+        found.setUnitPrice(new BigDecimal("1200"));
+        found.setCurrency("KRW");
+        found.setTaxType("TAXABLE");
+        found.setVatIncludedAt("N");
+        found.setOrderType("DOMESTIC");
+        found.setOrderTypeName("내수");
+        Map<Long, ItemPriceLookupVO> defaults = new HashMap<Long, ItemPriceLookupVO>();
+        defaults.put(100L, found);
+        LocalDate baseDt = LocalDate.of(2026, 11, 20);
+        when(priceLookupService.findDefaultSupplierPrices(eq(TENANT), any(Collection.class), eq(baseDt)))
+                .thenReturn(defaults);
+        when(dao.selectDetailLocks(anyMap())).thenReturn(Arrays.asList(lock(51L, 5L, null), lock(61L, 6L, null),
+                lock(62L, 6L, null)));
+
+        List<PurchaseRequestConfirmDetailVO> result =
+                service.loadRequestDetails(TENANT, Arrays.asList(51L, 61L, 62L), baseDt);
+
+        assertThat(result.get(0).getSupplierId()).isEqualTo(7L);
+        assertThat(result.get(0).getSupplierName()).isEqualTo("공급사7");
+        assertThat(result.get(0).getUnitPrice()).isEqualByComparingTo("1200");
+        assertThat(result.get(0).getOrderType()).isEqualTo("DOMESTIC");
+        assertThat(result.get(0).getOrderTypeName()).isEqualTo("내수");
+        assertThat(result.get(1).getSupplierId()).isNull();
+        assertThat(result.get(1).getUnitPrice()).isNull();
+        assertThat(result.get(2).getSupplierId()).isNull();
+        ArgumentCaptor<Collection<Long>> materialIds = ArgumentCaptor.forClass((Class) Collection.class);
+        verify(priceLookupService).findDefaultSupplierPrices(eq(TENANT), materialIds.capture(), eq(baseDt));
+        assertThat(materialIds.getValue()).containsExactlyInAnyOrder(100L, 200L);
     }
 
     @Test

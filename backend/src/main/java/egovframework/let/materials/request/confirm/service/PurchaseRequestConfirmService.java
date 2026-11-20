@@ -23,8 +23,13 @@ public interface PurchaseRequestConfirmService {
     List<PurchaseRequestConfirmCandidateVO> listCandidates(Long tenantId, String keyword, LocalDate fromDt, LocalDate toDt)
             throws Exception;
 
-    List<PurchaseRequestConfirmDetailVO> loadRequestDetails(Long tenantId, List<Long> purchaseRequestDetailIds)
-            throws Exception;
+    /**
+     * 확정할 품목 행을 조회하고, 확정되지 않은 행에는 품목의 기본 거래처와 그 거래처의 기준일 단가·발주구분을 채운다.
+     *
+     * @param baseDt 단가 기준일(null이면 서버 오늘)
+     */
+    List<PurchaseRequestConfirmDetailVO> loadRequestDetails(Long tenantId, List<Long> purchaseRequestDetailIds,
+            LocalDate baseDt) throws Exception;
 
     List<PurchaseConfirmListItemVO> listConfirms(Long tenantId, String keyword, String status, LocalDate fromDt,
             LocalDate toDt) throws Exception;

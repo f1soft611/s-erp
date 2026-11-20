@@ -18,11 +18,11 @@ import {
   type ItemPartnerPricePickerKind,
 } from './itemPartnerPriceGridModel';
 
-/** 거래처 선택 창의 "거래처 없음" 항목. 선택하면 품목 기본단가(거래처 공통)가 된다. */
+/** 거래처 선택 창의 "거래처 없음" 항목. 선택하면 품목 공통단가(거래처 공통)가 된다. */
 const DEFAULT_CUSTOMER_OPTION: MasterPickerOption = {
   id: 0,
   code: '',
-  name: '기본단가(거래처 공통)',
+  name: '공통단가(거래처 공통)',
 };
 
 async function searchCustomersWithDefault(keyword: string): Promise<MasterPickerOption[]> {
@@ -117,7 +117,7 @@ export function ItemPartnerPriceGrid({
         key={gridKey}
         ref={gridRef}
         ariaLabel="품목·거래처별 단가 목록"
-        storageKey={fixedCustomer ? 'co-master-item-price-by-customer-v1' : canCreate || canUpdate ? 'co-master-item-partner-price-grid-v2' : 'co-master-item-price-history-v1'}
+        storageKey={fixedCustomer ? 'co-master-item-price-by-customer-v2' : canCreate || canUpdate ? 'co-master-item-partner-price-grid-v3' : 'co-master-item-price-history-v2'}
         rows={rows}
         columns={columns}
         highlightKeyword={highlightKeyword}

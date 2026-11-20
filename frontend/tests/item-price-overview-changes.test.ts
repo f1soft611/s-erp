@@ -51,6 +51,45 @@ describe('item price overview model', () => {
     expect(() => normalizeItemPriceOverviewRow({ rowId: '' })).toThrow();
   });
 
+  it('normalizes order type, default supplier flag and the parent default supplier name', () => {
+    const row = child();
+    expect(row).toMatchObject({ purchaseOrderType: '', purchaseDefaultSupplier: false, salesDefaultSupplier: false });
+    const withDefault = normalizeItemPriceOverviewRow({
+      rowId: 'cust-1-301', parentId: 'item-1', materialId: 1, materialCode: 'A', materialName: '품목A',
+      customerId: 301, customerCode: 'C1', customerName: '거래처1', sales: null,
+      purchase: side({ priceId: 12, orderType: 'DOMESTIC', orderTypeName: '내수', defaultSupplier: true }),
+    });
+    expect(withDefault).toMatchObject({
+      purchaseOrderType: 'DOMESTIC', purchaseOrderTypeName: '내수', purchaseDefaultSupplier: true,
+    });
+    const parentRow = parent({ defaultSupplierId: 301, defaultSupplierName: '거래처1' });
+    expect(parentRow).toMatchObject({ defaultSupplierId: 301, defaultSupplierName: '거래처1' });
+  });
+
+  it('sends a flag-only change with unchanged values so the server keeps the price row', () => {
+    const source = child();
+    const edited = { ...source, purchaseDefaultSupplier: true };
+    const batch = buildItemPriceBatch(changes({ updatedRows: [edited] }), [source], today, ids);
+    expect(batch.prices.insertedRows).toEqual([]);
+    expect(batch.prices.updatedRows).toEqual([expect.objectContaining({
+      priceId: '12', customerId: 301, tradeType: '매입', unitPrice: 900, startDt: '2026-11-01',
+      defaultSupplier: true, orderType: '',
+    })]);
+    const cleared = buildItemPriceBatch(changes({ updatedRows: [{ ...edited, purchaseDefaultSupplier: false }] }),
+      [{ ...source, purchaseDefaultSupplier: true }], today, ids);
+    expect(cleared.prices.updatedRows[0]).toMatchObject({ defaultSupplier: false });
+  });
+
+  it('sends the order type with value changes and never flags common-price or sales rows', () => {
+    const source = parent();
+    const edited = { ...source, purchaseOrderType: 'DOMESTIC', salesUnitPrice: 1500 };
+    const batch = buildItemPriceBatch(changes({ updatedRows: [edited] }), [source], today, ids);
+    expect(batch.prices.updatedRows[0]).toMatchObject({ tradeType: '매입', orderType: 'DOMESTIC' });
+    expect(batch.prices.updatedRows[0]).not.toHaveProperty('defaultSupplier');
+    expect(batch.prices.insertedRows[0]).toMatchObject({ tradeType: '매출', orderType: '' });
+    expect(batch.prices.insertedRows[0]).not.toHaveProperty('defaultSupplier');
+  });
+
   it('inserts a new default price when the side had none', () => {
     const source = parent();
     const edited = { ...source, salesUnitPrice: 1500, salesStartDt: today };
