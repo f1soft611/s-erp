@@ -23,8 +23,11 @@ import egovframework.com.cmm.ResponseCode;
 import egovframework.com.cmm.service.ResultVO;
 import egovframework.com.cmm.util.EgovAccessControlHelper;
 import egovframework.com.cmm.util.ResultVoHelper;
+import egovframework.let.hr.employee.domain.model.EmployeeBatchSaveRequestVO;
+import egovframework.let.hr.employee.domain.model.EmployeeBatchSaveResultVO;
 import egovframework.let.hr.employee.domain.model.EmployeeSaveRequestVO;
 import egovframework.let.hr.employee.domain.model.EmployeeVO;
+import egovframework.let.hr.employee.service.EmployeeBatchService;
 import egovframework.let.hr.employee.service.EmployeeService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,6 +42,7 @@ public class EmployeeApiController {
 
     private final ResultVoHelper resultVoHelper;
     private final EmployeeService employeeService;
+    private final EmployeeBatchService employeeBatchService;
 
     @GetMapping
     public ResultVO listEmployees(
@@ -79,6 +83,18 @@ public class EmployeeApiController {
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAdmin(user);
         return itemResult(employeeService.getEmployee(user.getTenantId(), userId));
+    }
+
+    /** 공통 행 폼의 일괄 저장. 한 트랜잭션이라 하나라도 실패하면 전체가 취소된다. */
+    @PostMapping("/save-batch")
+    public ResponseEntity<ResultVO> saveBatch(
+            @RequestBody EmployeeBatchSaveRequestVO payload,
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
+        requireAdmin(user);
+        EmployeeBatchSaveResultVO result = employeeBatchService.saveBatch(user.getTenantId(), resolveUserId(user), payload);
+        Map<String, Object> resultMap = new HashMap<>();
+        resultMap.put("item", result);
+        return ResponseEntity.ok(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
     }
 
     @PostMapping

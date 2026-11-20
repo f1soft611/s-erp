@@ -3,6 +3,7 @@ package egovframework.let.hr.employee.service.impl;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -20,9 +21,11 @@ import org.springframework.web.server.ResponseStatusException;
 
 import egovframework.let.common.idsequence.service.IdSequenceService;
 import egovframework.let.hr.common.ResidentNumberCipher;
+import egovframework.let.hr.employee.domain.model.EmployeePickerVO;
 import egovframework.let.hr.employee.domain.model.EmployeeSaveRequestVO;
 import egovframework.let.hr.employee.domain.model.EmployeeVO;
 import egovframework.let.hr.employee.domain.repository.EmployeeDAO;
+import egovframework.let.hr.order.service.HrOrderHistoryRecorder;
 import egovframework.let.hr.employee.service.EmployeeService;
 import egovframework.let.utl.sim.service.EgovFileScrty;
 
@@ -34,6 +37,7 @@ public class EmployeeServiceImpl extends EgovAbstractServiceImpl implements Empl
     private static final int MAX_AUTO_NUMBER_ATTEMPTS = 1000;
     private static final int MAX_PHOTO_LENGTH = 700 * 1024;
     private static final int MIN_PASSWORD_LENGTH = 8;
+    private static final int MAX_PICKER_KEYWORD = 100;
 
     private static final Pattern EMPLOYEE_NO = Pattern.compile("^[A-Za-z0-9]{1,20}$");
     private static final Pattern LOGIN_CODE = Pattern.compile("^[A-Za-z0-9._-]{4,30}$");
@@ -43,14 +47,17 @@ public class EmployeeServiceImpl extends EgovAbstractServiceImpl implements Empl
     private final EmployeeDAO employeeDAO;
     private final IdSequenceService idSequenceService;
     private final ResidentNumberCipher residentNumberCipher;
+    private final HrOrderHistoryRecorder historyRecorder;
 
     public EmployeeServiceImpl(
             EmployeeDAO employeeDAO,
             IdSequenceService idSequenceService,
-            ResidentNumberCipher residentNumberCipher) {
+            ResidentNumberCipher residentNumberCipher,
+            HrOrderHistoryRecorder historyRecorder) {
         this.employeeDAO = employeeDAO;
         this.idSequenceService = idSequenceService;
         this.residentNumberCipher = residentNumberCipher;
+        this.historyRecorder = historyRecorder;
     }
 
     // ---- 조회 ----
@@ -79,6 +86,25 @@ public class EmployeeServiceImpl extends EgovAbstractServiceImpl implements Empl
     public EmployeeVO getEmployee(Long tenantId, Long userId) throws Exception {
         validateTenantId(tenantId);
         return findOrThrow(tenantId, userId);
+    }
+
+    @Override
+    public List<EmployeePickerVO> listPickerEmployees(Long tenantId, Long departmentId, String keyword) throws Exception {
+        validateTenantId(tenantId);
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        if (departmentId != null) {
+            params.put("departmentId", departmentId);
+        }
+        if (StringUtils.hasText(keyword)) {
+            String trimmed = keyword.trim();
+            if (trimmed.length() > MAX_PICKER_KEYWORD) {
+                throw new IllegalArgumentException("검색어는 100자 이하여야 합니다.");
+            }
+            params.put("keyword", trimmed);
+        }
+        List<EmployeePickerVO> rows = employeeDAO.selectPickerEmployees(params);
+        return rows == null ? Collections.<EmployeePickerVO>emptyList() : rows;
     }
 
     @Override
@@ -143,7 +169,10 @@ public class EmployeeServiceImpl extends EgovAbstractServiceImpl implements Empl
         if (userId == null) {
             throw new IllegalStateException("사원 등록 결과를 확인할 수 없습니다.");
         }
-        return findOrThrow(tenantId, userId);
+        EmployeeVO created = findOrThrow(tenantId, userId);
+        // 신규 등록은 입사 이력(입사일·부서·직위)을 같은 트랜잭션에서 남긴다.
+        historyRecorder.recordJoin(tenantId, currentUserId, created);
+        return created;
     }
 
     // ---- 수정 ----
@@ -152,6 +181,13 @@ public class EmployeeServiceImpl extends EgovAbstractServiceImpl implements Empl
     @Transactional(rollbackFor = Exception.class)
     public EmployeeVO updateEmployee(Long tenantId, Long currentUserId, Long userId, EmployeeSaveRequestVO payload)
             throws Exception {
+        return updateEmployee(tenantId, currentUserId, userId, payload, true);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public EmployeeVO updateEmployee(Long tenantId, Long currentUserId, Long userId, EmployeeSaveRequestVO payload,
+            boolean recordHistory) throws Exception {
         validateTenantId(tenantId);
         if (userId == null) {
             throw new IllegalArgumentException("사원 ID가 필요합니다.");
@@ -213,7 +249,12 @@ public class EmployeeServiceImpl extends EgovAbstractServiceImpl implements Empl
             image.put("profileImage", params.get("photoImage"));
             employeeDAO.updateLoginProfileImage(image);
         }
-        return findOrThrow(tenantId, userId);
+        EmployeeVO saved = findOrThrow(tenantId, userId);
+        if (recordHistory) {
+            // 사원관리 직접 수정: 부서·직위 등 추적 항목이 실제로 바뀐 경우에만 이력을 남긴다.
+            historyRecorder.recordDirectEdit(tenantId, currentUserId, existing, saved);
+        }
+        return saved;
     }
 
     // ---- 검증과 파라미터 구성 ----
@@ -233,7 +274,8 @@ public class EmployeeServiceImpl extends EgovAbstractServiceImpl implements Empl
         }
 
         String positionCode = requireCode(tenantId, "POSITION", "직위", payload.getPositionCode());
-        String employmentTypeCode = requireCode(tenantId, "EMPLOYMENT_TYPE", "근무형태", payload.getEmploymentTypeCode());
+        // 근무형태는 필수가 아니다(비우면 null로 저장). 값이 있으면 공통코드에 있어야 한다.
+        String employmentTypeCode = optionalCode(tenantId, "EMPLOYMENT_TYPE", "근무형태", payload.getEmploymentTypeCode());
         String genderCode = optionalCode(tenantId, "GENDER", "성별", payload.getGenderCode());
         String nativeTypeCode = optionalCode(tenantId, "NATIVE_TYPE", "내/외국인", payload.getNativeTypeCode());
         String nationalityCode = optionalCode(tenantId, "COUNTRY", "국적", payload.getNationalityCode());

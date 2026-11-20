@@ -6,6 +6,7 @@ import java.util.Map;
 import org.egovframe.rte.psl.dataaccess.EgovAbstractMapper;
 import org.springframework.stereotype.Repository;
 
+import egovframework.let.hr.employee.domain.model.EmployeePickerVO;
 import egovframework.let.hr.employee.domain.model.EmployeeVO;
 
 @Repository("employeeDAO")
@@ -17,6 +18,11 @@ public class EmployeeDAO extends EgovAbstractMapper {
 
     public EmployeeVO selectEmployeeById(Map<String, Object> params) throws Exception {
         return selectOne("EmployeeDAO.selectEmployeeById", params);
+    }
+
+    /** 사원 선택 도움창용 목록(선택에 필요한 항목만). */
+    public List<EmployeePickerVO> selectPickerEmployees(Map<String, Object> params) throws Exception {
+        return selectList("EmployeeDAO.selectPickerEmployees", params);
     }
 
     /** 같은 사번을 쓰는 사원 수(excludeUserId는 제외). */
