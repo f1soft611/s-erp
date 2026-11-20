@@ -3,10 +3,15 @@ package egovframework.let.sales.shipment.statement.service.impl;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -39,26 +44,40 @@ public class SalesStatementServiceImpl {
         if (dao.lockDelivery(params) == null) {
             throw notFound("출하를 찾을 수 없습니다.");
         }
-        if (dao.existsActive(params)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 거래명세서가 등록된 출하입니다.");
+        List<Long> detailIds = dao.selectAvailableDetailIdsByDelivery(params);
+        if (detailIds == null || detailIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "발행 가능한 출하 상세가 없습니다.");
         }
-        String scope = date.format(DateTimeFormatter.BASIC_ISO_DATE);
-        Long number = sequence.nextValue("SALES_STATEMENT_NO", String.valueOf(tenantId), scope);
-        if (number == null || number < 1) {
-            throw new IllegalStateException("거래명세서 번호 생성에 실패했습니다.");
+        List<Map<String, Object>> created = createGrouped(tenantId, userId, detailIds, date, note, true);
+        return created.get(0);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> create(Long tenantId, String userId, Long salesDeliveryId,
+            List<Long> salesDeliveryDetailIds, String statementDt, String remark) throws Exception {
+        validatePrincipal(tenantId, userId);
+        LocalDate date = parseDate(statementDt);
+        String note = validateRemark(remark);
+        List<Long> detailIds = salesDeliveryDetailIds;
+        if (detailIds == null || detailIds.isEmpty()) {
+            validateId(salesDeliveryId);
+            Map<String, Object> params = params(tenantId, userId);
+            params.put("salesDeliveryId", salesDeliveryId);
+            if (dao.lockDelivery(params) == null) {
+                throw notFound("출하를 찾을 수 없습니다.");
+            }
+            detailIds = dao.selectAvailableDetailIdsByDelivery(params);
         }
-        params.put("statementNo", String.format(Locale.ROOT, "TS-%s-%04d", scope, number));
-        params.put("statementDt", date);
-        params.put("remark", note);
-        Long id = dao.insertHeader(params);
-        if (id == null || id < 1) {
-            throw new IllegalStateException("거래명세서 저장에 실패했습니다.");
-        }
-        params.put("salesStatementId", id);
-        if (dao.insertDetails(params) < 1) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "출하 상세가 없습니다.");
-        }
-        return get(tenantId, userId, id);
+        List<Map<String, Object>> created = createGrouped(tenantId, userId, detailIds, date, note, true);
+        return created.get(0);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public List<Map<String, Object>> createBatch(Long tenantId, String userId, List<Long> salesDeliveryDetailIds,
+            String statementDt) throws Exception {
+        validatePrincipal(tenantId, userId);
+        LocalDate date = parseDate(statementDt);
+        return createGrouped(tenantId, userId, salesDeliveryDetailIds, date, "", false);
     }
 
     public Map<String, Object> get(Long tenantId, String userId, Long id) throws Exception {
@@ -76,7 +95,24 @@ public class SalesStatementServiceImpl {
         validatePrincipal(tenantId, userId);
         Map<String, Object> params = params(tenantId, userId);
         params.put("keyword", keyword == null ? "" : keyword.trim());
-        return dao.selectSources(params);
+        List<Map<String, Object>> sources = dao.selectSources(params);
+        for (Map<String, Object> source : sources) {
+            Object value = source.get("salesDeliveryDetailIds");
+            if (!(value instanceof String)) {
+                throw new IllegalStateException("출하 상세 목록 응답을 확인해 주세요.");
+            }
+            List<Long> detailIds = new ArrayList<Long>();
+            String[] values = ((String) value).split(",");
+            try {
+                for (String detailId : values) {
+                    detailIds.add(Long.valueOf(detailId));
+                }
+            } catch (NumberFormatException ex) {
+                throw new IllegalStateException("출하 상세 목록 응답을 확인해 주세요.", ex);
+            }
+            source.put("salesDeliveryDetailIds", detailIds);
+        }
+        return sources;
     }
 
     public List<Map<String, Object>> status(Long tenantId, String userId, String from, String to, String keyword)
@@ -114,6 +150,7 @@ public class SalesStatementServiceImpl {
         Map<String, Object> params = params(tenantId, userId);
         params.put("salesStatementId", id);
         if (dao.deleteHeader(params) != 1) throw notFound("거래명세서를 찾을 수 없습니다.");
+        dao.clearSourceDetailLinks(params);
     }
 
     private Map<String, Object> params(Long tenantId, String userId) {
@@ -121,6 +158,87 @@ public class SalesStatementServiceImpl {
         result.put("tenantId", tenantId);
         result.put("userId", userId);
         return result;
+    }
+
+    private List<Map<String, Object>> createGrouped(Long tenantId, String userId,
+            List<Long> salesDeliveryDetailIds, LocalDate date, String remark, boolean singleCustomer)
+            throws Exception {
+        if (salesDeliveryDetailIds == null || salesDeliveryDetailIds.isEmpty()
+                || salesDeliveryDetailIds.size() > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "발행할 출하 상세를 확인해 주세요.");
+        }
+        Set<Long> uniqueIds = new TreeSet<Long>();
+        for (Long detailId : salesDeliveryDetailIds) {
+            validateId(detailId);
+            uniqueIds.add(detailId);
+        }
+
+        Map<String, Object> lockParams = params(tenantId, userId);
+        lockParams.put("salesDeliveryDetailIds", new ArrayList<Long>(uniqueIds));
+        List<Map<String, Object>> targets = dao.lockDeliveryDetails(lockParams);
+        if (targets == null || targets.size() != uniqueIds.size()) {
+            throw notFound("출하 상세를 찾을 수 없습니다.");
+        }
+
+        Map<Long, List<Map<String, Object>>> groups =
+                new LinkedHashMap<Long, List<Map<String, Object>>>();
+        for (Map<String, Object> target : targets) {
+            if (target.get("revenueClosedAt") != null) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "마감된 출하 상세는 발행할 수 없습니다.");
+            }
+            if (Boolean.TRUE.equals(target.get("hasActiveStatement"))) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 발행된 출하 상세가 포함되어 있습니다.");
+            }
+            Long customerId = numberValue(target.get("customerId"));
+            numberValue(target.get("salesDeliveryId"));
+            List<Map<String, Object>> group = groups.get(customerId);
+            if (group == null) {
+                group = new ArrayList<Map<String, Object>>();
+                groups.put(customerId, group);
+            }
+            group.add(target);
+        }
+        if (singleCustomer && groups.size() != 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "거래처가 같은 출하 상세만 선택할 수 있습니다.");
+        }
+
+        List<Map<String, Object>> created = new ArrayList<Map<String, Object>>();
+        String scope = date.format(DateTimeFormatter.BASIC_ISO_DATE);
+        for (Map.Entry<Long, List<Map<String, Object>>> entry : groups.entrySet()) {
+            List<Map<String, Object>> group = entry.getValue();
+            List<Long> groupIds = new ArrayList<Long>();
+            for (Map<String, Object> target : group) {
+                groupIds.add(numberValue(target.get("salesDeliveryDetailId")));
+            }
+            Long number = sequence.nextValue("SALES_STATEMENT_NO", String.valueOf(tenantId), scope);
+            if (number == null || number < 1) {
+                throw new IllegalStateException("거래명세서 번호 생성에 실패했습니다.");
+            }
+            Map<String, Object> params = params(tenantId, userId);
+            params.put("salesDeliveryId", numberValue(group.get(0).get("salesDeliveryId")));
+            params.put("customerId", entry.getKey());
+            params.put("salesDeliveryDetailIds", groupIds);
+            params.put("statementNo", String.format(Locale.ROOT, "TS-%s-%04d", scope, number));
+            params.put("statementDt", date);
+            params.put("remark", remark);
+            Long id = dao.insertHeader(params);
+            if (id == null || id < 1) {
+                throw new IllegalStateException("거래명세서 저장에 실패했습니다.");
+            }
+            params.put("salesStatementId", id);
+            if (dao.insertDetails(params) != groupIds.size()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "선택한 출하 상세를 저장하지 못했습니다.");
+            }
+            created.add(get(tenantId, userId, id));
+        }
+        return created;
+    }
+
+    private Long numberValue(Object value) {
+        if (!(value instanceof Number)) {
+            throw new IllegalStateException("출하 상세 응답을 확인해 주세요.");
+        }
+        return Long.valueOf(((Number) value).longValue());
     }
 
     private void validatePrincipal(Long tenantId, String userId) {

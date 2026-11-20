@@ -21,7 +21,15 @@ export async function getStatement(id: number): Promise<StatementItem> {
 }
 
 export async function createStatement(payload: StatementPayload): Promise<StatementItem> {
-  return item(await apiPost<{ item?: StatementItem }>(PATH, payload));
+  const salesDeliveryDetailIds = [...new Set(payload.salesDeliveryDetailIds)];
+  if (salesDeliveryDetailIds.length === 0
+    || salesDeliveryDetailIds.some((id) => !Number.isSafeInteger(id) || id < 1)) {
+    throw new Error('거래명세서 상세를 선택해 주세요.');
+  }
+  return item(await apiPost<{ item?: StatementItem }>(PATH, {
+    ...payload,
+    salesDeliveryDetailIds,
+  }));
 }
 
 export async function updateStatement(id: number, payload: Pick<StatementPayload, 'statementDt' | 'remark'>): Promise<StatementItem> {

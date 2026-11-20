@@ -21,8 +21,11 @@ vi.mock('../src/pages/sales/shipment/delivery/create/services/salesDelivery.serv
   ...await original<object>(), getDelivery: vi.fn(),
 }));
 const source = { salesDeliveryId: 1, deliveryNo: 'SD-1', deliveryDt: '2026-11-09',
-  deliveryType: 'DIRECT' as const, customerName: '거래처', totalAmt: 220 };
-const detail = { salesStatementDetailId: 2, lineNo: 1, materialCode: 'M1', materialName: '품목',
+  deliveryType: 'DIRECT' as const, customerId: 5, customerName: '거래처', totalAmt: 220,
+  salesDeliveryDetailIds: [2] };
+const secondSource = { ...source, salesDeliveryId: 4, deliveryNo: 'SD-2', deliveryDt: '2026-11-10',
+  salesDeliveryDetailIds: [3] };
+const detail = { salesStatementDetailId: 2, salesDeliveryDetailId: 2, lineNo: 1, materialCode: 'M1', materialName: '품목',
   materialSpec: '규격', unit: 'EA', deliveryQty: 2, unitPrice: 100, supplyAmt: 200, vatAmt: 20, totalAmt: 220 };
 const item = { ...source, salesStatementId: 3, statementNo: 'TS-1', statementDt: '2026-11-09',
   orderNo: null, supplierName: '공급자', supplierPostCode: '12345', supplierFacsimileNo: '02-555-0101',
@@ -177,12 +180,22 @@ it('disables the statement date and calendar in view mode', async () => {
   expect(screen.getByLabelText(/명세일/, { selector: 'input' })).toBeDisabled();
   expect(screen.getByRole('button', { name: '명세일 달력 열기' })).toBeDisabled();
 });
-it('selects one shipment and saves its server snapshot', async () => {
-  vi.mocked(getDelivery).mockResolvedValue({
-    ...source, salesDeliveryId: 1, customerId: 5, customerCode: 'C1', salesOrderId: null,
-    orderNo: null, deliveryPlace: '', deliveryMethod: '', remark: '',
-    details: [{ ...detail, salesDeliveryDetailId: 2, materialId: 4, salesOrderDetailId: null, salesDeliveryPlanDetailId: null }],
-  });
+it('groups selected detail lines from multiple same-customer deliveries into one statement', async () => {
+  vi.mocked(searchStatementSources).mockResolvedValue([source, secondSource]);
+  vi.mocked(getDelivery)
+    .mockResolvedValueOnce({
+      ...source, customerCode: 'C1', salesOrderId: null, orderNo: null, deliveryPlace: '', deliveryMethod: '', remark: '',
+      details: [
+        { ...detail, salesDeliveryDetailId: 2, materialId: 4, salesOrderDetailId: null, salesDeliveryPlanDetailId: null },
+        { ...detail, salesStatementDetailId: 99, salesDeliveryDetailId: 99, lineNo: 2, materialCode: 'ISSUED',
+          materialId: 9, salesOrderDetailId: null, salesDeliveryPlanDetailId: null },
+      ],
+    })
+    .mockResolvedValueOnce({
+      ...secondSource, customerCode: 'C1', salesOrderId: null, orderNo: null, deliveryPlace: '', deliveryMethod: '', remark: '',
+      details: [{ ...detail, salesStatementDetailId: 3, salesDeliveryDetailId: 3, lineNo: 1, materialCode: 'M2',
+        materialId: 5, salesOrderDetailId: null, salesDeliveryPlanDetailId: null }],
+    });
   vi.mocked(createStatement).mockResolvedValue(item);
   mount(<SalesStatementCreatePage {...props} />);
   expect(screen.getByRole('region', { name: '거래명세서 입력 내용' })).toHaveStyle({
@@ -192,12 +205,56 @@ it('selects one shipment and saves its server snapshot', async () => {
   fireEvent.click(screen.getByRole('button', { name: '출하 선택' }));
   const picker = screen.getByRole('dialog', { name: '출하 선택' });
   fireEvent.click(within(picker).getByRole('button', { name: '검색' }));
-  fireEvent.click(await within(picker).findByRole('button', { name: 'SD-1' }));
-  await screen.findByDisplayValue('SD-1');
+  await within(picker).findByText('SD-1');
+  fireEvent.click(within(picker).getByLabelText('1 행 선택'));
+  fireEvent.click(within(picker).getByLabelText('4 행 선택'));
+  fireEvent.click(within(picker).getByRole('button', { name: '선택 완료' }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '출하 선택' })).not.toBeInTheDocument());
+  await screen.findByDisplayValue(/SD-1.*SD-2/);
+  const grid = screen.getByRole('grid', { name: '거래명세서 상세 목록' });
+  expect(within(grid).queryByText('ISSUED')).not.toBeInTheDocument();
+  fireEvent.click(await screen.findByLabelText('2 행 선택'));
+  fireEvent.click(await screen.findByLabelText('3 행 선택'));
   fireEvent.click(await screen.findByRole('button', { name: '저장', exact: true }));
   await screen.findByDisplayValue('TS-1');
-  expect(createStatement).toHaveBeenCalledWith(expect.objectContaining({ salesDeliveryId: 1 }));
-  expect(screen.getByRole('grid', { name: '거래명세서 상세 목록' })).toHaveTextContent('규격');
+  expect(createStatement).toHaveBeenCalledWith(expect.objectContaining({
+    salesDeliveryDetailIds: [2, 3],
+  }));
+  expect(grid).toHaveTextContent('규격');
+});
+it('prevents grouping deliveries from different customers', async () => {
+  vi.mocked(searchStatementSources).mockResolvedValue([
+    source, { ...secondSource, customerId: 7, customerName: '다른 거래처' },
+  ]);
+  mount(<SalesStatementCreatePage {...props} />);
+  fireEvent.click(screen.getByRole('button', { name: '출하 선택' }));
+  const picker = screen.getByRole('dialog', { name: '출하 선택' });
+  fireEvent.click(within(picker).getByRole('button', { name: '검색' }));
+  await within(picker).findByText('SD-1');
+  fireEvent.click(within(picker).getByLabelText('1 행 선택'));
+
+  expect(within(picker).getByLabelText('4 행 선택').querySelector('input')).toBeDisabled();
+});
+it('requires at least one selected detail before creating a statement', async () => {
+  vi.mocked(getDelivery).mockResolvedValue({
+    ...source, customerId: 5, customerCode: 'C1', salesOrderId: null,
+    orderNo: null, deliveryPlace: '', deliveryMethod: '', remark: '',
+    details: [{ ...detail, salesDeliveryDetailId: 2, materialId: 4,
+      salesOrderDetailId: null, salesDeliveryPlanDetailId: null }],
+  });
+  mount(<SalesStatementCreatePage {...props} />);
+  fireEvent.click(screen.getByRole('button', { name: '출하 선택' }));
+  const picker = screen.getByRole('dialog', { name: '출하 선택' });
+  fireEvent.click(within(picker).getByRole('button', { name: '검색' }));
+  await within(picker).findByText('SD-1');
+  fireEvent.click(within(picker).getByLabelText('1 행 선택'));
+  fireEvent.click(within(picker).getByRole('button', { name: '선택 완료' }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '출하 선택' })).not.toBeInTheDocument());
+  await screen.findByDisplayValue('SD-1');
+  fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+
+  expect(await screen.findByText('거래명세서 상세를 선택해 주세요.')).toBeInTheDocument();
+  expect(createStatement).not.toHaveBeenCalled();
 });
 it('opens the same registration form from status detail and prints its stored snapshot', async () => {
   vi.mocked(getStatementStatus).mockResolvedValue([{ ...detail, salesStatementId: 3, statementNo: 'TS-1',

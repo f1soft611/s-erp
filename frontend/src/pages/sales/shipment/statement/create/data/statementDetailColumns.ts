@@ -3,6 +3,7 @@ import type { StatementDetail } from '../../types/salesStatement.types';
 
 export const statementDetailColumns: F1GridColumn<StatementDetail>[] = [
   { field: 'lineNo', headerName: 'No', type: 'rownumber', width: 56, align: 'center' },
+  { field: 'sourceDeliveryNo', headerName: '출하번호', width: 135, align: 'center' },
   { field: 'materialCode', headerName: '품목코드', width: 120, align: 'center' },
   { field: 'materialName', headerName: '품목명', width: 180, align: 'center' },
   { field: 'materialSpec', headerName: '품목규격', width: 150, align: 'center' },

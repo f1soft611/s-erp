@@ -130,6 +130,8 @@ export type PageSearchAreaProps = {
   onDetailClose?: () => void;
   onDetailOpenChange?: (open: boolean) => void;
   detailLoading?: boolean;
+  detailExtraContent?: ReactNode;
+  detailExtraActiveFilterCount?: number;
 };
 
 function getFieldValue(
@@ -207,6 +209,8 @@ export function PageSearchArea({
   onDetailClose,
   onDetailOpenChange,
   detailLoading = false,
+  detailExtraContent,
+  detailExtraActiveFilterCount = 0,
 }: PageSearchAreaProps) {
   const [detailOpen, setDetailOpen] = useState(false);
   const [draftValues, setDraftValues] = useState(() =>
@@ -606,6 +610,11 @@ export function PageSearchArea({
       displayValue: field.type === 'month' ? formatMonthValue(displayValue) : (option?.label ?? displayValue),
     }];
   });
+  const activeDetailFilterCount =
+    activeDetailFilters.length +
+    (Number.isFinite(detailExtraActiveFilterCount)
+      ? Math.max(0, Math.trunc(detailExtraActiveFilterCount))
+      : 0);
   const visibleDetailFilters = activeDetailFilters.filter(
     ({ field }) => !pendingRemovalFields[field.field],
   );
@@ -816,9 +825,9 @@ export function PageSearchArea({
         )}
         {detailFields.length > 0 && (
           <Badge
-            badgeContent={activeDetailFilters.length}
+            badgeContent={activeDetailFilterCount}
             color="primary"
-            invisible={activeDetailFilters.length === 0}
+            invisible={activeDetailFilterCount === 0}
             sx={{ flex: '0 0 auto', ml: 'auto' }}
           >
             <IconButton
@@ -826,12 +835,12 @@ export function PageSearchArea({
               size="small"
               aria-label={detailOpen ? '상세 검색 닫기' : '상세 검색 열기'}
               aria-description={
-                activeDetailFilters.length
-                  ? `적용된 상세 검색 조건 ${activeDetailFilters.length}개`
+                activeDetailFilterCount
+                  ? `적용된 상세 검색 조건 ${activeDetailFilterCount}개`
                   : undefined
               }
               aria-expanded={detailOpen}
-              data-active={activeDetailFilters.length > 0}
+              data-active={activeDetailFilterCount > 0}
               onClick={() => {
                 quickDateRequestsRef.current.clear();
                 const nextOpen = !detailOpen;
@@ -840,10 +849,10 @@ export function PageSearchArea({
               }}
               sx={{
                 flex: '0 0 auto',
-                color: activeDetailFilters.length ? 'primary.main' : 'text.secondary',
+                color: activeDetailFilterCount ? 'primary.main' : 'text.secondary',
                 border: '1px solid',
-                borderColor: activeDetailFilters.length ? 'primary.main' : 'divider',
-                bgcolor: activeDetailFilters.length ? 'action.selected' : 'background.paper',
+                borderColor: activeDetailFilterCount ? 'primary.main' : 'divider',
+                bgcolor: activeDetailFilterCount ? 'action.selected' : 'background.paper',
                 '&:hover': { bgcolor: 'action.hover' },
               }}
             >
@@ -907,6 +916,9 @@ export function PageSearchArea({
               ) : (
                 renderSearchField(block.field)
               ),
+            )}
+            {detailExtraContent != null && (
+              <Box sx={{ minWidth: 0 }}>{detailExtraContent}</Box>
             )}
           </Box>
           <Divider
