@@ -160,6 +160,41 @@ class SalesDeliveryMapperTest {
         }
     }
 
+    @Test
+    void sourceOrderSearchFiltersAreAppliedBeforeLimit() throws Exception {
+        Configuration configuration = parse();
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("tenantId", 71L);
+        params.put("limit", 200);
+        params.put("keyword", "SO");
+        params.put("orderDtFrom", "2026-11-01");
+        params.put("orderDtTo", "2026-11-30");
+        params.put("orderNo", "SO-7");
+        params.put("customerKeyword", "C10");
+        params.put("materialKeyword", "M20");
+        params.put("planNo", "DP-2");
+        params.put("planDtFrom", "2026-11-05");
+        params.put("planDtTo", "2026-11-20");
+        BoundSql bound = configuration.getMappedStatement("SalesDeliveryDAO.selectSourceOrders").getBoundSql(params);
+        String query = normalize(bound.getSql());
+
+        assertThat(query).contains(
+                "h.tenant_id = ?",
+                "h.order_dt BETWEEN CAST(? AS date) AND CAST(? AS date)",
+                "h.order_no ILIKE '%' || ? || '%'",
+                "c.customer_code ILIKE '%' || ? || '%' OR c.customer_name ILIKE '%' || ? || '%'",
+                "m.material_code ILIKE '%' || ? || '%' OR m.material_name ILIKE '%' || ? || '%'",
+                "ph.plan_no ILIKE '%' || ? || '%'",
+                "pd.plan_dt >= CAST(? AS date)",
+                "pd.plan_dt <= CAST(? AS date)",
+                "pd.planned_qty > pd.delivered_qty",
+                "LIMIT ?");
+        assertThat(bound.getParameterMappings())
+                .extracting(ParameterMapping::getProperty)
+                .contains("keyword", "orderDtFrom", "orderDtTo", "orderNo", "customerKeyword",
+                        "materialKeyword", "planNo", "planDtFrom", "planDtTo", "limit");
+    }
+
     private Configuration parse() throws Exception {
         Configuration configuration = new Configuration();
         try (InputStream input = Resources.getResourceAsStream(RESOURCE)) {

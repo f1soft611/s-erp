@@ -179,6 +179,7 @@ function F1GridInner<T extends object>(
     showCheckbox = true,
     selectionMode = 'cell',
     multiSelect = false,
+    isRowSelectable,
     createRow,
     createDuplicate,
     editorPlugins,
@@ -1669,6 +1670,8 @@ function F1GridInner<T extends object>(
   }
 
   function setSingleRowSelection(rowId: F1GridRowId, checked: boolean) {
+    const row = getGridRowById(data, rowId);
+    if (isRowSelectable && (!row || !isRowSelectable(row))) return;
     setRowSelection((current) =>
       setGridRowSelected(
         !multiSelect && checked ? createGridRowSelection() : current,
@@ -1677,6 +1680,26 @@ function F1GridInner<T extends object>(
       ),
     );
     setLastSelectedRowId(rowId);
+  }
+
+  function toggleAllRows() {
+    if (!multiSelect) return;
+    if (!isRowSelectable) {
+      setRowSelection(selectAllGridRows(!selectedAll));
+      return;
+    }
+
+    const nextSelected = !selectedAll;
+    const nextIds = new Set(selectedIds);
+    selectableRowIds.forEach((rowId) => {
+      if (nextSelected) nextIds.add(rowId);
+      else nextIds.delete(rowId);
+    });
+    setRowSelection({
+      allSelected: false,
+      includedIds: nextIds,
+      excludedIds: new Set(),
+    });
   }
 
   function startEdit(rowId: F1GridRowId, columnIndex: number) {
@@ -2843,8 +2866,14 @@ function F1GridInner<T extends object>(
     },
   }));
 
+  const selectableRowIds = isRowSelectable
+    ? visibleRows.filter(isRowSelectable).map((row) => getGridRowId(row, rowKey))
+    : visibleRowIds;
+  const selectedSelectableCount = selectableRowIds.filter((rowId) =>
+    isGridRowSelected(rowSelection, rowId),
+  ).length;
   const selectedAll =
-    visibleRows.length > 0 && selectedCount === visibleRows.length;
+    selectableRowIds.length > 0 && selectedSelectableCount === selectableRowIds.length;
   const showAddRootInContextMenu = allowAddRootInContextMenu ?? true;
   const showAddRowInContextMenu = allowAddRowInContextMenu ?? true;
   const rowInsertionDisabled =
@@ -3075,7 +3104,8 @@ function F1GridInner<T extends object>(
           rows={visibleRows}
           columnLine={columnLine}
           selectedAll={selectedAll}
-          selectedCount={selectedCount}
+          selectedCount={selectedSelectableCount}
+          hasSelectableRows={selectableRowIds.length > 0}
           columnWidths={columnWidths}
           columnTracks={columnTracks}
           resizableColumns={resizableColumns}
@@ -3084,9 +3114,7 @@ function F1GridInner<T extends object>(
           multiSelect={multiSelect}
           onResizeColumn={handleResizeColumn}
           getColumnCheckboxState={getColumnCheckboxState}
-          onToggleAllRows={() => {
-            if (multiSelect) setRowSelection(selectAllGridRows(!selectedAll));
-          }}
+          onToggleAllRows={toggleAllRows}
           onToggleColumnCheckbox={toggleColumnCheckbox}
           onToggleColumnVisibility={toggleColumnVisibility}
           sorts={sortState}
@@ -3160,6 +3188,7 @@ function F1GridInner<T extends object>(
             selectedIds={selectedIds}
             rowSelection={rowSelection}
             selectionMode={selectionMode}
+            isRowSelectable={isRowSelectable}
             focusedCell={focusedCell}
             editingCell={editingCell}
             selectedCellRange={cellSelection}

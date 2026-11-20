@@ -283,16 +283,16 @@ describe('document status page', () => {
     ]);
     expect(fields.map((field) => field.field)).toEqual([
       'submittedAt',
-      'documentStatus',
-      'documentType',
       'documentNo',
       'title',
       'drafterName',
       'drafterDepartmentName',
       'participantName',
+      'currentApprovalStep',
+      'documentStatus',
+      'documentType',
       'myParticipantType',
       'myActionStatus',
-      'currentApprovalStep',
     ]);
     expect(fields.find((field) => field.field === 'submittedAt')?.type).toBe(
       'date',
@@ -323,17 +323,17 @@ describe('document status page', () => {
     expect(
       fields.map((field) => [field.field, field.searchSpan]),
     ).toEqual([
-      ['submittedAt', 4],
-      ['documentStatus', 2],
-      ['documentType', 2],
+      ['submittedAt', 2],
       ['documentNo', 1],
-      ['title', 4],
+      ['title', 1],
       ['drafterName', 1],
       ['drafterDepartmentName', 1],
       ['participantName', 1],
+      ['currentApprovalStep', 1],
+      ['documentStatus', 1],
+      ['documentType', 1],
       ['myParticipantType', 1],
       ['myActionStatus', 1],
-      ['currentApprovalStep', 4],
     ]);
   });
 

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker } from 'react-router-dom';
 import { useCommonConfirmDialog } from '../../../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import { normalizeDateInput } from '../../../../../../shared/components/f1-grid/editing/dateInput';
 import { getSystemDate } from '../../../../../../shared/services/systemDateService';
+import type { F1GridRowId } from '../../../../../../shared/components/f1-grid';
 import { getDelivery } from '../../../delivery/create/services/salesDelivery.service';
 import { createStatement, deleteStatement, getStatement, updateStatement } from '../../services/salesStatement.service';
 import type { StatementDetail, StatementItem, StatementSource } from '../../types/salesStatement.types';
@@ -16,12 +17,13 @@ export function useSalesStatementCreate({
 }: SalesStatementCreateProps) {
   const [id, setId] = useState(statementId);
   const [item, setItem] = useState<StatementItem | null>(null);
-  const [source, setSource] = useState<StatementSource | null>(null);
+  const [sources, setSources] = useState<StatementSource[]>([]);
+  const [selectedRowIds, setSelectedRowIds] = useState<F1GridRowId[]>([]);
   const [rows, setRows] = useState<StatementDetail[]>([]);
   const [date, setDate] = useState('');
   const [dateError, setDateError] = useState('');
   const [remark, setRemark] = useState('');
-  const [baseline, setBaseline] = useState(() => JSON.stringify([null, '', '']));
+  const [baseline, setBaseline] = useState(() => JSON.stringify([[], '', '', []]));
   const [picker, setPicker] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [pending, setPending] = useState(false);
@@ -34,7 +36,25 @@ export function useSalesStatementCreate({
   const canDelete = canRead && mode !== 'view' && Boolean(id && permissions?.delete);
   const editable = canSave && !pending;
   const { confirm, dialog } = useCommonConfirmDialog();
-  const dirty = JSON.stringify([source?.salesDeliveryId ?? null, date, remark]) !== baseline;
+  const source = useMemo<StatementSource | null>(() => {
+    if (sources.length === 0) return null;
+    return {
+      ...sources[0],
+      deliveryNo: sources.map((value) => value.deliveryNo).join(', '),
+      deliveryDt: sources.map((value) => value.deliveryDt).join(', '),
+      totalAmt: sources.reduce((total, value) => total + Number(value.totalAmt), 0),
+    };
+  }, [sources]);
+  const selectedIds = useMemo(() => rows
+    .filter((row) => selectedRowIds.includes(row.salesStatementDetailId))
+    .map((row) => row.salesDeliveryDetailId)
+    .filter((detailId): detailId is number => detailId !== null), [rows, selectedRowIds]);
+  const dirty = JSON.stringify([
+    sources.map((value) => value.salesDeliveryId),
+    date,
+    remark,
+    selectedIds,
+  ]) !== baseline;
   useUnsavedChangesBeforeUnload(dirty);
   const blocker = useBlocker(!embedded && (dirty || pending));
   useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
@@ -48,7 +68,7 @@ export function useSalesStatementCreate({
         dateTouchedRef.current = true;
         setDate(today);
         setBaseline((current) => {
-          const values = JSON.parse(current) as [number | null, string, string];
+          const values = JSON.parse(current) as [number[], string, string, number[]];
           values[1] = today;
           return JSON.stringify(values);
         });
@@ -62,12 +82,24 @@ export function useSalesStatementCreate({
   }, [statementId]);
   const apply = useCallback((value: StatementItem) => {
     setItem(value); setId(value.salesStatementId);
-    setSource({ salesDeliveryId: value.salesDeliveryId, deliveryNo: value.deliveryNo, deliveryDt: value.deliveryDt,
-      deliveryType: value.deliveryType, customerName: value.customerName ?? '', totalAmt: value.totalAmt });
+    const detailIds = value.details
+      .map((detail) => detail.salesDeliveryDetailId)
+      .filter((detailId): detailId is number => detailId !== null);
+    setSources([{
+      salesDeliveryId: value.salesDeliveryId,
+      customerId: value.customerId,
+      deliveryNo: value.deliveryNo,
+      deliveryDt: value.deliveryDt,
+      deliveryType: value.deliveryType,
+      customerName: value.customerName ?? '',
+      totalAmt: value.totalAmt,
+      salesDeliveryDetailIds: detailIds,
+    }]);
+    setSelectedRowIds([]);
     setDate(value.statementDt); setRemark(value.remark ?? ''); setRows(value.details);
     dateTouchedRef.current = true;
     setDateError('');
-    setBaseline(JSON.stringify([value.salesDeliveryId, value.statementDt, value.remark ?? '']));
+    setBaseline(JSON.stringify([[value.salesDeliveryId], value.statementDt, value.remark ?? '', []]));
   }, []);
   useEffect(() => {
     if (!statementId || !canRead) return;
@@ -78,26 +110,40 @@ export function useSalesStatementCreate({
       .finally(() => { if (active) setPending(false); });
     return () => { active = false; };
   }, [statementId, canRead, apply]);
-  const choose = useCallback(async (value: StatementSource) => {
+  const choose = useCallback(async (values: StatementSource[]) => {
     setPicker(false); setPending(true); setError('');
     try {
-      const delivery = await getDelivery(value.salesDeliveryId);
-      setSource(value);
-      setRows(delivery.details.map((row) => ({ ...row, salesStatementDetailId: row.salesDeliveryDetailId, materialSpec: row.materialSpec ?? null })));
+      const detailsBySource = await Promise.all(values.map(async (value) => {
+        const delivery = await getDelivery(value.salesDeliveryId);
+        const availableIds = new Set(value.salesDeliveryDetailIds);
+        return delivery.details
+          .filter((row) => availableIds.has(row.salesDeliveryDetailId))
+          .map((row) => ({
+            ...row,
+            salesStatementDetailId: row.salesDeliveryDetailId,
+            materialSpec: row.materialSpec ?? null,
+            sourceDeliveryNo: value.deliveryNo,
+            sourceDeliveryDt: value.deliveryDt,
+          }));
+      }));
+      const nextRows = detailsBySource.flat().map((row, index) => ({ ...row, lineNo: index + 1 }));
+      setSources(values);
+      setRows(nextRows);
+      setSelectedRowIds([]);
     } catch (cause) { setError(cause instanceof Error ? cause.message : '출하 조회에 실패했습니다.'); }
     finally { setPending(false); }
   }, []);
   const reset = useCallback(async () => {
     setPending(true); setError(''); setNotice('');
     dateTouchedRef.current = false;
-    setId(undefined); setItem(null); setSource(null); setRows([]); setDate(''); setRemark('');
+    setId(undefined); setItem(null); setSources([]); setSelectedRowIds([]); setRows([]); setDate(''); setRemark('');
     setDateError('');
-    setBaseline(JSON.stringify([null, '', '']));
+    setBaseline(JSON.stringify([[], '', '', []]));
     try {
       const today = await getSystemDate();
       dateTouchedRef.current = true;
       setDate(today);
-      setBaseline(JSON.stringify([null, today, '']));
+      setBaseline(JSON.stringify([[], today, '', []]));
     } catch (cause) {
       setError(cause instanceof Error
         ? `서버 기준일을 불러오지 못했습니다. ${cause.message}`
@@ -122,14 +168,20 @@ export function useSalesStatementCreate({
     const statementDt = commitDate();
     if (!statementDt) return;
     if (!source) { setError('출하와 명세일을 입력해 주세요.'); return; }
+    if (!id && selectedIds.length === 0) { setError('거래명세서 상세를 선택해 주세요.'); return; }
     busy.current = true; setPending(true); setError(''); setNotice('');
     try {
       const value = id ? await updateStatement(id, { statementDt, remark })
-        : await createStatement({ salesDeliveryId: source.salesDeliveryId, statementDt, remark });
+        : await createStatement({
+          salesDeliveryId: source.salesDeliveryId,
+          salesDeliveryDetailIds: selectedIds,
+          statementDt,
+          remark,
+        });
       apply(value); setNotice(`거래명세서가 저장되었습니다. 명세번호: ${value.statementNo}`); onSaved?.();
     } catch (cause) { setError(cause instanceof Error ? cause.message : '거래명세서 저장에 실패했습니다.'); }
     finally { busy.current = false; setPending(false); }
-  }, [editable, source, commitDate, remark, id, apply, onSaved]);
+  }, [editable, source, commitDate, remark, id, apply, onSaved, selectedIds]);
   const remove = useCallback(async () => {
     if (!canDelete || !id || busy.current) return;
     if (!(await confirm({ title: '거래명세서 삭제', description: '거래명세서를 삭제하시겠습니까?' }))) return;
@@ -152,7 +204,7 @@ export function useSalesStatementCreate({
   useEffect(() => () => onEmbeddedActionsChange?.(null), [onEmbeddedActionsChange]);
 
   return {
-    id, item, source, rows, date, changeDate, commitDate, dateError, remark, setRemark, picker, setPicker, printing, setPrinting,
+    id, item, source, rows, selectedRowIds, setSelectedRowIds, date, changeDate, commitDate, dateError, remark, setRemark, picker, setPicker, printing, setPrinting,
     pending, error, setError, notice, canRead, canSave, canDelete, editable, dirty, blocker, dialog,
     choose, save, remove, handleNew, print,
   };

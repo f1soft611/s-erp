@@ -21,10 +21,32 @@ export type MasterPickerProps = {
   helperText?: string;
 };
 
-export type MasterPickerDialogProps = {
+type MasterPickerDialogCommonProps = {
   label: string;
   open: boolean;
   search: MasterPickerSearch;
   onClose: () => void;
-  onChange: (value: MasterPickerOption) => void;
+};
+
+export type MasterPickerDialogProps = MasterPickerDialogCommonProps &
+  (
+    | {
+        multiple?: false;
+        onChange: (value: MasterPickerOption) => void;
+      }
+    | {
+        multiple: true;
+        selectedValues: MasterPickerOption[];
+        onApply: (values: MasterPickerOption[]) => void;
+      }
+  );
+
+export type MasterPickerMultiSelectProps = {
+  selectedValues: MasterPickerOption[];
+  search: MasterPickerSearch;
+  onApply: (values: MasterPickerOption[]) => void;
+  disabled?: boolean;
+  required?: boolean;
+  error?: boolean;
+  helperText?: string;
 };

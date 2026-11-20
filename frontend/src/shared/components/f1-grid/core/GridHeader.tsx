@@ -52,6 +52,7 @@ type GridHeaderProps<T extends object> = {
   columnLine: boolean;
   selectedAll: boolean;
   selectedCount: number;
+  hasSelectableRows?: boolean;
   columnWidths: Record<string, number>;
   columnTracks: string;
   resizableColumns?: boolean;
@@ -103,6 +104,7 @@ function GridHeaderInner<T extends object>({
   columnLine,
   selectedAll,
   selectedCount,
+  hasSelectableRows = true,
   columnWidths,
   columnTracks,
   resizableColumns = true,
@@ -353,6 +355,7 @@ function GridHeaderInner<T extends object>({
                 aria-label="전체 행 선택"
                 checked={selectedAll}
                 indeterminate={selectedCount > 0 && !selectedAll}
+                disabled={!hasSelectableRows}
                 onChange={onToggleAllRows}
               />
             ) : null}

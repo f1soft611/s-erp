@@ -4,6 +4,9 @@ export type StatementPageProps = DeliveryPageProps;
 
 export type StatementDetail = {
   salesStatementDetailId: number;
+  salesDeliveryDetailId: number | null;
+  sourceDeliveryNo?: string | null;
+  sourceDeliveryDt?: string | null;
   lineNo: number;
   materialCode: string | null;
   materialName: string | null;
@@ -19,6 +22,7 @@ export type StatementDetail = {
 export type StatementItem = {
   salesStatementId: number;
   salesDeliveryId: number;
+  customerId: number;
   statementNo: string;
   statementDt: string;
   deliveryNo: string;
@@ -56,11 +60,13 @@ export type StatementItem = {
 
 export type StatementSource = {
   salesDeliveryId: number;
+  customerId: number;
   deliveryNo: string;
   deliveryDt: string;
   deliveryType: 'DIRECT' | 'ORDER';
   customerName: string;
   totalAmt: number;
+  salesDeliveryDetailIds: number[];
 };
 
 export type StatementStatusRow = StatementDetail & {
@@ -68,6 +74,8 @@ export type StatementStatusRow = StatementDetail & {
   statementNo: string;
   statementDt: string;
   deliveryNo: string;
+  sourceDeliveryNo?: string | null;
+  sourceDeliveryDt?: string | null;
   customerCode: string;
   customerName: string;
   lineTotalAmt: number;
@@ -75,6 +83,7 @@ export type StatementStatusRow = StatementDetail & {
 
 export type StatementPayload = {
   salesDeliveryId: number;
+  salesDeliveryDetailIds: number[];
   statementDt: string;
   remark: string;
 };

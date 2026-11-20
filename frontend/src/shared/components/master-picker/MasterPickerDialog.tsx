@@ -1,16 +1,24 @@
-import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import {
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from 'react';
 import SearchIcon from '@mui/icons-material/Search';
 import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
   List,
+  ListItem,
   ListItemButton,
   ListItemText,
   Stack,
   TextField,
+  Typography,
 } from '@mui/material';
 import { CommonDialog } from '../CommonDialog';
 import type {
@@ -18,19 +26,66 @@ import type {
   MasterPickerOption,
 } from './masterPicker.types';
 
+const EMPTY_OPTIONS: MasterPickerOption[] = [];
+
+type DraftSelectionState = {
+  source: MasterPickerOption[];
+  draft: MasterPickerOption[];
+};
+
+function hasSameOptions(
+  first: MasterPickerOption[],
+  second: MasterPickerOption[],
+) {
+  return (
+    first.length === second.length &&
+    first.every((option, index) => {
+      const other = second[index];
+      const details = option.details ?? [];
+      const otherDetails = other.details ?? [];
+
+      return (
+        option.id === other.id &&
+        option.code === other.code &&
+        option.name === other.name &&
+        details.length === otherDetails.length &&
+        details.every(
+          (detail, detailIndex) =>
+            detail.label === otherDetails[detailIndex].label &&
+            detail.value === otherDetails[detailIndex].value,
+        )
+      );
+    })
+  );
+}
+
 export function MasterPickerDialog({
-  label,
-  open,
-  search,
-  onClose,
-  onChange,
+  ...props
 }: MasterPickerDialogProps) {
+  const { label, open, search, onClose } = props;
+  const isMultiple = props.multiple === true;
+  const selectedValues =
+    props.multiple === true ? props.selectedValues : EMPTY_OPTIONS;
   const [keyword, setKeyword] = useState('');
   const [results, setResults] = useState<MasterPickerOption[]>([]);
+  const [draftState, setDraftState] = useState<DraftSelectionState>(() => ({
+    source: selectedValues,
+    draft: selectedValues,
+  }));
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState('');
   const requestId = useRef(0);
+  const hasExternalSelectionChanged = !hasSameOptions(
+    draftState.source,
+    selectedValues,
+  );
+  if (hasExternalSelectionChanged) {
+    setDraftState({ source: selectedValues, draft: selectedValues });
+  }
+  const draftSelection = hasExternalSelectionChanged
+    ? selectedValues
+    : draftState.draft;
 
   const close = () => {
     requestId.current += 1;
@@ -74,8 +129,24 @@ export function MasterPickerDialog({
   };
 
   const handleSelect = (option: MasterPickerOption) => {
-    onChange(option);
+    if (isMultiple) {
+      setDraftState({
+        source: selectedValues,
+        draft: draftSelection.some(({ id }) => id === option.id)
+          ? draftSelection.filter(({ id }) => id !== option.id)
+          : [...draftSelection, option],
+      });
+      return;
+    }
+    props.onChange(option);
     close();
+  };
+
+  const handleApply = () => {
+    if (props.multiple === true) {
+      props.onApply(draftSelection);
+      close();
+    }
   };
 
   return (
@@ -83,9 +154,37 @@ export function MasterPickerDialog({
       open={open}
       onClose={close}
       title={`${label} 선택`}
-      description={`${label} 코드 또는 이름으로 검색한 뒤 항목을 선택하세요.`}
+      description={
+        isMultiple
+          ? `${label} 코드 또는 이름으로 검색한 뒤 항목을 선택하고 적용하세요.`
+          : `${label} 코드 또는 이름으로 검색한 뒤 항목을 선택하세요.`
+      }
       size="xs"
       fullScreenOnMobile
+      footerStart={
+        isMultiple ? (
+          <Typography role="status" variant="body2">
+            선택 {draftSelection.length}개
+          </Typography>
+        ) : undefined
+      }
+      actions={
+        isMultiple ? (
+          <>
+            <Button type="button" onClick={close}>
+              취소
+            </Button>
+            <Button
+              type="button"
+              variant="contained"
+              disableElevation
+              onClick={handleApply}
+            >
+              적용
+            </Button>
+          </>
+        ) : undefined
+      }
     >
       <Box>
         <Box
@@ -143,40 +242,80 @@ export function MasterPickerDialog({
           )}
           {!loading && !error && results.length > 0 && (
             <List disablePadding>
-              {results.map((option) => (
-                <ListItemButton
-                  key={option.id}
-                  onClick={() => handleSelect(option)}
-                  aria-label={`${option.code} ${option.name} 선택`}
-                  sx={{
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    gap: 1.5,
-                    mb: 1,
-                    '&:hover': {
-                      borderColor: 'primary.main',
-                      bgcolor: 'action.hover',
-                    },
-                  }}
-                >
-                  <Chip
-                    label={option.code}
-                    size="small"
-                    color="primary"
-                    variant="outlined"
-                    sx={{ flexShrink: 0, fontWeight: 600 }}
-                  />
-                  <ListItemText
-                    primary={option.name}
-                    secondary={option.details?.map(({ label: detailLabel, value }) => `${detailLabel}: ${value}`).join(' · ') || undefined}
-                    slotProps={{
-                      primary: { noWrap: true, sx: { fontWeight: 600 } },
-                      secondary: { sx: { overflowWrap: 'anywhere' } },
+              {results.map((option) => {
+                const itemDetails =
+                  option.details
+                    ?.map(
+                      ({ label: detailLabel, value }) =>
+                        `${detailLabel}: ${value}`,
+                    )
+                    .join(' · ') || undefined;
+                const checkboxLabel = `${option.code} ${option.name} 선택`;
+                const itemText = (
+                  <>
+                    <Chip
+                      label={option.code}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                      sx={{ flexShrink: 0, fontWeight: 600 }}
+                    />
+                    <ListItemText
+                      primary={option.name}
+                      secondary={itemDetails}
+                      slotProps={{
+                        primary: { noWrap: true, sx: { fontWeight: 600 } },
+                        secondary: { sx: { overflowWrap: 'anywhere' } },
+                      }}
+                    />
+                  </>
+                );
+
+                return isMultiple ? (
+                  <ListItem
+                    key={option.id}
+                    sx={{
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                      gap: 1,
+                      mb: 1,
+                      p: 1,
                     }}
-                  />
-                </ListItemButton>
-              ))}
+                  >
+                    <Checkbox
+                      checked={draftSelection.some(
+                        ({ id }) => id === option.id,
+                      )}
+                      onChange={() => handleSelect(option)}
+                      slotProps={{
+                        input: { 'aria-label': checkboxLabel },
+                      }}
+                      sx={{ p: 0.5 }}
+                    />
+                    {itemText}
+                  </ListItem>
+                ) : (
+                  <ListItemButton
+                    key={option.id}
+                    onClick={() => handleSelect(option)}
+                    aria-label={checkboxLabel}
+                    sx={{
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                      gap: 1.5,
+                      mb: 1,
+                      '&:hover': {
+                        borderColor: 'primary.main',
+                        bgcolor: 'action.hover',
+                      },
+                    }}
+                  >
+                    {itemText}
+                  </ListItemButton>
+                );
+              })}
             </List>
           )}
           {!loading && !error && !hasSearched && (

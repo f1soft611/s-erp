@@ -1,6 +1,7 @@
 package egovframework.let.sales.shipment.delivery.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -26,6 +27,7 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 
 import egovframework.com.cmm.LoginVO;
 import egovframework.com.cmm.util.ResultVoHelper;
+import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliverySourceOrderSearchVO;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryStatusSearchVO;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryVO;
 import egovframework.let.sales.shipment.delivery.service.SalesDeliveryService;
@@ -72,11 +74,21 @@ class SalesDeliveryApiControllerTest {
 
     @Test
     void sourceOrdersAndStatusUseItemsEnvelopeAndPrincipalTenant() throws Exception {
-        when(service.listSourceOrders(71L, "SO")).thenReturn(Collections.emptyList());
+        when(service.listSourceOrders(eq(71L), any(SalesDeliverySourceOrderSearchVO.class)))
+                .thenReturn(Collections.emptyList());
         when(service.listStatus(eq(71L), eq("user01"), any(SalesDeliveryStatusSearchVO.class)))
                 .thenReturn(Collections.emptyList());
 
-        mvc.perform(get(ROOT + "/source-orders").param("keyword", "SO"))
+        mvc.perform(get(ROOT + "/source-orders")
+                        .param("keyword", "SO")
+                        .param("orderDtFrom", "2026-11-01")
+                        .param("orderDtTo", "2026-11-30")
+                        .param("orderNo", "SO-7")
+                        .param("customerKeyword", "C10")
+                        .param("materialKeyword", "M20")
+                        .param("planNo", "DP-2")
+                        .param("planDtFrom", "2026-11-05")
+                        .param("planDtTo", "2026-11-20"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.items").isArray());
         mvc.perform(get(ROOT + "/status")
@@ -85,7 +97,16 @@ class SalesDeliveryApiControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.items").isArray());
 
-        verify(service).listSourceOrders(71L, "SO");
+        verify(service).listSourceOrders(eq(71L), argThat(search ->
+                "SO".equals(search.getKeyword())
+                        && "2026-11-01".equals(search.getOrderDtFrom())
+                        && "2026-11-30".equals(search.getOrderDtTo())
+                        && "SO-7".equals(search.getOrderNo())
+                        && "C10".equals(search.getCustomerKeyword())
+                        && "M20".equals(search.getMaterialKeyword())
+                        && "DP-2".equals(search.getPlanNo())
+                        && "2026-11-05".equals(search.getPlanDtFrom())
+                        && "2026-11-20".equals(search.getPlanDtTo())));
         verify(service).listStatus(eq(71L), eq("user01"), any(SalesDeliveryStatusSearchVO.class));
     }
 

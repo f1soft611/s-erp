@@ -33,10 +33,11 @@ function PrintCopy({ item, rows }: { item: StatementItem; rows: StatementDetail[
     </div>
     <div className="statement-print-total"><strong>금 액</strong><span>{amountInKorean(item.totalAmt)}</span><strong>₩{amount(item.totalAmt)}</strong></div>
     <table className="statement-print-items">
-      <thead><tr><th>일자</th><th>품목명 [규격]</th><th>수량 (단위)</th><th>단가</th><th>공급가액</th><th>부가세</th></tr></thead>
+      <thead><tr><th>출하번호 / 일자</th><th>품목명 [규격]</th><th>수량 (단위)</th><th>단가</th><th>공급가액</th><th>부가세</th></tr></thead>
       <tbody>
         {rows.map((row) => <tr key={row.salesStatementDetailId}>
-          <td>{item.deliveryDt.slice(5).replace('-', '/')}</td>
+          <td>{text(row.sourceDeliveryNo ?? item.deliveryNo)}<br />
+            {text((row.sourceDeliveryDt ?? item.deliveryDt).slice(5).replace('-', '/'))}</td>
           <td>{text(row.materialName)} [{text(row.materialSpec)}] <span>{text(row.materialCode)}</span></td>
           <td className="number">{amount(row.deliveryQty)} {text(row.unit)}</td><td className="number">{amount(row.unitPrice)}</td>
           <td className="number">{amount(row.supplyAmt)}</td><td className="number">{amount(row.vatAmt)}</td>

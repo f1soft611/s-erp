@@ -373,6 +373,7 @@ export type F1GridProps<T extends object> = {
   showCheckbox?: boolean;
   selectionMode?: 'cell' | 'row';
   multiSelect?: boolean;
+  isRowSelectable?: (row: T) => boolean;
   createRow?: () => T;
   createDuplicate?: (row: T) => T;
   editorPlugins?: F1GridEditorPlugin<T>[];

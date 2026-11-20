@@ -6,6 +6,8 @@ import type {
   MasterPickerSearch,
 } from './masterPicker.types';
 
+export { CustomerMultiPicker } from './CustomerMultiPicker';
+
 type Props = Omit<MasterPickerProps, 'label'>;
 
 export function CustomerPicker(props: Props) {

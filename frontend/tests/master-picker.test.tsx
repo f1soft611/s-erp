@@ -1,13 +1,308 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { MasterPicker } from '../src/shared/components/master-picker/MasterPicker';
+import { CustomerMultiPicker } from '../src/shared/components/master-picker/MasterPickers';
 import type { MasterPickerOption } from '../src/shared/components/master-picker/masterPicker.types';
 
 const options: MasterPickerOption[] = [
   { id: 1, code: 'C-001', name: '테스트 거래처' },
+  { id: 2, code: 'C-002', name: '두번째 거래처' },
 ];
 
 describe('MasterPicker', () => {
+  it('applies two draft customer selections and reports the selected count', async () => {
+    const onApply = vi.fn();
+    render(
+      <CustomerMultiPicker
+        selectedValues={[]}
+        search={vi.fn(async () => options)}
+        onApply={onApply}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '거래처 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+    fireEvent.click(
+      await screen.findByRole('checkbox', {
+        name: 'C-001 테스트 거래처 선택',
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole('checkbox', {
+        name: 'C-002 두번째 거래처 선택',
+      }),
+    );
+
+    expect(screen.getByText('선택 2개')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    expect(onApply).toHaveBeenCalledTimes(1);
+    expect(onApply).toHaveBeenCalledWith(options);
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('summarizes multiple customers and removes a selected customer from its chip', () => {
+    const onApply = vi.fn();
+    const selectedValues = [
+      ...options,
+      { id: 3, code: 'C-003', name: '세번째 거래처' },
+      { id: 4, code: 'C-004', name: '네번째 거래처' },
+    ];
+    function ControlledPicker() {
+      const [selection, setSelection] = useState(selectedValues);
+      return (
+        <CustomerMultiPicker
+          selectedValues={selection}
+          search={vi.fn(async () => options)}
+          onApply={(next) => {
+            onApply(next);
+            setSelection(next);
+          }}
+        />
+      );
+    }
+    render(<ControlledPicker />);
+
+    expect(screen.getByRole('textbox', { name: '거래처' })).toHaveValue(
+      '테스트 거래처 외 3건',
+    );
+    expect(screen.getByRole('button', { name: '거래처 두번째 거래처 제거' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '거래처 두번째 거래처 제거' }));
+    expect(screen.getByRole('textbox', { name: '거래처' })).toHaveValue(
+      '테스트 거래처 외 2건',
+    );
+    expect(screen.queryByText('C-002 · 두번째 거래처')).not.toBeInTheDocument();
+    expect(screen.getByText('C-001 · 테스트 거래처')).toBeInTheDocument();
+    expect(onApply).toHaveBeenCalledWith([selectedValues[0], selectedValues[2], selectedValues[3]]);
+  });
+
+  it('discards draft customer changes when cancelled', async () => {
+    const onApply = vi.fn();
+    render(
+      <CustomerMultiPicker
+        selectedValues={[options[0]]}
+        search={vi.fn(async () => options)}
+        onApply={onApply}
+      />,
+    );
+
+    const selectedField = screen.getByRole('textbox', { name: '거래처' });
+    expect(selectedField).toHaveValue('C-001 · 테스트 거래처');
+    expect(selectedField).toHaveAttribute('readonly');
+    fireEvent.click(screen.getByRole('button', { name: '거래처 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+    expect(
+      await screen.findByRole('checkbox', {
+        name: 'C-001 테스트 거래처 선택',
+      }),
+    ).toBeChecked();
+    fireEvent.click(
+      screen.getByRole('checkbox', {
+        name: 'C-002 두번째 거래처 선택',
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+
+    expect(onApply).not.toHaveBeenCalled();
+    expect(selectedField).toHaveValue('C-001 · 테스트 거래처');
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('discards draft changes when the dialog close button is used', async () => {
+    const onApply = vi.fn();
+    render(
+      <CustomerMultiPicker
+        selectedValues={[]}
+        search={vi.fn(async () => options)}
+        onApply={onApply}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '거래처 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+    fireEvent.click(
+      await screen.findByRole('checkbox', {
+        name: 'C-002 두번째 거래처 선택',
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+
+    expect(onApply).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole('textbox', { name: '거래처' })).toHaveValue('');
+  });
+
+  it('retains draft selections when search results change', async () => {
+    const search = vi
+      .fn()
+      .mockResolvedValueOnce([options[0]])
+      .mockResolvedValueOnce([options[1]])
+      .mockResolvedValueOnce([options[0]]);
+    render(
+      <CustomerMultiPicker
+        selectedValues={[]}
+        search={search}
+        onApply={() => undefined}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '거래처 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+    fireEvent.click(
+      await screen.findByRole('checkbox', {
+        name: 'C-001 테스트 거래처 선택',
+      }),
+    );
+    const searchInput = screen.getByRole('textbox', { name: '거래처 검색' });
+    fireEvent.change(searchInput, { target: { value: '두번째' } });
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+    await screen.findByRole('checkbox', {
+      name: 'C-002 두번째 거래처 선택',
+    });
+    expect(screen.getByText('선택 1개')).toBeInTheDocument();
+
+    fireEvent.change(searchInput, { target: { value: '첫번째' } });
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+    expect(
+      await screen.findByRole('checkbox', {
+        name: 'C-001 테스트 거래처 선택',
+      }),
+    ).toBeChecked();
+  });
+
+  it('reconciles an updated controlled selection without resetting local edits', async () => {
+    const initialSelectedValues = [options[0]];
+    const updatedSelectedValues = [options[1]];
+    const search = vi.fn(async () => options);
+    const onApply = vi.fn();
+    const { rerender } = render(
+      <CustomerMultiPicker
+        selectedValues={initialSelectedValues}
+        search={search}
+        onApply={onApply}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '거래처 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+    expect(
+      await screen.findByRole('checkbox', {
+        name: 'C-001 테스트 거래처 선택',
+      }),
+    ).toBeChecked();
+
+    rerender(
+      <CustomerMultiPicker
+        selectedValues={updatedSelectedValues}
+        search={search}
+        onApply={onApply}
+      />,
+    );
+
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'C-001 테스트 거래처 선택',
+      }),
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'C-002 두번째 거래처 선택',
+      }),
+    ).toBeChecked();
+
+    fireEvent.click(
+      screen.getByRole('checkbox', {
+        name: 'C-001 테스트 거래처 선택',
+      }),
+    );
+    rerender(
+      <CustomerMultiPicker
+        selectedValues={[...updatedSelectedValues]}
+        search={search}
+        onApply={onApply}
+      />,
+    );
+
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'C-001 테스트 거래처 선택',
+      }),
+    ).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    expect(onApply).toHaveBeenCalledTimes(1);
+    expect(onApply).toHaveBeenCalledWith([options[1], options[0]]);
+  });
+
+  it('uses each external selection update as the new draft baseline', async () => {
+    const selectionA = [options[0]];
+    const selectionB = [options[1]];
+    const search = vi.fn(async () => options);
+    const onApply = vi.fn();
+    const { rerender } = render(
+      <CustomerMultiPicker
+        selectedValues={selectionA}
+        search={search}
+        onApply={onApply}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '거래처 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+    fireEvent.click(
+      await screen.findByRole('checkbox', {
+        name: 'C-002 두번째 거래처 선택',
+      }),
+    );
+
+    rerender(
+      <CustomerMultiPicker
+        selectedValues={selectionB}
+        search={search}
+        onApply={onApply}
+      />,
+    );
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'C-001 테스트 거래처 선택',
+      }),
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'C-002 두번째 거래처 선택',
+      }),
+    ).toBeChecked();
+
+    rerender(
+      <CustomerMultiPicker
+        selectedValues={selectionA}
+        search={search}
+        onApply={onApply}
+      />,
+    );
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'C-001 테스트 거래처 선택',
+      }),
+    ).toBeChecked();
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'C-002 두번째 거래처 선택',
+      }),
+    ).not.toBeChecked();
+
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+    expect(onApply).toHaveBeenCalledTimes(1);
+    expect(onApply).toHaveBeenCalledWith(selectionA);
+  });
+
   it('displays additional information without changing selection behavior', async () => {
     const option = { ...options[0], details: [{ label: '대표자명', value: '대표' }] };
     const onChange = vi.fn();

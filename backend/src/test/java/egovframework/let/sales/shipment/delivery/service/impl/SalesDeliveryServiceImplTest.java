@@ -29,6 +29,7 @@ import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryDetai
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryDetailVO;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryRequestVO;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliverySourceOrderHeaderVO;
+import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliverySourceOrderSearchVO;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliverySourceOrderVO;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryStatusSearchVO;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryVO;
@@ -476,15 +477,59 @@ class SalesDeliveryServiceImplTest {
     }
 
     @Test
-    void sourceOrdersAreLimitedToTenantAnd200RowsAtDaoBoundary() throws Exception {
+    void sourceOrderSearchAppliesRequiredDateAndAllFiltersWithinTenantLimit() throws Exception {
         when(dao.selectSourceOrders(anyMap())).thenReturn(Collections.<SalesDeliverySourceOrderVO>emptyList());
 
-        service.listSourceOrders(71L, "SO");
+        SalesDeliverySourceOrderSearchVO search = new SalesDeliverySourceOrderSearchVO();
+        search.setKeyword("SO");
+        search.setOrderDtFrom("2026-11-01");
+        search.setOrderDtTo("2026-11-30");
+        search.setOrderNo("SO-7");
+        search.setCustomerKeyword("C10");
+        search.setMaterialKeyword("M20");
+        search.setPlanNo("DP-2");
+        search.setPlanDtFrom("2026-11-05");
+        search.setPlanDtTo("2026-11-20");
+        service.listSourceOrders(71L, search);
 
         verify(dao).selectSourceOrders(argThat(params ->
                 Long.valueOf(71L).equals(params.get("tenantId"))
                         && Integer.valueOf(200).equals(params.get("limit"))
-                        && "SO".equals(params.get("keyword"))));
+                        && "SO".equals(params.get("keyword"))
+                        && LocalDate.of(2026, 11, 1).equals(params.get("orderDtFrom"))
+                        && LocalDate.of(2026, 11, 30).equals(params.get("orderDtTo"))
+                        && "SO-7".equals(params.get("orderNo"))
+                        && "C10".equals(params.get("customerKeyword"))
+                        && "M20".equals(params.get("materialKeyword"))
+                        && "DP-2".equals(params.get("planNo"))
+                        && LocalDate.of(2026, 11, 5).equals(params.get("planDtFrom"))
+                        && LocalDate.of(2026, 11, 20).equals(params.get("planDtTo"))));
+    }
+
+    @Test
+    void sourceOrderSearchRejectsMissingInvalidAndReversedDateRanges() throws Exception {
+        SalesDeliverySourceOrderSearchVO missingOrderDate = new SalesDeliverySourceOrderSearchVO();
+        assertThatThrownBy(() -> service.listSourceOrders(71L, missingOrderDate))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("수주일자");
+        verifyNoInteractions(dao);
+
+        SalesDeliverySourceOrderSearchVO reversedOrderDate = new SalesDeliverySourceOrderSearchVO();
+        reversedOrderDate.setOrderDtFrom("2026-11-30");
+        reversedOrderDate.setOrderDtTo("2026-11-01");
+        assertThatThrownBy(() -> service.listSourceOrders(71L, reversedOrderDate))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("수주일자");
+
+        SalesDeliverySourceOrderSearchVO reversedPlanDate = new SalesDeliverySourceOrderSearchVO();
+        reversedPlanDate.setOrderDtFrom("2026-11-01");
+        reversedPlanDate.setOrderDtTo("2026-11-30");
+        reversedPlanDate.setPlanDtFrom("2026-11-20");
+        reversedPlanDate.setPlanDtTo("2026-11-05");
+        assertThatThrownBy(() -> service.listSourceOrders(71L, reversedPlanDate))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("계획일자");
+        verifyNoInteractions(dao);
     }
 
     private void stubOrderAndLine(String orderQty, String lineQty, String deliveredQty) throws Exception {

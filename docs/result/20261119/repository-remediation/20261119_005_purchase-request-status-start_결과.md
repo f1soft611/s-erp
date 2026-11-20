@@ -37,7 +37,7 @@ default provider와 GET 응답은 합성, 저장소는 메모리 대체다. 전�
 
 ## 원격과 잔여
 
-선행071 `6c9b2ea045316ce6b5aed09c2c47f6d221b3dbd6`의 정확한 CI44419928964는 마지막 집계227파일2,722개와 네 job 모두 성공했다. [최종 판정](screenshots/closing-request-start/remote-ci.json)을 함께 보관한다.072는 별도 allowlist 커밋/비강제 푸시·원격 일치 후 정확한 SHA 전체 CI를 확인한다. 확인 전 예상 집계를 성공으로 기록하지 않는다.
+선행071 `6c9b2ea045316ce6b5aed09c2c47f6d221b3dbd6`의 정확한 CI44419928964는 마지막 집계227파일2,722개와 네 job 모두 성공했다. [최종 판정](screenshots/closing-request-start/remote-ci.json)을 함께 보관한다.072는17파일 allowlist로 `225d7f761b5cc838cdce59f93d42d984ecd6d667`을 별도 커밋/비강제 푸시·원격 일치했다. 정확한 [CI44422062406](https://github.com/f1soft611/s-erp/actions/runs/44422062406)은 마지막 집계227파일2,727개와 네 job 모두 성공했다. [최종 판정](screenshots/purchase-request-status-start/remote-ci.json)은 후속073 문서와 함께 보관하며, 사용자 중단 요청 시점에는 해당 문서가 미커밋 상태다.
 
 backend/API/DB/의존성 변경 없음. DB MCP·스키마 스크립트 대상이 아니다. 잔여 state-in-effect63개와 호환 패치 없는 기존 의존성 권고2건이 있어 전체 요청은 아직 완료로 표시하지 않는다.
 

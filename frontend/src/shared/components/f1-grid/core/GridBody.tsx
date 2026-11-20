@@ -84,6 +84,7 @@ type GridBodyProps<T extends object> = {
   virtualTopPadding?: number;
   virtualBottomPadding?: number;
   showCheckbox?: boolean;
+  isRowSelectable?: (row: T) => boolean;
   showFormAction?: boolean;
   formActionPinnedShadow?: boolean;
   onOpenRowForm?: (row: T) => void;
@@ -160,6 +161,7 @@ export function GridBody<T extends object>({
   virtualTopPadding = 0,
   virtualBottomPadding = 0,
   showCheckbox = true,
+  isRowSelectable,
   showFormAction = false,
   formActionPinnedShadow = true,
   onOpenRowForm,
@@ -312,6 +314,7 @@ export function GridBody<T extends object>({
             getPinOffset={getPinOffset}
             cellAdornment={cellAdornment}
             showCheckbox={showCheckbox}
+            isRowSelectable={isRowSelectable}
             showFormAction={showFormAction}
             formActionPinnedShadow={formActionPinnedShadow}
             onOpenRowForm={onOpenRowForm}
