@@ -31,6 +31,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.TextNode;
 
+import egovframework.let.system.policies.domain.model.LoginLockPolicyVO;
 import egovframework.let.system.policies.domain.model.SystemPolicyHistoryVO;
 import egovframework.let.system.policies.domain.model.SystemPolicyOptionVO;
 import egovframework.let.system.policies.domain.model.SystemPolicySaveRequestVO;
@@ -54,6 +55,10 @@ public class SystemPolicyServiceImpl extends EgovAbstractServiceImpl implements 
 
     static final String GRID_DECIMAL_PREFIX = "GRID_DECIMAL_";
     static final String STATEMENT_ISSUE_MODE = "STATEMENT_ISSUE_MODE";
+    static final String LOGIN_LOCK_ENABLED = "LOGIN_LOCK_ENABLED";
+    static final String LOGIN_LOCK_MAX_ATTEMPTS = "LOGIN_LOCK_MAX_ATTEMPTS";
+    static final String PROFILE_PHOTO_EDIT_MODE = "PROFILE_PHOTO_EDIT_MODE";
+    private static final String ACCOUNT_SECURITY_CATEGORY = "계정·보안";
     private static final int MAX_GRID_DECIMALS = 6;
     private static final Set<String> GRID_ZERO_MODES =
             Collections.unmodifiableSet(new HashSet<String>(Arrays.asList("FIXED", "AUTO")));
@@ -89,6 +94,7 @@ public class SystemPolicyServiceImpl extends EgovAbstractServiceImpl implements 
 
     @Override
     public List<SystemPolicyVO> listPolicies(Long tenantId) throws Exception {
+        ensureAccountSecurityPolicies(tenantId);
         List<SystemPolicyVO> policies = systemPolicyDAO.selectPolicyList(tenantId);
         if (policies == null) {
             return Collections.emptyList();
@@ -112,6 +118,96 @@ public class SystemPolicyServiceImpl extends EgovAbstractServiceImpl implements 
             return "AUTO".equals(MAPPER.readTree(json).asText()) ? "AUTO" : "MANUAL";
         } catch (Exception ex) {
             return "MANUAL";
+        }
+    }
+
+    @Override
+    public LoginLockPolicyVO getLoginLockPolicy(Long tenantId) throws Exception {
+        JsonNode enabled = readPolicyValue(tenantId, LOGIN_LOCK_ENABLED);
+        if (enabled == null || !enabled.isBoolean() || !enabled.booleanValue()) {
+            return LoginLockPolicyVO.disabled();
+        }
+        int maxAttempts = LoginLockPolicyVO.DEFAULT_MAX_ATTEMPTS;
+        JsonNode limit = readPolicyValue(tenantId, LOGIN_LOCK_MAX_ATTEMPTS);
+        if (limit != null && limit.isIntegralNumber()) {
+            int candidate = limit.intValue();
+            if (candidate >= LoginLockPolicyVO.MIN_MAX_ATTEMPTS && candidate <= LoginLockPolicyVO.MAX_MAX_ATTEMPTS) {
+                maxAttempts = candidate;
+            }
+        }
+        return new LoginLockPolicyVO(true, maxAttempts);
+    }
+
+    @Override
+    public String getProfilePhotoEditMode(Long tenantId) throws Exception {
+        JsonNode mode = readPolicyValue(tenantId, PROFILE_PHOTO_EDIT_MODE);
+        return mode != null && mode.isTextual() && "ADMIN_ONLY".equals(mode.textValue()) ? "ADMIN_ONLY" : "SELF";
+    }
+
+    /** 저장된 정책 값을 JSON으로 읽는다. 행이 없거나 JSON이 아니면 null. */
+    private JsonNode readPolicyValue(Long tenantId, String policyCode) throws Exception {
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("tenantId", tenantId);
+        params.put("policyCode", policyCode);
+        String json = systemPolicyDAO.selectPolicyValueByCode(params);
+        if (json == null) {
+            return null;
+        }
+        try {
+            return MAPPER.readTree(json);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    /**
+     * 계정 보안 정책 3종이 없는 테넌트(SQL로 새로 만든 테넌트 등)에 기본값으로 만든다.
+     * 정책관리 화면을 열 때 실행되며 동시에 다른 요청이 만들었으면(중복 키) 무시한다.
+     */
+    private void ensureAccountSecurityPolicies(Long tenantId) throws Exception {
+        createDefaultIfMissing(tenantId, LOGIN_LOCK_ENABLED, "로그인 실패 잠금 사용",
+                "사용하면 로그인에 연속 실패한 계정을 잠그고 관리자가 해제할 때까지 로그인하지 못하게 합니다. 기본은 미사용입니다.",
+                "BOOLEAN", "false", "[]", null, null, "");
+        createDefaultIfMissing(tenantId, LOGIN_LOCK_MAX_ATTEMPTS, "로그인 실패 잠금 기준 횟수",
+                "로그인 실패가 이 횟수에 도달하면 계정을 잠급니다(잠금 사용 시에만 적용, 3~10회).",
+                "NUMBER", "5", "[]", BigDecimal.valueOf(3), BigDecimal.valueOf(10), "회");
+        createDefaultIfMissing(tenantId, PROFILE_PHOTO_EDIT_MODE, "내 정보 사진 변경",
+                "내 정보 관리에서 본인이 사진을 바꿀 수 있는지(SELF), 관리자만 바꿀 수 있는지(ADMIN_ONLY) 설정합니다.",
+                "SELECT", "\"SELF\"",
+                "[{\"value\":\"SELF\",\"label\":\"본인 변경 허용\"},{\"value\":\"ADMIN_ONLY\",\"label\":\"관리자만 변경\"}]",
+                null, null, "");
+    }
+
+    private void createDefaultIfMissing(Long tenantId, String code, String name, String description, String type,
+            String valueJson, String optionsJson, BigDecimal min, BigDecimal max, String unit) throws Exception {
+        Map<String, Object> codeParams = new HashMap<String, Object>();
+        codeParams.put("tenantId", tenantId);
+        codeParams.put("policyCode", code);
+        Long existing = systemPolicyDAO.selectPolicyIdByCode(codeParams);
+        if (existing != null && existing > 0) {
+            return;
+        }
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("tenantId", tenantId);
+        params.put("policyCode", code);
+        params.put("policyName", name);
+        params.put("category", ACCOUNT_SECURITY_CATEGORY);
+        params.put("description", description);
+        params.put("valueType", type);
+        params.put("valueJson", valueJson);
+        params.put("optionsJson", optionsJson);
+        params.put("minValue", min);
+        params.put("maxValue", max);
+        params.put("unit", unit);
+        params.put("actorId", null);
+        Long policyId;
+        try {
+            policyId = systemPolicyDAO.insertPolicy(params);
+        } catch (DuplicateKeyException ex) {
+            return;
+        }
+        if (policyId != null) {
+            insertHistory(tenantId, null, policyId, code, "CREATE", null, valueJson, null, null);
         }
     }
 

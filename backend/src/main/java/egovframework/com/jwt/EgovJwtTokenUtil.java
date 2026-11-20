@@ -95,6 +95,9 @@ public class EgovJwtTokenUtil implements Serializable{
 		claims.put("roleId", loginVO.getRoleId());//역할 ID
 		claims.put("tenantCode", loginVO.getTenantCode());//테넌트 코드
 		claims.put("tenantId", loginVO.getTenantId());//테넌트 ID
+		if (loginVO.isPasswordChangeRequired()) {
+			claims.put("pcr", Boolean.TRUE);//비밀번호 변경 필요
+		}
 
     	log.debug("===>>> secret = "+SECRET_KEY);
         return Jwts.builder().setClaims(claims).setSubject(subject).setIssuedAt(new Date(System.currentTimeMillis()))
@@ -122,6 +125,9 @@ public class EgovJwtTokenUtil implements Serializable{
 		claims.put("roleId", loginVO.getRoleId());//역할 ID
 		claims.put("tenantCode", loginVO.getTenantCode());//테넌트 코드
 		claims.put("tenantId", loginVO.getTenantId());//테넌트 ID
+		if (loginVO.isPasswordChangeRequired()) {
+			claims.put("pcr", Boolean.TRUE);//비밀번호 변경 필요
+		}
 
     	log.debug("===>>> refresh token secret = "+SECRET_KEY);
         return Jwts.builder().setClaims(claims).setSubject(subject).setIssuedAt(new Date(System.currentTimeMillis()))
@@ -177,6 +183,8 @@ public class EgovJwtTokenUtil implements Serializable{
 					loginVO.setTenantId(Long.valueOf(tenantIdText));
 				}
 			}
+
+			loginVO.setPasswordChangeRequired(Boolean.TRUE.equals(getClaimFromToken(token).get("pcr")));
 
             if(loginVO.getId() == null) throw new InvalidJwtException("Missing id in token");
         } catch (IllegalArgumentException | ExpiredJwtException |

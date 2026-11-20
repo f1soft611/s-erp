@@ -79,9 +79,11 @@ type ImageFieldProps = {
   value: string | null;
   onChange: (value: string | null) => void;
   onError: (message: string) => void;
+  /** 변경할 수 없으면 등록/삭제 버튼을 잠그고 이유를 보여 준다. */
+  lockedReason?: string;
 };
 
-function ImageField({ label, value, onChange, onError }: ImageFieldProps) {
+function ImageField({ label, value, onChange, onError, lockedReason }: ImageFieldProps) {
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -131,24 +133,28 @@ function ImageField({ label, value, onChange, onError }: ImageFieldProps) {
           spacing={0.5}
           sx={{ alignItems: 'center', flexWrap: 'wrap' }}
         >
-          <Button component="label" variant="outlined" size="small">
+          <Button component="label" variant="outlined" size="small" disabled={Boolean(lockedReason)}>
             등록/교체
             <input
               hidden
               type="file"
               accept="image/png,image/jpeg"
+              disabled={Boolean(lockedReason)}
               onChange={handleFileChange}
             />
           </Button>
           <IconButton
             aria-label={`${label} 삭제`}
             onClick={() => onChange(null)}
-            disabled={!value}
+            disabled={!value || Boolean(lockedReason)}
           >
             <DeleteOutlineOutlined />
           </IconButton>
         </Stack>
       </Box>
+      {lockedReason ? (
+        <Typography variant="caption" color="text.secondary">{lockedReason}</Typography>
+      ) : null}
     </Stack>
   );
 }
@@ -331,8 +337,18 @@ function ProfileSettingsPage() {
                 slotProps={{ input: { readOnly: true } }}
               />
               <TextField
+                label="사번"
+                value={profile?.employeeNo ?? ''}
+                slotProps={{ input: { readOnly: true } }}
+              />
+              <TextField
                 label="부서"
                 value={profile?.departmentName ?? ''}
+                slotProps={{ input: { readOnly: true } }}
+              />
+              <TextField
+                label="직위"
+                value={profile?.positionNm ?? ''}
                 slotProps={{ input: { readOnly: true } }}
               />
               <TextField
@@ -366,6 +382,9 @@ function ProfileSettingsPage() {
                 value={profileImage}
                 onChange={setProfileImage}
                 onError={setError}
+                lockedReason={profile?.photoEditable === false
+                  ? '프로필 사진은 관리자만 변경할 수 있습니다. 변경이 필요하면 관리자에게 요청해 주세요.'
+                  : undefined}
               />
               <ImageField
                 label="도장 이미지"

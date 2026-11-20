@@ -3,6 +3,7 @@ import {
   isAccessTokenExpiringSoon,
   isTokenExpired,
   logout,
+  markPasswordChangeRequired,
   refreshAccessToken,
   resolveApiBaseUrl,
 } from './authService';
@@ -10,6 +11,7 @@ import { ApiNetworkError, ApiResponseError, isRequestAborted } from './apiErrors
 export { ApiNetworkError, ApiResponseError } from './apiErrors';
 
 const API_BASE_URL = resolveApiBaseUrl();
+const PASSWORD_CHANGE_REQUIRED_CODE = 'PASSWORD_CHANGE_REQUIRED';
 
 interface ApiEnvelope<T> {
   resultCode?: number | string;
@@ -118,6 +120,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const resultCode = body.resultCode ?? body.code ?? '200';
   const resultMessage =
     body.resultMessage || body.message || '요청이 실패했습니다.';
+
+  if (String(resultCode) === PASSWORD_CHANGE_REQUIRED_CODE) {
+    // 관리자가 초기화한 계정 등: 비밀번호를 바꿀 때까지 다른 요청은 서버가 거부하므로 변경 화면으로 보낸다.
+    markPasswordChangeRequired();
+    throw new ApiResponseError(
+      normalizeApiErrorMessage(resultMessage),
+      response.status,
+    );
+  }
 
   if (!response.ok || String(resultCode) !== '200') {
     throw new ApiResponseError(

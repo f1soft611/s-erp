@@ -102,4 +102,41 @@ describe('ProfileSettingsPage', () => {
     });
     expect(await screen.findByText('내 정보가 저장되었습니다.')).toBeInTheDocument();
   });
+
+  it('shows the employee number and position read-only', async () => {
+    vi.mocked(profileService.fetchMyProfile).mockResolvedValue({
+      userId: 'admin', employeeId: 42, name: '사용자명', email: 'user@example.com',
+      departmentName: '개발팀', levelName: '사원', profileImage: null, stampImage: null,
+      employeeNo: '261101', positionNm: '과장',
+    });
+    render(<MemoryRouter><ProfileSettingsPage /></MemoryRouter>);
+
+    const employeeNo = await screen.findByLabelText('사번');
+    await waitFor(() => expect(employeeNo).toHaveValue('261101'));
+    expect(employeeNo).toHaveAttribute('readonly');
+    expect(screen.getByLabelText('직위')).toHaveValue('과장');
+  });
+
+  it('allows changing the profile photo unless the policy locks it', async () => {
+    render(<MemoryRouter><ProfileSettingsPage /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText(/이메일/i)).toHaveValue('user@example.com'));
+
+    expect(screen.queryByText(/관리자만 변경할 수 있습니다/)).not.toBeInTheDocument();
+    expect(screen.getAllByText('등록/교체')[0].closest('label')).not.toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('locks the profile photo but not the stamp when the policy is admin-only', async () => {
+    vi.mocked(profileService.fetchMyProfile).mockResolvedValue({
+      userId: 'admin', employeeId: 42, name: '사용자명', email: 'user@example.com',
+      departmentName: '개발팀', levelName: '사원', profileImage: 'data:image/png;base64,AAAA', stampImage: null,
+      photoEditable: false,
+    });
+    render(<MemoryRouter><ProfileSettingsPage /></MemoryRouter>);
+
+    expect(await screen.findByText(/프로필 사진은 관리자만 변경할 수 있습니다/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '프로필 이미지 삭제' })).toBeDisabled();
+    const [profileUpload, stampUpload] = screen.getAllByText('등록/교체').map((node) => node.closest('label'));
+    expect(profileUpload).toHaveAttribute('aria-disabled', 'true');
+    expect(stampUpload).not.toHaveAttribute('aria-disabled', 'true');
+  });
 });

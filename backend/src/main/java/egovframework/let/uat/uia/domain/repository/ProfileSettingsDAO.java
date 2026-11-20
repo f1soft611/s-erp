@@ -17,6 +17,10 @@ public class ProfileSettingsDAO extends EgovAbstractMapper {
     public void updateMyProfile(Map<String, Object> params) throws Exception {
         update("loginDAO.updateUserEmail", params);
         update("loginDAO.updateLoginImages", params);
+        // 사원 마스터(tb_user.photo_image)가 원본이므로 사진을 실제로 바꾼 경우에만 함께 기록한다.
+        if (Boolean.TRUE.equals(params.get("syncUserPhoto"))) {
+            update("loginDAO.updateUserPhoto", params);
+        }
     }
 
     public String selectPasswordHash(Map<String, Object> params) throws Exception {

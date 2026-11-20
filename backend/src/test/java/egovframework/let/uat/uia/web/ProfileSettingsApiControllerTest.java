@@ -42,6 +42,26 @@ class ProfileSettingsApiControllerTest {
     }
 
     @Test
+    void profileResponseExposesEmployeeNumberPositionAndPhotoPolicy() throws Exception {
+        ProfileSettingsService service = mock(ProfileSettingsService.class);
+        ProfileSettingsApiController controller = new ProfileSettingsApiController(
+                new ResultVoHelper(), service);
+        LoginVO user = authenticatedUser();
+        MyProfileVO profile = new MyProfileVO();
+        profile.setUserId("login-code");
+        profile.setEmployeeNo("261101");
+        profile.setPositionNm("과장");
+        profile.setPhotoEditable(false);
+        when(service.getMyProfile(user)).thenReturn(profile);
+
+        Map<String, Object> result = controller.getMyProfile(user).getResult();
+
+        assertEquals("261101", result.get("employeeNo"));
+        assertEquals("과장", result.get("positionNm"));
+        assertEquals(Boolean.FALSE, result.get("photoEditable"));
+    }
+
+    @Test
     void passwordChangeUsesTheAuthenticatedUser() throws Exception {
         ProfileSettingsService service = mock(ProfileSettingsService.class);
         ProfileSettingsApiController controller = new ProfileSettingsApiController(

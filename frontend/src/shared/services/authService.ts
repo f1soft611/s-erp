@@ -9,11 +9,15 @@ export interface AuthSession {
   accessToken: string;
   refreshToken: string;
   expiresAt: string;
+  /** 초기화·최초 발급 계정은 비밀번호를 바꿀 때까지 true. 이 동안은 비밀번호 변경 화면만 쓸 수 있다. */
+  passwordChangeRequired?: boolean;
 }
 
 const AUTH_STORAGE_KEY = 's-erp-auth';
 const AUTH_CHANGE_EVENT = 's-erp-auth-change';
 const SESSION_NOTICE_KEY = 's-erp-session-notice';
+const SESSION_NOTICE_SEVERITY_KEY = 's-erp-session-notice-severity';
+export type SessionNoticeSeverity = 'error' | 'info';
 
 export const resolveApiBaseUrl = (
   hostname: string = typeof window === 'undefined'
@@ -131,17 +135,32 @@ export const isAccessTokenExpiringSoon = (
   return Date.now() + bufferMs >= expiresAt;
 };
 
-export const setSessionNotice = (message: string | null): void => {
+export const setSessionNotice = (
+  message: string | null,
+  severity: SessionNoticeSeverity = 'error',
+): void => {
   if (typeof window === 'undefined') {
     return;
   }
 
   if (!message) {
     window.localStorage.removeItem(SESSION_NOTICE_KEY);
+    window.localStorage.removeItem(SESSION_NOTICE_SEVERITY_KEY);
     return;
   }
 
   window.localStorage.setItem(SESSION_NOTICE_KEY, message);
+  window.localStorage.setItem(SESSION_NOTICE_SEVERITY_KEY, severity);
+};
+
+export const readSessionNoticeSeverity = (): SessionNoticeSeverity => {
+  if (typeof window === 'undefined') {
+    return 'error';
+  }
+
+  return window.localStorage.getItem(SESSION_NOTICE_SEVERITY_KEY) === 'info'
+    ? 'info'
+    : 'error';
 };
 
 export const readSessionNotice = (): string | null => {
@@ -227,6 +246,7 @@ interface LoginJwtResponse {
   resultMessage: string;
   jToken?: string;
   refreshToken?: string;
+  resultVO?: { passwordChangeRequired?: boolean } | null;
 }
 
 export const login = async (
@@ -262,6 +282,7 @@ export const login = async (
     accessToken: body.jToken,
     refreshToken: body.refreshToken ?? '',
     expiresAt: new Date(Date.now() + ACCESS_TOKEN_VALIDITY_MS).toISOString(),
+    passwordChangeRequired: body.resultVO?.passwordChangeRequired === true,
   };
 
   setSessionNotice(null);
@@ -274,7 +295,26 @@ export const login = async (
   };
 };
 
-export const logout = (): void => {
+/** 현재 로그인한 계정이 비밀번호를 바꿔야 하는 상태인지. */
+export const isPasswordChangeRequired = (): boolean =>
+  getStoredAuth()?.passwordChangeRequired === true;
+
+/** 서버가 비밀번호 변경 필요(PASSWORD_CHANGE_REQUIRED)로 거부했을 때 세션에 표시해 변경 화면으로 보낸다. */
+export const markPasswordChangeRequired = (): void => {
+  const auth = getStoredAuth();
+  if (!auth || auth.passwordChangeRequired === true) {
+    return;
+  }
+
+  window.localStorage.setItem(
+    AUTH_STORAGE_KEY,
+    JSON.stringify({ ...auth, passwordChangeRequired: true }),
+  );
+  notifyAuthChange();
+};
+
+/** 로그아웃한다. notice를 주면 로그인 화면에 그 안내문을 보여 준다(없으면 안내문을 지운다). */
+export const logout = (notice?: { message: string; severity?: SessionNoticeSeverity }): void => {
   try {
     for (const key of Object.keys(window.sessionStorage)) {
       if (key.startsWith('s-erp-notice-popups:')) window.sessionStorage.removeItem(key);
@@ -283,7 +323,7 @@ export const logout = (): void => {
     console.warn('공지 팝업 진행 정보를 정리하지 못했습니다.');
   }
   window.localStorage.removeItem(AUTH_STORAGE_KEY);
-  setSessionNotice(null);
+  setSessionNotice(notice?.message ?? null, notice?.severity);
   syncBrowserLocation('/login');
   notifyAuthChange();
 };

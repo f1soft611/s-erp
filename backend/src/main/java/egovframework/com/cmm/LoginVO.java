@@ -118,6 +118,12 @@ public class LoginVO implements Serializable{
 	@Schema(description = "역할ID")
 	private Long roleId;
 
+	@Schema(description = "로그인 실패 잠금으로 거부된 계정인지(로그인 실패 응답에서만 true)")
+	private boolean accountLocked;
+
+	@Schema(description = "비밀번호를 변경해야 하는 계정인지(초기화·최초 발급 후). true이면 변경 전까지 비밀번호 변경 외 API를 쓸 수 없다")
+	private boolean passwordChangeRequired;
+
 	@Deprecated
 	public String getFactoryCode() {
 		return tenantCode;

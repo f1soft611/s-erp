@@ -48,4 +48,20 @@ public interface EgovLoginService {
 	 */
 	public boolean searchPassword(LoginVO vo) throws Exception;
 
+	/**
+	 * 토큰 갱신 등에서 계정이 아직 로그인할 수 있는 상태(허용·사용 중 사원·미퇴직)인지 확인한다.
+	 * @param tenantId 테넌트 ID
+	 * @param loginCode 로그인 코드
+	 * @exception Exception Exception
+	 */
+	public boolean isLoginable(Long tenantId, String loginCode) throws Exception;
+
+	/**
+	 * 계정이 비밀번호를 변경해야 하는 상태(초기화·최초 발급 후)인지 확인한다. 토큰 갱신 때 새 토큰에 반영한다.
+	 * @param tenantId 테넌트 ID
+	 * @param loginCode 로그인 코드
+	 * @exception Exception Exception
+	 */
+	public boolean isPasswordChangeRequired(Long tenantId, String loginCode) throws Exception;
+
 }
