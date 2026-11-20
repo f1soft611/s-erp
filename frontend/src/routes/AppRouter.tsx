@@ -153,6 +153,14 @@ function AppRouter() {
             }
           />
           <Route
+            path="/hr/*"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/co/*"
             element={
               <ProtectedRoute>

@@ -242,7 +242,7 @@ const sections: DocSection[] = [
       api(
         'treeContextMenu',
         'F1GridContextMenuTreeConfig',
-        'F1Tree가 내부 주입하는 트리 메뉴 확장점. 일반 F1Grid 사용처에서는 지정하지 않음.',
+        'F1Tree가 내부 주입하는 트리 메뉴 확장점. 일반 F1Grid 사용처에서는 지정하지 않음. `items`로 우클릭한 행 대상 사용자 정의 항목(편집·사용안함 등)을 추가할 수 있음.',
         '미지정',
       ),
     ],
@@ -386,6 +386,12 @@ const sections: DocSection[] = [
       ),
       api('treeColumn', 'keyof T', '트리 펼침 아이콘과 라벨을 표시할 필드.', '필수'),
       api('treeCheckbox', 'boolean', '트리 노드 선택 체크박스를 표시.', 'false'),
+      api(
+        'treeNodeIcon',
+        '(node: { row, rowId, depth, expanded, hasChildren }) => ReactNode',
+        '트리 컬럼의 펼침 화살표 뒤, 텍스트 앞에 노드 아이콘(예: 열림·닫힘 폴더)을 그림. 지정하지 않으면 아이콘 없음.',
+        '없음',
+      ),
       api(
         'defaultExpandAll',
         'boolean',

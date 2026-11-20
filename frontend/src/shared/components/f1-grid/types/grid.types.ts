@@ -293,6 +293,15 @@ export type F1GridContextMenuTreeConfig = {
   addChildLabel?: string;
   addRootDisabled?: boolean;
   isAddChildDisabled?: (targetRowId?: F1GridRowId) => boolean;
+  /** 추가·편집 외에 우클릭한 행 대상으로 실행할 사용자 정의 항목(예: 편집, 사용안함). 지정하지 않으면 그리지 않는다. */
+  items?: F1GridContextMenuTreeItem[];
+};
+
+export type F1GridContextMenuTreeItem = {
+  key: string;
+  label: string;
+  disabled?: (targetRowId?: F1GridRowId) => boolean;
+  onClick: (targetRowId?: F1GridRowId) => void;
 };
 
 export type F1GridValidationError = {
@@ -383,6 +392,14 @@ export type F1GridRef<T extends object> = {
   setCellValue(rowId: F1GridRowId, field: keyof T, value: unknown): void;
 };
 
+export type F1TreeNodeIconContext<T extends object> = {
+  row: T;
+  rowId: F1GridRowId;
+  depth: number;
+  expanded: boolean;
+  hasChildren: boolean;
+};
+
 export type F1TreeProps<T extends object> = Omit<
   F1GridProps<T>,
   'rowProjection' | 'cellAdornment'
@@ -391,6 +408,8 @@ export type F1TreeProps<T extends object> = Omit<
   parentKey: keyof T;
   treeColumn: keyof T;
   treeCheckbox?: boolean;
+  /** 트리 컬럼의 펼침 화살표 뒤, 텍스트 앞에 그릴 노드 아이콘(예: 폴더). 지정하지 않으면 아이콘을 그리지 않는다. */
+  treeNodeIcon?: (node: F1TreeNodeIconContext<T>) => ReactNode;
   defaultExpandAll?: boolean;
   defaultExpanded?: 'all' | 'root' | F1GridRowId[];
   getRowOrder?: (row: T) => number;
