@@ -39,9 +39,31 @@ class SalesStatementSchemaTest {
         identical("20261109_009_company_statement_stamp_change.md");
     }
 
+    @Test
+    void lineLevelClosingMigrationCopiesMatchAndGuardRollback() throws Exception {
+        assertThat(identical("20261120", "20261120_002_sales_statement_detail_source_and_revenue_closing.sql"))
+                .contains("ADD COLUMN IF NOT EXISTS sales_delivery_detail_id BIGINT",
+                        "ADD COLUMN IF NOT EXISTS revenue_closed_at",
+                        "ADD COLUMN IF NOT EXISTS revenue_closed_by",
+                        "match_detail.line_no = dd.line_no",
+                        "uq_sales_statement_source_detail",
+                        "uq_sales_statement_active_delivery");
+        assertThat(identical("20261120",
+                "20261120_002_rollback_sales_statement_detail_source_and_revenue_closing.sql"))
+                .contains("Revenue-close records exist",
+                        "partial or multiple-delivery detail state",
+                        "Multiple active statements reference one delivery",
+                        "CREATE UNIQUE INDEX uq_sales_statement_active_delivery");
+        identical("20261120", "20261120_002_change_sales_statement_detail_source_and_revenue_closing.md");
+    }
+
     private String identical(String name) throws Exception {
-        Path backend = Paths.get("DATABASE", "20261109", name);
-        Path docs = Paths.get("..", "docs", "database", "20261109", name);
+        return identical("20261109", name);
+    }
+
+    private String identical(String directory, String name) throws Exception {
+        Path backend = Paths.get("DATABASE", directory, name);
+        Path docs = Paths.get("..", "docs", "database", directory, name);
         byte[] first = Files.readAllBytes(backend);
         assertThat(first).isEqualTo(Files.readAllBytes(docs));
         return new String(first, StandardCharsets.UTF_8);

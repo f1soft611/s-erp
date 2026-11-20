@@ -449,6 +449,31 @@ describe('PageSearchArea 상세 검색', () => {
     expect(screen.getByText('상태: 사용')).toBeVisible();
   });
 
+  it('상세검색에 추가 콘텐츠를 표시하고 적용 거래처 수를 배지에 더한다', () => {
+    render(
+      <PageSearchArea
+        detailFields={fields}
+        appliedDetailValues={{ name: '기존 검색어' }}
+        detailExtraContent={<span>거래처 추가 검색</span>}
+        detailExtraActiveFilterCount={2}
+      />,
+    );
+
+    expect(screen.queryByText('거래처 추가 검색')).not.toBeInTheDocument();
+
+    const toggle = screen.getByRole('button', { name: '상세 검색 열기' });
+    expect(toggle).toHaveAttribute('aria-description', '적용된 상세 검색 조건 3개');
+    expect(screen.getByText('3')).toBeVisible();
+
+    fireEvent.click(toggle);
+
+    expect(
+      within(screen.getByRole('dialog', { name: '상세 검색' })).getByText(
+        '거래처 추가 검색',
+      ),
+    ).toBeVisible();
+  });
+
   it('미적용 입력만 있으면 상세검색 토글을 활성화하지 않는다', () => {
     render(
       <PageSearchArea

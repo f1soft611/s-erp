@@ -80,6 +80,12 @@ export const pageContentMap: Record<string, PageContent> = {
     cards: [],
     items: [],
   },
+  'revenue-closing': {
+    title: '매출마감관리',
+    description: '출하일 기준 매출대상과 거래처별 매출마감 현황을 조회합니다.',
+    cards: [],
+    items: [],
+  },
   'delivery-plan-create': {
     title: '출하계획등록',
     description: '수주를 기준으로 예정일별 출하계획을 등록하고 분할 수량을 관리합니다.',

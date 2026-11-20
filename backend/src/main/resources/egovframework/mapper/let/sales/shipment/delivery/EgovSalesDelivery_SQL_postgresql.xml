@@ -140,12 +140,34 @@
           AND h.use_at = 'Y'
           AND h.status NOT IN ('수주취소', '취소', '출하완료', '완료')
           AND pd.planned_qty &gt; pd.delivered_qty
+          AND h.order_dt BETWEEN CAST(#{orderDtFrom, jdbcType=DATE} AS date)
+                             AND CAST(#{orderDtTo, jdbcType=DATE} AS date)
         <if test="keyword != null and keyword != ''">
           AND (h.order_no ILIKE '%' || #{keyword} || '%'
                OR c.customer_code ILIKE '%' || #{keyword} || '%'
                OR c.customer_name ILIKE '%' || #{keyword} || '%'
                OR m.material_code ILIKE '%' || #{keyword} || '%'
                OR m.material_name ILIKE '%' || #{keyword} || '%')
+        </if>
+        <if test="orderNo != null and orderNo != ''">
+          AND h.order_no ILIKE '%' || #{orderNo} || '%'
+        </if>
+        <if test="customerKeyword != null and customerKeyword != ''">
+          AND (c.customer_code ILIKE '%' || #{customerKeyword} || '%'
+               OR c.customer_name ILIKE '%' || #{customerKeyword} || '%')
+        </if>
+        <if test="materialKeyword != null and materialKeyword != ''">
+          AND (m.material_code ILIKE '%' || #{materialKeyword} || '%'
+               OR m.material_name ILIKE '%' || #{materialKeyword} || '%')
+        </if>
+        <if test="planNo != null and planNo != ''">
+          AND ph.plan_no ILIKE '%' || #{planNo} || '%'
+        </if>
+        <if test="planDtFrom != null">
+          AND pd.plan_dt &gt;= CAST(#{planDtFrom, jdbcType=DATE} AS date)
+        </if>
+        <if test="planDtTo != null">
+          AND pd.plan_dt &lt;= CAST(#{planDtTo, jdbcType=DATE} AS date)
         </if>
         ORDER BY h.order_dt DESC, h.sales_order_id DESC, ph.sales_delivery_plan_id DESC, pd.line_no
         LIMIT #{limit}

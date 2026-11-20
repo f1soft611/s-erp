@@ -116,6 +116,7 @@ function groupSearchFields(fields: PageSearchField[]): SearchRenderBlock[] {
 }
 
 export type PageSearchAreaProps = {
+  mode?: 'page' | 'dialog';
   children?: ReactNode;
   searchField?: ReactNode;
   onDefaultSearch?: () => void;
@@ -127,7 +128,10 @@ export type PageSearchAreaProps = {
   onDetailSearch?: (values: Record<string, PageSearchFieldValue>) => void;
   onDetailReset?: (values: Record<string, PageSearchFieldValue>) => void;
   onDetailClose?: () => void;
+  onDetailOpenChange?: (open: boolean) => void;
   detailLoading?: boolean;
+  detailExtraContent?: ReactNode;
+  detailExtraActiveFilterCount?: number;
 };
 
 function getFieldValue(
@@ -191,6 +195,7 @@ function areSearchValuesEqual(
 }
 
 export function PageSearchArea({
+  mode = 'page',
   children,
   searchField,
   onDefaultSearch,
@@ -202,7 +207,10 @@ export function PageSearchArea({
   onDetailSearch,
   onDetailReset,
   onDetailClose,
+  onDetailOpenChange,
   detailLoading = false,
+  detailExtraContent,
+  detailExtraActiveFilterCount = 0,
 }: PageSearchAreaProps) {
   const [detailOpen, setDetailOpen] = useState(false);
   const [draftValues, setDraftValues] = useState(() =>
@@ -319,6 +327,7 @@ export function PageSearchArea({
   const closeDetails = () => {
     quickDateRequestsRef.current.clear();
     setDetailOpen(false);
+    onDetailOpenChange?.(false);
     onDetailClose?.();
   };
 
@@ -577,6 +586,7 @@ export function PageSearchArea({
   };
 
   const searchRenderBlocks = groupSearchFields(detailFields);
+  const isDialogMode = mode === 'dialog';
   const activeDetailFilters = detailFields.flatMap((field) => {
     const value = appliedDetailValues[field.field];
     if (value === null || value === undefined) return [];
@@ -600,6 +610,11 @@ export function PageSearchArea({
       displayValue: field.type === 'month' ? formatMonthValue(displayValue) : (option?.label ?? displayValue),
     }];
   });
+  const activeDetailFilterCount =
+    activeDetailFilters.length +
+    (Number.isFinite(detailExtraActiveFilterCount)
+      ? Math.max(0, Math.trunc(detailExtraActiveFilterCount))
+      : 0);
   const visibleDetailFilters = activeDetailFilters.filter(
     ({ field }) => !pendingRemovalFields[field.field],
   );
@@ -636,14 +651,16 @@ export function PageSearchArea({
       sx={(theme) => ({
         position: 'relative',
         zIndex: detailOpen ? 13 : 1,
-        px: 3,
-        py: 1.25,
-        borderBottom: `1px solid ${theme.palette.divider}`,
+        px: isDialogMode ? 0 : 3,
+        py: isDialogMode ? 0 : 1.25,
+        borderBottom: isDialogMode ? 0 : `1px solid ${theme.palette.divider}`,
         bgcolor:
-          theme.palette.mode === 'dark'
-            ? 'rgba(15, 23, 42, 0.72)'
-            : 'rgba(148, 163, 184, 0.03)',
-        backdropFilter: 'blur(8px)',
+          isDialogMode
+            ? 'transparent'
+            : theme.palette.mode === 'dark'
+              ? 'rgba(15, 23, 42, 0.72)'
+              : 'rgba(148, 163, 184, 0.03)',
+        backdropFilter: isDialogMode ? 'none' : 'blur(8px)',
         transition: 'background-color 0.2s ease',
       })}
     >
@@ -701,9 +718,9 @@ export function PageSearchArea({
               sx={{
                 display: 'flex',
                 alignItems: 'center',
-                flex: { xs: '1 1 100%', md: '1 1 220px' },
-                maxWidth: 360,
-                minWidth: { xs: '100%', md: 220 },
+                flex: isDialogMode ? '1 1 0%' : { xs: '1 1 100%', md: '1 1 220px' },
+                maxWidth: isDialogMode ? 'none' : 360,
+                minWidth: isDialogMode ? 0 : { xs: '100%', md: 220 },
                 order: 1,
                 height: 40,
               }}
@@ -753,9 +770,9 @@ export function PageSearchArea({
             sx={{
               display: 'flex',
               alignItems: 'center',
-              flex: { xs: '1 1 100%', md: '1 1 220px' },
-              maxWidth: 360,
-              minWidth: { xs: '100%', md: 220 },
+              flex: isDialogMode ? '1 1 0%' : { xs: '1 1 100%', md: '1 1 220px' },
+              maxWidth: isDialogMode ? 'none' : 360,
+              minWidth: isDialogMode ? 0 : { xs: '100%', md: 220 },
               height: 40,
             }}
           >
@@ -808,9 +825,9 @@ export function PageSearchArea({
         )}
         {detailFields.length > 0 && (
           <Badge
-            badgeContent={activeDetailFilters.length}
+            badgeContent={activeDetailFilterCount}
             color="primary"
-            invisible={activeDetailFilters.length === 0}
+            invisible={activeDetailFilterCount === 0}
             sx={{ flex: '0 0 auto', ml: 'auto' }}
           >
             <IconButton
@@ -818,22 +835,24 @@ export function PageSearchArea({
               size="small"
               aria-label={detailOpen ? '상세 검색 닫기' : '상세 검색 열기'}
               aria-description={
-                activeDetailFilters.length
-                  ? `적용된 상세 검색 조건 ${activeDetailFilters.length}개`
+                activeDetailFilterCount
+                  ? `적용된 상세 검색 조건 ${activeDetailFilterCount}개`
                   : undefined
               }
               aria-expanded={detailOpen}
-              data-active={activeDetailFilters.length > 0}
+              data-active={activeDetailFilterCount > 0}
               onClick={() => {
                 quickDateRequestsRef.current.clear();
-                setDetailOpen((current) => !current);
+                const nextOpen = !detailOpen;
+                setDetailOpen(nextOpen);
+                onDetailOpenChange?.(nextOpen);
               }}
               sx={{
                 flex: '0 0 auto',
-                color: activeDetailFilters.length ? 'primary.main' : 'text.secondary',
+                color: activeDetailFilterCount ? 'primary.main' : 'text.secondary',
                 border: '1px solid',
-                borderColor: activeDetailFilters.length ? 'primary.main' : 'divider',
-                bgcolor: activeDetailFilters.length ? 'action.selected' : 'background.paper',
+                borderColor: activeDetailFilterCount ? 'primary.main' : 'divider',
+                bgcolor: activeDetailFilterCount ? 'action.selected' : 'background.paper',
                 '&:hover': { bgcolor: 'action.hover' },
               }}
             >
@@ -897,6 +916,9 @@ export function PageSearchArea({
               ) : (
                 renderSearchField(block.field)
               ),
+            )}
+            {detailExtraContent != null && (
+              <Box sx={{ minWidth: 0 }}>{detailExtraContent}</Box>
             )}
           </Box>
           <Divider
@@ -1031,7 +1053,7 @@ export function PageSearchArea({
                 onClick={searchDetails}
                 disabled={detailLoading}
               >
-                조회
+                {isDialogMode ? '검색' : '조회'}
               </Button>
               <Button
                 type="button"

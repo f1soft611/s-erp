@@ -48,9 +48,9 @@ export function createDocumentStatusColumns({
       editable: false,
       search: {
         label: '문서번호',
-        order: 4,
+        order: 2,
         span: 1,
-        group: '문서정보',
+        group: '텍스트',
       },
       highlightSearch: true,
       renderCell: onOpenDocument
@@ -90,7 +90,7 @@ export function createDocumentStatusColumns({
       width: 260,
       editable: false,
       highlightSearch: true,
-      search: { label: '제목', order: 5, span: 4, group: '제목' },
+      search: { label: '제목', order: 3, span: 1, group: '텍스트' },
     },
     {
       field: 'documentType',
@@ -100,7 +100,7 @@ export function createDocumentStatusColumns({
       width: 100,
       align: 'center',
       editable: false,
-      search: { label: '문서종류', order: 3, span: 2, group: '결재상태' },
+      search: { label: '문서종류', order: 9, span: 1, group: '선택' },
     },
     {
       field: 'documentStatus',
@@ -110,7 +110,7 @@ export function createDocumentStatusColumns({
       width: 100,
       align: 'center',
       editable: false,
-      search: { label: '결재상태', order: 2, span: 2, group: '결재상태' },
+      search: { label: '결재상태', order: 8, span: 1, group: '선택' },
       renderCell: ({ row }) => {
         const presentation = getApprovalStatusPresentation(
           row.documentStatus,
@@ -141,7 +141,7 @@ export function createDocumentStatusColumns({
       search: {
         label: '결재신청일',
         order: 1,
-        span: 4,
+        span: 2,
         group: '결재신청일',
         required: true,
         defaultValue: {
@@ -157,7 +157,7 @@ export function createDocumentStatusColumns({
       align: 'center',
       editable: false,
       highlightSearch: true,
-      search: { label: '기안자', order: 6, group: '기안정보' },
+      search: { label: '기안자', order: 4, span: 1, group: '텍스트' },
     },
     {
       field: 'drafterDepartmentName',
@@ -165,7 +165,7 @@ export function createDocumentStatusColumns({
       width: 100,
       align: 'center',
       editable: false,
-      search: { label: '기안부서', order: 7, group: '기안정보' },
+      search: { label: '기안부서', order: 5, span: 1, group: '텍스트' },
     },
     {
       field: 'participantName',
@@ -175,8 +175,9 @@ export function createDocumentStatusColumns({
       editable: false,
       search: {
         label: '결재 참여자',
-        order: 8,
-        group: '결재 참여자',
+        order: 6,
+        span: 1,
+        group: '텍스트',
       },
     },
     {
@@ -189,8 +190,9 @@ export function createDocumentStatusColumns({
       options: PARTICIPANT_TYPE_OPTIONS,
       search: {
         label: '내 결재 역할',
-        order: 9,
-        group: '내 결재정보',
+        order: 10,
+        span: 1,
+        group: '선택',
       },
       renderCell: ({ row }) =>
         renderTokenLabels(row.myParticipantType, PARTICIPANT_TYPE_LABELS),
@@ -205,8 +207,9 @@ export function createDocumentStatusColumns({
       options: ACTION_STATUS_OPTIONS,
       search: {
         label: '내 처리상태',
-        order: 10,
-        group: '내 결재정보',
+        order: 11,
+        span: 1,
+        group: '선택',
       },
       renderCell: ({ row }) =>
         renderTokenLabels(row.myActionStatus, ACTION_STATUS_LABELS),
@@ -219,9 +222,9 @@ export function createDocumentStatusColumns({
       align: 'center',
       search: {
         label: '현재 결재담당자',
-        order: 11,
-        span: 4,
-        group: '현재 결재',
+        order: 7,
+        span: 1,
+        group: '텍스트',
       },
     },
     {

@@ -1,6 +1,6 @@
 import { apiDelete, apiGet, apiPost, apiPut } from '../../../../../../shared/services/apiClient';
 import { ApiResponseError } from '../../../../../../shared/services/apiErrors';
-import type { DeliveryFilters, DeliveryForm, DeliveryItem, DeliveryPayload, DeliveryRow, DeliveryStatusRow, SourceOrderRow } from '../types/salesDelivery.types';
+import type { DeliveryFilters, DeliveryForm, DeliveryItem, DeliveryPayload, DeliveryRow, DeliveryStatusRow, SourceOrderRow, SourceOrderSearchFilters } from '../types/salesDelivery.types';
 
 const PATH = '/api/v1/sales/deliveries';
 export function localDate(date = new Date()): string {
@@ -117,8 +117,12 @@ async function saveDelivery(request: () => Promise<{ item?: DeliveryItem }>) {
 export async function deleteDelivery(id: number) {
   await apiDelete(`${PATH}/${id}`);
 }
-export async function searchSourceOrders(keyword: string) {
-  const response = await apiGet<{ items?: SourceOrderRow[] }>(`${PATH}/source-orders?${new URLSearchParams({ keyword })}`);
+export async function searchSourceOrders(filters: SourceOrderSearchFilters) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value.trim()) params.set(key, value.trim());
+  });
+  const response = await apiGet<{ items?: SourceOrderRow[] }>(`${PATH}/source-orders?${params}`);
   if (!Array.isArray(response.items)) throw new Error('수주 목록 응답을 확인해 주세요.');
   return response.items;
 }

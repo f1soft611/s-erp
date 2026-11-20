@@ -37,6 +37,7 @@ import { SalesDeliveryPlanCreatePage } from '../../sales/shipment/deliveryplan/c
 import { SalesDeliveryPlanStatusPage } from '../../sales/shipment/deliveryplan/status/SalesDeliveryPlanStatusPage';
 import { SalesStatementCreatePage } from '../../sales/shipment/statement/create/SalesStatementCreatePage';
 import { SalesStatementStatusPage } from '../../sales/shipment/statement/status/SalesStatementStatusPage';
+import { RevenueClosingPage } from '../../sales/revenue/closing/RevenueClosingPage';
 import { PurchaseRequestCreatePage } from '../../materials/request/create/PurchaseRequestCreatePage';
 import { PurchaseRequestStatusPage } from '../../materials/request/status/PurchaseRequestStatusPage';
 import { PurchaseOrderCreatePage } from '../../materials/order/create/PurchaseOrderCreatePage';
@@ -246,6 +247,18 @@ export function DashboardContent({
     const DeliveryPage = currentPageKey === 'delivery-create' ? SalesDeliveryCreatePage : SalesDeliveryStatusPage;
     return <DeliveryPage selectedModule={selectedModule} currentMenuName={currentMenuName}
       content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
+  }
+
+  if (selectedModule.id === 'sales' && currentPageKey === 'revenue-closing') {
+    return (
+      <RevenueClosingPage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+        breadcrumbItems={breadcrumbItems}
+        selectedMenuPermissions={selectedMenuPermissions}
+      />
+    );
   }
 
   if (selectedModule.id === 'sales' && (currentPageKey === 'statement-create' || currentPageKey === 'statement-status')) {

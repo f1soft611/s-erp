@@ -86,11 +86,23 @@ describe('sales delivery contract', () => {
     await getDelivery(3);
     await updateDelivery(3, buildDeliveryPayload(form()));
     await deleteDelivery(3);
-    await searchSourceOrders('SO & 7');
+    await searchSourceOrders({
+      keyword: 'SO & 7',
+      orderDtFrom: '2026-11-01',
+      orderDtTo: '2026-11-30',
+      orderNo: 'SO/7',
+      customerKeyword: 'C+1',
+      materialKeyword: 'M 20',
+      planNo: 'DP-7',
+      planDtFrom: '2026-11-05',
+      planDtTo: '2026-11-20',
+    });
     expect(apiPost).toHaveBeenCalledWith('/api/v1/sales/deliveries', expect.any(Object));
     expect(apiPut).toHaveBeenCalledWith('/api/v1/sales/deliveries/3', expect.any(Object));
     expect(apiDelete).toHaveBeenCalledWith('/api/v1/sales/deliveries/3');
-    expect(apiGet).toHaveBeenCalledWith('/api/v1/sales/deliveries/source-orders?keyword=SO+%26+7');
+    expect(apiGet).toHaveBeenCalledWith(
+      '/api/v1/sales/deliveries/source-orders?keyword=SO+%26+7&orderDtFrom=2026-11-01&orderDtTo=2026-11-30&orderNo=SO%2F7&customerKeyword=C%2B1&materialKeyword=M+20&planNo=DP-7&planDtFrom=2026-11-05&planDtTo=2026-11-20',
+    );
     vi.mocked(apiGet).mockResolvedValue({});
     await expect(getDelivery(3)).rejects.toThrow();
     vi.mocked(apiPost).mockRejectedValue(new Error('잔량 초과'));

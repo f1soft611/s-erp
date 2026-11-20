@@ -24,6 +24,7 @@ import egovframework.com.cmm.ResponseCode;
 import egovframework.com.cmm.service.ResultVO;
 import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryRequestVO;
+import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliverySourceOrderSearchVO;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryStatusSearchVO;
 import egovframework.let.sales.shipment.delivery.service.SalesDeliveryService;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -81,11 +82,11 @@ public class SalesDeliveryApiController {
     }
 
     @GetMapping("/source-orders")
-    public ResultVO listSourceOrders(@RequestParam(required = false) String keyword,
+    public ResultVO listSourceOrders(@ModelAttribute SalesDeliverySourceOrderSearchVO search,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
         Map<String, Object> values = new HashMap<String, Object>();
-        values.put("items", salesDeliveryService.listSourceOrders(user.getTenantId(), keyword));
+        values.put("items", salesDeliveryService.listSourceOrders(user.getTenantId(), search));
         return resultVoHelper.buildFromMap(values, ResponseCode.SUCCESS);
     }
 

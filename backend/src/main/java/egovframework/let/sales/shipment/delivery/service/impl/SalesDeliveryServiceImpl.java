@@ -26,6 +26,7 @@ import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryDetai
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryDetailVO;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryRequestVO;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliverySourceOrderHeaderVO;
+import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliverySourceOrderSearchVO;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliverySourceOrderVO;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryStatusSearchVO;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryStatusVO;
@@ -207,11 +208,33 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
     }
 
     @Override
-    public List<SalesDeliverySourceOrderVO> listSourceOrders(Long tenantId, String keyword) throws Exception {
+    public List<SalesDeliverySourceOrderVO> listSourceOrders(Long tenantId,
+            SalesDeliverySourceOrderSearchVO search) throws Exception {
         validateTenant(tenantId);
+        if (search == null) {
+            throw badRequest("수주일자 기준일을 입력해 주세요.");
+        }
+        LocalDate orderDtFrom = parseSourceSearchDate(search.getOrderDtFrom(), "수주일자", true);
+        LocalDate orderDtTo = parseSourceSearchDate(search.getOrderDtTo(), "수주일자", true);
+        if (orderDtFrom.isAfter(orderDtTo)) {
+            throw badRequest("수주일자 시작일과 종료일을 확인해 주세요.");
+        }
+        LocalDate planDtFrom = parseSourceSearchDate(search.getPlanDtFrom(), "계획일자", false);
+        LocalDate planDtTo = parseSourceSearchDate(search.getPlanDtTo(), "계획일자", false);
+        if (planDtFrom != null && planDtTo != null && planDtFrom.isAfter(planDtTo)) {
+            throw badRequest("계획일자 시작일과 종료일을 확인해 주세요.");
+        }
         Map<String, Object> params = new HashMap<String, Object>();
         params.put("tenantId", tenantId);
-        params.put("keyword", normalize(keyword));
+        params.put("keyword", normalize(search.getKeyword()));
+        params.put("orderDtFrom", orderDtFrom);
+        params.put("orderDtTo", orderDtTo);
+        params.put("orderNo", normalize(search.getOrderNo()));
+        params.put("customerKeyword", normalize(search.getCustomerKeyword()));
+        params.put("materialKeyword", normalize(search.getMaterialKeyword()));
+        params.put("planNo", normalize(search.getPlanNo()));
+        params.put("planDtFrom", planDtFrom);
+        params.put("planDtTo", planDtTo);
         params.put("limit", 200);
         return salesDeliveryDAO.selectSourceOrders(params);
     }
@@ -724,6 +747,21 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
             return LocalDate.parse(value);
         } catch (DateTimeParseException exception) {
             throw badRequest("출하일자를 YYYY-MM-DD 형식으로 입력해 주세요.");
+        }
+    }
+
+    private LocalDate parseSourceSearchDate(String value, String label, boolean required) {
+        String normalized = normalize(value);
+        if (normalized == null) {
+            if (required) {
+                throw badRequest(label + " 기준일의 시작일과 종료일을 입력해 주세요.");
+            }
+            return null;
+        }
+        try {
+            return LocalDate.parse(normalized);
+        } catch (DateTimeParseException exception) {
+            throw badRequest(label + "을 YYYY-MM-DD 형식으로 입력해 주세요.");
         }
     }
 

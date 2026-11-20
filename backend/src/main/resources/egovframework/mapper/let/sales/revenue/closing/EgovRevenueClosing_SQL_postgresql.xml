@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="RevenueClosingDAO">
+    <select id="selectDetails" parameterType="map"
+            resultType="egovframework.let.sales.revenue.closing.domain.model.RevenueClosingDetailVO">
+        SELECT d.sales_delivery_detail_id AS "rowId",
+               h.sales_delivery_id AS "salesDeliveryId",
+               h.delivery_no AS "deliveryNo",
+               to_char(h.delivery_dt, 'YYYY-MM-DD') AS "deliveryDt",
+               COALESCE(o.order_no, '') AS "orderNo",
+               h.customer_id AS "customerId",
+               c.customer_code AS "customerCode",
+               COALESCE(c.customer_name, c.customer_code) AS "customerName",
+               m.material_code AS "materialCode",
+               m.material_name AS "materialName",
+               CASE WHEN d.revenue_closed_at IS NULL THEN 'OPEN' ELSE 'CLOSED' END AS "closingStatus",
+               d.delivery_qty AS "quantity",
+               d.supply_amt AS "salesAmount",
+               d.vat_amt AS "vatAmount",
+               d.total_amt AS "totalAmount"
+        FROM tb_sales_delivery_hd h
+        JOIN tb_sales_delivery_dt d
+          ON d.sales_delivery_id = h.sales_delivery_id
+         AND d.tenant_id = h.tenant_id
+        JOIN tb_customer_info c
+          ON c.customer_id = h.customer_id
+         AND c.tenant_id = h.tenant_id
+        LEFT JOIN tb_sales_order_hd o
+          ON o.sales_order_id = d.sales_order_id
+         AND o.tenant_id = h.tenant_id
+        JOIN tb_material_info m
+          ON m.material_id = d.material_id
+         AND m.tenant_id = h.tenant_id
+        WHERE h.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+          AND h.delivery_dt BETWEEN #{deliveryDtFrom, jdbcType=DATE} AND #{deliveryDtTo, jdbcType=DATE}
+        <if test="customerIds != null and customerIds.size() > 0">
+          AND h.customer_id IN
+          <foreach collection="customerIds" item="customerId" open="(" separator="," close=")">
+            #{customerId, jdbcType=BIGINT}
+          </foreach>
+        </if>
+          AND (
+            #{keyword, jdbcType=VARCHAR} = ''
+            OR h.delivery_no ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
+            OR o.order_no ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
+            OR c.customer_code ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
+            OR c.customer_name ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
+            OR m.material_code ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
+            OR m.material_name ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
+          )
+        ORDER BY h.delivery_dt DESC, h.sales_delivery_id DESC, d.line_no
+    </select>
+
+    <select id="selectCustomerSummaries" parameterType="map"
+            resultType="egovframework.let.sales.revenue.closing.domain.model.RevenueClosingCustomerSummaryVO">
+        SELECT h.customer_id AS "customerId",
+               c.customer_code AS "customerCode",
+               COALESCE(c.customer_name, c.customer_code) AS "customerName",
+               COUNT(*) AS "totalCount",
+               COUNT(*) FILTER (WHERE d.revenue_closed_at IS NOT NULL) AS "closedCount",
+               COUNT(*) FILTER (WHERE d.revenue_closed_at IS NULL) AS "openCount"
+        FROM tb_sales_delivery_hd h
+        JOIN tb_sales_delivery_dt d
+          ON d.sales_delivery_id = h.sales_delivery_id
+         AND d.tenant_id = h.tenant_id
+        JOIN tb_material_info m
+          ON m.material_id = d.material_id
+         AND m.tenant_id = h.tenant_id
+        JOIN tb_customer_info c
+          ON c.customer_id = h.customer_id
+         AND c.tenant_id = h.tenant_id
+        LEFT JOIN tb_sales_order_hd o
+          ON o.sales_order_id = h.sales_order_id
+         AND o.tenant_id = h.tenant_id
+        WHERE h.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+          AND h.delivery_dt BETWEEN #{deliveryDtFrom, jdbcType=DATE} AND #{deliveryDtTo, jdbcType=DATE}
+        <if test="customerIds != null and customerIds.size() > 0">
+          AND h.customer_id IN
+          <foreach collection="customerIds" item="customerId" open="(" separator="," close=")">
+            #{customerId, jdbcType=BIGINT}
+          </foreach>
+        </if>
+          AND (
+            #{keyword, jdbcType=VARCHAR} = ''
+            OR h.delivery_no ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
+            OR o.order_no ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
+            OR c.customer_code ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
+            OR c.customer_name ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
+            OR d.material_id IS NOT NULL AND (
+                m.material_code ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
+                OR m.material_name ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
+            )
+          )
+        GROUP BY h.customer_id, c.customer_code, c.customer_name
+        ORDER BY c.customer_name ASC NULLS LAST, c.customer_code ASC, h.customer_id
+    </select>
+
+    <select id="lockDetailsForClosing" parameterType="map" resultType="map">
+        SELECT d.sales_delivery_detail_id AS "salesDeliveryDetailId",
+               d.revenue_closed_at AS "revenueClosedAt",
+               EXISTS (
+                   SELECT 1
+                   FROM tb_sales_statement_dt sd
+                   JOIN tb_sales_statement_hd sh
+                     ON sh.sales_statement_id = sd.sales_statement_id
+                    AND sh.tenant_id = sd.tenant_id
+                   WHERE sd.tenant_id = d.tenant_id
+                     AND sd.sales_delivery_detail_id = d.sales_delivery_detail_id
+                     AND sh.use_at = 'Y'
+               ) AS "hasActiveStatement"
+        FROM tb_sales_delivery_dt d
+        JOIN tb_sales_delivery_hd h
+          ON h.sales_delivery_id = d.sales_delivery_id
+         AND h.tenant_id = d.tenant_id
+        WHERE d.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+          AND d.sales_delivery_detail_id IN
+          <foreach collection="salesDeliveryDetailIds" item="detailId" open="(" separator="," close=")">
+              #{detailId, jdbcType=BIGINT}
+          </foreach>
+        ORDER BY d.sales_delivery_detail_id
+        FOR UPDATE OF h, d
+    </select>
+
+    <update id="markDetailsClosed" parameterType="map">
+        UPDATE tb_sales_delivery_dt
+        SET revenue_closed_at = CURRENT_TIMESTAMP,
+            revenue_closed_by = #{userId, jdbcType=VARCHAR}
+        WHERE tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND revenue_closed_at IS NULL
+          AND sales_delivery_detail_id IN
+          <foreach collection="salesDeliveryDetailIds" item="detailId" open="(" separator="," close=")">
+              #{detailId, jdbcType=BIGINT}
+          </foreach>
+    </update>
+</mapper>

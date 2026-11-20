@@ -95,6 +95,7 @@ type GridRowProps<T extends object> = {
   ) => { side: 'left' | 'right'; offset: number; shadow?: boolean } | undefined;
   cellAdornment?: (row: T, column: F1GridColumn<T>) => ReactNode;
   showCheckbox?: boolean;
+  isRowSelectable?: (row: T) => boolean;
   showFormAction?: boolean;
   formActionPinnedShadow?: boolean;
   onOpenRowForm?: (row: T) => void;
@@ -176,6 +177,7 @@ const areGridRowPropsEqual = <T extends object>(
     Object.is(prev.getPinOffset, next.getPinOffset) &&
     Object.is(prev.cellAdornment, next.cellAdornment) &&
     prev.showCheckbox === next.showCheckbox &&
+    Object.is(prev.isRowSelectable, next.isRowSelectable) &&
     prev.showFormAction === next.showFormAction &&
     prev.formActionPinnedShadow === next.formActionPinnedShadow &&
     Object.is(prev.onOpenRowForm, next.onOpenRowForm)
@@ -232,6 +234,7 @@ const GridRowInner = <T extends object>({
   getPinOffset,
   cellAdornment,
   showCheckbox = true,
+  isRowSelectable,
   showFormAction = false,
   formActionPinnedShadow = true,
   onOpenRowForm,
@@ -460,6 +463,7 @@ const GridRowInner = <T extends object>({
             size="small"
             aria-label={`${rowId} 행 선택`}
             checked={isSelected}
+            disabled={isRowSelectable ? !isRowSelectable(row) : false}
             onClick={(event) => {
               event.stopPropagation();
               onSetRowSelection(rowId, !isSelected);

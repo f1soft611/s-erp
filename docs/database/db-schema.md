@@ -64,11 +64,15 @@
 | hd | remark, use_at, created_by, created_at, updated_by, updated_at | varchar, char, timestamp | 비고·사용 여부·변경 이력 |
 | dt | sales_statement_detail_id | bigint | 상세 PK |
 | dt | sales_statement_id, tenant_id | bigint | 명세서 헤더 복합 FK |
+| dt | sales_delivery_detail_id | bigint | 원본 출하 상세 ID, nullable; `(tenant_id, sales_delivery_detail_id)` unique로 중복 발행 방지 |
 | dt | line_no | integer | 명세서 내 행 번호 |
 | dt | material_code, material_name, material_spec, unit | varchar | 품목 정보 스냅샷 |
 | dt | delivery_qty, unit_price, supply_amt, vat_amt, total_amt | numeric(15,2) | 출하 수량과 금액 스냅샷 |
 
-- 활성 명세서는 `(tenant_id, sales_delivery_id)` 부분 유일 인덱스로 출하당 한 건만 허용한다. 명세서를 비활성화하면 재등록할 수 있다.
+- 매출마감 batch는 거래처별 한 헤더에 여러 출하 상세를 묶을 수 있다. 헤더 `sales_delivery_id`는 대표 출하이며 상세의 원본 출하 상세 ID가 실제 출처를 식별한다.
+- 기존 헤더의 `(tenant_id, sales_delivery_id)` 활성 unique index를 상세의 `(tenant_id, sales_delivery_detail_id)` 부분 unique index로 대체한다. 명세서 soft-delete 시 상세 원본 ID 연결을 해제해 재발행을 허용한다.
+- `tb_sales_delivery_dt.revenue_closed_at` 및 `revenue_closed_by`는 상세 행의 명시적 마감 기록이며, 일반/AUTO 거래명세서 발행은 두 필드를 설정하지 않는다.
+- [20261120_002 변경 SQL/롤백/이력](20261120/20261120_002_change_sales_statement_detail_source_and_revenue_closing.md), [backend 사본](../../backend/DATABASE/20261120). SQL은 작성만 수행하며 실제 DB에는 적용하지 않는다.
 - SQL과 롤백은 `20261109_007_create_sales_statement.sql`, `20261109_007_rollback_sales_statement.sql`을 따른다.
 
 ### 2-4. tb_login_account
@@ -984,11 +988,14 @@
 | | `delivery_qty` | `numeric(15,2)` | NOT NULL | 양수 납품수량 |
 | | `unit_price`, `supply_amt`, `total_amt` | `numeric(15,2)` | NOT NULL | 비음수 단가/공급가/합계 |
 | | `vat_amt` | `numeric(15,2)` | NOT NULL, 0 | 비음수 부가세 |
+| | `revenue_closed_at` | `timestamp without time zone` | NULL | 명시적 매출마감 일시; 일반 명세서 발행으로 설정하지 않음 |
+| | `revenue_closed_by` | `varchar(100)` | NULL | 명시적 매출마감 사용자 |
 
 - 부모/상세의 tenant와 구분은 복합 FK로 제한한다. 상세별 수주·수주상세 및 계획상세 복합 FK가 각 행의 원 수주를 검증하며, 헤더의 대표 수주에 종속시키는 복합 FK는 다중 수주 출하를 위해 제거한다. DIRECT는 source IDs가 모두 NULL, ORDER는 모두 NOT NULL인 CHECK를 둔다.
 - 기존 `tb_sales_order_dt`에 `(sales_order_detail_id,sales_order_id,tenant_id,material_id)` 복합 UNIQUE를 추가한다. 납품상세는 이 키를 참조하여 수주·품목·tenant 일치를 보장한다.
 - 수량 양수, 금액 비음수/NaN 거부, 상세 합계=공급가+VAT CHECK. 문서 내 중복 수주상세는 UNIQUE로 제한한다.
 - tenant+일자/거래처/수주참조, 상세 tenant+품목/수주참조 인덱스를 제공한다.
+- `revenue_closed_at`/`revenue_closed_by`는 [20261120_002](20261120/20261120_002_change_sales_statement_detail_source_and_revenue_closing.md) 스키마 변경안으로 추가된다. 기존 발행 이력은 마감으로 backfill하지 않아 OPEN 상태를 유지한다.
 - 납품 저장/수정/삭제는 수주 헤더 잠금 후 기존 `shipped_qty`를 증감한다. 논리삭제 후에도 납품상세 이력은 유지되며 연결 수주의 상세 재생성/삭제는 차단한다.
 - 다중 수주 출하는 동일 거래처 수주만 한 문서로 묶으며 헤더에는 첫 상세의 대표 수주 ID를, 상세에는 각 행의 실제 수주 ID를 저장한다. [20261112_008 변경 이력 및 롤백](20261112/20261112_008_change_multi_order_sales_delivery_schema.md).
 - [DDL/메뉴/롤백 및 변경이력](20261104/20261104_001_change_sales_delivery_schema.md), [backend 사본](../../backend/DATABASE/20261104), [상세사양](../spec/20261104/20261104_001_납품관리_상세사양서.md). 스크립트 작성만 수행하며 실제 DB에는 적용하지 않는다.

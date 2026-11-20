@@ -4596,6 +4596,37 @@ describe('F1-GRID interaction', () => {
     ]);
   });
 
+  it('disables row selection when the row is not selectable and excludes it from select-all', async () => {
+    const selectableRows = [
+      { id: 'open', label: 'Open line', canClose: true },
+      { id: 'closed', label: 'Closed line', canClose: false },
+    ];
+    const selectableColumns: F1GridColumn<(typeof selectableRows)[number]>[] = [
+      { field: 'label', headerName: 'Line' },
+    ];
+    const onSelectionChange = vi.fn();
+
+    render(
+      <F1Grid
+        rows={selectableRows}
+        columns={selectableColumns}
+        rowKey="id"
+        selectionMode="row"
+        multiSelect
+        isRowSelectable={(row) => row.canClose}
+        onSelectionChange={onSelectionChange}
+      />,
+    );
+
+    expect(screen.getByLabelText('closed 행 선택').querySelector('input')).toBeDisabled();
+    fireEvent.click(screen.getByLabelText('전체 행 선택').querySelector('input')!);
+
+    await waitFor(() => {
+      expect(onSelectionChange).toHaveBeenLastCalledWith(['open']);
+    });
+    expect(screen.getByLabelText('closed 행 선택')).not.toBeChecked();
+  });
+
   it('commits an inline text edit on Enter and returns the updated row', () => {
     const gridRef = createRef<F1GridRef<MenuRow>>();
 

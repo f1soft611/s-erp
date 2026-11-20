@@ -8,7 +8,8 @@ import { createDelivery, getDelivery, updateDelivery, getDeliveryStatus, searchS
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
 import { getSystemDate } from '../src/shared/services/systemDateService';
 
-vi.mock('../src/shared/services/systemDateService', () => ({
+vi.mock('../src/shared/services/systemDateService', async (original) => ({
+  ...await original<object>(),
   getSystemDate: vi.fn(),
 }));
 vi.mock('../src/pages/sales/shipment/delivery/create/services/salesDelivery.service', async (original) => ({
@@ -35,6 +36,11 @@ const props = {
 };
 function mount(node: React.ReactNode) {
   render(<RouterProvider router={createMemoryRouter([{ path: '/', element: node }])} />);
+}
+async function searchSourceOrderByEnter() {
+  const searchInput = screen.getByRole('textbox', { name: '수주 선택 빠른 검색' });
+  await waitFor(() => expect(searchInput).toBeEnabled());
+  fireEvent.keyDown(searchInput, { key: 'Enter', code: 'Enter' });
 }
 async function openStatusDocument(mode: 'view' | 'edit') {
   fireEvent.click(await screen.findByRole('button', { name: 'SD-1 상세 보기' }));
@@ -283,7 +289,7 @@ it('selects one order, populates remaining lines and prevents source identity ed
   fireEvent.mouseDown(screen.getByRole('combobox'));
   fireEvent.click(screen.getByRole('option', { name: '수주출하' }));
   fireEvent.click(screen.getByRole('button', { name: '수주 선택', exact: true }));
-  fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
+  await searchSourceOrderByEnter();
   const sourceGrid = await screen.findByRole('grid', { name: '출하 대상 수주 목록' });
   expect(within(sourceGrid).getByRole('gridcell', { name: '거래처' })).toHaveStyle({ justifyContent: 'center' });
   expect(within(sourceGrid).getByRole('gridcell', { name: 'M20' })).toHaveStyle({ justifyContent: 'center' });
@@ -309,22 +315,130 @@ it('selects one order, populates remaining lines and prevents source identity ed
       deliveryQty: 6, unitPrice: 100, vatAmt: 60 }],
   })));
 }, 15000);
-it('keeps source-order search controls together in a full-width modal form', async () => {
+it('uses a full-width status-style keyword search without a submit button', async () => {
   vi.mocked(searchSourceOrders).mockResolvedValue([]);
   mount(<SalesDeliveryCreatePage {...props} />);
   fireEvent.mouseDown(screen.getByRole('combobox'));
   fireEvent.click(screen.getByRole('option', { name: '수주출하' }));
   fireEvent.click(screen.getByRole('button', { name: '수주 선택', exact: true }));
-  const searchForm = await screen.findByRole('form', { name: '수주 선택 검색' });
-  const searchInput = within(searchForm).getByRole('textbox', { name: '수주번호·거래처 검색' });
-  const searchButton = within(searchForm).getByRole('button', { name: '검색', exact: true });
+  const searchGroup = await screen.findByRole('group', { name: '수주 선택 검색' });
+  const searchInput = within(searchGroup).getByRole('textbox', { name: '수주 선택 빠른 검색' });
   const searchField = searchInput.closest('.MuiOutlinedInput-root');
   expect(searchField).not.toBeNull();
   expect(getComputedStyle(searchField!).height).toBe('40px');
-  expect(getComputedStyle(searchButton).height).toBe('40px');
+  expect(within(searchGroup).queryByRole('button', { name: '검색', exact: true })).not.toBeInTheDocument();
+  await waitFor(() => expect(searchInput).toBeEnabled());
   fireEvent.change(searchInput, { target: { value: 'SO-찾기' } });
-  fireEvent.submit(searchForm);
-  await waitFor(() => expect(searchSourceOrders).toHaveBeenCalledWith('SO-찾기'));
+  expect(within(searchGroup).getByRole('button', { name: '수주 선택 검색어 초기화' })).toBeInTheDocument();
+  fireEvent.keyDown(searchInput, { key: 'Enter', code: 'Enter' });
+  await waitFor(() => expect(searchSourceOrders).toHaveBeenCalledWith(expect.objectContaining({
+    keyword: 'SO-찾기',
+    orderDtFrom: '2000-01-03',
+    orderDtTo: '2000-02-03',
+  })));
+});
+it('provides required order-date quick ranges and applies detailed source filters', async () => {
+  vi.mocked(searchSourceOrders).mockResolvedValue([]);
+  render(<SourceOrderPicker open onClose={() => undefined} onSelect={() => undefined} />);
+
+  const searchGroup = await screen.findByRole('group', { name: '수주 선택 검색' });
+  fireEvent.click(within(searchGroup).getByRole('button', { name: '상세 검색 열기' }));
+  const detailSearch = await screen.findByRole('dialog', { name: '상세 검색' });
+  const orderDateFrom = within(detailSearch).getByLabelText('수주일자 시작일');
+  const orderDateTo = within(detailSearch).getByLabelText('수주일자 종료일');
+
+  await waitFor(() => {
+    expect(orderDateFrom).toHaveValue('2000-01-03');
+    expect(orderDateTo).toHaveValue('2000-02-03');
+  });
+  expect(orderDateFrom).toBeRequired();
+  expect(orderDateTo).toBeRequired();
+  fireEvent.click(within(detailSearch).getByRole('button', { name: '이번주', exact: true }));
+  await waitFor(() => {
+    expect(orderDateFrom).toHaveValue('2000-01-31');
+    expect(orderDateTo).toHaveValue('2000-02-06');
+  });
+  expect(within(detailSearch).getByRole('group', { name: '수주일자 빠른 날짜 세팅' })).toBeInTheDocument();
+
+  fireEvent.change(within(detailSearch).getByLabelText('수주번호'), { target: { value: 'SO-7' } });
+  fireEvent.change(within(detailSearch).getByLabelText('거래처'), { target: { value: 'C10' } });
+  fireEvent.change(within(detailSearch).getByLabelText('품목'), { target: { value: 'M20' } });
+  fireEvent.change(within(detailSearch).getByLabelText('계획번호'), { target: { value: 'DP-2' } });
+  fireEvent.change(within(detailSearch).getByLabelText('계획일자 시작일'), { target: { value: '2000-02-01' } });
+  fireEvent.change(within(detailSearch).getByLabelText('계획일자 종료일'), { target: { value: '2000-02-28' } });
+  fireEvent.click(within(detailSearch).getByRole('button', { name: '검색', exact: true }));
+
+  await waitFor(() => expect(searchSourceOrders).toHaveBeenCalledWith({
+    keyword: '',
+    orderDtFrom: '2000-01-31',
+    orderDtTo: '2000-02-06',
+    orderNo: 'SO-7',
+    customerKeyword: 'C10',
+    materialKeyword: 'M20',
+    planNo: 'DP-2',
+    planDtFrom: '2000-02-01',
+    planDtTo: '2000-02-28',
+  }));
+});
+it('blocks source-order search when the required order-date period is incomplete', async () => {
+  vi.mocked(searchSourceOrders).mockResolvedValue([]);
+  render(<SourceOrderPicker open onClose={() => undefined} onSelect={() => undefined} />);
+
+  const searchGroup = await screen.findByRole('group', { name: '수주 선택 검색' });
+  fireEvent.click(within(searchGroup).getByRole('button', { name: '상세 검색 열기' }));
+  const detailSearch = await screen.findByRole('dialog', { name: '상세 검색' });
+  await waitFor(() => expect(within(detailSearch).getByLabelText('수주일자 시작일')).toHaveValue('2000-01-03'));
+  fireEvent.change(within(detailSearch).getByLabelText('수주일자 시작일'), { target: { value: '' } });
+  fireEvent.click(within(detailSearch).getByRole('button', { name: '검색', exact: true }));
+
+  expect(await within(detailSearch).findByText('필수 입력입니다.')).toBeInTheDocument();
+  expect(searchSourceOrders).not.toHaveBeenCalled();
+});
+it('makes the source-order grid inert while detailed search is open', async () => {
+  const row = {
+    salesOrderId: 7, salesOrderDetailId: 70, salesDeliveryPlanDetailId: 700, orderNo: 'SO-7', orderDt: '2026-11-04',
+    customerId: 10, customerCode: 'C10', customerName: '거래처', planNo: 'DP-1', planDt: '2026-11-08',
+    deliveryPlace: '창고', deliveryMethod: '택배', lineNo: 1, materialId: 20, materialCode: 'M20',
+    materialName: '품목', unit: 'EA', orderQty: 10, shippedQty: 0, plannedQty: 5, deliveredQty: 0,
+    remainingQty: 5, unitPrice: 100,
+  };
+  vi.mocked(searchSourceOrders).mockResolvedValue([row]);
+  render(<SourceOrderPicker open onClose={() => undefined} onSelect={() => undefined} />);
+  await searchSourceOrderByEnter();
+
+  const searchGroup = await screen.findByRole('group', { name: '수주 선택 검색' });
+  const grid = await screen.findByRole('grid', { name: '출하 대상 수주 목록' });
+  expect(await within(grid).findByRole('gridcell', { name: 'DP-1' })).toBeInTheDocument();
+  fireEvent.click(within(searchGroup).getByRole('button', { name: '상세 검색 열기' }));
+  await screen.findByRole('dialog', { name: '상세 검색' });
+
+  await waitFor(() => expect(grid.closest('[inert]')).toBeInTheDocument());
+  fireEvent.click(within(searchGroup).getByRole('button', { name: '상세 검색 닫기' }));
+  await waitFor(() => expect(grid.closest('[inert]')).not.toBeInTheDocument());
+});
+it('dims order-picker content like the status backdrop without adding a page backdrop', async () => {
+  render(<SourceOrderPicker open onClose={() => undefined} onSelect={() => undefined} />);
+  const pickerDialog = await screen.findByRole('dialog', { name: '수주 선택' });
+  const searchGroup = await screen.findByRole('group', { name: '수주 선택 검색' });
+  const searchInput = within(searchGroup).getByRole('textbox', { name: '수주 선택 빠른 검색' });
+  fireEvent.click(within(searchGroup).getByRole('button', { name: '상세 검색 열기' }));
+  await screen.findByRole('dialog', { name: '상세 검색' });
+
+  expect(getComputedStyle(searchInput.closest('.MuiOutlinedInput-root')!).backgroundColor).toBe('rgb(255, 255, 255)');
+  const backdrop = await screen.findByTestId('source-order-picker-detail-backdrop');
+  expect(backdrop.parentElement).toBe(pickerDialog);
+  expect(backdrop.closest('.MuiDialogContent-root')).toBeNull();
+  expect(backdrop).toHaveAttribute('aria-hidden', 'true');
+  expect(backdrop).toHaveStyle({
+    position: 'absolute',
+    inset: '0px',
+    zIndex: '12',
+    backgroundColor: 'rgba(15, 23, 42, 0.12)',
+  });
+  expect(backdrop).not.toHaveStyle({ backdropFilter: 'blur(2px)' });
+
+  fireEvent.click(within(searchGroup).getByRole('button', { name: '상세 검색 닫기' }));
+  await waitFor(() => expect(screen.queryByTestId('source-order-picker-detail-backdrop')).not.toBeInTheDocument());
 });
 it('selects only checked plan-detail rows across multiple plans', async () => {
   const base = {
@@ -341,8 +455,9 @@ it('selects only checked plan-detail rows across multiple plans', async () => {
   vi.mocked(searchSourceOrders).mockResolvedValue(rows);
   const onSelect = vi.fn();
   render(<SourceOrderPicker open onClose={() => undefined} onSelect={onSelect} />);
-  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  await searchSourceOrderByEnter();
   const grid = await screen.findByRole('grid', { name: '출하 대상 수주 목록' });
+  expect(await within(grid).findByRole('gridcell', { name: 'SO-7' })).toBeInTheDocument();
   expect(within(grid).getByRole('columnheader', { name: '전체 행 선택' })).toBeInTheDocument();
   expect(within(grid).getByRole('columnheader', { name: '수주번호' })).toBeInTheDocument();
   expect(within(grid).getByRole('columnheader', { name: '계획번호' })).toBeInTheDocument();
@@ -369,8 +484,9 @@ it('does not show zero-balance plan details in the delivery picker', async () =>
     { ...base, salesOrderDetailId: 71, salesDeliveryPlanDetailId: 701, planNo: 'DP-2', remainingQty: 0 },
   ]);
   render(<SourceOrderPicker open onClose={() => undefined} onSelect={() => undefined} />);
-  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  await searchSourceOrderByEnter();
   const grid = await screen.findByRole('grid', { name: '출하 대상 수주 목록' });
+  expect(await within(grid).findByText('DP-1')).toBeInTheDocument();
   expect(within(grid).getAllByRole('row')).toHaveLength(2);
   expect(within(grid).queryByText('DP-2')).not.toBeInTheDocument();
 });
@@ -388,7 +504,7 @@ it('keeps the order picker open when checked orders belong to different customer
   ]);
   const onSelect = vi.fn();
   render(<SourceOrderPicker open onClose={() => undefined} onSelect={onSelect} />);
-  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  await searchSourceOrderByEnter();
   const dialog = await screen.findByRole('dialog', { name: '수주 선택' });
   const grid = within(dialog).getByRole('grid', { name: '출하 대상 수주 목록' });
   const firstRow = within(grid).getAllByRole('gridcell', { name: 'SO-7' })[0].closest('[role="row"]')!;
@@ -417,7 +533,7 @@ it('combines multiple same-customer orders into one delivery with per-line sourc
   fireEvent.mouseDown(screen.getByRole('combobox', { name: '출하구분' }));
   fireEvent.click(screen.getByRole('option', { name: '수주출하' }));
   fireEvent.click(screen.getByRole('button', { name: '수주 선택', exact: true }));
-  fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
+  await searchSourceOrderByEnter();
   const grid = await screen.findByRole('grid', { name: '출하 대상 수주 목록' });
   const firstRow = within(grid).getAllByRole('gridcell', { name: 'SO-7' })[0].closest('[role="row"]')!;
   const secondRow = within(grid).getByRole('gridcell', { name: 'SO-8' }).closest('[role="row"]')!;

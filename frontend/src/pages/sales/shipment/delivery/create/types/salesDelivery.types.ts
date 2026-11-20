@@ -87,6 +87,17 @@ export type SourceOrderRow = {
   remainingQty: number;
   unitPrice: number;
 };
+export type SourceOrderSearchFilters = {
+  keyword: string;
+  orderDtFrom: string;
+  orderDtTo: string;
+  orderNo: string;
+  customerKeyword: string;
+  materialKeyword: string;
+  planNo: string;
+  planDtFrom: string;
+  planDtTo: string;
+};
 export type DeliveryStatusRow = Omit<DeliveryItem, 'details' | 'totalAmt'> & DeliveryDetail;
 export type DeliveryFilters = {
   deliveryDtFrom: string;

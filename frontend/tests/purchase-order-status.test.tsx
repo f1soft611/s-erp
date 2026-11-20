@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { useLayoutEffect } from 'react';
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiGet, apiPost, apiPut } from '../src/shared/services/apiClient';
@@ -22,7 +23,17 @@ import type {
   PurchaseOrderDetailItem,
   PurchaseOrderItem,
 } from '../src/pages/materials/order/create/types/purchaseOrder.types';
-import type { PurchaseOrderStatusRow } from '../src/pages/materials/order/status/types/purchaseOrderStatus.types';
+import type { PurchaseOrderStatusFilters, PurchaseOrderStatusRow } from '../src/pages/materials/order/status/types/purchaseOrderStatus.types';
+import {
+  usePurchaseOrderStatusDetail,
+  usePurchaseOrderStatusList,
+  usePurchaseOrderStatusSearch,
+} from '../src/pages/materials/order/status/hooks/usePurchaseOrderStatus';
+
+const orderDefaultsControl = vi.hoisted(() => ({
+  values: { orderDt: { from: '2026-11-01', to: '2026-11-30' } } as
+    { orderDt: { from: string; to: string } } | null,
+}));
 
 vi.mock('../src/shared/services/apiClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/shared/services/apiClient')>();
@@ -43,7 +54,7 @@ vi.mock('../src/pages/co/master/common-code/services/commonCodeManagement.servic
 
 vi.mock('../src/shared/hooks/usePageSearchDefaults', () => ({
   usePageSearchDefaults: () => ({
-    values: { orderDt: { from: '2026-11-01', to: '2026-11-30' } },
+    values: orderDefaultsControl.values,
     loading: false,
     error: null,
     retry: vi.fn(),
@@ -165,6 +176,186 @@ describe('purchase order status service', () => {
   });
 });
 
+describe('purchase order status start commits', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+    orderDefaultsControl.values = { orderDt: { from: '2026-11-01', to: '2026-11-30' } };
+  });
+
+  it.each([false, true])('publishes order search defaults in the first eligible commit with passive storage and restored edits (initially ready: %s)', (initiallyReady) => {
+    const key = 's-erp:page:materials-purchase-order-status';
+    const loadedDefaults = { orderDt: { from: '2026-11-01', to: '2026-11-30' } };
+    const defaults = { ...loadedDefaults, status: 'ACTIVE' };
+    orderDefaultsControl.values = initiallyReady ? loadedDefaults : null;
+    const writes = vi.spyOn(Storage.prototype, 'setItem');
+    const commits: Array<{ initialized: boolean; keyword: string; values: Record<string, unknown>; applied: Record<string, unknown>; filters: PurchaseOrderStatusFilters | null; writes: number }> = [];
+    try {
+      const { result, rerender, unmount } = renderHook(() => {
+        const search = usePurchaseOrderStatusSearch();
+        useLayoutEffect(() => {
+          commits.push({
+            initialized: search.defaultsInitialized, keyword: search.keyword, values: search.detailValues,
+            applied: search.appliedDetailValues, filters: search.appliedFilters,
+            writes: writes.mock.calls.filter(([storedKey]) => storedKey === key).length,
+          });
+        });
+        return search;
+      });
+      if (!initiallyReady) {
+        expect(result.current.defaultsInitialized).toBe(false);
+        expect(window.sessionStorage.getItem(key)).toBeNull();
+        act(() => result.current.setKeyword('Owned pending'));
+        commits.length = 0;
+        orderDefaultsControl.values = loadedDefaults;
+        rerender();
+      }
+      expect(commits[0]).toMatchObject({
+        initialized: true, keyword: '', values: defaults, applied: defaults,
+        filters: { orderDtFrom: '2026-11-01', orderDtTo: '2026-11-30', status: 'ACTIVE' }, writes: 0,
+      });
+      expect(JSON.parse(window.sessionStorage.getItem(key)!)).toEqual({ version: 2, value: { keyword: '', detailValues: defaults } });
+      const initialSnapshot = window.sessionStorage.getItem(key);
+      act(() => {
+        result.current.setKeyword('Owned applied');
+        result.current.setDetailValues({ ...defaults, supplierName: 'Owned team', status: 'ALL' });
+      });
+      expect(result.current.appliedFilters?.keyword).toBeUndefined();
+      expect(window.sessionStorage.getItem(key)).toBe(initialSnapshot);
+      act(() => result.current.applySearch());
+      expect(result.current.appliedFilters).toMatchObject({ keyword: 'Owned applied', supplierKeyword: 'Owned team', status: 'ALL' });
+      const appliedSnapshot = window.sessionStorage.getItem(key);
+      const latestDefaults = { orderDt: { from: '2026-12-01', to: '2026-12-31' } };
+      orderDefaultsControl.values = latestDefaults;
+      rerender();
+      expect(window.sessionStorage.getItem(key)).toBe(appliedSnapshot);
+      unmount();
+      const reopened = renderHook(() => usePurchaseOrderStatusSearch());
+      expect(reopened.result.current.keyword).toBe('Owned applied');
+      expect(reopened.result.current.appliedFilters).toMatchObject({ orderDtFrom: '2026-11-01', status: 'ALL' });
+      act(() => reopened.result.current.resetSearch());
+      expect(reopened.result.current.keyword).toBe('');
+      expect(reopened.result.current.detailValues).toEqual({ ...latestDefaults, status: 'ACTIVE' });
+      expect(apiGetMock).not.toHaveBeenCalled();
+    } finally {
+      writes.mockRestore();
+    }
+  });
+
+  it.each([false, true])('publishes order list-start commits without changing quiet reloads, paused versions or cancellation (initially ready: %s)', async (initiallyReady) => {
+    const requests: Array<{ resolve: (value: { resultList: PurchaseOrderStatusRow[] }) => void; reject: (error: Error) => void }> = [];
+    apiGetMock.mockImplementation(() => new Promise<{ resultList: PurchaseOrderStatusRow[] }>((resolve, reject) => {
+      requests.push({ resolve, reject });
+    }));
+    const filters: PurchaseOrderStatusFilters = { orderDtFrom: '2026-11-01', orderDtTo: '2026-11-30', status: 'ACTIVE' };
+    const initialProps: { filters: PurchaseOrderStatusFilters | null } = { filters: initiallyReady ? filters : null };
+    const commits: Array<{ loading: boolean; hasLoaded: boolean; error: string; initialLoading: boolean }> = [];
+    const { result, rerender } = renderHook(({ filters: current }) => {
+      const list = usePurchaseOrderStatusList(current);
+      useLayoutEffect(() => {
+        commits.push({ loading: list.loading, hasLoaded: list.hasLoaded, error: list.error, initialLoading: list.initialLoad.loading });
+      });
+      return list;
+    }, { initialProps });
+    if (!initiallyReady) {
+      expect(requests).toHaveLength(0);
+      commits.length = 0;
+      rerender({ filters });
+    }
+    const normalStart = { loading: true, hasLoaded: false, error: '', initialLoading: true };
+    const quietStart = { ...normalStart, loading: false };
+    expect(commits[0]).toEqual(normalStart);
+    await act(async () => requests[0].reject(new Error('Owned order list failure')));
+    expect(result.current.error).toBe('Owned order list failure');
+    commits.length = 0;
+    act(() => result.current.retry());
+    expect(commits[0]).toEqual(normalStart);
+    const currentRows = [row(11)];
+    await act(async () => requests[1].resolve({ resultList: currentRows }));
+    commits.length = 0;
+    act(() => result.current.refreshQuietly());
+    expect(commits[0]).toEqual(quietStart);
+    expect(result.current.rows).toEqual(currentRows);
+    await act(async () => requests[2].resolve({ resultList: currentRows }));
+    commits.length = 0;
+    rerender({ filters: { ...filters, keyword: 'Owned changed' } });
+    expect(commits[0]).toEqual(normalStart);
+    rerender({ filters: { ...filters, keyword: 'Owned latest' } });
+    await act(async () => requests[3].resolve({ resultList: [] }));
+    expect(result.current.rows).toEqual(currentRows);
+    expect(result.current.loading).toBe(true);
+    await act(async () => requests[4].resolve({ resultList: currentRows }));
+    rerender({ filters: null });
+    act(() => result.current.refreshQuietly());
+    expect(requests).toHaveLength(5);
+    expect(result.current.loading).toBe(false);
+    commits.length = 0;
+    rerender({ filters });
+    expect(commits[0]).toEqual(quietStart);
+    await act(async () => requests[5].resolve({ resultList: currentRows }));
+    rerender({ filters });
+    expect(requests).toHaveLength(6);
+    expect(result.current.loading).toBe(false);
+    expect(result.current.hasLoaded).toBe(true);
+  });
+
+  it('publishes order detail-start commits without changing same-ID, editor or stale-response behavior', async () => {
+    const requests: Array<{ resolve: (value: PurchaseOrderItem) => void; reject: (error: Error) => void }> = [];
+    apiGetMock.mockImplementation(() => new Promise<{ item: PurchaseOrderItem }>((resolve, reject) => {
+      requests.push({ resolve: (value) => resolve({ item: value }), reject });
+    }));
+    const commits: Array<{ id: number | null; loading: boolean; error: string }> = [];
+    const { result } = renderHook(() => {
+      const detail = usePurchaseOrderStatusDetail();
+      useLayoutEffect(() => {
+        commits.push({ id: detail.selectedId, loading: detail.loading, error: detail.error });
+      });
+      return detail;
+    });
+    act(() => result.current.openDetail(700));
+    expect(commits.find(({ id }) => id === 700)).toEqual({ id: 700, loading: true, error: '' });
+    await act(async () => requests[0].reject(new Error('Owned order detail failure')));
+    expect(result.current.error).toBe('Owned order detail failure');
+    commits.length = 0;
+    act(() => result.current.refreshDetail());
+    expect(commits[0]).toEqual({ id: 700, loading: true, error: '' });
+    await act(async () => requests[1].resolve(orderItem('Y')));
+    act(() => result.current.openDetail(700));
+    expect(requests).toHaveLength(2);
+    expect(result.current.loading).toBe(false);
+    expect(result.current.item?.purchaseOrderId).toBe(700);
+    for (const mode of ['view', 'edit', 'close'] as const) {
+      act(() => result.current.openEditor(mode));
+      expect(result.current.editorMode).toBe(mode);
+      act(() => result.current.closeEditor());
+      expect(result.current.editorMode).toBeNull();
+    }
+    commits.length = 0;
+    act(() => result.current.refreshDetail());
+    expect(commits[0]).toEqual({ id: 700, loading: true, error: '' });
+    expect(result.current.item?.purchaseOrderId).toBe(700);
+    await act(async () => requests[2].resolve(orderItem('Y')));
+    act(() => result.current.openDetail(701));
+    act(() => result.current.closeDetail());
+    commits.length = 0;
+    act(() => result.current.openDetail(700));
+    expect(commits[0]).toEqual({ id: 700, loading: true, error: '' });
+    await act(async () => requests[3].resolve({ ...orderItem('Y'), purchaseOrderId: 701 }));
+    expect(result.current.item).toBeNull();
+    expect(result.current.loading).toBe(true);
+    await act(async () => requests[4].resolve(orderItem('Y')));
+    act(() => result.current.openEditor('close'));
+    act(() => result.current.closeDetail());
+    expect(result.current.editorMode).toBeNull();
+    act(() => result.current.refreshDetail());
+    expect(requests).toHaveLength(5);
+    expect(result.current.selectedId).toBeNull();
+    expect(result.current.loading).toBe(false);
+    expect(apiPostMock).not.toHaveBeenCalled();
+    expect(apiPutMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('PurchaseOrderStatusPage', () => {
   let current: PurchaseOrderItem;
   const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
@@ -183,6 +374,7 @@ describe('PurchaseOrderStatusPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    orderDefaultsControl.values = { orderDt: { from: '2026-11-01', to: '2026-11-30' } };
     window.sessionStorage.clear();
     current = orderItem('Y');
     apiGetMock.mockImplementation(async (path: string) => {

@@ -12,6 +12,18 @@ public class SalesStatementDAO extends EgovAbstractMapper {
         return selectOne("SalesStatementDAO.lockDelivery", params);
     }
 
+    public List<Map<String, Object>> lockDeliveryDetails(Map<String, Object> params) throws Exception {
+        return selectList("SalesStatementDAO.lockDeliveryDetails", params);
+    }
+
+    public List<Long> selectAvailableDetailIdsByDelivery(Map<String, Object> params) throws Exception {
+        return selectList("SalesStatementDAO.selectAvailableDetailIdsByDelivery", params);
+    }
+
+    public boolean existsActiveLine(Map<String, Object> params) throws Exception {
+        return Boolean.TRUE.equals(selectOne("SalesStatementDAO.existsActiveLine", params));
+    }
+
     public boolean existsActive(Map<String, Object> params) throws Exception {
         return Boolean.TRUE.equals(selectOne("SalesStatementDAO.existsActive", params));
     }
@@ -22,6 +34,10 @@ public class SalesStatementDAO extends EgovAbstractMapper {
 
     public int insertDetails(Map<String, Object> params) throws Exception {
         return insert("SalesStatementDAO.insertDetails", params);
+    }
+
+    public int clearSourceDetailLinks(Map<String, Object> params) throws Exception {
+        return update("SalesStatementDAO.clearSourceDetailLinks", params);
     }
 
     public Map<String, Object> selectHeader(Map<String, Object> params) throws Exception {

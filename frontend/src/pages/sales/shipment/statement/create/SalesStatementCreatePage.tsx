@@ -16,7 +16,7 @@ import type { SalesStatementCreateProps } from './types/salesStatementCreate.typ
 export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
   const { currentMenuName, content, breadcrumbItems, selectedMenuPermissions: permissions, embedded = false } = props;
   const {
-    id, item, source, rows, date, changeDate, commitDate, dateError, remark, setRemark, picker, setPicker, printing, setPrinting,
+    id, item, source, rows, selectedRowIds, setSelectedRowIds, date, changeDate, commitDate, dateError, remark, setRemark, picker, setPicker, printing, setPrinting,
     pending, error, setError, notice, canRead, canSave, canDelete, editable, dirty, blocker, dialog,
     choose, save, remove, handleNew, print,
   } = useSalesStatementCreate(props);
@@ -53,8 +53,10 @@ export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
                 <SearchIcon fontSize="small" />
               </IconButton></InputAdornment> } }} />
           <TextField size="small" label="거래처" value={source?.customerName ?? ''} slotProps={{ input: { readOnly: true } }} />
-          <DateEditor label="출하일자" variant="outlined" autoFocus={false} value={source?.deliveryDt ?? ''}
-            disabled onChange={() => {}} />
+          <DateEditor label="출하일자" variant="outlined" autoFocus={false}
+            value={source?.deliveryDt.split(', ')[0] ?? ''} disabled
+            onChange={changeDate}
+            helperText={source?.deliveryNo.includes(', ') ? '첫 출하 기준' : undefined} />
           <TextField size="small" label="비고" multiline minRows={2} sx={{ gridColumn: '1 / -1' }} value={remark}
             disabled={!editable} onChange={(event) => setRemark(event.target.value)} slotProps={{ htmlInput: { maxLength: 500 } }} />
         </Box>
@@ -65,7 +67,12 @@ export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
           <Typography variant="caption" color="text.secondary">출하 품목과 금액을 저장 시점 기준으로 보관합니다.</Typography>
         </Box>
         <Box sx={{ minHeight: 260, minWidth: 0, flex: '1 0 260px', overflow: 'hidden', px: 1 }}>
-          <StatementDetailGrid rows={rows} />
+          <StatementDetailGrid
+            rows={rows}
+            selectable={!id}
+            selectedRowIds={selectedRowIds}
+            onSelectionChange={setSelectedRowIds}
+          />
         </Box>
       </Paper>
     </Box>

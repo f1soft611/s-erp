@@ -50,7 +50,8 @@ public class SalesStatementApiController {
         require(user, "statement-create", Action.CREATE);
         if (payload == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명세서 내용을 입력해 주세요.");
         return result("item", service.create(user.getTenantId(), user.getId(),
-                payload.getSalesDeliveryId(), payload.getStatementDt(), payload.getRemark()));
+                payload.getSalesDeliveryId(), payload.getSalesDeliveryDetailIds(),
+                payload.getStatementDt(), payload.getRemark()));
     }
 
     @GetMapping("/source-deliveries")
@@ -155,6 +156,7 @@ public class SalesStatementApiController {
     @Setter
     public static class SaveRequest {
         private Long salesDeliveryId;
+        private List<Long> salesDeliveryDetailIds;
         private String statementDt;
         private String remark;
     }
