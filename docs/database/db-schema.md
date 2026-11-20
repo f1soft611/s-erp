@@ -87,6 +87,8 @@
 | use_at              | char      | 사용 여부          |
 | created_at          | timestamp | 생성 일시          |
 | updated_at          | timestamp | 수정 일시          |
+| password_change_required | char | 최초 로그인 시 비밀번호 변경 강제(Y/N, 기본 N). 관리자 초기화·사원등록 발급이 Y로 설정 (20261120_001, 적용 전) |
+| updated_by          | bigint    | 관리자 처리를 한 사용자(tb_user.user_id) (20261120_001, 적용 전) |
 
 역할:
 
@@ -1096,6 +1098,7 @@ PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 
 | `tax_type` | `varchar(30)` | NOT NULL, `TAXABLE` | 부가세구분(공통코드 `PURCHASE_TAX_TYPE`), `20261118_001` |
 | `vat_included_at` | `char(1)` | NOT NULL, `N` | 부가세 포함 여부 Y/N, `20261118_001` |
 | `foreign_unit_price` | `numeric(15,2)` | NULL | 외화단가(선택), `20261118_001` |
+| `order_type` | `varchar(50)` | NULL | 발주구분(공통코드 `PURCHASE_ORDER_TYPE` 코드값). 매입 행에서만 사용, `20261120_006` |
 | `start_dt`, `end_dt` | `date` | 시작일 NOT NULL, 종료일 NULL | 단가 적용기간 |
 | `moq` | `numeric(15,2)` | NULL | 최소주문수량 |
 | `use_at` | `char(1)` | NOT NULL, `Y` | 사용여부 |
@@ -1367,8 +1370,25 @@ PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 
 - [생성 SQL](20261117/20261117_004_create_quality_inspection_schema.sql), [롤백 SQL](20261117/20261117_004_rollback_quality_inspection_schema.sql), [변경 이력](20261117/20261117_004_change_quality_inspection_schema.md) 및 [backend 사본](../../backend/DATABASE/20261117) 참고.
 - 모듈·메뉴: 품질관리 모듈 `QUALITY`(`/quality`, 정렬 5), 수입검사 그룹 `QUALITY_INSPECT`, 자재수입검사등록·현황 [20261117_005](20261117/20261117_005_change_quality_inspect_menu.md).
 
+### tb_item_default_supplier (2026-11-20, 미적용)
+
+품목별 매입 기본 거래처. 품목당 1행이며 가격은 `tb_item_partner_price`에 있다. 구매요청확정에서 요청을 불러올 때 구매처를 자동 설정하는 데 쓴다.
+
+| 컬럼 | 타입 | NULL/기본값 | 설명 |
+|---|---|---|---|
+| `default_supplier_id` | `bigserial` | NOT NULL, PK | 기본 거래처 ID |
+| `tenant_id` | `bigint` | NOT NULL | tenant FK |
+| `material_id` | `bigint` | NOT NULL | 품목 복합 FK `(material_id, tenant_id)`. `(tenant_id, material_id)` 유일 |
+| `customer_id` | `bigint` | NOT NULL | 기본 거래처 복합 FK `(customer_id, tenant_id)`. 그 품목에 사용 중 매입 단가가 있는 거래처(서비스가 검증) |
+| `created_by`, `updated_by` | `varchar(100)` | NULL | 등록자·수정자. 초기 이전 데이터는 `migration` |
+| `created_at` / `updated_at` | `timestamp` | NOT NULL `CURRENT_TIMESTAMP` / NULL | 등록·수정 일시 |
+
+- 초기 데이터: 사용 중 매입 단가가 있는 사용 중 거래처가 정확히 1곳인 품목만 자동 지정한다.
+- [적용 SQL](20261120/20261120_006_create_item_default_supplier.sql), [롤백 SQL](20261120/20261120_006_rollback_create_item_default_supplier.sql), [변경 이력](20261120/20261120_006_change_create_item_default_supplier.md), [backend 사본](../../backend/DATABASE/20261120)
+
 ## 변경 이력
 
+- 2026-11-20: 품목 기본 거래처 `tb_item_default_supplier` 신설, 단가 `tb_item_partner_price.order_type`(발주구분) 추가, 한 곳뿐인 품목의 기본 거래처 초기 지정 `20261120_006`을 정의했다. 읽기 전용 MCP로 `tb_material_info`·`tb_customer_info` 복합 유일 키와 단가 제약을 확인했고 실제 DB에는 적용하지 않았으며 격리된 PGlite에서 이전·제약·재실행·롤백 중단 조건을 검증했다. [docs/database/20261120](20261120) 참고.
 - 2026-11-18: 확정 상세 `tb_purchase_request_dt`에 `tax_type`·`vat_included_at`(NULL 허용, CHECK Y/N)을 추가하는 `20261118_002`, 단가 `tb_item_partner_price.unit_price` NOT NULL 해제와 원화·외화 단가 중 하나 이상 CHECK `20261118_003`을 정의했다. [docs/database/20261118](20261118) 및 [backend 사본](../../backend/DATABASE/20261118) 참고. 적용 전.
 - 2026-11-18: 단가 `tb_item_partner_price`에 기본단가(`customer_id` NULL 허용), `tax_type`·`vat_included_at`·`foreign_unit_price` 추가, `currency` 선택화(기존 KRW→NULL), 기본단가 부분 유니크 인덱스를 추가하는 `20261118_001`을 정의했다. [docs/database/20261118](20261118) 및 [backend 사본](../../backend/DATABASE/20261118) 참고. 적용 전.
 - 2026-11-17: 입고 상세 `tb_purchase_receipt_dt`에 매입마감 컬럼 9개(`closing_month`, `closed_at`, `closed_by`, `closing_unit_price`, `closing_tax_type`, `closing_vat_included_at`, `closing_supply_amt`, `closing_vat_amt`, `closing_total_amt`)와 CHECK 4개, 인덱스 `ix_purchase_receipt_dt_closing_month`를 추가하는 `20261117_007`, 매입마감처리 메뉴 `20261117_008`을 정의했다. 읽기 전용 MCP로 컬럼이 아직 없음을 확인했고 실제 DB에는 적용하지 않았다. [docs/database/20261117](20261117) 및 [backend 사본](../../backend/DATABASE/20261117) 참고.
@@ -1425,6 +1445,10 @@ PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 
 - 2026-09-16: 공통 첨부/댓글 스키마 추가로 `tb_common_file`, `tb_common_comment` 신규 테이블 생성. 공통 서비스는 `owner_type + owner_id` 기준으로 notice, board, approval, feed를 모두 재사용할 수 있도록 정리. 적용 스크립트는 [backend/DATABASE/20260916](../../backend/DATABASE/20260916) 및 [docs/database/2026-09-16](2026-09-16) 참고.
 - 2026-09-18: 공지사항 본문 이미지와 일반 첨부파일을 구분하기 위해 `tb_common_file.file_usage_type` 컬럼 및 허용값 제약을 추가. 적용 스크립트는 [backend/DATABASE/20260918](../../backend/DATABASE/20260918) 및 [docs/database/20260918](20260918) 참고.
 - 2026-09-16: 공지사항 본문은 `contents_html`/`contents_json`/`contents_text` 3중 저장 구조로 정교화하고, MinIO 첨부 메타 연동을 위해 `tb_board_file` 및 `tb_board_post` 보강, NOTICE 타입 보장. 적용 스크립트는 [backend/DATABASE/20260916](../../backend/DATABASE/20260916) 및 [docs/database/2026-09-16](2026-09-16) 참고.
+- 2026-11-20: 인사관리 3단계 인사명령으로 `tb_hr_order_hd`(명령 1건: 명령일·유형·출처·비고·처리자)·`tb_hr_order_dt`(사원별 변경항목 명령 전/후 값) 2개 테이블을 추가하고 `HR_INFO_ORDER` 인사명령 메뉴를 등록했다(20261120_006). 스크립트 작성, 적용 전. [backend/DATABASE/20261120](../../backend/DATABASE/20261120) 참고.
+- 2026-11-20: 인사관리 메뉴 `HR_INFO_EMPLOYEE`의 이름을 사원등록에서 사원관리로 변경했다(20261120_005, 스키마 변경 없음). 스크립트 작성, 적용 전. [backend/DATABASE/20261120](../../backend/DATABASE/20261120) 참고.
+- 2026-11-20: 창고 미사용 관리로 `tb_warehouse`에 `use_at`(사용여부, 기본 Y, Y/N 제약)을 추가하고(20261120_003) 점검 창고 3건을 불용창고 해제·미사용으로 정리했다(20261120_004). 불용창고(`disuse_at`, 불용재고 보관·처분 창고)와는 다른 개념이다. 스크립트 작성, 적용 전. [backend/DATABASE/20261120](../../backend/DATABASE/20261120) 및 [docs/database/20261120](20261120) 참고.
+- 2026-11-20: 인사관리 2-2단계(계정관리)로 `tb_login_account`에 `password_change_required`(기본 N)·`updated_by`를 추가하고 `ST_ACCOUNTS` 계정관리 메뉴를 등록했다(20261120_001). 모든 테넌트에 계정 보안 정책 `LOGIN_LOCK_ENABLED`·`LOGIN_LOCK_MAX_ATTEMPTS`·`PROFILE_PHOTO_EDIT_MODE`를 시드하고 사원 사진을 계정 사진으로 보정했다(20261120_002). 스크립트 작성, 적용 전. [backend/DATABASE/20261120](../../backend/DATABASE/20261120) 및 [docs/database/20261120](20261120) 참고.
 - 2026-11-19: 인사관리 2-1단계(사원등록)로 `tb_user`에 사번·직위·성별·근무형태·내외국인·국적·생일·입사/퇴사/휴직/복직일·외국인 체류·근로계약일·주민등록번호 암호문/해시·연락처·주소·실사용자·사진·감사 컬럼 31개와 사번·주민번호 해시 유일 인덱스를 추가하고 `HR_INFO_EMPLOYEE` 메뉴를 등록했다(20261119_004). 공통코드 `GENDER`·`NATIVE_TYPE`·`EMPLOYMENT_TYPE`·`BIRTH_CALENDAR`·`POSITION`과 `COUNTRY` ISO 249개국(alpha-3 코드, 기존 KR·JP는 KOR·JPN으로 변경)을 시드했다(20261119_005). 스크립트 작성, 적용 전. [backend/DATABASE/20261119](../../backend/DATABASE/20261119) 참고.
 - 2026-11-19: 인사관리 1단계(부서관리)로 `tb_department`에 `manager_user_id`, `department_dc`, `created_by`, `updated_by`와 동일 상위 부서명 유일 인덱스를 추가하고 `HR` 모듈·메뉴를 등록하고(20261119_002 적용) 메뉴를 그룹 "인사정보"(`HR_INFO`) 아래 "부서관리"(`HR_INFO_DEPARTMENT`)로 이름 통합했다(20261119_003, 적용 전). 스크립트는 [backend/DATABASE/20261119](../../backend/DATABASE/20261119) 및 [docs/database/20261119](20261119) 참고.
 - 2026-09-18: 공지사항 구분 코드와 게시글/댓글 최신 행위자 감사 컬럼을 추가했다. 적용 스크립트는 [backend/DATABASE/20260918](../../backend/DATABASE/20260918) 및 [docs/database/20260918](20260918) 참고.
