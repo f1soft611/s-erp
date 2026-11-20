@@ -83,8 +83,23 @@ export type F1GridColumnFormOptions<T extends object> = {
   disabled?: boolean | ((row: T, mode: F1GridFormMode) => boolean);
   group?: string;
   order?: number;
+  /**
+   * 섹션(그룹) 순서. 지정하지 않으면 섹션은 그 그룹의 칸이 컬럼 목록에서 처음 나온 순서로 놓인다.
+   * 목록에서는 앞쪽에 두고 싶은 컬럼(예: 사원 사진)의 폼 섹션을 맨 아래로 보내야 할 때처럼, 컬럼 위치와 섹션 위치가 다를 때 큰 값을 준다.
+   * 한 섹션 안에 여러 값이 있으면 최솟값을 쓰고, 지정하지 않은 섹션은 나타나는 순서(0부터)를 순번으로 본다.
+   */
+  groupOrder?: number;
   span?: 1 | 2 | 3;
   multiple?: boolean;
+  /** 행 폼의 텍스트 칸을 비밀번호 입력(`type="password"`)으로 가린다. 목록 셀 표시와 값 저장에는 영향이 없다. */
+  inputType?: 'password';
+  /** 칸 아래에 보여 주는 안내 문구(검증 오류가 있으면 오류가 우선한다). 행마다 달라지면 함수로 지정한다. */
+  helperText?: string | ((row: T) => string);
+  /**
+   * 행 폼에 칸을 보일지 직접 정한다. 지정하면 "수정 가능한 칸만 보인다"는 기본 규칙 대신 이 값을 쓴다.
+   * 수정할 수 없는 칸(예: 수정 시 변경 불가인 사번)을 읽기 전용으로 보여 줄 때 쓴다. 입력 가능 여부는 `editable`/`form.readOnly`가 따로 정한다.
+   */
+  visible?: boolean | ((row: T) => boolean);
   targetField?: keyof T;
   targetLabel?: string;
 };
@@ -209,6 +224,15 @@ export type F1GridColumn<T extends object> = {
     row: T,
     applyPatch: (changes: Partial<T>) => void,
   ) => Partial<T> | undefined;
+  /** `type: 'image'` 칸의 표시·저장 옵션. `shape: 'circle'`이면 셀·행 폼 미리보기를 원형(48px)으로, `fallbackText`가 있으면 이미지가 없을 때 아이콘 대신 그 글자(예: 이름 첫 글자)를 원 안에 표시한다. */
+  imageOptions?: {
+    shape?: 'circle';
+    fallbackText?: (row: T) => string;
+    /** 행 폼에서 큰 미리보기(한 변 px)와 "선택/삭제" 버튼, 안내문(`form.helperText`)을 나란히 보여 준다. 없으면 기존의 작은 표시. */
+    formSize?: number;
+    /** 지정하면 PNG·JPEG·WEBP(10MB 이하)를 받아 브라우저에서 긴 변 `maxSide`px JPEG로 줄여 저장한다(결과 길이 `maxLength` 이하). 없으면 PNG·JPEG 512KB 이하 그대로. */
+    compress?: { maxSide: number; maxLength: number };
+  };
   renderCell?: (context: F1GridCellRenderContext<T>) => ReactNode;
   getCellStyle?: (
     context: F1GridCellRenderContext<T>,
@@ -225,6 +249,11 @@ export type F1GridColumn<T extends object> = {
   pinned?: F1GridPinSide;
   selectOnFocus?: boolean;
   syncWithTreeCheckbox?: boolean;
+};
+
+export type F1GridValidateOptions = {
+  /** true이면 추가·수정한 행만 검증하고 변경하지 않은 행은 검증과 오류 표시에서 제외한다. */
+  changedOnly?: boolean;
 };
 
 export type F1GridChanges<T> = {
@@ -386,7 +415,11 @@ export type F1GridRef<T extends object> = {
   getActiveRows(): T[];
   getChanges(): F1GridChanges<T>;
   acceptSavedRows(savedRows: F1GridSavedRow<T>[]): T[];
-  validate(): boolean;
+  /**
+   * 행을 검증한다. 기본은 보이는 모든 행이고, `changedOnly: true`이면 추가·수정한 행만 검증한다.
+   * 저장 데이터가 불완전한 기존 행이 있어도 변경하지 않은 행 때문에 저장이 막히지 않게 할 때 쓴다.
+   */
+  validate(options?: F1GridValidateOptions): boolean;
   startEdit(rowId: F1GridRowId, field: keyof T): void;
   stopEdit(): void;
   setCellValue(rowId: F1GridRowId, field: keyof T, value: unknown): void;

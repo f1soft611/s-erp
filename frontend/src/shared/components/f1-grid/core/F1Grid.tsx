@@ -52,6 +52,7 @@ import type {
   F1GridRowFormPlugin,
   F1GridSavedRow,
   F1GridSort,
+  F1GridValidateOptions,
   F1GridValidationError,
 } from '../types/grid.types';
 import { findNextEditableCell } from '../keyboard/GridKeyboard';
@@ -1481,12 +1482,20 @@ function F1GridInner<T extends object>(
     }));
   }
 
-  function validate(): boolean {
+  function validate(options?: F1GridValidateOptions): boolean {
     const nextErrors: Record<string, string> = {};
     const validationErrors: F1GridValidationError[] = [];
     const context = createGridValidationContext(activeRows, columns, rowKey);
+    let changedIds: Set<string> | undefined;
+    if (options?.changedOnly) {
+      const changes = getGridChanges(data);
+      changedIds = new Set(
+        [...changes.insertedRows, ...changes.updatedRows].map((row) => String(getGridRowId(row, rowKey))),
+      );
+    }
     visibleRows.forEach((row) => {
       const rowId = getGridRowId(row, rowKey);
+      if (changedIds && !changedIds.has(String(rowId))) return;
       Object.entries(validateGridRow(row, columns, context)).forEach(
         ([field, message]) => {
           nextErrors[`${String(rowId)}:${field}`] = message;
