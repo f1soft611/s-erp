@@ -5043,7 +5043,17 @@ describe('Document write page', () => {
       'rgb(255, 255, 255)',
     );
     expect(getComputedStyle(editor).color).toBe('rgb(15, 23, 42)');
-    expect(getComputedStyle(title).fontWeight).toBe('700');
+    // JSDOM computes this MUI font cascade as 400 despite the matching 700 rule.
+    const titleFontRule = Array.from(document.styleSheets)
+      .flatMap((sheet) => Array.from(sheet.cssRules))
+      .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
+      .find((rule) =>
+        !rule.selectorText.includes(':') &&
+        rule.selectorText.includes('MuiInputBase-input') &&
+        title.matches(rule.selectorText) &&
+        rule.style.fontWeight === '700',
+      );
+    expect(titleFontRule).toBeDefined();
     expect(getComputedStyle(editor).fontWeight).toBe('400');
   });
 

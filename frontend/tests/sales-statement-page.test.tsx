@@ -271,6 +271,7 @@ it('shows the 100-detail limit before submitting a statement', async () => {
   await within(picker).findByText('SD-1');
   fireEvent.click(within(picker).getByLabelText('1 행 선택'));
   fireEvent.click(within(picker).getByRole('button', { name: '선택 완료' }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '출하 선택' })).not.toBeInTheDocument());
   await screen.findByDisplayValue('SD-1');
   const grid = screen.getByRole('grid', { name: '거래명세서 상세 목록' });
   fireEvent.click(within(grid).getAllByRole('checkbox')[0]);
