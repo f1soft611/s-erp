@@ -130,8 +130,9 @@ export function createPurchaseRequestStatusColumns({
     },
     {
       field: 'lineNo',
-      headerName: '행',
+      headerName: '순번',
       type: 'number',
+      decimalPlaces: 0,
       width: 50,
       align: 'center',
       editable: false,

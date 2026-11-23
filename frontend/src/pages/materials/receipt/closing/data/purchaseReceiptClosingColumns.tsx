@@ -32,6 +32,7 @@ const amount = <T extends object>(
 /** 구매처 요약(왼쪽 그리드). 좁은 영역에 맞춰 열을 줄였다. */
 export function createClosingSupplierColumns(): F1GridColumn<PurchaseReceiptClosingSupplier>[] {
   return [
+    { field: 'supplierId', headerName: 'No', type: 'rownumber', width: 56, align: 'center', editable: false, pinned: 'left' },
     { field: 'supplierName', headerName: '구매처', type: 'text', width: 150, editable: false, pinned: 'left' },
     {
       field: 'receiptCount', headerName: '입고건', type: 'number', decimal: { places: 0 }, width: 70, align: 'right', editable: false,

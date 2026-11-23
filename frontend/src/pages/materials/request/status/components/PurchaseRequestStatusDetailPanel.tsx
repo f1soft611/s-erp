@@ -131,7 +131,7 @@ export function PurchaseRequestStatusDetailPanel({ item, loading, error, canEdit
               <Table size="small" aria-label="구매요청 품목 목록" sx={{ minWidth: 520 }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell align="center">행</TableCell>
+                    <TableCell align="center">순번</TableCell>
                     <TableCell>품목코드</TableCell>
                     <TableCell>품목명</TableCell>
                     <TableCell align="right">요청수량</TableCell>

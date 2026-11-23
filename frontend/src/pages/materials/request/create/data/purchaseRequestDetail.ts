@@ -73,7 +73,7 @@ export function createPurchaseRequestDetailColumns(
   return [
     {
       field: 'rowId',
-      headerName: '행',
+      headerName: '순번',
       type: 'rownumber',
       width: 56,
       align: 'center',
