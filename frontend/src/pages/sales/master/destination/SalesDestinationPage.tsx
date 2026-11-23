@@ -10,6 +10,7 @@ import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import Splitter from '../../../../shared/components/Splitter';
 import { F1Grid, type F1GridRef } from '../../../../shared/components/f1-grid';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
+import { useNotification } from '../../../../shared/context/notification';
 import { useCommonConfirmDialog } from '../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import type { MenuPermission, ModuleItem, PageContent } from '../../../dashboard/types/dashboard';
@@ -27,6 +28,7 @@ type Props = {
 
 export function SalesDestinationPage({ content, breadcrumbItems, selectedMenuPermissions }: Props) {
   const state = useSalesDestinationManagement();
+  const { showSuccess } = useNotification();
   const { confirm, dialog } = useCommonConfirmDialog();
   const gridRef = useRef<F1GridRef<SalesDestinationGridRow>>(null);
   const [keyword, setKeyword] = useState('');
@@ -35,7 +37,8 @@ export function SalesDestinationPage({ content, breadcrumbItems, selectedMenuPer
   const canCreate = Boolean(selectedMenuPermissions?.create);
   const canUpdate = Boolean(selectedMenuPermissions?.update);
   const canDelete = Boolean(selectedMenuPermissions?.delete);
-  const selectedCustomer = state.customers.find((row) => row.customerId === state.customerId);
+  const customerId = state.customerId;
+  const selectedCustomer = state.customers.find((row) => row.customerId === customerId);
   const columns = useMemo(() => destinationColumns(canCreate && !state.saving, canUpdate && !state.saving),
     [canCreate, canUpdate, state.saving]);
 
@@ -64,12 +67,6 @@ export function SalesDestinationPage({ content, breadcrumbItems, selectedMenuPer
     { key: 'write', actions: [{ label: '납품처 추가', icon: AddIcon, visible: canCreate,
       disabled: !state.customerId || state.rowsLoading || state.saving,
       onClick: () => gridRef.current?.addRow() }] },
-    { key: 'delete', actions: [{ label: '납품처 삭제', icon: DeleteOutlineIcon, visible: canDelete,
-      disabled: !state.selectedId || state.hasChanges || state.rowsLoading || state.saving,
-      onClick: () => { void (async () => {
-        if (state.selectedId && await confirm({ title: '납품처 삭제',
-          description: '선택한 납품처를 삭제하시겠습니까?' })) await state.remove(state.selectedId);
-      })(); } }] },
     { key: 'read', actions: [{ label: '조회', icon: SearchIcon,
       visible: Boolean(selectedMenuPermissions?.read), disabled: state.saving,
       onClick: () => { void search(); } }] },
@@ -80,8 +77,22 @@ export function SalesDestinationPage({ content, breadcrumbItems, selectedMenuPer
         const grid = gridRef.current;
         if (!grid) return;
         if (!grid.validate()) { state.setError('필수 입력 항목을 확인해 주세요.'); return; }
-        void state.save(grid.getChanges());
+        const changes = grid.getChanges();
+        void (async () => {
+          if (!await state.save(changes)) return;
+          grid.acceptSavedRows([...changes.insertedRows, ...changes.updatedRows].map((row) => ({
+            previousRowId: row.salesDestinationId,
+            row,
+          })));
+          showSuccess('납품처 정보를 저장했습니다.');
+        })();
       } }] },
+    { key: 'delete', actions: [{ label: '삭제', icon: DeleteOutlineIcon, visible: canDelete,
+      disabled: !state.selectedId || state.hasChanges || state.rowsLoading || state.saving,
+      onClick: () => { void (async () => {
+        if (state.selectedId && await confirm({ title: '납품처 삭제',
+          description: '선택한 납품처를 삭제하시겠습니까?' })) await state.remove(state.selectedId);
+      })(); } }] }
   ];
 
   return (
@@ -126,22 +137,24 @@ export function SalesDestinationPage({ content, breadcrumbItems, selectedMenuPer
             </Typography>
           </Box>
           <Box sx={{ flex: 1, height: '100%', overflow: 'hidden' }}>
-            {state.customerId !== null && <F1Grid key={state.gridKey} ref={gridRef} ariaLabel="납품처 목록"
+            <F1Grid key={state.gridKey} ref={gridRef} ariaLabel="납품처 목록"
               storageKey="sales-destination-list-v2" rows={state.rows} columns={columns}
               rowKey="salesDestinationId" height="100%" loading={state.rowsLoading}
               showCheckbox={false} selectionMode="row" multiSelect={false}
-              createRow={() => ({ salesDestinationId: `new-${crypto.randomUUID()}`, customerId: state.customerId!,
+              createRow={customerId === null ? undefined : () => ({
+                salesDestinationId: `new-${crypto.randomUUID()}`, customerId,
                 destinationCode: '', destinationName: '', businessNo: '', address: '', contactName: '',
-                mobileNo: '', telephoneNo: '', facsimileNo: '', remark: '' })}
-              rowFormPlugin={canCreate || canUpdate ? {
+                mobileNo: '', telephoneNo: '', facsimileNo: '', remark: '',
+              })}
+              rowFormPlugin={customerId !== null && (canCreate || canUpdate) ? {
                 getTitle: ({ mode }) => mode === 'create' ? '납품처 등록' : '납품처 수정',
                 onBeforeApply: ({ mode, draftRow }) =>
                   mode === 'create' || typeof draftRow.salesDestinationId === 'string' ? canCreate : canUpdate,
               } : { enabled: false }}
-              allowAddRowInContextMenu={canCreate} allowDuplicateRowInContextMenu={false}
+              allowAddRowInContextMenu={customerId !== null && canCreate} allowDuplicateRowInContextMenu={false}
               allowDeleteRowInContextMenu={false}
               onChangesChange={(changes) => state.setHasChanges(Boolean(changes.insertedRows.length || changes.updatedRows.length))}
-              onSelectionChange={(ids) => state.setSelectedId(typeof ids[0] === 'number' ? ids[0] : null)} />}
+              onSelectionChange={(ids) => state.setSelectedId(typeof ids[0] === 'number' ? ids[0] : null)} />
           </Box>
           </CardContent>
         </Card>

@@ -89,6 +89,26 @@ describe('sales order entry page', () => {
     ]);
   });
 
+  it('orders the header fields according to the requested entry layout', async () => {
+    renderSalesOrderPage();
+    await screen.findByDisplayValue('2000-02-03');
+    const fields = [
+      screen.getByLabelText('수주번호'),
+      screen.getByLabelText(/수주일자/, { selector: 'input' }),
+      screen.getByLabelText('납기일자'),
+      screen.getByLabelText('수주상태'),
+      screen.getByLabelText(/거래처/, { selector: 'input' }),
+      screen.getByLabelText(/납품처/, { selector: 'input' }),
+      screen.getByLabelText(/매출처/, { selector: 'input' }),
+      screen.getByLabelText('견적번호'),
+      screen.getByRole('combobox', { name: '배송방법' }),
+      screen.getByLabelText('비고'),
+    ];
+    for (let index = 1; index < fields.length; index += 1) {
+      expect(fields[index - 1].compareDocumentPosition(fields[index]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
   it('requires a customer before selecting a destination and shows the billing customer picker', async () => {
     renderSalesOrderPage();
     await screen.findByDisplayValue('2000-02-03');
