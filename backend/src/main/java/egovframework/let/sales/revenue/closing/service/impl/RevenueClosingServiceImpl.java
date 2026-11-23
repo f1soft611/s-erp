@@ -68,9 +68,11 @@ public class RevenueClosingServiceImpl implements RevenueClosingService {
             throws Exception {
         validatePrincipal(tenantId, userId);
         if (request == null || request.getSalesDeliveryDetailIds() == null
-                || request.getSalesDeliveryDetailIds().isEmpty()
-                || request.getSalesDeliveryDetailIds().size() > MAX_BATCH_SIZE) {
+                || request.getSalesDeliveryDetailIds().isEmpty()) {
             throw badRequest("마감할 상세를 확인해 주세요.");
+        }
+        if (request.getSalesDeliveryDetailIds().size() > MAX_BATCH_SIZE) {
+            throw badRequest("매출마감은 출하 상세를 최대 100건까지 처리할 수 있습니다.");
         }
         LocalDate statementDate = parseDate(request.getStatementDt());
         Set<Long> uniqueIds = new TreeSet<Long>();

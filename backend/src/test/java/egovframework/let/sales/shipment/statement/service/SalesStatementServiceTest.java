@@ -15,6 +15,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -169,6 +171,31 @@ class SalesStatementServiceTest {
                 .getAnnotation(Transactional.class);
         assertThat(transaction).isNotNull();
         assertThat(transaction.rollbackFor()).contains(Exception.class);
+    }
+
+    @Test
+    void enforcesDetailLimitForExplicitAndLegacyRequests() throws Exception {
+        List<Long> ids = LongStream.rangeClosed(1, 101).boxed().collect(Collectors.toList());
+        when(dao.lockDeliveryDetails(anyMap())).thenReturn(Collections.<Map<String, Object>>emptyList());
+        assertThatThrownBy(() -> service.create(71L, "user01", 15L,
+                ids.subList(0, 100), "2026-11-09", ""))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+        verify(dao).lockDeliveryDetails(anyMap());
+
+        assertThatThrownBy(() -> service.create(71L, "user01", 15L, ids, "2026-11-09", ""))
+                .isInstanceOfSatisfying(ResponseStatusException.class, error -> {
+                    assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(error.getReason()).contains("100건");
+                });
+        when(dao.lockDelivery(anyMap())).thenReturn(15L);
+        when(dao.selectAvailableDetailIdsByDelivery(anyMap())).thenReturn(ids);
+        assertThatThrownBy(() -> service.create(71L, "user01", 15L, null, "2026-11-09", ""))
+                .isInstanceOfSatisfying(ResponseStatusException.class, error -> {
+                    assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(error.getReason()).contains("100건");
+                });
+        verify(dao, never()).insertHeader(anyMap());
     }
 
     private Map<String, Object> line(Long detailId, Long deliveryId, Long customerId,

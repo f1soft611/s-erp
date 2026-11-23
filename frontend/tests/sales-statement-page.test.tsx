@@ -256,6 +256,34 @@ it('requires at least one selected detail before creating a statement', async ()
   expect(await screen.findByText('거래명세서 상세를 선택해 주세요.')).toBeInTheDocument();
   expect(createStatement).not.toHaveBeenCalled();
 });
+it('shows the 100-detail limit before submitting a statement', async () => {
+  const ids = Array.from({ length: 101 }, (_, index) => index + 1);
+  vi.mocked(searchStatementSources).mockResolvedValue([{ ...source, salesDeliveryDetailIds: ids }]);
+  vi.mocked(getDelivery).mockResolvedValue({
+    ...source, customerCode: 'C1', salesOrderId: null, orderNo: null, deliveryPlace: '', deliveryMethod: '', remark: '',
+    details: ids.map((id) => ({ ...detail, salesDeliveryDetailId: id, lineNo: id, materialId: id,
+      salesOrderDetailId: null, salesDeliveryPlanDetailId: null })),
+  });
+  mount(<SalesStatementCreatePage {...props} />);
+  fireEvent.click(screen.getByRole('button', { name: '출하 선택' }));
+  const picker = screen.getByRole('dialog', { name: '출하 선택' });
+  fireEvent.click(within(picker).getByRole('button', { name: '검색' }));
+  await within(picker).findByText('SD-1');
+  fireEvent.click(within(picker).getByLabelText('1 행 선택'));
+  fireEvent.click(within(picker).getByRole('button', { name: '선택 완료' }));
+  await screen.findByDisplayValue('SD-1');
+  const grid = screen.getByRole('grid', { name: '거래명세서 상세 목록' });
+  fireEvent.click(within(grid).getAllByRole('checkbox')[0]);
+  fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+  expect(await screen.findByText(/100건/)).toBeInTheDocument();
+  expect(createStatement).not.toHaveBeenCalled();
+  vi.mocked(createStatement).mockResolvedValueOnce(item);
+  fireEvent.click(within(grid).getAllByRole('checkbox')[1]);
+  fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+  await waitFor(() => expect(createStatement).toHaveBeenCalledWith(
+    expect.objectContaining({ salesDeliveryDetailIds: ids.slice(1) }),
+  ));
+}, 20000);
 it('opens the same registration form from status detail and prints its stored snapshot', async () => {
   vi.mocked(getStatementStatus).mockResolvedValue([{ ...detail, salesStatementId: 3, statementNo: 'TS-1',
     statementDt: '2026-11-09', deliveryNo: 'SD-1', customerCode: 'C1', customerName: '거래처', lineTotalAmt: 220 }]);

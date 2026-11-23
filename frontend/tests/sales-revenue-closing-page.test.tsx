@@ -231,6 +231,29 @@ it('hides the close action without CREATE permission and disables it with no sel
   expect(screen.getByRole('button', { name: '마감 (0건)' })).toBeDisabled();
 });
 
+it('shows the 100-detail limit before opening a close confirmation', async () => {
+  vi.mocked(searchRevenueClosings).mockResolvedValueOnce({
+    details: Array.from({ length: 101 }, (_, index) => ({ ...detailRows[1], rowId: index + 1 })),
+    customerSummaries: summaryRows,
+  });
+  render(<RevenueClosingPage {...props}
+    selectedMenuPermissions={{ ...props.selectedMenuPermissions, create: true }} />);
+  await screen.findAllByRole('gridcell', { name: '품목 B' });
+  fireEvent.click(within(screen.getByRole('grid', { name: '매출대상 상세 목록' })).getAllByRole('checkbox')[0]);
+  fireEvent.click(await screen.findByRole('button', { name: '마감 (101건)' }));
+  expect(await screen.findByText(/100건/)).toBeInTheDocument();
+  expect(screen.queryByRole('dialog', { name: '매출 마감' })).not.toBeInTheDocument();
+  expect(getSystemDate).not.toHaveBeenCalled();
+  expect(closeRevenueClosings).not.toHaveBeenCalled();
+  fireEvent.click(within(screen.getByRole('grid', { name: '매출대상 상세 목록' })).getAllByRole('checkbox')[1]);
+  fireEvent.click(await screen.findByRole('button', { name: '마감 (100건)' }));
+  fireEvent.click(within(screen.getByRole('dialog', { name: '매출 마감' }))
+    .getByRole('button', { name: '마감 처리' }));
+  await waitFor(() => expect(closeRevenueClosings).toHaveBeenCalledWith(
+    Array.from({ length: 100 }, (_, index) => index + 2), '2026-11-20',
+  ));
+}, 15000);
+
 it('keeps selection and makes no request when close confirmation is cancelled', async () => {
   vi.mocked(searchRevenueClosings).mockResolvedValueOnce({
     details: [{ ...detailRows[1], rowId: 7 }],
