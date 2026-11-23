@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiPost, apiPut } from '../../../../../shared/services/apiClient';
+import { MAX_STATEMENT_DETAIL_COUNT } from '../../../shared/statementDetailLimit';
 import type { StatementItem, StatementPayload, StatementSource, StatementStatusRow } from '../types/salesStatement.types';
 
 const PATH = '/api/v1/sales/statements';
@@ -22,6 +23,9 @@ export async function getStatement(id: number): Promise<StatementItem> {
 
 export async function createStatement(payload: StatementPayload): Promise<StatementItem> {
   const salesDeliveryDetailIds = [...new Set(payload.salesDeliveryDetailIds)];
+  if (salesDeliveryDetailIds.length > MAX_STATEMENT_DETAIL_COUNT) {
+    throw new Error('거래명세서는 출하 상세를 최대 100건까지 발행할 수 있습니다.');
+  }
   if (salesDeliveryDetailIds.length === 0
     || salesDeliveryDetailIds.some((id) => !Number.isSafeInteger(id) || id < 1)) {
     throw new Error('거래명세서 상세를 선택해 주세요.');

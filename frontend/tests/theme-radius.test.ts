@@ -5,11 +5,12 @@ import { describe, expect, it } from 'vitest';
 import { createAppTheme } from '../src/theme/theme';
 
 describe('shared app theme shape', () => {
-  it('uses the six pixel project radius', () => {
-    expect(createAppTheme().shape.borderRadius).toBe(6);
+  it('uses the four pixel project radius in both themes', () => {
+    expect(createAppTheme('light').shape.borderRadius).toBe(4);
+    expect(createAppTheme('dark').shape.borderRadius).toBe(4);
   });
 
-  it('resolves the shared MUI radius unit to six pixels', () => {
+  it('resolves the shared MUI radius unit to four pixels', () => {
     render(createElement(
       ThemeProvider,
       { theme: createAppTheme() },
@@ -21,7 +22,7 @@ describe('shared app theme shape', () => {
       ),
     ));
 
-    expect(getComputedStyle(screen.getByTestId('radius-sample')).borderRadius).toBe('6px');
-    expect(getComputedStyle(screen.getByTestId('default-chip')).borderRadius).toBe('6px');
+    expect(getComputedStyle(screen.getByTestId('radius-sample')).borderRadius).toBe('4px');
+    expect(getComputedStyle(screen.getByTestId('default-chip')).borderRadius).toBe('4px');
   });
 });

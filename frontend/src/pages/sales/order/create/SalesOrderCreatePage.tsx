@@ -29,6 +29,8 @@ import {
 } from '../../../../shared/components/master-picker/MasterPickers';
 import type { MasterPickerOption } from '../../../../shared/components/master-picker/masterPicker.types';
 import { MasterPickerDialog } from '../../../../shared/components/master-picker/MasterPickerDialog';
+import { MasterPicker } from '../../../../shared/components/master-picker/MasterPicker';
+import { searchSalesDestinations } from '../../master/destination/services/salesDestination.service';
 import type { F1GridChanges, F1GridRef } from '../../../../shared/components/f1-grid';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import type {
@@ -99,7 +101,11 @@ export type SalesOrderEmbeddedActionState = {
   remove: () => void;
 };
 
-type HeaderSnapshot = SalesOrderHeaderValues & { customerId: number | null };
+type HeaderSnapshot = SalesOrderHeaderValues & {
+  customerId: number | null;
+  salesDestinationId: number | null;
+  billingCustomerId: number | null;
+};
 
 const EDITABLE_ORDER_STATUS = '수주등록';
 const EMPTY_AMOUNTS = { supplyAmount: 0, vatAmount: 0, totalAmount: 0 };
@@ -116,7 +122,7 @@ function createEmptyHeader(orderDt = ''): SalesOrderHeaderValues {
 }
 
 function createEmptySnapshot(): HeaderSnapshot {
-  return { ...createEmptyHeader(), customerId: null };
+  return { ...createEmptyHeader(), customerId: null, salesDestinationId: null, billingCustomerId: null };
 }
 
 export function SalesOrderCreatePage({
@@ -150,6 +156,8 @@ export function SalesOrderCreatePage({
   const [initialSnapshot] = useState<HeaderSnapshot>(createEmptySnapshot);
   const [baseline, setBaseline] = useState<HeaderSnapshot>(initialSnapshot);
   const [customer, setCustomer] = useState<MasterPickerOption | null>(null);
+  const [destination, setDestination] = useState<MasterPickerOption | null>(null);
+  const [billingCustomer, setBillingCustomer] = useState<MasterPickerOption | null>(null);
   const [orderDate, setOrderDate] = useState(initialSnapshot.orderDt);
   const [quotationNumber, setQuotationNumber] = useState('');
   const [selectedQuotationCustomerId, setSelectedQuotationCustomerId] =
@@ -211,6 +219,8 @@ export function SalesOrderCreatePage({
 
   const hasHeaderChanges =
     (customer?.id ?? null) !== baseline.customerId ||
+    (destination?.id ?? null) !== baseline.salesDestinationId ||
+    (billingCustomer?.id ?? null) !== baseline.billingCustomerId ||
     orderDate !== baseline.orderDt ||
     quotationNumber.trim() !== baseline.quotNo.trim() ||
     deliveryDate !== baseline.deliveryDt ||
@@ -234,8 +244,12 @@ export function SalesOrderCreatePage({
       nextCustomer: MasterPickerOption | null,
       header: SalesOrderHeaderValues,
       rows: SalesOrderDetailRow[],
+      nextDestination: MasterPickerOption | null = null,
+      nextBillingCustomer: MasterPickerOption | null = null,
     ) => {
       setCustomer(nextCustomer);
+      setDestination(nextDestination);
+      setBillingCustomer(nextBillingCustomer);
       setOrderDate(header.orderDt);
       orderDateTouchedRef.current = true;
       setQuotationNumber(header.quotNo);
@@ -246,7 +260,9 @@ export function SalesOrderCreatePage({
       setDeliveryPlace(header.deliveryPlace);
       setDeliveryMethod(header.deliveryMethod);
       setRemark(header.remark);
-      setBaseline({ ...header, customerId: nextCustomer?.id ?? null });
+      setBaseline({ ...header, customerId: nextCustomer?.id ?? null,
+        salesDestinationId: nextDestination?.id ?? null,
+        billingCustomerId: nextBillingCustomer?.id ?? null });
       setGridRows(rows);
       setGridKey((key) => key + 1);
       setAmounts(rows.length > 0 ? sumSalesOrderAmounts(rows) : EMPTY_AMOUNTS);
@@ -267,7 +283,7 @@ export function SalesOrderCreatePage({
       const form = toSalesOrderForm(order);
       setLoadedOrder(order);
       setIsLocked(false);
-      applyForm(form.customer, form.header, form.rows);
+      applyForm(form.customer, form.header, form.rows, form.destination, form.billingCustomer);
     },
     [applyForm],
   );
@@ -420,6 +436,8 @@ export function SalesOrderCreatePage({
     const input = {
       orderDt: normalizedOrderDate,
       customerId: customer?.id ?? null,
+      salesDestinationId: destination?.id ?? null,
+      billingCustomerId: billingCustomer?.id ?? null,
       quotNo: quotationNumber,
       deliveryDt: normalizedDeliveryDate,
       deliveryPlace,
@@ -436,6 +454,8 @@ export function SalesOrderCreatePage({
       errors.orderDt,
       errors.deliveryDt,
       errors.customerId,
+      errors.salesDestinationId,
+      errors.billingCustomerId,
       errors.details,
       ...errors.detailMessages,
     ].filter((message): message is string => Boolean(message));
@@ -487,6 +507,8 @@ export function SalesOrderCreatePage({
   }, [
     applyLoadedOrder,
     customer,
+    destination,
+    billingCustomer,
     deliveryDate,
     deliveryMethod,
     deliveryPlace,
@@ -770,26 +792,76 @@ export function SalesOrderCreatePage({
               error={Boolean(orderDateError || validationErrors?.orderDt)}
               helperText={orderDateError || validationErrors?.orderDt}
             />
-            <CustomerPicker
-              value={customer}
-              search={searchOrderCustomers}
-              triggerMode="icon"
+            <DateEditor
+              label="납기일자"
+              variant="outlined"
+              autoFocus={false}
+              required
+              value={deliveryDate}
               onChange={(value) => {
-                setCustomer(value);
-                if (
-                  selectedQuotationCustomerId !== null &&
-                  value.id !== selectedQuotationCustomerId
-                ) {
-                  setQuotationNumber('');
-                  setSelectedQuotationCustomerId(null);
-                }
+                setDeliveryDate(value);
+                setDeliveryDateError('');
                 clearValidationErrors();
               }}
+              onBlur={() => {
+                const normalized = deliveryDate.trim() ? normalizeDateInput(deliveryDate) : '';
+                if (normalized) setDeliveryDate(normalized);
+                setDeliveryDateError(deliveryDate.trim() && !normalized
+                  ? '올바른 납기일자를 입력해 주세요.' : '');
+              }}
               disabled={!isEditable}
-              required
-              error={Boolean(validationErrors?.customerId)}
-              helperText={validationErrors?.customerId}
+              error={Boolean(deliveryDateError)}
+              helperText={deliveryDateError}
             />
+            <TextField
+              label="수주상태"
+              size="small"
+              value={getSalesOrderCodeLabel(
+                commonCodes.orderStatusOptions,
+                loadedOrder?.status ?? EDITABLE_ORDER_STATUS,
+              )}
+              slotProps={{ input: { readOnly: true } }}
+              sx={{ '& .MuiInputBase-root': { backgroundColor: 'action.disabledBackground' } }}
+            />
+            <Box sx={{ gridColumn: '1 / -1', display: 'grid', gap: 2,
+              gridTemplateColumns: {
+                xs: 'minmax(0, 1fr)',
+                sm: 'repeat(2, minmax(0, 1fr))',
+                lg: 'repeat(4, minmax(0, 1fr))',
+              },
+              '& > .MuiStack-root': { mt: 0 },
+              ...(!isEditable && { '& .MuiInputBase-root': { backgroundColor: 'action.disabledBackground' } }),
+            }}>
+              <CustomerPicker
+                value={customer}
+                search={searchOrderCustomers}
+                triggerMode="icon"
+                onChange={(value) => {
+                  if (value.id !== customer?.id) setDestination(null);
+                  setCustomer(value);
+                  if (selectedQuotationCustomerId !== null && value.id !== selectedQuotationCustomerId) {
+                    setQuotationNumber('');
+                    setSelectedQuotationCustomerId(null);
+                  }
+                  clearValidationErrors();
+                }}
+                disabled={!isEditable}
+                required
+                error={Boolean(validationErrors?.customerId)}
+                helperText={validationErrors?.customerId}
+              />
+              <MasterPicker label="납품처" value={destination}
+                search={(keyword) => customer ? searchSalesDestinations(customer.id, keyword) : Promise.resolve([])}
+                triggerMode="icon" onChange={(value) => { setDestination(value); clearValidationErrors(); }}
+                disabled={!isEditable || !customer} required
+                error={Boolean(validationErrors?.salesDestinationId)}
+                helperText={validationErrors?.salesDestinationId} />
+              <MasterPicker label="매출처" value={billingCustomer} search={searchOrderCustomers}
+                triggerMode="icon" onChange={(value) => { setBillingCustomer(value); clearValidationErrors(); }}
+                disabled={!isEditable} required
+                error={Boolean(validationErrors?.billingCustomerId)}
+                helperText={validationErrors?.billingCustomerId} />
+            </Box>
             <TextField
               label="견적번호"
               size="small"
@@ -822,37 +894,6 @@ export function SalesOrderCreatePage({
                 },
               }}
             />
-            <DateEditor
-              label="납기일자"
-              variant="outlined"
-              autoFocus={false}
-              required
-              value={deliveryDate}
-              onChange={(value) => {
-                setDeliveryDate(value);
-                setDeliveryDateError('');
-                clearValidationErrors();
-              }}
-              onBlur={() => {
-                const normalized = deliveryDate.trim() ? normalizeDateInput(deliveryDate) : '';
-                if (normalized) setDeliveryDate(normalized);
-                setDeliveryDateError(deliveryDate.trim() && !normalized
-                  ? '올바른 납기일자를 입력해 주세요.' : '');
-              }}
-              disabled={!isEditable}
-              error={Boolean(deliveryDateError)}
-              helperText={deliveryDateError}
-            />
-            <TextField
-              label="납품장소"
-              size="small"
-              value={deliveryPlace}
-              onChange={(event) => {
-                setDeliveryPlace(event.target.value);
-                clearValidationErrors();
-              }}
-              disabled={!isEditable}
-            />
             <TextField
               label="배송방법"
               size="small"
@@ -874,16 +915,6 @@ export function SalesOrderCreatePage({
                 </MenuItem>
               ))}
             </TextField>
-            <TextField
-              label="수주상태"
-              size="small"
-              value={getSalesOrderCodeLabel(
-                commonCodes.orderStatusOptions,
-                loadedOrder?.status ?? EDITABLE_ORDER_STATUS,
-              )}
-              slotProps={{ input: { readOnly: true } }}
-              sx={{ '& .MuiInputBase-root': { backgroundColor: 'action.disabledBackground' } }}
-            />
             <TextField
               label="비고"
               size="small"

@@ -163,9 +163,12 @@ public class SalesStatementServiceImpl {
     private List<Map<String, Object>> createGrouped(Long tenantId, String userId,
             List<Long> salesDeliveryDetailIds, LocalDate date, String remark, boolean singleCustomer)
             throws Exception {
-        if (salesDeliveryDetailIds == null || salesDeliveryDetailIds.isEmpty()
-                || salesDeliveryDetailIds.size() > 100) {
+        if (salesDeliveryDetailIds == null || salesDeliveryDetailIds.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "발행할 출하 상세를 확인해 주세요.");
+        }
+        if (salesDeliveryDetailIds.size() > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "거래명세서는 출하 상세를 최대 100건까지 발행할 수 있습니다. 자동 발행 시 출하도 저장되지 않습니다.");
         }
         Set<Long> uniqueIds = new TreeSet<Long>();
         for (Long detailId : salesDeliveryDetailIds) {

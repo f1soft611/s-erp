@@ -143,7 +143,7 @@ export const commentMentionSx = {
   [`& .${COMMENT_MENTION_CLASS}`]: {
     color: 'primary.main',
     bgcolor: 'rgba(25, 118, 210, 0.12)',
-    borderRadius: '6px',
+    borderRadius: '4px',
     fontWeight: 700,
     px: '3px',
     py: '1px',

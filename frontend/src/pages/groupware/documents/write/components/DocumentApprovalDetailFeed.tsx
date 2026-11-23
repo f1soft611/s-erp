@@ -178,7 +178,7 @@ const approvalLineStatusBorderColors: Record<ApprovalLineStatusTone, string> = {
   warning: 'warning.light',
 };
 
-const approvalBadgeBorderRadius = '6px';
+const approvalBadgeBorderRadius = '4px';
 const completedApprovalStatuses = new Set(['APPROVED', 'REJECTED', 'RETURNED']);
 type ReasonAction = Extract<
   DocumentApprovalActionRequest['action'],
@@ -1813,7 +1813,7 @@ export function DocumentApprovalDetailFeed(
                                                   approvalLineStatusColors[
                                                     statusTone
                                                   ],
-                                                borderRadius: '6px',
+                                                borderRadius: '4px',
                                                 color:
                                                   approvalLineStatusColors[
                                                     statusTone
@@ -1848,7 +1848,7 @@ export function DocumentApprovalDetailFeed(
                                                 py: 0.75,
                                                 border: '1px solid',
                                                 borderColor: 'divider',
-                                                borderRadius: '6px',
+                                                borderRadius: '4px',
                                                 bgcolor: 'background.paper',
                                               }}
                                             >
@@ -1974,7 +1974,7 @@ export function DocumentApprovalDetailFeed(
                                         py: 0.75,
                                         border: '1px solid',
                                         borderColor: 'divider',
-                                        borderRadius: '6px',
+                                        borderRadius: '4px',
                                         bgcolor: 'background.paper',
                                       }}
                                     >

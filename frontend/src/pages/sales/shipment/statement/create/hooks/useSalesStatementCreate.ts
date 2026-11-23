@@ -6,6 +6,7 @@ import { normalizeDateInput } from '../../../../../../shared/components/f1-grid/
 import { getSystemDate } from '../../../../../../shared/services/systemDateService';
 import type { F1GridRowId } from '../../../../../../shared/components/f1-grid';
 import { getDelivery } from '../../../delivery/create/services/salesDelivery.service';
+import { MAX_STATEMENT_DETAIL_COUNT } from '../../../../shared/statementDetailLimit';
 import { createStatement, deleteStatement, getStatement, updateStatement } from '../../services/salesStatement.service';
 import type { StatementDetail, StatementItem, StatementSource } from '../../types/salesStatement.types';
 import type { SalesStatementCreateProps } from '../types/salesStatementCreate.types';
@@ -169,6 +170,10 @@ export function useSalesStatementCreate({
     if (!statementDt) return;
     if (!source) { setError('출하와 명세일을 입력해 주세요.'); return; }
     if (!id && selectedIds.length === 0) { setError('거래명세서 상세를 선택해 주세요.'); return; }
+    if (!id && new Set(selectedIds).size > MAX_STATEMENT_DETAIL_COUNT) {
+      setError('거래명세서는 출하 상세를 최대 100건까지 발행할 수 있습니다.');
+      return;
+    }
     busy.current = true; setPending(true); setError(''); setNotice('');
     try {
       const value = id ? await updateStatement(id, { statementDt, remark })

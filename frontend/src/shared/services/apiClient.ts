@@ -21,6 +21,27 @@ interface ApiEnvelope<T> {
   code?: number | string;
 }
 
+function rejectPasswordChangeRequired(body: ApiEnvelope<unknown>, status: number): void {
+  const resultCode = body.resultCode ?? body.code;
+  if (String(resultCode) !== PASSWORD_CHANGE_REQUIRED_CODE) return;
+  markPasswordChangeRequired();
+  throw new ApiResponseError(
+    normalizeApiErrorMessage(body.resultMessage || body.message || '요청이 실패했습니다.'),
+    status,
+  );
+}
+
+function checkPasswordChangeError(rawText: string, status: number): void {
+  if (status !== 403) return;
+  let body: ApiEnvelope<unknown>;
+  try {
+    body = JSON.parse(rawText) as ApiEnvelope<unknown>;
+  } catch {
+    return;
+  }
+  if (body && typeof body === 'object') rejectPasswordChangeRequired(body, status);
+}
+
 async function receive<T>(operation: () => Promise<T>): Promise<T> {
   try {
     return await operation();
@@ -121,14 +142,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const resultMessage =
     body.resultMessage || body.message || '요청이 실패했습니다.';
 
-  if (String(resultCode) === PASSWORD_CHANGE_REQUIRED_CODE) {
-    // 관리자가 초기화한 계정 등: 비밀번호를 바꿀 때까지 다른 요청은 서버가 거부하므로 변경 화면으로 보낸다.
-    markPasswordChangeRequired();
-    throw new ApiResponseError(
-      normalizeApiErrorMessage(resultMessage),
-      response.status,
-    );
-  }
+  rejectPasswordChangeRequired(body, response.status);
 
   if (!response.ok || String(resultCode) !== '200') {
     throw new ApiResponseError(
@@ -153,7 +167,10 @@ export async function apiGetEventStream(path: string, signal: AbortSignal): Prom
     headers: { Accept: 'text/event-stream', Authorization: `Bearer ${auth.accessToken}` },
     cache: 'no-store',
   }));
-  if (!response.ok) throw new ApiResponseError('실시간 연결을 시작할 수 없습니다.', response.status);
+  if (!response.ok) {
+    if (response.status === 403) checkPasswordChangeError(await receive(() => response.text()), response.status);
+    throw new ApiResponseError('실시간 연결을 시작할 수 없습니다.', response.status);
+  }
   return response;
 }
 
@@ -169,7 +186,9 @@ export async function apiGetBlob(path: string): Promise<Blob> {
     : `${API_BASE_URL}${path}`;
   const response = await fetch(requestUrl, { headers });
   if (!response.ok) {
-    throw new Error(normalizeApiErrorMessage(await response.text()));
+    const message = await response.text();
+    checkPasswordChangeError(message, response.status);
+    throw new Error(normalizeApiErrorMessage(message));
   }
 
   return response.blob();
@@ -188,6 +207,7 @@ export async function apiDownload(
   const response = await fetch(`${API_BASE_URL}${path}`, { headers });
   if (!response.ok) {
     const message = await response.text();
+    checkPasswordChangeError(message, response.status);
     throw new Error(normalizeApiErrorMessage(message));
   }
 

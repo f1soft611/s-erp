@@ -311,8 +311,8 @@ describe('common notice view mode components', () => {
     if (!statusChip || !kindChip) throw new Error('Expected document Chips to render.');
     expect(statusChip).toHaveClass('MuiChip-filled');
     expect(kindChip).toHaveClass('MuiChip-outlined');
-    expect(statusChip).toHaveStyle({ borderRadius: '6px' });
-    expect(kindChip).toHaveStyle({ borderRadius: '6px' });
+    expect(statusChip).toHaveStyle({ borderRadius: '4px' });
+    expect(kindChip).toHaveStyle({ borderRadius: '4px' });
   });
 
   it('keeps default list status styling when document presentation is omitted', () => {

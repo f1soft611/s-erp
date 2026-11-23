@@ -12,7 +12,7 @@ const basePalette = {
     main: '#0f172a',
   },
   shape: {
-    borderRadius: 6,
+    borderRadius: 4,
   },
 };
 

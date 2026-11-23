@@ -798,7 +798,7 @@ export function PageSearchArea({
                   width: 40,
                   height: 40,
                   flex: '0 0 40px',
-                  borderRadius: '6px 0 0 6px',
+                  borderRadius: '4px 0 0 4px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -823,7 +823,7 @@ export function PageSearchArea({
                   height: '100%',
                   '& .MuiOutlinedInput-root': {
                     height: '100%',
-                    borderRadius: '0 6px 6px 0',
+                    borderRadius: '0 4px 4px 0',
                   },
                 }}
                 onKeyDown={handleDefaultSearchKeyDown}
@@ -849,7 +849,7 @@ export function PageSearchArea({
                 width: 40,
                 height: 40,
                 flex: '0 0 40px',
-                borderRadius: '6px 0 0 6px',
+                borderRadius: '4px 0 0 4px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -877,11 +877,11 @@ export function PageSearchArea({
                 minWidth: 0,
                 height: '100%',
                 '& > :first-of-type .MuiOutlinedInput-root': {
-                  borderRadius: '0 6px 6px 0',
+                  borderRadius: '0 4px 4px 0',
                 },
                 '& .MuiOutlinedInput-root': {
                   height: '100%',
-                  borderRadius: '0 6px 6px 0',
+                  borderRadius: '0 4px 4px 0',
                 },
               }}
               onKeyDown={handleDefaultSearchKeyDown}

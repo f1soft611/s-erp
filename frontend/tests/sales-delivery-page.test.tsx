@@ -276,6 +276,27 @@ it('creates direct delivery from shared customer/material pickers with edited qu
       deliveryQty: 2, unitPrice: 100, vatAmt: 20 }],
   })));
 }, 15000);
+it('shows the automatic statement limit error when delivery creation fails', async () => {
+  const message = '거래명세서는 출하 상세를 최대 100건까지 발행할 수 있습니다. 자동 발행 시 출하도 저장되지 않습니다.';
+  vi.mocked(createDelivery).mockRejectedValueOnce(new Error(message));
+  mount(<SalesDeliveryCreatePage {...props} />);
+  fireEvent.click(screen.getByRole('button', { name: '거래처 선택' }));
+  fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
+  fireEvent.click(await screen.findByRole('button', { name: 'C10 거래처 선택' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: '상세 행 추가' }));
+  fireEvent.click(screen.getByRole('button', { name: '품목 선택', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
+  fireEvent.click(await screen.findByRole('button', { name: 'M20 품목 선택' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  const row = screen.getByRole('row', { name: /delivery-.*행 선택/ });
+  fireEvent.doubleClick(within(row).getAllByRole('gridcell')[4]);
+  fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '2' } });
+  fireEvent.keyDown(screen.getByRole('spinbutton'), { key: 'Enter', code: 'Enter' });
+  fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+  expect(await screen.findByText(message)).toBeInTheDocument();
+  expect(createDelivery).toHaveBeenCalledOnce();
+}, 15000);
 it('selects one order, populates remaining lines and prevents source identity editing', async () => {
   vi.mocked(searchSourceOrders).mockResolvedValue([{
     salesOrderId: 7, salesOrderDetailId: 70, salesDeliveryPlanDetailId: 700, orderNo: 'SO-7', orderDt: '2026-11-04',

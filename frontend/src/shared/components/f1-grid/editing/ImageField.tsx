@@ -96,7 +96,7 @@ export function ImageField({
   }
 
   if (formSize) {
-    const radius = circle ? '50%' : 2;
+    const radius = circle ? '50%' : 1;
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', minWidth: 0 }}
         onClick={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>

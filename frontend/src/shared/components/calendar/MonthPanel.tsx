@@ -60,7 +60,7 @@ export function MonthPanel({ value, onChange, onClear, todayValue }: MonthPanelP
               sx={(theme) => ({
                 position: 'relative',
                 height: 40,
-                borderRadius: 1.5,
+                borderRadius: 1,
                 fontSize: 14,
                 fontWeight: selected ? 700 : 400,
                 color: selected ? theme.palette.primary.contrastText : theme.palette.text.primary,

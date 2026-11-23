@@ -70,3 +70,12 @@ it('rejects close responses that did not close every selected detail', async () 
   await expect(closeRevenueClosings([200, 201], '2026-11-20'))
     .rejects.toThrow('매출마감 처리 응답을 확인해 주세요.');
 });
+
+it('allows 100 distinct details and rejects 101 before posting', async () => {
+  const ids = Array.from({ length: 101 }, (_, index) => index + 1);
+  vi.mocked(apiPost).mockResolvedValue({ closedCount: 100, items: [] });
+  await expect(closeRevenueClosings(ids.slice(0, 100), '2026-11-20')).resolves.toMatchObject({ closedCount: 100 });
+  vi.mocked(apiPost).mockClear();
+  await expect(closeRevenueClosings(ids, '2026-11-20')).rejects.toThrow(/100건/);
+  expect(apiPost).not.toHaveBeenCalled();
+});

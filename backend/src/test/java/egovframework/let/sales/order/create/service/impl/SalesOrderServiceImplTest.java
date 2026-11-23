@@ -51,6 +51,7 @@ class SalesOrderServiceImplTest {
         when(salesDeliveryPlanService.getMode(71L)).thenReturn("MANUAL");
         when(salesDeliveryPlanService.lockModeForPlanCreation(71L)).thenReturn("MANUAL");
         when(salesOrderDAO.existsCustomer(anyMap())).thenReturn(true);
+        when(salesOrderDAO.existsDestination(anyMap())).thenReturn(true);
         when(salesOrderDAO.existsMaterial(anyMap())).thenReturn(true);
         when(salesOrderDAO.insertOrderHeader(anyMap())).thenReturn(300L);
         when(salesOrderDAO.insertOrderDetail(anyMap())).thenReturn(400L);
@@ -58,6 +59,28 @@ class SalesOrderServiceImplTest {
         when(salesOrderDAO.countDeliveryReferences(anyMap())).thenReturn(0);
         when(idSequenceService.nextValue("SALES_ORDER_NO", "71", "20261027"))
                 .thenReturn(1L);
+    }
+
+    @Test
+    void requiresDestinationAndBillingCustomer() throws Exception {
+        SalesOrderCreateRequestVO payload = validPayload();
+        payload.setSalesDestinationId(null);
+        assertThatThrownBy(() -> service.createOrder(71L, "user01", payload))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("납품처");
+        payload.setSalesDestinationId(90L);
+        payload.setBillingCustomerId(null);
+        assertThatThrownBy(() -> service.createOrder(71L, "user01", payload))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("매출처");
+    }
+
+    @Test
+    void rejectsDestinationBelongingToAnotherCustomer() throws Exception {
+        when(salesOrderDAO.existsDestination(anyMap())).thenReturn(false);
+        assertThatThrownBy(() -> service.createOrder(71L, "user01", validPayload()))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("납품처");
     }
 
     @Test
@@ -220,7 +243,7 @@ class SalesOrderServiceImplTest {
                 .extracting(error -> ((ResponseStatusException) error).getStatus())
                 .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
 
-        verify(salesOrderDAO).existsCustomer(anyMap());
+        verify(salesOrderDAO, org.mockito.Mockito.times(2)).existsCustomer(anyMap());
         verify(salesOrderDAO).existsMaterial(anyMap());
         verify(salesOrderDAO, org.mockito.Mockito.never())
                 .insertOrderHeader(anyMap());
@@ -501,6 +524,8 @@ class SalesOrderServiceImplTest {
         SalesOrderCreateRequestVO payload = new SalesOrderCreateRequestVO();
         payload.setOrderDt(LocalDate.of(2026, 10, 27));
         payload.setCustomerId(10L);
+        payload.setSalesDestinationId(90L);
+        payload.setBillingCustomerId(11L);
         payload.setDetails(Collections.singletonList(detail(20L, "2", "2", "1.00")));
         return payload;
     }

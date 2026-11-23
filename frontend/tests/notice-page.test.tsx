@@ -136,7 +136,7 @@ describe('Community notice page', () => {
             ? theme.palette.getContrastText(backgroundColor)
             : backgroundColor,
           height: '28px',
-          borderRadius: '6px',
+          borderRadius: '4px',
         });
       }
       expect(
