@@ -228,7 +228,7 @@ export function SalesDeliveryPlanStatusPage({
         onKeyDown={(event) => { if (event.key === 'Enter') void search(); }}
         slotProps={{ htmlInput: { 'aria-label': '출하계획현황 빠른 검색' } }}
         sx={(theme) => ({ width: '100%', height: 40, '& .MuiOutlinedInput-root': {
-          height: '100%', borderRadius: '0 6px 6px 0', backgroundColor: theme.palette.background.paper,
+          height: '100%', borderRadius: '0 4px 4px 0', backgroundColor: theme.palette.background.paper,
         } })} />} />
     <Box data-testid="sales-status-content" sx={{ px: { xs: 1, sm: 2 }, pt: 1, pb: 2, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, gap: 1 }}>
       <PageMessageArea

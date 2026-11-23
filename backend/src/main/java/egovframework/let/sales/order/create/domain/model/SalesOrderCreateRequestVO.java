@@ -28,6 +28,12 @@ public class SalesOrderCreateRequestVO implements Serializable {
     @Schema(description = "거래처 ID", required = true, example = "10")
     private Long customerId;
 
+    @Schema(description = "납품처 ID", required = true)
+    private Long salesDestinationId;
+
+    @Schema(description = "매출처 거래처 ID", required = true)
+    private Long billingCustomerId;
+
     @Schema(description = "견적번호", example = "QT-20261027-0001")
     private String quotNo;
 

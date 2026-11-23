@@ -15,6 +15,9 @@ import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +25,11 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
+import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
+import org.springframework.transaction.interceptor.TransactionInterceptor;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import egovframework.let.common.idsequence.service.IdSequenceService;
@@ -36,6 +44,8 @@ import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryVO;
 import egovframework.let.sales.shipment.delivery.domain.repository.SalesDeliveryDAO;
 import egovframework.let.sales.shipment.deliveryplan.service.SalesDeliveryPlanService;
 import egovframework.let.sales.shipment.statement.service.impl.SalesStatementServiceImpl;
+import egovframework.let.sales.shipment.statement.domain.repository.SalesStatementDAO;
+import egovframework.let.sales.shipment.delivery.service.SalesDeliveryService;
 import egovframework.let.system.policies.service.SystemPolicyService;
 
 class SalesDeliveryServiceImplTest {
@@ -93,6 +103,34 @@ class SalesDeliveryServiceImplTest {
         service.createDelivery(71L, "user01", directPayload());
 
         verifyNoInteractions(statementService);
+    }
+
+    @Test
+    void rollsBackAutoDeliveryWhenStatementExceedsDetailLimit() throws Exception {
+        SalesStatementDAO statementDao = org.mockito.Mockito.mock(SalesStatementDAO.class);
+        List<Long> ids = LongStream.rangeClosed(1, 101).boxed().collect(Collectors.toList());
+        when(statementDao.lockDelivery(anyMap())).thenReturn(501L);
+        when(statementDao.selectAvailableDetailIdsByDelivery(anyMap())).thenReturn(ids);
+        when(systemPolicyService.getStatementIssueMode(71L)).thenReturn("AUTO");
+        SalesStatementServiceImpl realStatements = new SalesStatementServiceImpl(statementDao, sequenceService);
+        SalesDeliveryServiceImpl target = new SalesDeliveryServiceImpl(dao, sequenceService, planService,
+                systemPolicyService, realStatements);
+        PlatformTransactionManager transactions = org.mockito.Mockito.mock(PlatformTransactionManager.class);
+        SimpleTransactionStatus status = new SimpleTransactionStatus();
+        when(transactions.getTransaction(org.mockito.ArgumentMatchers.any())).thenReturn(status);
+        ProxyFactory proxy = new ProxyFactory(target);
+        proxy.addAdvice(new TransactionInterceptor(transactions, new AnnotationTransactionAttributeSource()));
+        SalesDeliveryService transactional = (SalesDeliveryService) proxy.getProxy();
+
+        assertThatThrownBy(() -> transactional.createDelivery(71L, "user01", directPayload()))
+                .isInstanceOfSatisfying(ResponseStatusException.class, error -> {
+                    assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(error.getReason()).contains("100건", "저장되지 않습니다");
+                });
+        verify(transactions).rollback(status);
+        verify(transactions, never()).commit(status);
+        verify(dao).insertDeliveryHeader(anyMap());
+        verify(statementDao, never()).insertHeader(anyMap());
     }
 
     @Test

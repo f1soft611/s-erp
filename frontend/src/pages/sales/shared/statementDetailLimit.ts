@@ -1,0 +1,1 @@
+export const MAX_STATEMENT_DETAIL_COUNT = 100;

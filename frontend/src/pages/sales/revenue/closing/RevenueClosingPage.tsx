@@ -17,6 +17,7 @@ import type {
   PageContent,
 } from '../../../dashboard/types/dashboard';
 import { searchOrderCustomers } from '../../order/create/services/salesOrderMaster.service';
+import { MAX_STATEMENT_DETAIL_COUNT } from '../../shared/statementDetailLimit';
 import { CustomerClosingSummary } from './components/CustomerClosingSummary';
 import { RevenueClosingDetailGrid } from './components/RevenueClosingDetailGrid';
 import { filterRevenueClosingDetails } from './data/revenueClosingFilters';
@@ -216,6 +217,11 @@ export function RevenueClosingPage({
   const closeSelectedDetails = async () => {
     const detailIds = selectedDetailIds;
     if (!canCreate || closing || closeInFlightRef.current || detailIds.length === 0) return;
+    if (new Set(detailIds).size > MAX_STATEMENT_DETAIL_COUNT) {
+      setNotice('');
+      setError('매출마감은 출하 상세를 최대 100건까지 처리할 수 있습니다.');
+      return;
+    }
     closeInFlightRef.current = true;
     const accepted = await confirm({
       title: '매출 마감',
@@ -341,7 +347,7 @@ export function RevenueClosingPage({
               height: 40,
               '& .MuiOutlinedInput-root': {
                 height: '100%',
-                borderRadius: '0 6px 6px 0',
+                borderRadius: '0 4px 4px 0',
                 backgroundColor: theme.palette.background.paper,
               },
             })}

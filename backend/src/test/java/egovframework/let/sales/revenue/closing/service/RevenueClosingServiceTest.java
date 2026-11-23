@@ -13,6 +13,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -164,6 +166,26 @@ class RevenueClosingServiceTest {
         verify(statements, never()).createBatch(org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyList(),
                 org.mockito.ArgumentMatchers.anyString());
+        verify(dao, never()).markDetailsClosed(anyMap());
+    }
+
+    @Test
+    void enforcesOneHundredDetailLimitBeforeClosing() throws Exception {
+        List<Long> ids = LongStream.rangeClosed(1, 101).boxed().collect(Collectors.toList());
+        RevenueClosingCloseRequestVO request = new RevenueClosingCloseRequestVO();
+        request.setStatementDt("2026-11-20");
+        request.setSalesDeliveryDetailIds(ids.subList(0, 100));
+        when(dao.lockDetailsForClosing(anyMap())).thenReturn(Collections.<Map<String, Object>>emptyList());
+        assertThatThrownBy(() -> service.close(9L, "user-1", request))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+        verify(dao).lockDetailsForClosing(anyMap());
+        request.setSalesDeliveryDetailIds(ids);
+        assertThatThrownBy(() -> service.close(9L, "user-1", request))
+                .isInstanceOfSatisfying(ResponseStatusException.class, error -> {
+                    assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(error.getReason()).contains("100건");
+                });
         verify(dao, never()).markDetailsClosed(anyMap());
     }
 

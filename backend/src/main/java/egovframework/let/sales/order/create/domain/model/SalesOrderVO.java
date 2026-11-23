@@ -44,6 +44,15 @@ public class SalesOrderVO implements Serializable {
     @Schema(description = "거래처명 (조회 응답)", example = "에프원상사")
     private String customerName;
 
+    @Schema(description = "납품처 ID")
+    private Long salesDestinationId;
+    private String destinationCode;
+    private String destinationName;
+    @Schema(description = "매출처 거래처 ID")
+    private Long billingCustomerId;
+    private String billingCustomerCode;
+    private String billingCustomerName;
+
     @Schema(description = "견적번호")
     private String quotNo;
 

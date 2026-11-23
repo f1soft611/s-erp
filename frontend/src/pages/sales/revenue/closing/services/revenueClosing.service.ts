@@ -1,4 +1,5 @@
 import { apiGet, apiPost } from '../../../../../shared/services/apiClient';
+import { MAX_STATEMENT_DETAIL_COUNT } from '../../../shared/statementDetailLimit';
 import type {
   RevenueClosingCustomerSummaryRow,
   RevenueClosingDetailRow,
@@ -46,6 +47,9 @@ export async function closeRevenueClosings(
   statementDt: string,
 ): Promise<{ closedCount: number; items: RevenueClosingBatchItem[] }> {
   const ids = [...new Set(salesDeliveryDetailIds)];
+  if (ids.length > MAX_STATEMENT_DETAIL_COUNT) {
+    throw new Error('매출마감은 출하 상세를 최대 100건까지 처리할 수 있습니다.');
+  }
   if (ids.length === 0 || ids.some((id) => !Number.isSafeInteger(id) || id < 1)) {
     throw new Error('마감할 출하를 선택해 주세요.');
   }

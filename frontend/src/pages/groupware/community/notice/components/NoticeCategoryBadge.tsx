@@ -19,7 +19,7 @@ export function NoticeCategoryBadge({ code, label, compact = false, isDark }: No
       color: theme.palette.mode === 'dark'
         ? theme.palette.getContrastText(backgroundColor)
         : backgroundColor,
-      height: compact ? 22 : 28, borderRadius: '6px', fontWeight: 700, flexShrink: 0,
+      height: compact ? 22 : 28, borderRadius: '4px', fontWeight: 700, flexShrink: 0,
       ...(compact ? { ml: 'auto' } : {}),
     }} />;
 }

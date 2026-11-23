@@ -31,6 +31,10 @@ public class SalesOrderDAO extends EgovAbstractMapper {
         return Boolean.TRUE.equals(exists);
     }
 
+    public boolean existsDestination(Map<String, Object> params) throws Exception {
+        return Boolean.TRUE.equals(selectOne("SalesOrderDAO.existsDestination", params));
+    }
+
     /**
      * 테넌트 범위에서 품목 존재 여부를 확인한다.
      *

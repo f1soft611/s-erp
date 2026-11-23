@@ -58,7 +58,9 @@ class SalesOrderTenantScopeMapperTest {
         Configuration configuration = parse();
 
         String header = normalize(sql(configuration, "insertOrderHeader").getSql());
-        assertThat(header).contains("?, ?, CAST(? AS date), ?, ?, CAST(? AS date)");
+        assertThat(header).contains("?, ?, CAST(? AS date), ?, ?, ?, ?, CAST(? AS date)");
+        assertThat(properties(sql(configuration, "insertOrderHeader")))
+                .contains("salesDestinationId", "billingCustomerId");
 
         String detail = normalize(sql(configuration, "insertOrderDetail").getSql());
         assertThat(detail).contains("CAST(? AS date)");

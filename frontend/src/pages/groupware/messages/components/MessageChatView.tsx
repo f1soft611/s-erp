@@ -307,7 +307,7 @@ export function MessageChatView({
                       minWidth: 0,
                       px: 1.25,
                       py: 0.75,
-                      borderRadius: '6px',
+                      borderRadius: '4px',
                       bgcolor: mine ? sentBubble : receivedBubble,
                       color: mine ? primary.contrastText : 'text.primary',
                       border: mine ? 'none' : `1px solid ${receivedBorder}`,

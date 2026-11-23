@@ -216,7 +216,7 @@ export function SalesOverviewSkeleton() {
                   {[48, 62, 54, 80, 72, 90].map((height, index) => (
                     <Stack key={index} sx={{ height: 204, justifyContent: 'flex-end', alignItems: 'center', px: 0.4, pt: 1 }}>
                       <Skeleton width="75%" height={14} sx={{ mb: 1 }} />
-                      <Skeleton variant="rounded" sx={{ height: `${height}%`, width: '66%', maxWidth: 54, borderRadius: '6px 6px 0 0' }} />
+                      <Skeleton variant="rounded" sx={{ height: `${height}%`, width: '66%', maxWidth: 54, borderRadius: '4px 4px 0 0' }} />
                     </Stack>
                   ))}
                 </Box>

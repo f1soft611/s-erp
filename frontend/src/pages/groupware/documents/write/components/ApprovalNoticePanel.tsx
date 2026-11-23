@@ -67,7 +67,7 @@ export function ApprovalNoticePanel({ items, onSelect }: ApprovalNoticePanelProp
                   sx={{
                     height: 22,
                     fontWeight: 700,
-                    borderRadius: '6px',
+                    borderRadius: '4px',
                   }}
                 />
               </Stack>

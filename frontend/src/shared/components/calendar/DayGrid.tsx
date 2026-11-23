@@ -77,7 +77,7 @@ export function DayGrid({
                     position: 'relative',
                     height: CELL_HEIGHT,
                     fontSize: 14,
-                    borderRadius: isSelected ? 1.5 : 0,
+                    borderRadius: isSelected ? 1 : 0,
                     color: isSelected ? theme.palette.primary.contrastText : weekendColor,
                     opacity: cell.inMonth || isSelected ? 1 : 0.4,
                     fontWeight: isSelected ? 700 : 400,

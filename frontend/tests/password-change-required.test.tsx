@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { apiGet } from '../src/shared/services/apiClient';
+import { apiDownload, apiGet, apiGetBlob, apiGetEventStream } from '../src/shared/services/apiClient';
 import ForcePasswordChangePage, { PASSWORD_CHANGED_NOTICE } from '../src/pages/auth/ForcePasswordChangePage';
 import {
   getStoredAuth,
@@ -117,6 +117,32 @@ describe('API 응답의 비밀번호 변경 필요 처리', () => {
 
     await expect(apiGet('/api/v1/hr/employees')).rejects.toThrow('권한이 없습니다.');
 
+    expect(isPasswordChangeRequired()).toBe(false);
+  });
+
+  it.each([
+    ['Blob', () => apiGetBlob('/file')],
+    ['download', () => apiDownload('/file')],
+    ['stream', () => apiGetEventStream('/events', new AbortController().signal)],
+  ])('%s 요청이 변경 필요 403을 받으면 세션에 표시한다', async (_label, request) => {
+    vi.spyOn(window, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      resultCode: 'PASSWORD_CHANGE_REQUIRED', resultMessage: '비밀번호를 변경한 뒤에 이용할 수 있습니다.',
+    }), { status: 403 }));
+
+    await expect(request()).rejects.toThrow('비밀번호를 변경한 뒤에 이용할 수 있습니다.');
+    expect(isPasswordChangeRequired()).toBe(true);
+  });
+
+  it.each([
+    ['Blob', () => apiGetBlob('/file')],
+    ['download', () => apiDownload('/file')],
+    ['stream', () => apiGetEventStream('/events', new AbortController().signal)],
+  ])('%s 요청의 다른 403은 변경 필요로 표시하지 않는다', async (_label, request) => {
+    vi.spyOn(window, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      resultCode: '403', resultMessage: '권한이 없습니다.',
+    }), { status: 403 }));
+
+    await expect(request()).rejects.toThrow();
     expect(isPasswordChangeRequired()).toBe(false);
   });
 });

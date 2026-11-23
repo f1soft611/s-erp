@@ -12,6 +12,8 @@ export type SalesOrderCreateDetailPayload = {
 export type SalesOrderCreatePayload = {
   orderDt: string;
   customerId: number;
+  salesDestinationId: number;
+  billingCustomerId: number;
   quotNo: string | null;
   deliveryDt: string | null;
   deliveryPlace: string | null;
@@ -22,9 +24,11 @@ export type SalesOrderCreatePayload = {
 
 export type SalesOrderCreateInput = Omit<
   SalesOrderCreatePayload,
-  'customerId' | 'details'
+  'customerId' | 'salesDestinationId' | 'billingCustomerId' | 'details'
 > & {
   customerId: number | null;
+  salesDestinationId: number | null;
+  billingCustomerId: number | null;
   details: SalesOrderDetailRow[];
 };
 
@@ -32,6 +36,8 @@ export type SalesOrderValidationErrors = {
   orderDt?: string;
   deliveryDt?: string;
   customerId?: string;
+  salesDestinationId?: string;
+  billingCustomerId?: string;
   details?: string;
   detailRows: Record<string, string>;
   /** 행 수와 무관하게 중복 제거된 상세 검증 메시지 */
@@ -73,6 +79,12 @@ export type SalesOrderItem = {
   customerId: number;
   customerCode: string | null;
   customerName: string | null;
+  salesDestinationId: number | null;
+  destinationCode: string | null;
+  destinationName: string | null;
+  billingCustomerId: number | null;
+  billingCustomerCode: string | null;
+  billingCustomerName: string | null;
   quotNo: string | null;
   deliveryDt: string | null;
   deliveryPlace: string | null;
@@ -103,6 +115,8 @@ export type SalesOrderHeaderValues = {
 
 export type SalesOrderForm = {
   customer: MasterPickerOption;
+  destination: MasterPickerOption | null;
+  billingCustomer: MasterPickerOption | null;
   header: SalesOrderHeaderValues;
   rows: SalesOrderDetailRow[];
 };

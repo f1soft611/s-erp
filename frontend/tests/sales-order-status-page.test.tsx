@@ -71,6 +71,12 @@ function createOrderItem(overrides: Partial<SalesOrderItem> = {}): SalesOrderIte
     customerId: 10,
     customerCode: 'C-10',
     customerName: '거래처 10',
+    salesDestinationId: 90,
+    destinationCode: 'D-90',
+    destinationName: '납품처 90',
+    billingCustomerId: 10,
+    billingCustomerCode: 'C-10',
+    billingCustomerName: '거래처 10',
     quotNo: 'Q-1',
     deliveryDt: '2026-11-01',
     deliveryPlace: '본사 창고',
@@ -541,9 +547,9 @@ describe('sales order status page', () => {
 
     const dialog = await screen.findByRole('dialog', { name: '수주 상세보기' });
     await waitFor(() => {
-      expect(within(dialog).getByLabelText('납품장소')).toHaveValue('본사 창고');
+      expect(within(dialog).getByRole('textbox', { name: '납품처' })).toHaveValue('D-90 · 납품처 90');
     });
-    expect(within(dialog).getByLabelText('납품장소')).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: '납품처 선택' })).toBeDisabled();
     expect(within(dialog).queryByRole('button', { name: '저장' })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: '삭제' })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: '신규' })).not.toBeInTheDocument();
@@ -563,9 +569,9 @@ describe('sales order status page', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: '수정' }));
 
     const dialog = await screen.findByRole('dialog', { name: '수주 수정' });
-    const place = within(dialog).getByLabelText('납품장소');
+    const remark = within(dialog).getByLabelText('비고');
     await waitFor(() => {
-      expect(place).toHaveValue('본사 창고');
+      expect(remark).toHaveValue('긴급');
     });
     expect(within(dialog).queryByRole('button', { name: '신규' })).not.toBeInTheDocument();
     const region = within(dialog).getByRole('region', { name: '수주 입력 내용' });
@@ -591,13 +597,13 @@ describe('sales order status page', () => {
         : defaultGet(path),
     );
 
-    fireEvent.change(place, { target: { value: '제2 창고' } });
+    fireEvent.change(remark, { target: { value: '수정 비고' } });
     fireEvent.click(within(footerActions).getByRole('button', { name: '저장' }));
 
     await waitFor(() => {
       expect(apiPutMock).toHaveBeenCalledWith(
         '/api/v1/sales/orders/300',
-        expect.objectContaining({ deliveryPlace: '제2 창고' }),
+        expect.objectContaining({ remark: '수정 비고', salesDestinationId: 90, billingCustomerId: 10 }),
       );
     });
     await waitFor(() => {
@@ -622,7 +628,7 @@ describe('sales order status page', () => {
 
     const dialog = await screen.findByRole('dialog', { name: '수주 수정' });
     await waitFor(() => {
-      expect(within(dialog).getByLabelText('납품장소')).toHaveValue('본사 창고');
+      expect(within(dialog).getByRole('textbox', { name: '납품처' })).toHaveValue('D-90 · 납품처 90');
     });
     fireEvent.click(
       within(within(dialog).getByTestId('common-dialog-actions')).getByRole('button', {

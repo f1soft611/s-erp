@@ -480,7 +480,7 @@ export function RichTextEditor({
         width: '10px',
         height: '10px',
         border: '1px solid #1d4ed8',
-        borderRadius: '6px',
+        borderRadius: '4px',
         backgroundColor: '#ffffff',
         pointerEvents: 'auto',
         touchAction: 'none',

@@ -11,6 +11,15 @@
         )
     </select>
 
+    <select id="existsDestination" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM tb_sales_destination
+            WHERE tenant_id = #{tenantId}
+              AND customer_id = #{customerId}
+              AND sales_destination_id = #{id}
+        )
+    </select>
+
     <select id="existsMaterial" parameterType="map" resultType="boolean">
         SELECT EXISTS (
             SELECT 1
@@ -26,6 +35,8 @@
             order_no,
             order_dt,
             customer_id,
+            sales_destination_id,
+            billing_customer_id,
             quot_no,
             delivery_dt,
             delivery_place,
@@ -39,6 +50,8 @@
             #{orderNo},
             CAST(#{orderDt} AS date),
             #{customerId},
+            #{salesDestinationId},
+            #{billingCustomerId},
             #{quotNo},
             CAST(#{deliveryDt} AS date),
             #{deliveryPlace},
@@ -90,6 +103,12 @@
                h.customer_id AS customerId,
                c.customer_code AS customerCode,
                c.customer_name AS customerName,
+               h.sales_destination_id AS salesDestinationId,
+               dest.destination_code AS destinationCode,
+               dest.destination_name AS destinationName,
+               h.billing_customer_id AS billingCustomerId,
+               billing.customer_code AS billingCustomerCode,
+               billing.customer_name AS billingCustomerName,
                h.quot_no AS quotNo,
                h.delivery_dt AS deliveryDt,
                h.delivery_place AS deliveryPlace,
@@ -105,6 +124,13 @@
                LEFT JOIN tb_customer_info c
                  ON c.customer_id = h.customer_id
                 AND c.tenant_id = h.tenant_id
+               LEFT JOIN tb_sales_destination dest
+                 ON dest.sales_destination_id = h.sales_destination_id
+                AND dest.customer_id = h.customer_id
+                AND dest.tenant_id = h.tenant_id
+               LEFT JOIN tb_customer_info billing
+                 ON billing.customer_id = h.billing_customer_id
+                AND billing.tenant_id = h.tenant_id
                LEFT JOIN tb_login_account la
                  ON la.login_code = h.created_by
                 AND la.tenant_id = h.tenant_id
@@ -207,6 +233,8 @@
         UPDATE tb_sales_order_hd
         SET order_dt = CAST(#{orderDt} AS date),
             customer_id = #{customerId},
+            sales_destination_id = #{salesDestinationId},
+            billing_customer_id = #{billingCustomerId},
             quot_no = #{quotNo},
             delivery_dt = CAST(#{deliveryDt} AS date),
             delivery_place = #{deliveryPlace},

@@ -34,7 +34,7 @@ function SalesTrend({ rows, selectedMonth }: { rows: DashboardSales['trend']; se
               aria-label={`${row.month} 수주 공급가액 ${formatNumber(row.supplyAmount)}원, ${row.orderCount}건 상세 보기`}
               sx={(theme) => ({
                 minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-                height: 204, px: 0.4, pt: 1, borderRadius: '6px 6px 0 0',
+                height: 204, px: 0.4, pt: 1, borderRadius: '4px 4px 0 0',
                 '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.07) },
                 '&.Mui-focusVisible': { outline: `2px solid ${theme.palette.primary.main}`, outlineOffset: 2 },
               })}>
@@ -43,7 +43,7 @@ function SalesTrend({ rows, selectedMonth }: { rows: DashboardSales['trend']; se
               </Typography>
               <Box sx={(theme) => ({
                 width: '66%', maxWidth: 54, height: `${row.supplyAmount / max * 150}px`, flexShrink: 0,
-                borderRadius: '6px 6px 0 0',
+                borderRadius: '4px 4px 0 0',
                 background: row.month === selectedMonth
                   ? `linear-gradient(180deg, ${theme.palette.primary.main}, ${alpha(theme.palette.primary.main, 0.65)})`
                   : alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.35 : 0.2),

@@ -35,6 +35,19 @@ describe('sales order create API', () => {
     vi.clearAllMocks();
   });
 
+  it('requires both the selected destination and billing customer', () => {
+    const errors = validateSalesOrderInput({
+      orderDt: '2026-10-27',
+      deliveryDt: '2026-11-27',
+      customerId: 10,
+      salesDestinationId: null,
+      billingCustomerId: null,
+      details: [detailRow()],
+    });
+    expect(errors.salesDestinationId).toBe('납품처를 선택해 주세요.');
+    expect(errors.billingCustomerId).toBe('매출처를 선택해 주세요.');
+  });
+
   it('rejects missing header fields and incomplete detail rows', () => {
     const errors = validateSalesOrderInput({
       orderDt: '',
@@ -83,6 +96,8 @@ describe('sales order create API', () => {
     const payload = buildSalesOrderCreatePayload({
       orderDt: '2026-10-27',
       customerId: 10,
+      salesDestinationId: 90,
+      billingCustomerId: 11,
       quotNo: '  Q-7 ',
       deliveryDt: '',
       deliveryPlace: '  1층 ',
@@ -94,6 +109,8 @@ describe('sales order create API', () => {
     expect(payload).toEqual({
       orderDt: '2026-10-27',
       customerId: 10,
+      salesDestinationId: 90,
+      billingCustomerId: 11,
       quotNo: 'Q-7',
       deliveryDt: null,
       deliveryPlace: '1층',
@@ -119,6 +136,8 @@ describe('sales order create API', () => {
     const payload: SalesOrderCreatePayload = {
       orderDt: '2026-10-27',
       customerId: 10,
+      salesDestinationId: 90,
+      billingCustomerId: 11,
       quotNo: null,
       deliveryDt: null,
       deliveryPlace: null,
@@ -154,6 +173,8 @@ describe('sales order create API', () => {
     const payload = buildSalesOrderCreatePayload({
       orderDt: '2026-10-27',
       customerId: 10,
+      salesDestinationId: 90,
+      billingCustomerId: 11,
       quotNo: null,
       deliveryDt: '',
       deliveryPlace: null,

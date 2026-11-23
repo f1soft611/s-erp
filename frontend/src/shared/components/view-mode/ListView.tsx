@@ -61,7 +61,7 @@ export function ListView<T extends CommonViewItem>({
               ml: 'auto',
               height: 22,
               fontWeight: 700,
-              borderRadius: '6px',
+              borderRadius: '4px',
               ...(item.categoryColor
                 ? {}
                 : {
@@ -81,7 +81,7 @@ export function ListView<T extends CommonViewItem>({
               flexShrink: 0,
               height: 22,
               fontWeight: 700,
-              borderRadius: '6px',
+              borderRadius: '4px',
             }}
           />
         ) : null;
