@@ -66,7 +66,7 @@ export function PurchaseRequestSourcePicker({ open, onClose, onSelect }: {
       field: 'requestStatus', headerName: '상태', type: 'select', options: PURCHASE_REQUEST_STATUS_OPTIONS,
       width: 80, align: 'center', mergeRows: true,
     },
-    { field: 'lineNo', headerName: '행', type: 'number', width: 52, align: 'center' },
+    { field: 'lineNo', headerName: '순번', type: 'number', decimalPlaces: 0, width: 52, align: 'center' },
     { field: 'materialCode', headerName: '품목코드', width: 110, align: 'center' },
     { field: 'materialName', headerName: '품목명', width: 180 },
     { field: 'materialSpec', headerName: '규격', width: 110 },

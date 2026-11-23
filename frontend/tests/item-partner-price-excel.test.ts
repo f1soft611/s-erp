@@ -55,6 +55,34 @@ describe('item partner price Excel import', () => {
     });
   });
 
+  it('builds a 12-column sales template without purchase-only columns and a 14-column purchase template', async () => {
+    const ExcelJS = await import('exceljs');
+    const load = async (tradeType: '매입' | '매출') => {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(await (await createItemPartnerPriceTemplateBlob({ tradeType })).arrayBuffer());
+      return workbook;
+    };
+    const sales = await load('매출');
+    expect(sales.worksheets[0].getRow(1).values.slice(1)).toEqual(headers);
+    const salesGuide = sales.worksheets[1].getSheetValues().flat().join(' ');
+    expect(salesGuide).not.toContain('기본거래처');
+    expect(salesGuide).toContain('적용 기간');
+    const purchase = await load('매입');
+    expect(purchase.worksheets[0].getRow(1).values.slice(1)).toEqual([...headers, '발주구분', '기본거래처']);
+    expect(purchase.worksheets[1].getSheetValues().flat().join(' ')).toContain('기본거래처');
+  }, 20000);
+
+  it('rejects rows of the other trade type for the screen trade type', async () => {
+    const file = await workbookFile([
+      headers,
+      ['매입', '101', '201', 1000, null, null, null, null, '2026-10-01', null, null, 'Y'],
+      ['매출', '102', '201', 1000, null, null, null, null, '2026-10-01', null, null, 'Y'],
+    ]);
+    const parsed = await parseItemPartnerPriceWorkbook(file, { tradeType: '매출' });
+    expect(parsed[0].errors.join(' ')).toContain('이 화면은 매출 단가만');
+    expect(parsed[1].errors).toEqual([]);
+  });
+
   it('reads the optional order type and default supplier columns and validates them', async () => {
     const orderTypes = [{ value: 'DOMESTIC', label: '내수' }];
     const file = await workbookFile([
@@ -69,14 +97,14 @@ describe('item partner price Excel import', () => {
     expect(parsed[2].errors.join(' ')).toContain('발주구분');
   });
 
-  it('treats a blank customer code as a default price and flags foreign price without currency', async () => {
+  it('requires a customer code because common prices are retired and flags foreign price without currency', async () => {
     const file = await workbookFile([
       headers,
       ['매입', '000101', null, 1000, null, null, null, null, '2026-10-01', null, null, null],
       ['매입', '000102', '000201', 1000, null, 'X', 3, null, '2026-10-01', null, null, null],
     ]);
     const parsed = await parseItemPartnerPriceWorkbook(file);
-    expect(parsed[0].errors).toEqual([]);
+    expect(parsed[0].errors.join(' ')).toContain('거래처코드');
     expect(parsed[0]).toMatchObject({ customerCode: '', taxType: 'TAXABLE', vatIncludedAt: 'N', currency: '' });
     expect(parsed[1].errors.join(' ')).toContain('부가세포함');
     expect(parsed[1].errors.join(' ')).toContain('통화');

@@ -122,7 +122,7 @@ export function createQualityInspectionStatusColumns({
       mergeRows: true,
       search: { label: '상태', order: 8, span: 1, group: '선택', required: true, allowEmpty: false },
     },
-    { field: 'lineNo', headerName: '행', type: 'number', width: 50, align: 'center', editable: false, search: { hidden: true } },
+    { field: 'lineNo', headerName: '순번', type: 'number', decimalPlaces: 0, width: 50, align: 'center', editable: false, search: { hidden: true } },
     {
       field: 'arrivalNo',
       highlightSearch: true,

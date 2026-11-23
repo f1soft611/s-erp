@@ -27,6 +27,8 @@ import egovframework.let.co.master.itempartnerprice.domain.model.ItemPriceOvervi
 import egovframework.let.co.master.itempartnerprice.service.ItemPartnerPriceBatchService;
 import egovframework.let.co.master.itempartnerprice.service.ItemPartnerPriceOverviewService;
 import egovframework.let.co.master.itempartnerprice.service.ItemPartnerPriceService;
+import egovframework.let.co.master.itempartnerprice.service.ItemPriceAccessService;
+import egovframework.let.co.master.itempartnerprice.service.ItemPriceAccessService.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -40,29 +42,34 @@ public class ItemPartnerPriceApiController {
     private final ItemPartnerPriceService service;
     private final ItemPartnerPriceBatchService batchService;
     private final ItemPartnerPriceOverviewService overviewService;
+    private final ItemPriceAccessService accessService;
 
     @GetMapping("/overview")
     public ResultVO listOverview(@ModelAttribute ItemPriceOverviewCondition condition,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
-        return result("resultList", overviewService.listOverview(tenant(user), condition));
+        Long tenantId = accessService.requirePermission(user, condition.getTradeType(), Operation.READ);
+        return result("resultList", overviewService.listOverview(tenantId, condition));
     }
 
     @GetMapping("/customer-overview")
     public ResultVO listCustomerOverview(@ModelAttribute ItemPriceCustomerOverviewCondition condition,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
-        return result("resultList", overviewService.listCustomerOverview(tenant(user), condition));
+        Long tenantId = accessService.requirePermission(user, condition.getTradeType(), Operation.READ);
+        return result("resultList", overviewService.listCustomerOverview(tenantId, condition));
     }
 
     @GetMapping
     public ResultVO listPrices(@ModelAttribute ItemPartnerPriceSearchCondition condition,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
-        return result("resultList", service.listPrices(tenant(user), condition));
+        Long tenantId = accessService.requirePermission(user, condition.getTradeType(), Operation.READ);
+        return result("resultList", service.listPrices(tenantId, condition));
     }
 
     @PostMapping("/validate-import")
     public ResultVO validateImport(@RequestBody ItemPartnerPriceImportPreflightRequestVO payload,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         if (payload == null) throw new IllegalArgumentException("엑셀 검증 요청이 비어 있습니다.");
+        accessService.requireImportPermission(user, payload.getRows());
         return result("item", service.validateImport(tenant(user), payload.getRows()));
     }
 
@@ -70,6 +77,7 @@ public class ItemPartnerPriceApiController {
     public ResponseEntity<ResultVO> saveBatch(@RequestBody ItemPartnerPriceBatchSaveRequestVO payload,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAdmin(user);
+        accessService.requireBatchPermission(user, payload);
         return ResponseEntity.ok(result("item", batchService.saveBatch(tenant(user), actor(user), payload)));
     }
 

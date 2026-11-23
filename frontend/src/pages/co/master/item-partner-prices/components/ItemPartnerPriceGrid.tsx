@@ -10,24 +10,13 @@ import {
   searchOrderCustomers,
   searchOrderMaterials,
 } from '../../../../sales/order/create/services/salesOrderMaster.service';
-import type { ItemPartnerPriceRow } from '../types/itemPartnerPrice.types';
+import type { ItemPartnerPriceRow, ItemPartnerPriceTradeType } from '../types/itemPartnerPrice.types';
 import {
   createItemPartnerPriceColumns,
   createItemPartnerPriceRow,
   type ItemPartnerPriceCodeOptions,
   type ItemPartnerPricePickerKind,
 } from './itemPartnerPriceGridModel';
-
-/** 거래처 선택 창의 "거래처 없음" 항목. 선택하면 품목 공통단가(거래처 공통)가 된다. */
-const DEFAULT_CUSTOMER_OPTION: MasterPickerOption = {
-  id: 0,
-  code: '',
-  name: '공통단가(거래처 공통)',
-};
-
-async function searchCustomersWithDefault(keyword: string): Promise<MasterPickerOption[]> {
-  return [DEFAULT_CUSTOMER_OPTION, ...(await searchOrderCustomers(keyword))];
-}
 
 type PickerState = {
   kind: ItemPartnerPricePickerKind;
@@ -46,8 +35,12 @@ type Props = {
   gridKey: number;
   gridRef?: RefObject<F1GridRef<ItemPartnerPriceRow> | null>;
   codeOptions?: ItemPartnerPriceCodeOptions;
+  /** 화면의 거래구분. 신규 행의 거래구분을 이 값으로 고정하고 거래구분 열·폼 칸을 숨긴다. */
+  tradeType?: ItemPartnerPriceTradeType;
   /** 거래처 기준 화면: 신규 행의 거래처를 이 값으로 고정하고 거래처 컬럼을 숨긴다. */
   fixedCustomer?: { customerId: number; customerCode: string; customerName: string };
+  /** 품목 기준 화면: 신규 행의 품목을 이 값으로 고정하고 품목 컬럼을 숨긴다. 매입이면 기본 거래처는 한 행만 체크된다. */
+  fixedMaterial?: { materialId: number; materialCode: string; materialName: string; materialSpec?: string; materialUnit?: string };
   onChangesChange: (changes: F1GridChanges<ItemPartnerPriceRow>) => void;
 };
 
@@ -62,7 +55,9 @@ export function ItemPartnerPriceGrid({
   gridKey,
   gridRef,
   codeOptions,
+  tradeType,
   fixedCustomer,
+  fixedMaterial,
   onChangesChange,
 }: Props) {
   const [picker, setPicker] = useState<PickerState | null>(null);
@@ -73,15 +68,31 @@ export function ItemPartnerPriceGrid({
       codeOptions,
       canCreate || canUpdate,
       Boolean(fixedCustomer),
+      tradeType,
+      Boolean(fixedMaterial),
     ),
-    [canCreate, canUpdate, codeOptions, fixedCustomer],
+    [canCreate, canUpdate, codeOptions, fixedCustomer, fixedMaterial, tradeType],
   );
   const createRow = useMemo(
-    () => fixedCustomer
-      ? () => ({ ...createItemPartnerPriceRow(), ...fixedCustomer })
-      : createItemPartnerPriceRow,
-    [fixedCustomer],
+    () => () => ({ ...createItemPartnerPriceRow(tradeType), ...fixedCustomer, ...fixedMaterial }),
+    [fixedCustomer, fixedMaterial, tradeType],
   );
+
+  // 한 품목에는 기본 거래처가 하나뿐이다. 새로 체크된 행이 생기면 같은 품목의 다른 행 체크를 해제한다(서버가 최종 보장).
+  const handleChangesChange = (changes: F1GridChanges<ItemPartnerPriceRow>) => {
+    const grid = gridRef?.current;
+    if (grid && fixedMaterial && tradeType !== '매출') {
+      const before = new Map(rows.map((row) => [String(row.priceId), row.defaultSupplier]));
+      const active = grid.getActiveRows();
+      for (const row of active) {
+        if (!row.defaultSupplier || before.get(String(row.priceId)) === true) continue;
+        active
+          .filter((other) => other.priceId !== row.priceId && other.defaultSupplier)
+          .forEach((other) => grid.setCellValue(other.priceId, 'defaultSupplier', false));
+      }
+    }
+    onChangesChange(changes);
+  };
   const rowFormPlugin = useMemo(() => {
     if (!canCreate && !canUpdate) return { enabled: false };
     return {
@@ -101,13 +112,11 @@ export function ItemPartnerPriceGrid({
           materialCode: option.code,
           materialName: option.name,
         }
-      : option.id === 0
-        ? { customerId: null, customerCode: '', customerName: '' }
-        : {
-            customerId: option.id,
-            customerCode: option.code,
-            customerName: option.name,
-          });
+      : {
+          customerId: option.id,
+          customerCode: option.code,
+          customerName: option.name,
+        });
     setPicker(null);
   };
 
@@ -117,14 +126,14 @@ export function ItemPartnerPriceGrid({
         key={gridKey}
         ref={gridRef}
         ariaLabel="품목·거래처별 단가 목록"
-        storageKey={fixedCustomer ? 'co-master-item-price-by-customer-v2' : canCreate || canUpdate ? 'co-master-item-partner-price-grid-v3' : 'co-master-item-price-history-v2'}
+        storageKey={`${fixedCustomer ? 'co-master-item-price-by-customer-v3' : fixedMaterial ? 'co-master-item-price-by-item-v1' : canCreate || canUpdate ? 'co-master-item-partner-price-grid-v4' : 'co-master-item-price-history-v3'}-${tradeType === '매출' ? 'sales' : 'purchase'}`}
         rows={rows}
         columns={columns}
         highlightKeyword={highlightKeyword}
         rowKey="priceId"
         rowFormPlugin={rowFormPlugin}
         createRow={createRow}
-        onChangesChange={onChangesChange}
+        onChangesChange={handleChangesChange}
         loading={loading}
         height="100%"
         showCheckbox={false}
@@ -137,7 +146,7 @@ export function ItemPartnerPriceGrid({
         key={picker?.kind ?? 'closed'}
         open={picker !== null}
         label={picker?.kind === 'material' ? '품목' : '거래처'}
-        search={picker?.kind === 'material' ? searchOrderMaterials : searchCustomersWithDefault}
+        search={picker?.kind === 'material' ? searchOrderMaterials : searchOrderCustomers}
         onClose={() => setPicker(null)}
         onChange={(option) => chooseMaster(picker?.kind ?? 'material', option)}
       />

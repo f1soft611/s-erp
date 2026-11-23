@@ -332,7 +332,7 @@ export function PurchaseReceiptClosingPage({
                   <F1Grid
                     key={supplierGridKey}
                     ariaLabel="구매처별 매입마감 요약"
-                    storageKey="materials-purchase-closing-supplier-grid-v2"
+                    storageKey="materials-purchase-closing-supplier-grid-v3"
                     columns={supplierColumns}
                     rowKey="supplierId"
                     rows={list.suppliers}

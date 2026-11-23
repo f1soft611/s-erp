@@ -83,6 +83,31 @@ class ItemDefaultSupplierServiceImplTest {
     }
 
     @Test
+    void findMaterialsMissingDefaultSupplierReturnsCodeAndNameLabels() throws Exception {
+        ItemPriceOverviewRowVO row = new ItemPriceOverviewRowVO();
+        row.setMaterialId(10L);
+        row.setMaterialCode("A001");
+        row.setMaterialName("밀가루");
+        when(dao.selectMaterialsMissingDefaultSupplier(anyMap())).thenReturn(Collections.singletonList(row));
+
+        assertThat(service.findMaterialsMissingDefaultSupplier(TENANT, Arrays.asList(10L, 11L, null)))
+                .containsExactly("A001 밀가루");
+        assertThat(service.findMaterialsMissingDefaultSupplier(TENANT, Collections.<Long>emptyList())).isEmpty();
+        verify(dao).selectMaterialsMissingDefaultSupplier(anyMap());
+    }
+
+    @Test
+    void findMaterialIdsByPriceIdsPassesTheTradeTypeFilter() throws Exception {
+        when(dao.selectMaterialIdsByPriceIds(anyMap())).thenReturn(Arrays.asList(10L));
+        ArgumentCaptor<Map<String, Object>> params = mapCaptor();
+
+        assertThat(service.findMaterialIdsByPriceIds(TENANT, Arrays.asList(1L), " 매입 ")).containsExactly(10L);
+
+        verify(dao).selectMaterialIdsByPriceIds(params.capture());
+        assertThat(params.getValue()).containsEntry("tradeType", "매입");
+    }
+
+    @Test
     void findMaterialIdsByPriceIdsHandlesEmptyResult() throws Exception {
         when(dao.selectMaterialIdsByPriceIds(anyMap())).thenReturn(null);
         List<Long> found = service.findMaterialIdsByPriceIds(TENANT, Arrays.asList(1L, 2L));

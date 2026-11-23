@@ -7,16 +7,47 @@ import type { PageSearchField, PageSearchFieldValue } from '../../../../../share
  */
 const GROUP = '선택';
 
-export const PRICE_STATUS_FIELD: PageSearchField = {
-  field: 'priceFilter', label: '단가 상태', type: 'select', searchSpan: 1, group: GROUP, allowEmpty: false,
-  options: [
-    { value: 'ALL', label: '전체' },
-    { value: 'NO_PURCHASE', label: '매입 공통단가 미등록' },
-    { value: 'NO_SALES', label: '매출 공통단가 미등록' },
-    { value: 'HAS_SPECIAL', label: '특별단가 있는 품목' },
-    { value: 'NO_DEFAULT_SUPPLIER', label: '매입 기본 거래처 미지정' },
-  ],
+/** 품목 계정분류(tb_material_info.material_type_code) 코드와 이름. */
+export const ITEM_TYPE_OPTIONS = [
+  { value: 'PRODUCT', label: '제품' },
+  { value: 'SEMI', label: '반제품' },
+  { value: 'GOODS', label: '상품' },
+  { value: 'RAW', label: '원재료' },
+  { value: 'SUB', label: '부재료' },
+  { value: 'SUPPLY', label: '소모품' },
+];
+
+/** 화면 거래구분별 계정분류 기본값(쉼표 구분). 매입은 원재료·부재료·소모품, 매출은 제품·반제품·상품. */
+export const DEFAULT_ITEM_TYPES: Record<'매입' | '매출', string> = {
+  매입: 'RAW,SUB,SUPPLY',
+  매출: 'PRODUCT,SEMI,GOODS',
 };
+
+/** 품목 계정분류 멀티선택 조회조건. 아무것도 고르지 않으면 전체다. */
+export const PRICE_ITEM_TYPE_FIELD: PageSearchField = {
+  field: 'itemTypes', label: '품목 계정분류', type: 'select', searchSpan: 1, group: GROUP, multiple: true,
+  options: ITEM_TYPE_OPTIONS,
+};
+
+/** 거래구분 화면의 조회조건 기본값: 계정분류 기본값 + 이 화면에서 쓰는 다른 조건의 기본값. */
+export function priceSearchDefaults(
+  tradeType: '매입' | '매출',
+  extra: Record<string, PageSearchFieldValue> = {},
+): Record<string, PageSearchFieldValue> {
+  return { itemTypes: DEFAULT_ITEM_TYPES[tradeType], ...extra };
+}
+
+/** 거래구분(매입단가등록/매출단가등록) 화면의 단가 상태 필터. 기본 거래처 조건은 매입에만 있다. */
+export function priceStatusField(tradeType: '매입' | '매출'): PageSearchField {
+  return {
+    field: 'priceFilter', label: '단가 상태', type: 'select', searchSpan: 1, group: GROUP, allowEmpty: false,
+    options: [
+      { value: 'ALL', label: '전체' },
+      { value: 'NO_PRICE', label: '단가 미등록 품목' },
+      ...(tradeType === '매입' ? [{ value: 'NO_DEFAULT_SUPPLIER', label: '기본 거래처 미지정(2곳 이상)' }] : []),
+    ],
+  };
+}
 
 export const PRICE_REGISTER_FIELD: PageSearchField = {
   field: 'registerFilter', label: '단가 등록 여부', type: 'select', searchSpan: 1, group: GROUP, allowEmpty: false,
@@ -25,11 +56,6 @@ export const PRICE_REGISTER_FIELD: PageSearchField = {
     { value: 'REGISTERED', label: '단가 등록' },
     { value: 'UNREGISTERED', label: '단가 미등록' },
   ],
-};
-
-export const PRICE_TRADE_TYPE_FIELD: PageSearchField = {
-  field: 'tradeType', label: '거래구분', type: 'select', searchSpan: 1, group: GROUP,
-  options: [{ value: '매입', label: '매입' }, { value: '매출', label: '매출' }],
 };
 
 export const PRICE_USE_AT_FIELD: PageSearchField = {

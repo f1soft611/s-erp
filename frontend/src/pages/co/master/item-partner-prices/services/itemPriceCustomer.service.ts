@@ -31,8 +31,10 @@ export async function fetchItemPriceCustomers(
   filters: ItemPriceCustomerFilters = {},
 ): Promise<ItemPriceCustomerRow[]> {
   const query = new URLSearchParams();
+  if (filters.tradeType) query.set('tradeType', filters.tradeType);
   if (filters.keyword?.trim()) query.set('keyword', filters.keyword.trim());
   if (filters.registerFilter && filters.registerFilter !== 'ALL') query.set('registerFilter', filters.registerFilter);
+  if (filters.itemTypes?.trim()) query.set('itemTypes', filters.itemTypes.trim());
   if (filters.effectiveOn?.trim()) query.set('effectiveOn', filters.effectiveOn.trim());
   const result = await apiGet<{ resultList?: unknown }>(
     `/api/v1/co/master/item-partner-prices/customer-overview${query.size ? `?${query}` : ''}`,

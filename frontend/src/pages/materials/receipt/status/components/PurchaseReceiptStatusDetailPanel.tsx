@@ -149,7 +149,7 @@ export function PurchaseReceiptStatusDetailPanel({
               <Table size="small" aria-label="입고 품목 목록" sx={{ minWidth: 640 }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell align="center">행</TableCell>
+                    <TableCell align="center">순번</TableCell>
                     <TableCell>가입고번호</TableCell>
                     <TableCell>검사번호</TableCell>
                     <TableCell>발주번호</TableCell>

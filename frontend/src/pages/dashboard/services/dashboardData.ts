@@ -116,9 +116,15 @@ export const pageContentMap: Record<string, PageContent> = {
     cards: [],
     items: [],
   },
-  'item-partner-prices': {
-    title: '품목·거래처별 단가관리',
-    description: '품목과 거래처별 매입·매출 단가와 적용기간을 관리하고 엑셀로 등록합니다. 거래처를 비우면 모든 거래처에 적용되는 품목 공통단가입니다.',
+  'item-purchase-prices': {
+    title: '매입단가등록',
+    description: '품목과 거래처별 매입 단가와 적용기간을 관리하고 엑셀로 등록합니다. 단가는 거래처별로 등록하며, 한 품목의 거래처가 2곳 이상이면 매입 기본 거래처를 지정합니다.',
+    cards: [],
+    items: [],
+  },
+  'item-sales-prices': {
+    title: '매출단가등록',
+    description: '품목과 거래처별 매출 단가와 적용기간을 관리하고 엑셀로 등록합니다. 단가는 수주처(거래처)별로 등록합니다.',
     cards: [],
     items: [],
   },

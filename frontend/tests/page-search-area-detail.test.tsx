@@ -121,6 +121,37 @@ describe('PageSearchArea 상세 검색', () => {
     expect(screen.getByLabelText('기간 시작일')).toHaveValue('2026-11-18');
   });
 
+  it('lets a multiple select pick several values stored as a comma separated string', () => {
+    const options = [{ value: 'RAW', label: '원재료' }, { value: 'SUB', label: '부재료' }, { value: 'SUPPLY', label: '소모품' }];
+    const onDetailSearch = vi.fn();
+    const field: PageSearchField = { field: 'itemTypes', label: '품목 계정분류', type: 'select', searchSpan: 1, multiple: true, options };
+    render(
+      <PageSearchArea
+        detailFields={[field]}
+        defaultValues={{ itemTypes: 'RAW,SUB' }}
+        appliedDetailValues={{ itemTypes: 'RAW,SUB' }}
+        onDetailSearch={onDetailSearch}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    // 적용된 조건 칩은 선택한 이름을 쉼표로 보여 준다.
+    expect(screen.getByText('품목 계정분류: 원재료, 부재료')).toBeInTheDocument();
+    const combobox = screen.getByRole('combobox', { name: '품목 계정분류' });
+    expect(combobox).toHaveTextContent('원재료, 부재료');
+    fireEvent.mouseDown(combobox);
+    // 멀티선택에는 빈 값 "전체" 항목이 없고 선택 항목은 체크 표시가 된다.
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['원재료', '부재료', '소모품']);
+    expect(screen.getByRole('option', { name: '원재료' })).toHaveAttribute('aria-selected', 'true');
+    fireEvent.click(screen.getByRole('option', { name: '소모품' }));
+    fireEvent.click(screen.getByRole('option', { name: '원재료' }));
+    // 목록은 선택 중에도 열려 있고, 선택을 바꿔도 순서는 옵션 순서가 아니라 선택 순서를 따라도 값은 쉼표 문자열이다.
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
+    expect(screen.getByRole('combobox', { name: '품목 계정분류' })).toHaveTextContent('부재료, 소모품');
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    expect(onDetailSearch).toHaveBeenCalledWith(expect.objectContaining({ itemTypes: 'SUB,SUPPLY' }));
+  });
+
   it('shows the blank 전체 option on a select field unless allowEmpty is false', () => {
     const statusOptions = [{ value: 'ACTIVE', label: '정상' }, { value: 'CANCELED', label: '취소' }, { value: 'ALL', label: '전체' }];
     const { rerender } = render(

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import SearchIcon from '@mui/icons-material/Search';
 import { Box, IconButton, TextField } from '@mui/material';
 import { PageHeader } from '../../../../shared/components/PageHeader';
@@ -15,18 +15,18 @@ import type { MenuPermission, ModuleItem, PageContent } from '../../../dashboard
 import { ItemPartnerPriceGrid } from './components/ItemPartnerPriceGrid';
 import {
   PRICE_HISTORY_FIELD,
-  PRICE_TRADE_TYPE_FIELD,
+  PRICE_ITEM_TYPE_FIELD,
   PRICE_USE_AT_FIELD,
+  priceSearchDefaults,
   searchText,
 } from './data/priceSearchFields';
 import { useItemPartnerPriceCodes } from './hooks/useItemPartnerPriceCodes';
 import { useItemPartnerPriceManagement } from './hooks/useItemPartnerPriceManagement';
-import type { ItemPartnerPriceFilters } from './types/itemPartnerPrice.types';
+import type { ItemPartnerPriceFilters, ItemPartnerPriceTradeType } from './types/itemPartnerPrice.types';
 
-const SESSION_KEY = 's-erp:page:item-partner-prices';
-const SESSION_VERSION = 2;
-const DETAIL_FIELDS = [PRICE_TRADE_TYPE_FIELD, PRICE_USE_AT_FIELD, PRICE_HISTORY_FIELD];
-const DEFAULT_DETAIL_VALUES: Record<string, PageSearchFieldValue> = { includeHistory: 'Y' };
+const SESSION_KEY_PREFIX = 's-erp:page:item-price-history';
+const SESSION_VERSION = 3;
+const DETAIL_FIELDS = [PRICE_ITEM_TYPE_FIELD, PRICE_USE_AT_FIELD, PRICE_HISTORY_FIELD];
 
 type SearchSession = {
   keyword: string;
@@ -39,20 +39,23 @@ function isSearchSession(value: unknown): value is SearchSession {
   return typeof candidate.keyword === 'string' && isPageSearchValues(candidate.detailValues);
 }
 
-function toFilters(session: SearchSession): ItemPartnerPriceFilters {
+function toFilters(session: SearchSession, tradeType: ItemPartnerPriceTradeType): ItemPartnerPriceFilters {
+  // 거래구분은 화면(매입단가등록/매출단가등록)이 정하므로 검색 조건이 아니다.
   const filters: ItemPartnerPriceFilters = {
     keyword: session.keyword.trim() || undefined,
+    tradeType,
   };
-  const tradeType = searchText(session.detailValues, 'tradeType');
   const useAt = searchText(session.detailValues, 'useAt');
+  filters.itemTypes = searchText(session.detailValues, 'itemTypes') || undefined;
   // 이력 목록이므로 기본은 종료된 과거 단가까지 보여 준다. "현재·예정만"을 고르면 과거를 숨긴다.
   if (session.detailValues.includeHistory !== 'N') filters.includeHistory = true;
-  if (tradeType) filters.tradeType = tradeType as ItemPartnerPriceFilters['tradeType'];
   if (useAt) filters.useAt = useAt as ItemPartnerPriceFilters['useAt'];
   return filters;
 }
 
 type Props = {
+  /** 화면의 거래구분(매입단가등록=매입, 매출단가등록=매출). */
+  tradeType: ItemPartnerPriceTradeType;
   selectedModule: ModuleItem;
   currentMenuName: string;
   content: PageContent;
@@ -67,6 +70,7 @@ type Props = {
  * 여기서는 종료된 과거 단가를 포함해 기간별 단가를 조회·엑셀로 내보내기만 한다.
  */
 export function ItemPartnerPriceListPage({
+  tradeType,
   selectedModule,
   currentMenuName,
   content,
@@ -74,30 +78,34 @@ export function ItemPartnerPriceListPage({
   selectedMenuPermissions,
   tabs,
 }: Props) {
+  const defaultDetailValues = useMemo(
+    () => priceSearchDefaults(tradeType, { includeHistory: 'Y' }),
+    [tradeType],
+  );
   const { state: searchSession, setState: setSearchSession } =
-    usePageSessionState<SearchSession | null>(SESSION_KEY, null, {
+    usePageSessionState<SearchSession | null>(`${SESSION_KEY_PREFIX}-${tradeType === '매출' ? 'sales' : 'purchase'}`, null, {
       version: SESSION_VERSION,
       validate: (value): value is SearchSession | null =>
         value === null || isSearchSession(value),
     });
   const codeOptions = useItemPartnerPriceCodes();
   const management = useItemPartnerPriceManagement(
-    toFilters(searchSession ?? { keyword: '', detailValues: DEFAULT_DETAIL_VALUES }),
+    toFilters(searchSession ?? { keyword: '', detailValues: defaultDetailValues }, tradeType),
   );
   const [keyword, setKeyword] = useState(searchSession?.keyword ?? '');
   const [detailValues, setDetailValues] = useState<Record<string, PageSearchFieldValue>>(
-    searchSession?.detailValues ?? DEFAULT_DETAIL_VALUES,
+    searchSession?.detailValues ?? defaultDetailValues,
   );
   const detailFields = DETAIL_FIELDS;
 
   const search = (session: SearchSession) => {
-    management.applyFilters(toFilters(session));
+    management.applyFilters(toFilters(session, tradeType));
     setSearchSession(session);
     setDetailValues(session.detailValues);
   };
   const searchDefault = () => search({
     keyword: keyword.trim(),
-    detailValues: searchSession?.detailValues ?? DEFAULT_DETAIL_VALUES,
+    detailValues: searchSession?.detailValues ?? defaultDetailValues,
   });
   const searchDetails = (values: Record<string, PageSearchFieldValue>) =>
     search({ keyword: keyword.trim(), detailValues: values });
@@ -160,7 +168,8 @@ export function ItemPartnerPriceListPage({
           onDefaultSearch={searchDefault}
           detailFields={detailFields}
           detailValues={detailValues}
-          appliedDetailValues={searchSession?.detailValues ?? DEFAULT_DETAIL_VALUES}
+          appliedDetailValues={searchSession?.detailValues ?? defaultDetailValues}
+          defaultValues={defaultDetailValues}
           onDetailValuesChange={setDetailValues}
           onDetailSearch={searchDetails}
           detailLoading={management.loading}
@@ -180,6 +189,7 @@ export function ItemPartnerPriceListPage({
             gridKey={management.gridKey}
             gridRef={undefined}
             codeOptions={codeOptions}
+            tradeType={tradeType}
             onChangesChange={management.handleChangesChange}
           />
         </Box>

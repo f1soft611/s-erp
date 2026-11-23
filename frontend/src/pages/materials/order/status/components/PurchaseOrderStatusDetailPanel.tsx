@@ -146,7 +146,7 @@ export function PurchaseOrderStatusDetailPanel({
               <Table size="small" aria-label="발주 품목 목록" sx={{ minWidth: 560 }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell align="center">행</TableCell>
+                    <TableCell align="center">순번</TableCell>
                     <TableCell>품목코드</TableCell>
                     <TableCell>품목명</TableCell>
                     <TableCell align="right">발주수량</TableCell>

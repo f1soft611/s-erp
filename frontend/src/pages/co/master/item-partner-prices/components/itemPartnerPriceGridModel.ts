@@ -25,7 +25,7 @@ const useOptions = [
   { value: 'N', label: '미사용' },
 ];
 
-export function createItemPartnerPriceRow(): ItemPartnerPriceRow {
+export function createItemPartnerPriceRow(tradeType?: ItemPartnerPriceTradeType): ItemPartnerPriceRow {
   return {
     priceId: `new-price-${crypto.randomUUID()}`,
     materialId: null,
@@ -34,7 +34,7 @@ export function createItemPartnerPriceRow(): ItemPartnerPriceRow {
     customerId: null,
     customerCode: '',
     customerName: '',
-    tradeType: '',
+    tradeType: tradeType ?? '',
     unitPrice: null,
     taxType: 'TAXABLE',
     vatIncludedAt: 'N',
@@ -89,7 +89,12 @@ export function createItemPartnerPriceColumns(
   markRequired = true,
   /** 거래처 기준 화면처럼 거래처가 고정된 화면은 true로 두어 거래처 컬럼과 품목 코드·명 중복 컬럼을 숨긴다. */
   customerFixed = false,
+  /** 화면의 거래구분. 지정하면 거래구분 열·폼 칸을 숨기고(고정값), 매입 전용 열은 매입에서만 만든다. */
+  tradeType?: ItemPartnerPriceTradeType,
+  /** 품목 기준 화면처럼 품목이 고정된 화면은 true로 두어 품목 열을 숨기고 폼에는 비활성으로 보여 준다. */
+  materialFixed = false,
 ): F1GridColumn<ItemPartnerPriceRow>[] {
+  const keyFixed = customerFixed || materialFixed;
   const allowed = (row: ItemPartnerPriceRow) =>
     typeof canEditRow === 'function' ? canEditRow(row) : canEditRow;
   // 종료된 과거 단가는 수정할 수 없다. 적용 중인 단가는 키(거래구분·품목·거래처·적용 시작일)를 바꿀 수 없다.
@@ -109,9 +114,34 @@ export function createItemPartnerPriceColumns(
       search: { hidden: true },
     },
     {
+      field: 'defaultSupplier',
+      headerName: '기본',
+      type: 'checkbox',
+      hidden: tradeType === '매출',
+      width: 64,
+      align: 'center',
+      headerCheckbox: false,
+      syncWithTreeCheckbox: false,
+      editable: (row) => canEdit(row) && row.tradeType === '매입' && row.customerId != null,
+      onValueChange: (_row, checked) => ({ defaultSupplier: Boolean(checked) }),
+      validate: (value, row) => value && (row.tradeType !== '매입' || row.customerId == null || row.useAt !== 'Y')
+        ? '기본 거래처는 거래처가 있는 사용 중 매입 단가에만 지정할 수 있습니다.' : true,
+      // 거래처 칸 오른쪽(거래조건 그룹)에 둔다. 매입 단가에서 보이고(신규 등록도 한 번에 지정), 거래처를 고르고 단가를 입력해야 체크할 수 있다.
+      form: {
+        group: '거래조건',
+        order: 3.5,
+        label: '기본 거래처',
+        visible: (row) => row.tradeType === '매입',
+        readOnly: (row) => !canEdit(row) || row.customerId == null
+          || (row.unitPrice == null && row.foreignUnitPrice == null),
+      },
+      search: { hidden: true },
+    },
+    {
       field: 'tradeType',
       headerName: '거래구분',
       type: 'select',
+      hidden: Boolean(tradeType),
       width: 90,
       align: 'center',
       required: markRequired,
@@ -124,7 +154,7 @@ export function createItemPartnerPriceColumns(
       field: 'materialId',
       headerName: '품목 선택',
       type: 'code',
-      hidden: !markRequired,
+      hidden: !markRequired || materialFixed,
       width: 170,
       required: markRequired,
       editable: canEditKey,
@@ -136,7 +166,10 @@ export function createItemPartnerPriceColumns(
         return undefined;
       },
       onValueChange: () => { throw new Error('품목 선택 창에서 품목을 선택해 주세요.'); },
-      form: { group: '거래조건', order: 2 },
+      // 품목 기준 화면은 선택한 품목을 폼 상단에 비활성(읽기 전용)으로 보여 준다.
+      form: materialFixed
+        ? { group: '거래조건', order: 2, hidden: false, visible: () => true, readOnly: () => true }
+        : { group: '거래조건', order: 2 },
       search: { hidden: true },
     },
     {
@@ -144,7 +177,7 @@ export function createItemPartnerPriceColumns(
       headerName: '품목코드',
       width: 120,
       align: 'center',
-      hidden: customerFixed,
+      hidden: customerFixed || materialFixed,
       editable: false,
       highlightSearch: true,
       form: { hidden: true },
@@ -154,7 +187,7 @@ export function createItemPartnerPriceColumns(
       field: 'materialName',
       headerName: '품목명',
       width: 170,
-      hidden: customerFixed,
+      hidden: customerFixed || materialFixed,
       editable: false,
       highlightSearch: true,
       form: { hidden: true },
@@ -164,6 +197,18 @@ export function createItemPartnerPriceColumns(
       field: 'materialSpec',
       headerName: '규격',
       width: 130,
+      hidden: materialFixed,
+      editable: false,
+      form: { hidden: true },
+      search: { hidden: true },
+    },
+    {
+      // 품목코드·품목·규격·단위는 나란히 둔다.
+      field: 'materialUnit',
+      headerName: '단위',
+      width: 70,
+      align: 'center',
+      hidden: materialFixed,
       editable: false,
       form: { hidden: true },
       search: { hidden: true },
@@ -174,10 +219,11 @@ export function createItemPartnerPriceColumns(
       type: 'code',
       hidden: !markRequired || customerFixed,
       width: 190,
+      required: markRequired,
       editable: canEditKey,
       getValue: (row) => row.customerCode
         ? `${row.customerCode} · ${row.customerName}`
-        : '공통단가(거래처 공통)',
+        : '',
       onOpenCodePicker: (row, applyPatch) => {
         onChooseMaster?.('customer', row, applyPatch);
         return undefined;
@@ -198,7 +244,7 @@ export function createItemPartnerPriceColumns(
       headerName: '거래처코드',
       width: 120,
       align: 'center',
-      hidden: customerFixed,
+      hidden: customerFixed || materialFixed,
       editable: false,
       highlightSearch: true,
       form: { hidden: true },
@@ -208,8 +254,7 @@ export function createItemPartnerPriceColumns(
       field: 'customerName',
       headerName: '거래처명',
       width: 170,
-      hidden: customerFixed,
-      getValue: (row) => row.customerName || (markRequired ? '' : '공통단가(거래처 공통)'),
+      hidden: customerFixed || materialFixed,
       editable: false,
       highlightSearch: true,
       form: { hidden: true },
@@ -296,6 +341,7 @@ export function createItemPartnerPriceColumns(
       field: 'orderType',
       headerName: '발주구분',
       type: 'select',
+      hidden: tradeType === '매출',
       width: 100,
       align: 'center',
       options: codeOptions.orderTypes ?? [],
@@ -303,36 +349,6 @@ export function createItemPartnerPriceColumns(
       validate: (value, row) => String(value ?? '').trim() && row.tradeType !== '매입'
         ? '발주구분은 매입 단가에만 입력할 수 있습니다.' : true,
       form: { group: '단가조건', order: 6 },
-      search: { hidden: true },
-    },
-    {
-      field: 'defaultSupplier',
-      headerName: '기본 거래처',
-      type: 'checkbox',
-      width: 100,
-      align: 'center',
-      headerCheckbox: false,
-      syncWithTreeCheckbox: false,
-      editable: (row) => canEdit(row) && row.tradeType === '매입' && row.customerId != null,
-      onValueChange: (_row, checked) => ({ defaultSupplier: Boolean(checked) }),
-      validate: (value, row) => value && (row.tradeType !== '매입' || row.customerId == null || row.useAt !== 'Y')
-        ? '기본 거래처는 거래처가 있는 사용 중 매입 단가에만 지정할 수 있습니다.' : true,
-      // 거래처 칸 오른쪽(거래조건 그룹)에 둔다. 거래처가 있는 매입 단가에서만 보이고, 단가가 있어야 체크할 수 있다.
-      form: {
-        group: '거래조건',
-        order: 3.5,
-        visible: (row) => row.tradeType === '매입' && row.customerId != null,
-        readOnly: (row) => !canEdit(row) || (row.unitPrice == null && row.foreignUnitPrice == null),
-      },
-      search: { hidden: true },
-    },
-    {
-      field: 'materialUnit',
-      headerName: '단위',
-      width: 70,
-      align: 'center',
-      editable: false,
-      form: { hidden: true },
       search: { hidden: true },
     },
     {
@@ -351,7 +367,7 @@ export function createItemPartnerPriceColumns(
       headerName: '적용 종료일',
       type: 'date',
       width: 130,
-      editable: customerFixed ? false : canEdit,
+      editable: keyFixed ? false : canEdit,
       validate: (value, row) => {
         if (value == null || value === '') return true;
         if (!isValidDate(value)) return '적용 종료일을 YYYY-MM-DD 형식으로 입력해 주세요.';
@@ -359,20 +375,6 @@ export function createItemPartnerPriceColumns(
         return true;
       },
       form: { group: '단가조건', order: 9 },
-      search: { hidden: true },
-    },
-    {
-      field: 'moq',
-      headerName: '최소주문수량',
-      type: 'decimal',
-      width: 130,
-      align: 'right',
-      decimalPlaces: 2,
-      min: 0,
-      editable: canEdit,
-      renderCell: renderBlankWhenEmpty,
-      validate: (value) => validateAmount(value, true, '최소주문수량'),
-      form: { group: '단가조건', order: 10 },
       search: { hidden: true },
     },
     {

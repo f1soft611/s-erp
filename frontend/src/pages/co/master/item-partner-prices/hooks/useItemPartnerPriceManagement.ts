@@ -41,10 +41,9 @@ export function toItemPartnerPricePayload(row: ItemPartnerPriceRow): ItemPartner
   if (!Number.isSafeInteger(Number(row.materialId)) || Number(row.materialId) <= 0) {
     throw new Error('품목을 선택해 주세요.');
   }
-  // 거래처를 비우면 품목 공통단가(거래처 공통)로 저장한다.
-  if (row.customerId != null &&
-      (!Number.isSafeInteger(Number(row.customerId)) || Number(row.customerId) <= 0)) {
-    throw new Error('거래처를 확인해 주세요.');
+  // 단가는 항상 거래처에 붙는다(공통단가 폐지).
+  if (!Number.isSafeInteger(Number(row.customerId)) || Number(row.customerId) <= 0) {
+    throw new Error('거래처를 선택해 주세요.');
   }
   if (row.tradeType !== '매입' && row.tradeType !== '매출') {
     throw new Error('거래구분을 선택해 주세요.');
@@ -82,7 +81,7 @@ export function toItemPartnerPricePayload(row: ItemPartnerPriceRow): ItemPartner
   const canFlag = row.tradeType === '매입' && row.customerId != null;
   return {
     materialId: Number(row.materialId),
-    customerId: row.customerId == null ? null : Number(row.customerId),
+    customerId: Number(row.customerId),
     tradeType: row.tradeType,
     unitPrice,
     taxType: row.taxType || 'TAXABLE',

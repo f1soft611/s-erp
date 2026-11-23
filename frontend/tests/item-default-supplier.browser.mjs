@@ -10,7 +10,8 @@ const permissions = { read: true, create: true, update: true, delete: true, exce
 const menus = [
   { menuId: 10, parentMenuId: null, name: '기준정보', path: '/co', children: [{
     menuId: 11, parentMenuId: 10, name: '마스터', path: '/co/master', children: [
-      { menuId: 12, parentMenuId: 11, name: '단가등록', path: '/co/master/item-partner-prices', permissions },
+      { menuId: 12, parentMenuId: 11, name: '매입단가등록', path: '/co/master/item-purchase-prices', permissions },
+      { menuId: 13, parentMenuId: 11, name: '매출단가등록', path: '/co/master/item-sales-prices', permissions },
     ],
   }] },
   { menuId: 100, parentMenuId: null, name: '구매자재', path: '/materials', children: [{
@@ -120,7 +121,7 @@ try {
     const shot = (name) => page.screenshot({ path: fileURLToPath(new URL(`${name}-${width}.png`, output)), animations: 'disabled' });
 
     // 1) 단가등록 품목 기준
-    await page.goto(`${origin}/co/master/item-partner-prices`);
+    await page.goto(`${origin}/co/master/item-purchase-prices`);
     const tree = page.getByRole('treegrid', { name: '품목 기준 단가' }).or(page.getByRole('grid', { name: '품목 기준 단가' }));
     await tree.first().waitFor();
     await page.getByText('A001 · 원재료 A').first().waitFor();
@@ -193,8 +194,16 @@ try {
     assert.ok(!requestDetailsUrl.includes('baseDt'), 'baseDt is omitted so the server date is used');
 
     if (width >= 1280) {
+      // 매출단가등록 화면: 같은 화면 구성에서 매입 전용 열(기본 거래처·발주구분)이 없다.
+      await page.goto(`${origin}/co/master/item-sales-prices`);
+      await page.getByText('A001 · 원재료 A').first().waitFor();
+      assert.equal(await page.getByText('매입 기본 거래처').count(), 0, 'sales screen has no purchase default supplier column');
+      await page.getByRole('button', { name: /A001 · 원재료 A 펼치기/ }).click().catch(() => undefined);
+      await page.screenshot({ path: fileURLToPath(new URL(`sales-price-overview-${width}.png`, output)), animations: 'disabled' });
+    }
+    if (width >= 1280) {
       // 거래처 기준 탭의 행 폼도 같은 배치: 거래처 정보(비활성)와 오른쪽 기본 거래처 체크박스
-      await page.goto(`${origin}/co/master/item-partner-prices`);
+      await page.goto(`${origin}/co/master/item-purchase-prices`);
       await page.getByRole('tab', { name: '거래처 기준' }).click();
       await page.getByRole('grid', { name: '거래처 목록' }).getByText('거래처 하나').first().click();
       await page.getByRole('button', { name: '11 행 정보 수정' }).click();

@@ -159,7 +159,7 @@ export function createPurchaseOrderStatusColumns({
       mergeRows: true,
       search: { label: '출처', order: 6, span: 1, group: '선택' },
     },
-    { field: 'lineNo', headerName: '행', type: 'number', width: 50, align: 'center', editable: false, search: { hidden: true } },
+    { field: 'lineNo', headerName: '순번', type: 'number', decimalPlaces: 0, width: 50, align: 'center', editable: false, search: { hidden: true } },
     { field: 'confirmNo', headerName: '확정번호', type: 'text', width: 150, align: 'center', editable: false, search: { hidden: true } },
     {
       field: 'materialCode',

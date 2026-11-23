@@ -17,7 +17,7 @@ import egovframework.let.co.master.itempartnerprice.domain.repository.ItemPartne
 import egovframework.let.co.master.itempartnerprice.service.ItemPriceLookupService;
 
 /**
- * 단가 조회 규칙(거래처 단가 → 공통단가, 기준일 유효, 시작일 최신, 통화·단가 결정)을 구현한 공통 서비스 클래스.
+ * 단가 조회 규칙(거래처별 단가, 기준일 유효, 시작일 최신, 통화·단가 결정)을 구현한 공통 서비스 클래스. 공통단가는 폐지됨.
  *
  * @author S-ERP
  * @since 2026.11.20
@@ -64,7 +64,7 @@ public class ItemPriceLookupServiceImpl implements ItemPriceLookupService {
     }
 
     @Override
-    public Map<Long, ItemPriceLookupVO> findDefaultSupplierPrices(Long tenantId, Collection<Long> materialIds,
+    public Map<Long, ItemPriceLookupVO> findPurchasePrices(Long tenantId, Collection<Long> materialIds,
             LocalDate baseDt) throws Exception {
         requireTenant(tenantId);
         Map<Long, ItemPriceLookupVO> result = new LinkedHashMap<Long, ItemPriceLookupVO>();
@@ -86,13 +86,13 @@ public class ItemPriceLookupServiceImpl implements ItemPriceLookupService {
         Map<String, Object> params = tenantParams(tenantId);
         params.put("materialIds", ids);
         params.put("baseDt", baseDt.toString());
-        List<ItemPriceLookupVO> rows = dao.selectDefaultSupplierPrices(params);
+        List<ItemPriceLookupVO> rows = dao.selectPurchasePrices(params);
         if (rows == null) {
             return result;
         }
         for (ItemPriceLookupVO row : rows) {
             if (row.getTaxType() == null) {
-                // 기본 거래처는 있으나 기준일에 유효한 단가가 없다: 거래처만 채운다.
+                // 구매처는 정해졌으나 기준일에 유효한 단가가 없다: 거래처만 채운다.
                 row.setUnitPrice(null);
                 row.setForeignUnitPrice(null);
                 row.setForeignCurrency(null);

@@ -1110,7 +1110,7 @@ PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 
 | `price_id` | `bigserial` | NOT NULL, PK | 단가 내부 ID |
 | `tenant_id` | `bigint` | NOT NULL | 소유 tenant |
 | `material_id` | `bigint` | NOT NULL | 기존 품목 내부 ID, tenant 복합 FK |
-| `customer_id` | `bigint` | NULL | 기존 거래처 내부 ID, tenant 복합 FK. NULL이면 품목 기본단가(거래처 공통), `20261118_001` |
+| `customer_id` | `bigint` | NOT NULL | 기존 거래처 내부 ID, tenant 복합 FK. 매입은 구매처, 매출은 수주처. 거래처 없는 공통단가는 `20261123_002`에서 폐지(NULL 허용 해제, 기존 8행은 백업 후 삭제) |
 | `trade_type` | `varchar(10)` | NOT NULL | 매입/매출 |
 | `unit_price` | `numeric(15,2)` | NULL | 원화단가. 외화단가만 관리하면 NULL, `20261118_003`(원화·외화 중 하나 이상 CHECK `ck_tb_item_partner_price_any_price`) |
 | `currency` | `varchar(10)` | NULL | 외화단가의 통화(공통코드 `CURRENCY`). `20261118_001`에서 NOT NULL·기본 `KRW` 해제 |
@@ -1124,7 +1124,7 @@ PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 
 | audit columns | `varchar(10)`, `timestamp` | created_at은 current timestamp | S-ERP 등록/수정자 및 시각 |
 
 - tenant 업무키 `(tenant_id, material_id, customer_id, trade_type, start_dt)`는 unique다. 기존 동일키는 insert/update/import에서 충돌로 처리하고 업서트하지 않는다. 다른 시작일의 기간 중첩은 허용한다.
-- `20261118_001`: 거래처 NULL 기본단가 행은 부분 유니크 `uq_tb_item_partner_price_default_key (tenant_id, material_id, trade_type, start_dt) WHERE customer_id IS NULL`로 중복을 막는다. 같은 (품목, 거래처 또는 기본, 거래구분)의 기간 중첩은 서비스에서 막고 신규 적용일 등록 시 직전 행 종료일을 자동으로 닫는다.
+- `20261118_001`에서 만든 거래처 NULL 기본단가용 부분 유니크 `uq_tb_item_partner_price_default_key`는 `20261123_002`에서 삭제했다. 같은 (품목, 거래처, 거래구분)의 기간 중첩은 서비스에서 막고 신규 적용일 등록 시 직전 행 종료일을 자동으로 닫는다.
 - trade type, 사용여부, 비음수 단가/MOQ, 종료일-시작일 관계를 CHECK로 보장한다. 물리 삭제는 제공하지 않는다.
 - [설계](../superpowers/specs/2026-10-29-item-partner-pricing-design.md), [상세사양](../spec/20261029/20261029_002_품목_거래처별_단가관리_상세사양서.md), [날짜별 DDL/이력](20261029/20261029_002_change_item_partner_price_schema.md) 및 [backend 사본](../../backend/DATABASE/20261029) 참고. DDL/rollback 모두 미적용.
 
@@ -1407,6 +1407,7 @@ PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 
 
 ## 변경 이력
 
+- 2026-11-23: 단가 공통단가(거래처 없는 단가)를 폐지하는 `20261123_002`를 정의했다. 공통단가 행 백업·삭제, `tb_item_partner_price.customer_id` NOT NULL, 공통단가 전용 유니크 인덱스 삭제, 거래처 2곳 이상인데 기본 거래처가 없는 매입 품목의 기본 거래처 보정을 포함한다. [docs/database/20261123](20261123) 및 [backend 사본](../../backend/DATABASE/20261123) 참고. 적용 전, 격리된 PGlite에서 실행·재실행·롤백을 검증했다.
 - 2026-11-20: 품목 기본 거래처 `tb_item_default_supplier` 신설, 단가 `tb_item_partner_price.order_type`(발주구분) 추가, 한 곳뿐인 품목의 기본 거래처 초기 지정 `20261120_006`을 정의했다. 읽기 전용 MCP로 `tb_material_info`·`tb_customer_info` 복합 유일 키와 단가 제약을 확인했고 실제 DB에는 적용하지 않았으며 격리된 PGlite에서 이전·제약·재실행·롤백 중단 조건을 검증했다. [docs/database/20261120](20261120) 참고.
 - 2026-11-18: 확정 상세 `tb_purchase_request_dt`에 `tax_type`·`vat_included_at`(NULL 허용, CHECK Y/N)을 추가하는 `20261118_002`, 단가 `tb_item_partner_price.unit_price` NOT NULL 해제와 원화·외화 단가 중 하나 이상 CHECK `20261118_003`을 정의했다. [docs/database/20261118](20261118) 및 [backend 사본](../../backend/DATABASE/20261118) 참고. 적용 전.
 - 2026-11-18: 단가 `tb_item_partner_price`에 기본단가(`customer_id` NULL 허용), `tax_type`·`vat_included_at`·`foreign_unit_price` 추가, `currency` 선택화(기존 KRW→NULL), 기본단가 부분 유니크 인덱스를 추가하는 `20261118_001`을 정의했다. [docs/database/20261118](20261118) 및 [backend 사본](../../backend/DATABASE/20261118) 참고. 적용 전.

@@ -3,20 +3,25 @@ import type { F1GridChanges } from '../../../../../shared/components/f1-grid';
 import { useNotification } from '../../../../../shared/context/notification';
 import { useInitialLoadState } from '../../../../../shared/hooks/useInitialLoadState';
 import { getSystemDate } from '../../../../../shared/services/systemDateService';
+import { DEFAULT_ITEM_TYPES } from '../data/priceSearchFields';
 import { fetchItemPartnerPrices } from '../services/itemPartnerPrice.service';
 import { fetchItemPriceCustomers } from '../services/itemPriceCustomer.service';
 import { buildCustomerPriceBatch } from '../services/itemPriceCustomerChanges';
 import { saveItemPriceOverviewBatch } from '../services/itemPriceOverview.service';
 import { toItemPartnerPricePayload } from './useItemPartnerPriceManagement';
-import type { ItemPartnerPriceRow } from '../types/itemPartnerPrice.types';
+import type { ItemPartnerPriceRow, ItemPartnerPriceTradeType } from '../types/itemPartnerPrice.types';
 import type { ItemPriceCustomerFilters, ItemPriceCustomerRow } from '../types/itemPriceCustomer.types';
 
 /** 거래처 기준 탭: 거래처 목록(마스터)과 선택한 거래처의 단가(디테일). 저장은 기존 일괄 저장 API를 쓴다. */
-export function useItemPriceByCustomer() {
+export function useItemPriceByCustomer(tradeType: ItemPartnerPriceTradeType) {
   const { showSuccess } = useNotification();
-  const initialFiltersRef = useRef<ItemPriceCustomerFilters>({});
+  const initialFiltersRef = useRef<ItemPriceCustomerFilters>({ tradeType, itemTypes: DEFAULT_ITEM_TYPES[tradeType] });
   const [customers, setCustomers] = useState<ItemPriceCustomerRow[]>([]);
-  const [customerFilters, setCustomerFilters] = useState<ItemPriceCustomerFilters>({});
+  const [customerFilters, setCustomerFilters] = useState<ItemPriceCustomerFilters>(initialFiltersRef.current);
+  /** 오른쪽 단가 목록에도 같은 품목 계정분류 조건을 적용한다. */
+  const itemTypesRef = useRef(initialFiltersRef.current.itemTypes ?? '');
+  const selectedRef = useRef<ItemPriceCustomerRow | null>(null);
+  const includeHistoryRef = useRef(false);
   const [customersLoading, setCustomersLoading] = useState(true);
   const [selected, setSelected] = useState<ItemPriceCustomerRow | null>(null);
   const [includeHistory, setIncludeHistory] = useState(false);
@@ -68,7 +73,9 @@ export function useItemPriceByCustomer() {
     setRowsLoading(true);
     setError('');
     try {
-      const next = await fetchItemPartnerPrices({ customerId, includeHistory: history, useAt: 'Y' });
+      const next = await fetchItemPartnerPrices({
+        customerId, includeHistory: history, useAt: 'Y', tradeType, itemTypes: itemTypesRef.current,
+      });
       if (version !== rowVersion.current) return;
       rowsRef.current = next;
       setRows(next);
@@ -81,7 +88,7 @@ export function useItemPriceByCustomer() {
     } finally {
       if (version === rowVersion.current) setRowsLoading(false);
     }
-  }, []);
+  }, [tradeType]);
 
   useEffect(() => {
     const active = customerVersion;
@@ -91,11 +98,17 @@ export function useItemPriceByCustomer() {
 
   const searchCustomers = useCallback((filters: ItemPriceCustomerFilters) => {
     if (savingRef.current) return;
-    setCustomerFilters(filters);
-    void loadCustomers(filters);
-  }, [loadCustomers]);
+    const next = { ...filters, tradeType };
+    setCustomerFilters(next);
+    void loadCustomers(next);
+    const changedTypes = (next.itemTypes ?? '') !== itemTypesRef.current;
+    itemTypesRef.current = next.itemTypes ?? '';
+    // 계정분류 조건이 바뀌면 선택한 거래처의 단가 목록도 그 조건으로 다시 읽는다.
+    if (changedTypes && selectedRef.current) void loadRows(selectedRef.current.customerId, includeHistoryRef.current);
+  }, [loadCustomers, loadRows, tradeType]);
 
   const selectCustomer = useCallback((customer: ItemPriceCustomerRow | null) => {
+    selectedRef.current = customer;
     setSelected(customer);
     rowsRef.current = [];
     setRows([]);
@@ -104,6 +117,7 @@ export function useItemPriceByCustomer() {
   }, [includeHistory, loadRows]);
 
   const changeIncludeHistory = useCallback((value: boolean) => {
+    includeHistoryRef.current = value;
     setIncludeHistory(value);
     if (selected) void loadRows(selected.customerId, value);
   }, [selected, loadRows]);

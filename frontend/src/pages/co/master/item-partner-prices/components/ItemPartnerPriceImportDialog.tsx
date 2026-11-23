@@ -38,6 +38,8 @@ type Props = {
   codeOptions?: ItemPartnerPriceExcelOptions;
   /** 검증 후 실행 버튼 이름. 기본은 그리드에 추가. */
   stageLabel?: string;
+  /** 화면의 거래구분. 다른 구분의 행은 오류로 표시하고, 매출은 발주구분·기본거래처 열을 보이지 않는다. */
+  tradeType?: '매입' | '매출';
 };
 
 const editableColumns = [
@@ -77,7 +79,7 @@ function requestRows(rows: ItemPartnerPriceImportRow[]): ItemPartnerPriceImportR
   }));
 }
 
-export function ItemPartnerPriceImportDialog({ open, onClose, onStage, codeOptions, stageLabel }: Props) {
+export function ItemPartnerPriceImportDialog({ open, onClose, onStage, codeOptions, stageLabel, tradeType }: Props) {
   if (!open) return null;
   return (
     <OpenItemPartnerPriceImportDialog
@@ -85,6 +87,7 @@ export function ItemPartnerPriceImportDialog({ open, onClose, onStage, codeOptio
       onStage={onStage}
       codeOptions={codeOptions}
       stageLabel={stageLabel}
+      tradeType={tradeType}
     />
   );
 }
@@ -94,7 +97,9 @@ function OpenItemPartnerPriceImportDialog({
   onStage,
   codeOptions,
   stageLabel = '그리드에 추가',
+  tradeType,
 }: Omit<Props, 'open'>) {
+  const visibleColumns = tradeType === '매출' ? editableColumns.slice(0, 12) : editableColumns;
   const fileInput = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<ItemPartnerPriceImportRow[]>([]);
   const [serverRows, setServerRows] = useState<ItemPartnerPriceImportValidationRow[] | null>(null);
@@ -119,7 +124,7 @@ function OpenItemPartnerPriceImportDialog({
     setServerRows(null);
     setError('');
     try {
-      setRows(await parseItemPartnerPriceWorkbook(file, codeOptions));
+      setRows(await parseItemPartnerPriceWorkbook(file, { ...codeOptions, tradeType }));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '엑셀 파일을 읽지 못했습니다.');
     } finally {
@@ -137,7 +142,7 @@ function OpenItemPartnerPriceImportDialog({
       if (field === 'endDt') return { ...row, endDt: value || null };
       if (field === 'moq') return { ...row, moq: value || null };
       return { ...row, [field]: value };
-    })));
+    }), tradeType));
     setServerRows(null);
     setError('');
   };
@@ -258,7 +263,7 @@ function OpenItemPartnerPriceImportDialog({
               <TableHead>
                 <TableRow>
                   <TableCell>원본 행</TableCell>
-                  {editableColumns.map(([, label]) => <TableCell key={label}>{label}</TableCell>)}
+                  {visibleColumns.map(([, label]) => <TableCell key={label}>{label}</TableCell>)}
                   <TableCell>검증 결과</TableCell>
                 </TableRow>
               </TableHead>
@@ -268,7 +273,7 @@ function OpenItemPartnerPriceImportDialog({
                   return (
                     <TableRow key={row.sourceRowNumber} hover>
                       <TableCell>{row.sourceRowNumber}</TableCell>
-                      {editableColumns.map(([field, label]) => (
+                      {visibleColumns.map(([field, label]) => (
                         <TableCell key={field} sx={{ minWidth: 120 }}>
                           <TextField
                             size="small"

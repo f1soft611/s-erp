@@ -1,50 +1,46 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import AddIcon from '@mui/icons-material/Add';
-import DeleteOutlineOutlined from '@mui/icons-material/DeleteOutlineOutlined';
 import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
-import UploadFileOutlined from '@mui/icons-material/UploadFileOutlined';
-import SearchIcon from '@mui/icons-material/Search';
 import SaveIcon from '@mui/icons-material/Save';
-import { Box, IconButton, TextField } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
+import UploadFileOutlined from '@mui/icons-material/UploadFileOutlined';
+import { Box, IconButton, TextField, Typography } from '@mui/material';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
-import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
-import type { F1TreeRef } from '../../../../shared/components/f1-grid';
+import type { F1GridRef } from '../../../../shared/components/f1-grid';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import type { PageSearchField, PageSearchFieldValue } from '../../../../shared/components/page-search/searchFields';
 import { useCommonConfirmDialog } from '../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import type { MenuPermission, ModuleItem, PageContent } from '../../../dashboard/types/dashboard';
 import {
-  downloadItemPriceOverviewTemplate,
-  parseItemPriceOverviewWorkbook,
-} from './services/itemPriceOverviewExcel.service';
-import { PRICE_STATUS_FIELD, searchText } from './data/priceSearchFields';
-import { createItemPriceChildRow } from './components/itemPriceOverviewGridModel';
-import { ItemPriceOverviewTree } from './components/ItemPriceOverviewTree';
-import { ItemPriceRemoveDialog } from './components/ItemPriceRemoveDialog';
+  PRICE_ITEM_TYPE_FIELD,
+  priceSearchDefaults,
+  priceStatusField,
+  searchText,
+} from './data/priceSearchFields';
+import { ItemPartnerPriceGrid } from './components/ItemPartnerPriceGrid';
+import { ItemPartnerPriceImportDialog } from './components/ItemPartnerPriceImportDialog';
+import { ItemPriceItemList } from './components/ItemPriceItemList';
 import { useItemPartnerPriceCodes } from './hooks/useItemPartnerPriceCodes';
 import { useItemPriceOverview } from './hooks/useItemPriceOverview';
-import type {
-  ItemPriceOverviewFilter,
-  ItemPriceOverviewFilters,
-  ItemPriceOverviewRow,
-} from './types/itemPriceOverview.types';
-
-const DETAIL_FIELDS: PageSearchField[] = [PRICE_STATUS_FIELD];
+import { downloadItemPartnerPriceTemplate } from './services/itemPartnerPriceExcel.service';
+import type { ItemPartnerPriceRow, ItemPartnerPriceTradeType } from './types/itemPartnerPrice.types';
+import type { ItemPriceOverviewFilter, ItemPriceOverviewFilters, ItemPriceOverviewRow } from './types/itemPriceOverview.types';
 
 function toFilters(keyword: string, values: Record<string, PageSearchFieldValue>): ItemPriceOverviewFilters {
   const filters: ItemPriceOverviewFilters = { keyword: keyword.trim() || undefined };
   const priceFilter = searchText(values, 'priceFilter');
   if (priceFilter && priceFilter !== 'ALL') filters.priceFilter = priceFilter as ItemPriceOverviewFilter;
+  filters.itemTypes = searchText(values, 'itemTypes') || undefined;
   return filters;
 }
 
-type PendingSearch = { filters: ItemPriceOverviewFilters; keyword: string; values: Record<string, PageSearchFieldValue> };
-
 type Props = {
+  /** 화면의 거래구분(매입단가등록=매입, 매출단가등록=매출). */
+  tradeType: ItemPartnerPriceTradeType;
   selectedModule: ModuleItem;
   currentMenuName: string;
   content: PageContent;
@@ -55,80 +51,75 @@ type Props = {
   onDirtyChange?: (dirty: boolean) => void;
 };
 
+/**
+ * 품목 기준 탭: 좌측 품목 목록에서 품목을 고르면 우측에서 그 품목의 거래처별 단가를 조회·입력한다.
+ * 단가는 항상 거래처에 붙고, 매입은 거래처가 2곳 이상이면 기본 거래처를 하나 지정해야 한다.
+ */
 export function ItemPriceOverviewPage({
-  selectedModule, currentMenuName, content, breadcrumbItems, selectedMenuPermissions,
+  tradeType, selectedModule, currentMenuName, content, breadcrumbItems, selectedMenuPermissions,
   isTenantAdmin = false, tabs, onDirtyChange,
 }: Props) {
   const codeOptions = useItemPartnerPriceCodes();
-  const management = useItemPriceOverview();
+  const management = useItemPriceOverview(tradeType);
+  const detailFields = useMemo<PageSearchField[]>(
+    () => [priceStatusField(tradeType), PRICE_ITEM_TYPE_FIELD],
+    [tradeType],
+  );
+  const defaultValues = useMemo(() => priceSearchDefaults(tradeType, { priceFilter: 'ALL' }), [tradeType]);
+  const { confirm, dialog: confirmDialog } = useCommonConfirmDialog();
   useUnsavedChangesBeforeUnload(management.hasChanges);
   useEffect(() => { onDirtyChange?.(management.hasChanges); }, [management.hasChanges, onDirtyChange]);
-  const treeRef = useRef<F1TreeRef<ItemPriceOverviewRow>>(null);
+  const gridRef = useRef<F1GridRef<ItemPartnerPriceRow>>(null);
   const [keyword, setKeyword] = useState('');
-  const [detailValues, setDetailValues] = useState<Record<string, PageSearchFieldValue>>({ priceFilter: 'ALL' });
-  const [appliedValues, setAppliedValues] = useState<Record<string, PageSearchFieldValue>>({ priceFilter: 'ALL' });
-  const [selectedRowId, setSelectedRowId] = useState<string | number | undefined>(undefined);
-  const [pending, setPending] = useState<PendingSearch | null>(null);
-  const [removeTarget, setRemoveTarget] = useState<ItemPriceOverviewRow | null>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
-  const { confirm, dialog: confirmDialog } = useCommonConfirmDialog();
+  const [detailValues, setDetailValues] = useState<Record<string, PageSearchFieldValue>>(defaultValues);
+  const [appliedValues, setAppliedValues] = useState<Record<string, PageSearchFieldValue>>(defaultValues);
+  const [revertKey, setRevertKey] = useState(0);
+  const [importOpen, setImportOpen] = useState(false);
   const canCreate = Boolean(isTenantAdmin && selectedMenuPermissions?.create);
   const canUpdate = Boolean(isTenantAdmin && selectedMenuPermissions?.update);
   const canDelete = Boolean(isTenantAdmin && selectedMenuPermissions?.delete);
-  const canWrite = canCreate || canUpdate;
-  const selectedRow = management.rows.find((row) => row.rowId === selectedRowId) ?? null;
+  const canWrite = canCreate || canUpdate || canDelete;
+  const selected = management.selected;
 
-  const search = (next: PendingSearch) => {
+  const confirmDiscard = async () => {
+    if (!management.hasChanges) return true;
+    return confirm({
+      title: '저장하지 않은 변경사항',
+      description: '변경사항을 버리고 계속하시겠습니까?',
+      confirmLabel: '계속',
+    });
+  };
+
+  const searchItems = async (values: Record<string, PageSearchFieldValue>) => {
     if (management.saving) return;
-    if (management.hasChanges) {
-      setPending(next);
+    if (!(await confirmDiscard())) {
+      setDetailValues(appliedValues);
       return;
     }
-    management.applyFilters(next.filters);
-    setAppliedValues(next.values);
+    management.discardChanges();
+    setAppliedValues(values);
+    setDetailValues(values);
+    management.searchItems(toFilters(keyword, values));
   };
-  const searchDefault = () => search({ filters: toFilters(keyword, appliedValues), keyword, values: appliedValues });
-  const searchDetails = (values: Record<string, PageSearchFieldValue>) =>
-    search({ filters: toFilters(keyword, values), keyword, values });
 
-  const addSpecialPrice = () => {
-    const tree = treeRef.current;
-    if (!tree || selectedRowId === undefined) {
-      management.setError('특별단가를 추가할 품목 행을 먼저 선택해 주세요.');
+  const selectItem = async (item: ItemPriceOverviewRow | null) => {
+    if (item?.materialId === selected?.materialId) return;
+    if (!(await confirmDiscard())) {
+      setRevertKey((key) => key + 1);
       return;
     }
-    const active = tree.getActiveRows();
-    const selected = active.find((row) => row.rowId === selectedRowId);
-    const parent = selected?.parentId ? active.find((row) => row.rowId === selected.parentId) : selected;
-    if (!parent) return;
-    tree.addChildRow(parent.rowId, createItemPriceChildRow(parent));
-    tree.expandRow(parent.rowId);
+    management.discardChanges();
+    management.selectItem(item);
   };
 
-  const readImportFile = async (file?: File) => {
-    if (!file) return;
-    management.setError('');
-    try {
-      const result = await parseItemPriceOverviewWorkbook(file, management.rows, codeOptions);
-      if (result.errors.length) {
-        const shown = result.errors.slice(0, 8).join('\n');
-        const more = result.errors.length > 8 ? `\n외 ${result.errors.length - 8}건` : '';
-        management.setError(`${shown}${more}`);
-        return;
-      }
-      if (!result.updatedRows.length) {
-        management.setError('엑셀에서 변경된 단가가 없습니다.');
-        return;
-      }
-      const confirmed = await confirm({
-        title: '엑셀 단가 반영',
-        description: `엑셀에서 ${result.updatedRows.length}개 품목의 단가가 변경됩니다. 반영하시겠습니까?`,
-        confirmLabel: '반영',
-      });
-      if (confirmed) await management.applyImport(result.updatedRows);
-    } catch (cause) {
-      management.setError(cause instanceof Error ? cause.message : '엑셀 파일을 읽지 못했습니다.');
-    }
+  const addImportedRows = async (imported: ItemPartnerPriceRow[]) => {
+    setImportOpen(false);
+    const confirmed = await confirm({
+      title: '엑셀 단가 저장',
+      description: `엑셀의 단가 ${imported.length}건을 저장합니다. 계속하시겠습니까?`,
+      confirmLabel: '저장',
+    });
+    if (confirmed) await management.saveImportedRows(imported);
   };
 
   const actions: PermissionActionGroupDefinition[] = [
@@ -137,9 +128,9 @@ export function ItemPriceOverviewPage({
         label: '엑셀 양식 다운로드',
         icon: DownloadOutlined,
         visible: canCreate,
-        disabled: management.loading || management.saving,
+        disabled: management.saving,
         onClick: () => {
-          void downloadItemPriceOverviewTemplate(management.rows, codeOptions).catch((cause) =>
+          void downloadItemPartnerPriceTemplate({ ...codeOptions, tradeType }).catch((cause) =>
             management.setError(cause instanceof Error ? cause.message : '엑셀 양식을 다운로드하지 못했습니다.'));
         },
       },
@@ -147,36 +138,23 @@ export function ItemPriceOverviewPage({
         label: '엑셀 업로드',
         icon: UploadFileOutlined,
         visible: canCreate,
-        disabled: management.loading || management.saving,
-        onClick: () => {
-          if (management.hasChanges) {
-            management.setError('저장하지 않은 변경사항이 있습니다. 저장하거나 다시 조회한 뒤 업로드해 주세요.');
-            return;
-          }
-          fileInput.current?.click();
-        },
+        disabled: management.saving || management.hasChanges,
+        onClick: () => setImportOpen(true),
+      },
+      {
+        label: '단가 추가',
+        icon: AddIcon,
+        visible: canCreate,
+        disabled: !selected || management.rowsLoading || management.saving,
+        onClick: () => gridRef.current?.addRow(),
       },
     ] },
-    { key: 'write', actions: [{
-      label: '특별단가 추가',
-      icon: AddIcon,
-      visible: canCreate,
-      disabled: management.loading || management.saving || selectedRowId === undefined,
-      onClick: addSpecialPrice,
-    }] },
-    { key: 'delete', actions: [{
-      label: '단가 삭제',
-      icon: DeleteOutlineOutlined,
-      visible: canDelete,
-      disabled: !selectedRow || management.hasChanges || management.loading || management.saving,
-      onClick: () => setRemoveTarget(selectedRow),
-    }] },
     { key: 'read', actions: [{
       label: '조회',
       icon: SearchIcon,
       visible: Boolean(selectedMenuPermissions?.read),
       disabled: management.saving,
-      onClick: searchDefault,
+      onClick: () => { void searchItems(appliedValues); },
     }] },
     { key: 'write', actions: [{
       label: '저장',
@@ -184,20 +162,31 @@ export function ItemPriceOverviewPage({
       saving: management.saving,
       savingAriaLabel: '단가 저장 중',
       visible: canWrite,
-      disabled: !management.hasChanges || management.saving || management.loading,
+      disabled: !management.hasChanges || management.saving || management.rowsLoading,
       onClick: () => {
-        const tree = treeRef.current;
-        if (!tree) return;
-        if (!tree.validate()) {
-          management.setError('입력 값을 확인해 주세요.');
+        const grid = gridRef.current;
+        if (!grid) return;
+        if (!grid.validate()) {
+          management.setError('필수 입력 항목과 단가 조건을 확인해 주세요.');
           return;
         }
-        void management.saveChanges(tree.getChanges());
+        void management.saveChanges(grid.getChanges());
       },
     }] },
   ];
 
-  const rowSummary = useMemo(() => management.rows.filter((row) => row.parentId === null).length, [management.rows]);
+  const fixedMaterial = useMemo(
+    () => selected
+      ? {
+          materialId: selected.materialId,
+          materialCode: selected.materialCode,
+          materialName: selected.materialName,
+          materialSpec: selected.materialSpec,
+          materialUnit: selected.materialUnit,
+        }
+      : undefined,
+    [selected],
+  );
 
   return (
     <Box sx={{ display: 'flex', flex: 1, flexDirection: 'column', minHeight: 0, minWidth: 0, height: '100%' }}>
@@ -209,8 +198,8 @@ export function ItemPriceOverviewPage({
       {tabs}
       <PageLoadBoundary
         {...management.initialLoad}
-        label="품목 기준 단가"
-        onRetry={() => management.applyFilters(management.appliedFilters)}
+        label="품목 목록"
+        onRetry={() => management.searchItems(management.itemFilters)}
       >
         <PageSearchArea
           searchField={
@@ -236,72 +225,73 @@ export function ItemPriceOverviewPage({
               })}
             />
           }
-          onDefaultSearch={searchDefault}
-          detailFields={DETAIL_FIELDS}
+          onDefaultSearch={() => { void searchItems(appliedValues); }}
+          detailFields={detailFields}
           detailValues={detailValues}
           appliedDetailValues={appliedValues}
+          defaultValues={defaultValues}
           onDetailValuesChange={setDetailValues}
-          onDetailSearch={searchDetails}
-          detailLoading={management.loading}
+          onDetailSearch={(values) => { void searchItems(values); }}
+          detailLoading={management.itemsLoading}
         />
         <PageMessageArea message={management.error} onClose={() => management.setError('')} />
-        <Box sx={{ flex: 1, minHeight: 280, minWidth: 0, p: 1 }} data-item-count={rowSummary}>
-          <ItemPriceOverviewTree
-            rows={management.rows}
-            treeRef={treeRef}
-            gridKey={management.gridKey}
-            loading={management.loading}
-            canCreate={canCreate && !management.saving}
-            canUpdate={canUpdate && !management.saving}
-            canExportExcel={Boolean(selectedMenuPermissions?.excel)}
-            today={management.today}
-            highlightKeyword={management.appliedFilters.keyword}
-            codeOptions={codeOptions}
-            onChangesChange={management.handleChangesChange}
-            onSelectionChange={(ids) => setSelectedRowId(ids[0])}
-          />
+        <Box sx={{
+          display: 'flex', flex: 1, minHeight: 280, minWidth: 0, gap: 1, p: 1,
+          flexDirection: { xs: 'column', md: 'row' },
+        }}>
+          <Box sx={{ flex: { md: '0 0 520px' }, minWidth: 0, minHeight: { xs: 260, md: 0 }, height: { xs: 300, md: 'auto' } }}>
+            <ItemPriceItemList
+              tradeType={tradeType}
+              rows={management.items}
+              gridKey={management.listKey + revertKey * 100000}
+              loading={management.itemsLoading}
+              selectedId={selected?.materialId}
+              highlightKeyword={management.itemFilters.keyword}
+              onSelect={(item) => { void selectItem(item); }}
+            />
+          </Box>
+          <Box sx={{ display: 'flex', flex: 1, flexDirection: 'column', minWidth: 0, minHeight: 280 }}>
+            <Box sx={{ px: 0.5, py: 0.75 }}>
+              <Typography variant="subtitle2">
+                {selected
+                  ? `${selected.materialCode} · ${selected.materialName} 단가`
+                  : '왼쪽에서 품목을 선택해 주세요.'}
+              </Typography>
+              {selected && tradeType === '매입' ? (
+                <Typography variant="caption" color="text.secondary">
+                  거래처가 2곳 이상이면 기본 거래처를 하나 지정해야 합니다.
+                </Typography>
+              ) : null}
+            </Box>
+            <Box sx={{ flex: 1, minHeight: 0 }}>
+              {selected ? (
+                <ItemPartnerPriceGrid
+                  rows={management.rows}
+                  canCreate={canCreate && !management.saving}
+                  canUpdate={canUpdate && !management.saving}
+                  canDelete={canDelete && !management.saving}
+                  canExportExcel={Boolean(selectedMenuPermissions?.excel)}
+                  loading={management.rowsLoading}
+                  gridKey={management.gridKey}
+                  gridRef={gridRef}
+                  codeOptions={codeOptions}
+                  tradeType={tradeType}
+                  fixedMaterial={fixedMaterial}
+                  onChangesChange={management.handleChangesChange}
+                />
+              ) : null}
+            </Box>
+          </Box>
         </Box>
-        <input
-          ref={fileInput}
-          hidden
-          type="file"
-          accept=".xlsx"
-          aria-label="품목 기준 단가 엑셀 파일 선택"
-          onChange={(event) => {
-            void readImportFile(event.target.files?.[0]);
-            event.target.value = '';
-          }}
+        <ItemPartnerPriceImportDialog
+          open={importOpen}
+          onClose={() => setImportOpen(false)}
+          onStage={(rows) => { void addImportedRows(rows); }}
+          codeOptions={codeOptions}
+          tradeType={tradeType}
+          stageLabel="저장"
         />
         {confirmDialog}
-        <ItemPriceRemoveDialog
-          row={removeTarget}
-          onClose={() => setRemoveTarget(null)}
-          onConfirm={(sides, mode) => {
-            const target = removeTarget;
-            setRemoveTarget(null);
-            if (target) void management.removePrices(target, sides, mode);
-          }}
-        />
-        <UnsavedChangesConfirmDialog
-          open={pending !== null}
-          title="저장하지 않은 변경사항"
-          description="변경사항을 버리고 단가 목록을 다시 불러오시겠습니까?"
-          cancelLabel="취소"
-          continueLabel="계속"
-          onCancel={() => {
-            setPending(null);
-            setDetailValues(appliedValues);
-          }}
-          onContinue={() => {
-            if (pending) {
-              management.discardChanges();
-              management.applyFilters(pending.filters);
-              setAppliedValues(pending.values);
-              setDetailValues(pending.values);
-            }
-            setPending(null);
-          }}
-        />
       </PageLoadBoundary>
     </Box>
   );

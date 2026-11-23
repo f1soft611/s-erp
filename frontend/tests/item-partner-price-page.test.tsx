@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
 import { createItemPartnerPriceColumns, createItemPartnerPriceRow } from '../src/pages/co/master/item-partner-prices/components/itemPartnerPriceGridModel';
-import { createItemPriceOverviewColumns } from '../src/pages/co/master/item-partner-prices/components/itemPriceOverviewGridModel';
 import { ItemPartnerPriceGrid } from '../src/pages/co/master/item-partner-prices/components/ItemPartnerPriceGrid';
 import type { ItemPartnerPriceRow } from '../src/pages/co/master/item-partner-prices/types/itemPartnerPrice.types';
 import type { F1GridRef } from '../src/shared/components/f1-grid';
@@ -63,6 +62,10 @@ beforeEach(() => {
   masters.searchOrderMaterials.mockReset().mockResolvedValue([material]);
   masters.searchOrderCustomers.mockReset().mockResolvedValue([customer]);
 });
+
+const TRADE = encodeURIComponent('매입');
+const PURCHASE_TYPES = encodeURIComponent('RAW,SUB,SUPPLY');
+const SALES_TYPES = encodeURIComponent('PRODUCT,SEMI,GOODS');
 
 describe('item partner price page', () => {
   it('starts each master picker fresh while preserving selected form values', async () => {
@@ -148,8 +151,8 @@ describe('item partner price page', () => {
     }
     expect(columns.find((column) => column.field === 'materialId')?.type).toBe('code');
     expect(columns.find((column) => column.field === 'customerId')?.type).toBe('code');
-    // 거래처를 비우면 품목 기본단가이므로 필수가 아니다.
-    expect(columns.find((column) => column.field === 'customerId')?.required).toBeFalsy();
+    // 공통단가가 폐지되어 단가는 항상 거래처에 붙으므로 거래처도 필수다.
+    expect(columns.find((column) => column.field === 'customerId')?.required).toBe(true);
   });
 
   it('adds VAT, foreign price and currency columns', () => {
@@ -190,6 +193,69 @@ describe('item partner price page', () => {
     expect(editable('startDt', createItemPartnerPriceRow())).toBe(true);
   });
 
+  it('routes the 매출단가등록 page key to the sales screen without purchase-only columns', async () => {
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{ id: 'co', name: '기준정보', icon: null, tree: [], menus: [] }}
+            currentMenuName="매출단가등록"
+            currentPageKey="item-sales-prices"
+            breadcrumbItems={['기준정보', '매출단가등록']}
+            content={{ title: '매출단가등록', description: '단가', cards: [], items: [] }}
+            selectedMenuPermissions={{ read: true, create: true, update: true, delete: false, excel: true }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+    // 매출 화면은 제품·반제품·상품이 계정분류 기본 조건이다.
+    await waitFor(() => expect(api.apiGet).toHaveBeenCalledWith(
+      `/api/v1/co/master/item-partner-prices/overview?tradeType=${encodeURIComponent('매출')}&itemTypes=${SALES_TYPES}`,
+    ));
+    expect(await screen.findByRole('tab', { name: '품목 기준', selected: true })).toBeInTheDocument();
+  });
+
+  it('builds only the selected trade type columns and keeps the item columns side by side', () => {
+    const hidden = (tradeType: '매입' | '매출') => createItemPartnerPriceColumns(true, undefined, {}, true, false, tradeType)
+      .filter((column) => column.hidden).map((column) => String(column.field));
+    expect(hidden('매입')).toContain('tradeType');
+    expect(hidden('매입')).not.toContain('orderType');
+    expect(hidden('매출')).toEqual(expect.arrayContaining(['tradeType', 'orderType', 'defaultSupplier']));
+    expect(createItemPartnerPriceRow('매출').tradeType).toBe('매출');
+
+    // 품목코드·품목명·규격·단위는 나란히 있다(단위가 뒤쪽에 따로 떨어져 있지 않다).
+    const order = createItemPartnerPriceColumns(false, undefined, undefined, false).map((column) => String(column.field));
+    const code = order.indexOf('materialCode');
+    expect(order.slice(code, code + 4)).toEqual(['materialCode', 'materialName', 'materialSpec', 'materialUnit']);
+  });
+
+  it('puts the default supplier column first as "기본", hides it on sales, and has no minimum order quantity', () => {
+    const purchase = createItemPartnerPriceColumns(true, undefined, {}, true, false, '매입');
+    const fields = purchase.map((column) => String(column.field));
+    expect(fields.slice(0, 2)).toEqual(['priceId', 'defaultSupplier']);
+    expect(purchase[1]).toMatchObject({ headerName: '기본', type: 'checkbox' });
+    expect(purchase[1].hidden).toBeFalsy();
+    expect(purchase[1].form).toMatchObject({ label: '기본 거래처' });
+    expect(fields).not.toContain('moq');
+    const sales = createItemPartnerPriceColumns(true, undefined, {}, true, false, '매출');
+    expect(sales.find((column) => column.field === 'defaultSupplier')?.hidden).toBe(true);
+  });
+
+  it('hides the item columns and shows the fixed item read-only in the form on the item screen', () => {
+    const columns = createItemPartnerPriceColumns(true, undefined, {}, true, false, '매입', true);
+    const hidden = columns.filter((column) => column.hidden).map((column) => String(column.field));
+    expect(hidden).toEqual(expect.arrayContaining(['materialId', 'materialCode', 'materialName', 'materialSpec', 'materialUnit']));
+    expect(hidden).not.toContain('customerId');
+    const materialField = columns.find((column) => column.field === 'materialId');
+    const form = materialField?.form as { visible: (row: ItemPartnerPriceRow) => boolean; readOnly: (row: ItemPartnerPriceRow) => boolean };
+    expect(form.visible(createItemPartnerPriceRow('매입'))).toBe(true);
+    expect(form.readOnly(createItemPartnerPriceRow('매입'))).toBe(true);
+    // 종료일은 새 적용일 등록 때 서버가 자동으로 닫으므로 키가 고정된 화면에서는 직접 고치지 않는다.
+    const endDt = columns.find((column) => column.field === 'endDt')?.editable;
+    expect(typeof endDt === 'function' ? endDt(createItemPartnerPriceRow('매입')) : endDt).toBe(false);
+  });
+
   it('routes the co master menu to the price page and exposes Excel actions for admins', async () => {
     render(
       <ThemeProvider theme={createTheme()}>
@@ -197,8 +263,8 @@ describe('item partner price page', () => {
           <DashboardContent
             selectedModule={{ id: 'co', name: '기준정보', icon: null, tree: [], menus: [] }}
             currentMenuName="품목·거래처별 단가관리"
-            currentPageKey="item-partner-prices"
-            breadcrumbItems={['기준정보', '품목·거래처별 단가관리']}
+            currentPageKey="item-purchase-prices"
+            breadcrumbItems={['기준정보', '매입단가등록']}
             content={{ title: '단가관리', description: '단가', cards: [], items: [] }}
             selectedMenuPermissions={{ read: true, create: true, update: true, delete: false, excel: true }}
             isTenantAdmin
@@ -207,19 +273,19 @@ describe('item partner price page', () => {
       </ThemeProvider>,
     );
     await waitFor(() => expect(api.apiGet).toHaveBeenCalledWith(
-      '/api/v1/co/master/item-partner-prices/overview',
+      `/api/v1/co/master/item-partner-prices/overview?tradeType=${TRADE}&itemTypes=${PURCHASE_TYPES}`,
     ));
     expect(await screen.findByRole('tab', { name: '품목 기준', selected: true })).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: '특별단가 추가' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '단가 추가' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '엑셀 양식 다운로드' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '엑셀 업로드' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: '단가 이력 조회' }));
     // 이력 조회 탭은 조회 전용이라 종료된 단가까지 보이도록 includeHistory로 조회하고, 입력·저장·엑셀 업로드 버튼이 없다.
     await waitFor(() => expect(api.apiGet).toHaveBeenCalledWith(
-      '/api/v1/co/master/item-partner-prices?includeHistory=true',
+      `/api/v1/co/master/item-partner-prices?tradeType=${TRADE}&itemTypes=${PURCHASE_TYPES}&includeHistory=true`,
     ));
     expect(await screen.findByRole('button', { name: '조회' })).toBeInTheDocument();
-    for (const name of ['단가 추가', '저장', '엑셀 업로드', '엑셀 양식 다운로드', '특별단가 추가']) {
+    for (const name of ['단가 추가', '저장', '엑셀 업로드', '엑셀 양식 다운로드']) {
       expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
     }
   });
@@ -239,8 +305,8 @@ describe('item partner price page', () => {
           <DashboardContent
             selectedModule={{ id: 'co', name: '기준정보', icon: null, tree: [], menus: [] }}
             currentMenuName="품목·거래처별 단가관리"
-            currentPageKey="item-partner-prices"
-            breadcrumbItems={['기준정보', '품목·거래처별 단가관리']}
+            currentPageKey="item-purchase-prices"
+            breadcrumbItems={['기준정보', '매입단가등록']}
             content={{ title: '단가관리', description: '단가', cards: [], items: [] }}
             selectedMenuPermissions={{ read: true, create: true, update: true, delete: false, excel: true }}
             isTenantAdmin
@@ -250,7 +316,7 @@ describe('item partner price page', () => {
     );
     fireEvent.click(await screen.findByRole('tab', { name: '거래처 기준' }));
     await waitFor(() => expect(api.apiGet).toHaveBeenCalledWith(
-      '/api/v1/co/master/item-partner-prices/customer-overview',
+      `/api/v1/co/master/item-partner-prices/customer-overview?tradeType=${TRADE}&itemTypes=${PURCHASE_TYPES}`,
     ));
     expect(await screen.findByText('왼쪽에서 거래처를 선택해 주세요.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '엑셀 양식 다운로드' })).toBeInTheDocument();
@@ -258,24 +324,52 @@ describe('item partner price page', () => {
     expect(screen.getByRole('button', { name: '단가 추가' })).toBeDisabled();
     fireEvent.click(await screen.findByText('기준 거래처'));
     await waitFor(() => expect(api.apiGet).toHaveBeenCalledWith(
-      '/api/v1/co/master/item-partner-prices?useAt=Y&customerId=301',
+      `/api/v1/co/master/item-partner-prices?useAt=Y&tradeType=${TRADE}&itemTypes=${PURCHASE_TYPES}&customerId=301`,
     ));
     expect(await screen.findByText('C301 · 기준 거래처 단가')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('button', { name: '단가 추가' })).toBeEnabled());
   });
 
-  it('marks required inputs on the editable overview grid only, not on the read-only history grid', () => {
-    const overview = createItemPriceOverviewColumns({ canEdit: true, today: '2026-11-18' });
-    const header = (field: string) => overview.find((column) => String(column.field) === field);
-    expect(overview[0]).toMatchObject({ field: 'rowId', type: 'rownumber', headerName: 'No' });
-    expect(header('displayName')?.headerName).toBe('품목');
-    for (const field of ['purchaseUnitPrice', 'purchaseStartDt', 'salesUnitPrice', 'salesStartDt', 'customerId']) {
-      expect(header(field)?.requiredMark).toBe(true);
-      // 빈 행을 모두 검증 오류로 만들지 않도록 required(검증)는 쓰지 않는다.
-      expect(header(field)?.required).toBeFalsy();
-    }
-    expect(header('purchaseForeignUnitPrice')?.form).toMatchObject({ group: '매입 단가' });
+  it('loads the item list on the item tab and fetches that item prices on selection', async () => {
+    api.apiGet.mockImplementation(async (url: string) => {
+      if (url.includes('/overview')) {
+        return { resultList: [{
+          materialId: 101, materialCode: 'M101', materialName: '기준 품목', materialSpec: '10x20', materialUnit: 'EA',
+          materialTypeCode: 'RAW', customerCount: 2, defaultSupplierId: 301, defaultSupplierName: '기본 거래처',
+        }] };
+      }
+      return { resultList: [] };
+    });
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{ id: 'co', name: '기준정보', icon: null, tree: [], menus: [] }}
+            currentMenuName="매입단가등록"
+            currentPageKey="item-purchase-prices"
+            breadcrumbItems={['기준정보', '매입단가등록']}
+            content={{ title: '단가관리', description: '단가', cards: [], items: [] }}
+            selectedMenuPermissions={{ read: true, create: true, update: true, delete: false, excel: true }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+    expect(await screen.findByText('왼쪽에서 품목을 선택해 주세요.')).toBeInTheDocument();
+    // 품목코드·품목·규격·단위가 나란히 있는 왼쪽 목록
+    expect(await screen.findByText('기준 품목')).toBeInTheDocument();
+    expect(screen.getByText('10x20')).toBeInTheDocument();
+    expect(screen.getByText('원재료')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '단가 추가' })).toBeDisabled();
+    fireEvent.click(screen.getByText('기준 품목'));
+    await waitFor(() => expect(api.apiGet).toHaveBeenCalledWith(
+      `/api/v1/co/master/item-partner-prices?useAt=Y&tradeType=${TRADE}&materialId=101`,
+    ));
+    expect(await screen.findByText(/M101 · 기준 품목 단가/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: '단가 추가' })).toBeEnabled());
+  });
 
+  it('marks required inputs on the editable grid only, not on the read-only history grid', () => {
     const readOnlyHistory = createItemPartnerPriceColumns(false, undefined, undefined, false);
     expect(readOnlyHistory.some((column) => column.required)).toBe(false);
     const editable = createItemPartnerPriceColumns(true);

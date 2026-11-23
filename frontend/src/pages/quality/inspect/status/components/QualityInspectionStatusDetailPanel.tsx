@@ -135,7 +135,7 @@ export function QualityInspectionStatusDetailPanel({
               <Table size="small" aria-label="검사 품목 목록" sx={{ minWidth: 720 }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell align="center">행</TableCell>
+                    <TableCell align="center">순번</TableCell>
                     <TableCell>가입고번호</TableCell>
                     <TableCell>발주번호</TableCell>
                     <TableCell>품목코드</TableCell>

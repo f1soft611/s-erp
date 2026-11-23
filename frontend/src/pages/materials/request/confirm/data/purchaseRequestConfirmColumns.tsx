@@ -96,7 +96,7 @@ export function createPurchaseRequestConfirmColumns({
     { field: 'requestNo', headerName: '구매요청번호', type: 'text', width: 150, align: 'center', pinned: 'left', mergeRows: true, ...readOnly },
     { field: 'requestDt', headerName: '요청일', type: 'date', width: 100, align: 'center', mergeRows: true, ...readOnly },
     { field: 'requesterName', headerName: '요청자', type: 'text', width: 90, align: 'center', mergeRows: true, ...readOnly },
-    { field: 'lineNo', headerName: '행', type: 'number', width: 56, align: 'center', ...readOnly },
+    { field: 'lineNo', headerName: '순번', type: 'number', decimalPlaces: 0, width: 56, align: 'center', ...readOnly },
     { field: 'materialCode', headerName: '품목코드', type: 'text', width: 110, ...readOnly },
     { field: 'materialName', headerName: '품목명', type: 'text', width: 170, ...readOnly },
     { field: 'materialSpec', headerName: '규격', type: 'text', width: 110, ...readOnly },
