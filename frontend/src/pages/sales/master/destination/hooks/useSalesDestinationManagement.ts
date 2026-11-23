@@ -19,33 +19,41 @@ export function useSalesDestinationManagement() {
   const [gridKey, setGridKey] = useState(0);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
+  const quietCustomerRefreshRevision = useRef<number | null>(null);
+  const quietDestinationRefreshRevision = useRef<number | null>(null);
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
+    const quiet = quietCustomerRefreshRevision.current === revision;
+    if (quiet) quietCustomerRefreshRevision.current = null;
+    if (!quiet) setLoading(true);
     fetchDestinationCustomers(keyword)
       .then((list) => { if (active) setCustomers(list); })
       .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : '거래처 조회에 실패했습니다.'); })
-      .finally(() => { if (active) setLoading(false); });
+      .finally(() => { if (active && !quiet) setLoading(false); });
     return () => { active = false; };
   }, [keyword, revision]);
 
   useEffect(() => {
     let active = true;
-    setSelectedId(null);
-    setRows([]);
+    const quiet = quietDestinationRefreshRevision.current === revision;
+    if (quiet) quietDestinationRefreshRevision.current = null;
+    if (!quiet) {
+      setSelectedId(null);
+      setRows([]);
+    }
     if (customerId !== null) {
-      setRowsLoading(true);
+      if (!quiet) setRowsLoading(true);
       fetchSalesDestinations(customerId)
         .then((list) => { if (active) setRows(list); })
         .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : '납품처 조회에 실패했습니다.'); })
-        .finally(() => { if (active) setRowsLoading(false); });
-    } else setRowsLoading(false);
+        .finally(() => { if (active && !quiet) setRowsLoading(false); });
+    } else if (!quiet) setRowsLoading(false);
     return () => { active = false; };
   }, [customerId, revision]);
 
   const save = useCallback(async (changes: F1GridChanges<SalesDestinationGridRow>) => {
-    if (savingRef.current || customerId === null) return;
+    if (savingRef.current || customerId === null) return false;
     savingRef.current = true;
     setSaving(true);
     setError('');
@@ -57,12 +65,16 @@ export function useSalesDestinationManagement() {
       });
       await saveDestinationBatch(customerId, inserted, updated);
       setHasChanges(false);
-      setGridKey((value) => value + 1);
-      setRevision((value) => value + 1);
+      const nextRevision = revision + 1;
+      quietCustomerRefreshRevision.current = nextRevision;
+      quietDestinationRefreshRevision.current = nextRevision;
+      setRevision(nextRevision);
+      return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '납품처 저장에 실패했습니다.');
+      return false;
     } finally { savingRef.current = false; setSaving(false); }
-  }, [customerId]);
+  }, [customerId, revision]);
 
   const remove = useCallback(async (id: number) => {
     if (savingRef.current) return;

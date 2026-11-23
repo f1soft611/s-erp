@@ -1802,6 +1802,13 @@ function F1GridInner<T extends object>(
               String(row[column.field] ?? '') === draftText
                 ? row[column.field]
                 : draftText));
+    const committedValue =
+      row &&
+      (column.type === undefined || column.type === 'text') &&
+      draftText === '' &&
+      row[column.field] == null
+        ? row[column.field]
+        : value;
 
     if (
       column &&
@@ -1812,10 +1819,10 @@ function F1GridInner<T extends object>(
       ((column.type !== 'number' &&
         column.type !== 'decimal' &&
         column.type !== 'currency') ||
-        !Number.isNaN(value))
+        !Number.isNaN(committedValue))
     ) {
-      const changes = column.onValueChange?.(row, value) ?? {
-        [column.field]: value,
+      const changes = column.onValueChange?.(row, committedValue) ?? {
+        [column.field]: committedValue,
       };
       const hasChanges = Object.entries(changes).some(
         ([field, nextValue]) =>

@@ -3158,6 +3158,39 @@ describe('F1-GRID dirty indicator across column types', () => {
     });
   });
 
+  it.each([null, undefined] as const)('keeps an unchanged empty nullable text cell clean after edit commit (%s)', (emptyValue) => {
+    type NullableTextRow = { id: string; remark: string | null | undefined };
+    const gridRef = createRef<F1GridRef<NullableTextRow>>();
+    const nullableTextRows: NullableTextRow[] = [
+      { id: 'destination-1', remark: emptyValue },
+    ];
+    const nullableTextColumns: F1GridColumn<NullableTextRow>[] = [
+      { field: 'remark', headerName: '비고', editable: true },
+    ];
+
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={nullableTextRows}
+        columns={nullableTextColumns}
+        rowKey="id"
+        editorPlugins={[{ canEdit: () => true }]}
+      />,
+    );
+
+    const remarkCell = screen.getByRole('gridcell');
+    fireEvent.doubleClick(remarkCell);
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });
+
+    expect(gridRef.current?.getRows()[0].remark).toBe(emptyValue);
+    expect(remarkCell).toHaveAttribute('data-dirty-cell', 'false');
+    expect(gridRef.current?.getChanges()).toEqual({
+      insertedRows: [],
+      updatedRows: [],
+      deletedRows: [],
+    });
+  });
+
   it('keeps an explicitly entered zero distinct from an empty nullable number', () => {
     type NullableNumberRow = { id: string; expiryedCount: number | null };
     const gridRef = createRef<F1GridRef<NullableNumberRow>>();
