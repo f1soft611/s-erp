@@ -37,6 +37,7 @@ description: 'iPlusMES 팀 개발 규칙: 문서 우선, 범위 통제, 검증, 
 - 변경 영역에 맞는 가장 작은 검증 명령을 실행합니다.
 - 프론트엔드: [frontend/AGENTS.md](../../frontend/AGENTS.md) 의 Vite + Vitest 흐름을 사용합니다.
 - 백엔드: [backend/AGENTS.md](../../backend/AGENTS.md) 의 Maven 테스트/실행 흐름을 사용합니다.
+- 최초 사용자 요청과 모든 후속 피드백을 관찰 가능한 완료 기준으로 만들고, 각각을 자동화 테스트 또는 결과 문서의 명시적 수동 검증에 연결합니다. UI 저장 흐름은 문서와 기존 패턴에 맞춰 진행 표시, 성공 피드백, 오류 표시, dirty 초기화, 저장 후 갱신을 별도로 확인합니다.
 
 ## Java 8 호환 개발
 
