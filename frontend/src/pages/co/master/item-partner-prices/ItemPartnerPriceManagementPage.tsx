@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Box, Tab, Tabs } from '@mui/material';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import type { MenuPermission, ModuleItem, PageContent } from '../../../dashboard/types/dashboard';
+import type { ItemPartnerPriceTradeType } from './types/itemPartnerPrice.types';
 import { ItemPartnerPriceListPage } from './ItemPartnerPriceListPage';
 import { ItemPriceByCustomerPage } from './ItemPriceByCustomerPage';
 import { ItemPriceOverviewPage } from './ItemPriceOverviewPage';
@@ -11,6 +12,8 @@ type TabKey = 'overview' | 'customer' | 'list';
 const TAB_LABELS: Record<TabKey, string> = { overview: '품목 기준', customer: '거래처 기준', list: '단가 이력 조회' };
 
 type Props = {
+  /** 화면의 거래구분. 매입단가등록=매입, 매출단가등록=매출. 세 탭이 같은 값을 쓴다. */
+  tradeType: ItemPartnerPriceTradeType;
   selectedModule: ModuleItem;
   currentMenuName: string;
   content: PageContent;
@@ -19,7 +22,7 @@ type Props = {
   isTenantAdmin?: boolean;
 };
 
-/** 단가등록 탭 호스트: 품목 기준(트리) · 거래처 기준(마스터-디테일) · 단가 이력 조회(조회 전용). */
+/** 매입/매출 단가등록 탭 호스트: 품목 기준(트리) · 거래처 기준(마스터-디테일) · 단가 이력 조회(조회 전용). */
 export function ItemPartnerPriceManagementPage(props: Props) {
   const [tab, setTab] = useState<TabKey>('overview');
   const [dirty, setDirty] = useState(false);

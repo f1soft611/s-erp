@@ -7,14 +7,18 @@ type RowChanges = {
   deletedRows: ItemPartnerPriceRow[];
 };
 
+/** 단가 입력 화면이 고정하는 키: 거래처 기준은 거래처, 품목 기준은 품목. */
+export type FixedPriceKey = { customerId: number } | { materialId: number };
+
 /**
- * 거래처 기준 화면의 변경(신규 행·셀/폼 수정)을 일괄 저장 변경 집합으로 바꾼다. 한 행 = 품목 + 거래구분이다.
- * 정정/새 기간 판단 규칙은 품목 기준 화면과 같고, 겹침·자동 종료·과거 잠금 검증은 서버가 한다.
+ * 키가 고정된 화면(거래처 기준·품목 기준)의 변경(신규 행·셀/폼 수정)을 일괄 저장 변경 집합으로 바꾼다.
+ * 고정 키는 모든 신규·수정 행에 덮어써 화면에서 바꾼 값이 새지 않게 한다.
+ * 정정/새 기간 판단 규칙은 두 화면이 같고, 겹침·자동 종료·과거 잠금 검증은 서버가 한다.
  */
-export function buildCustomerPriceBatch(
+export function buildFixedKeyPriceBatch(
   changes: RowChanges,
   sourceRows: ItemPartnerPriceRow[],
-  customerId: number,
+  fixed: FixedPriceKey,
   today: string,
   newId: () => string = () => `new-price-${crypto.randomUUID()}`,
 ): ItemPartnerPriceBatchPayload {
@@ -28,7 +32,7 @@ export function buildCustomerPriceBatch(
 
   for (const row of changes.insertedRows) {
     insertedRows.push({
-      ...toItemPartnerPricePayload({ ...row, customerId, startDt: row.startDt || needToday(), endDt: null }),
+      ...toItemPartnerPricePayload({ ...row, ...fixed, startDt: row.startDt || needToday(), endDt: null }),
       priceId: String(row.priceId),
     });
   }
@@ -43,12 +47,12 @@ export function buildCustomerPriceBatch(
     const startDt = row.startDt || needToday();
     if (original.priceStatus === 'future' || startDt === original.startDt) {
       updatedRows.push({
-        ...toItemPartnerPricePayload({ ...row, customerId, startDt, endDt: original.endDt }),
+        ...toItemPartnerPricePayload({ ...row, ...fixed, startDt, endDt: original.endDt }),
         priceId: String(row.priceId),
       });
     } else if (startDt > original.startDt) {
       insertedRows.push({
-        ...toItemPartnerPricePayload({ ...row, customerId, startDt, endDt: null, moq: original.moq }),
+        ...toItemPartnerPricePayload({ ...row, ...fixed, startDt, endDt: null, moq: original.moq }),
         priceId: newId(),
       });
     } else {
@@ -68,4 +72,26 @@ export function buildCustomerPriceBatch(
   }
 
   return { prices: { insertedRows, updatedRows, deletedRows } };
+}
+
+/** 거래처 기준 화면: 거래처를 고정해 변경 집합을 만든다. */
+export function buildCustomerPriceBatch(
+  changes: RowChanges,
+  sourceRows: ItemPartnerPriceRow[],
+  customerId: number,
+  today: string,
+  newId?: () => string,
+): ItemPartnerPriceBatchPayload {
+  return buildFixedKeyPriceBatch(changes, sourceRows, { customerId }, today, newId);
+}
+
+/** 품목 기준 화면: 품목을 고정해 변경 집합을 만든다. */
+export function buildMaterialPriceBatch(
+  changes: RowChanges,
+  sourceRows: ItemPartnerPriceRow[],
+  materialId: number,
+  today: string,
+  newId?: () => string,
+): ItemPartnerPriceBatchPayload {
+  return buildFixedKeyPriceBatch(changes, sourceRows, { materialId }, today, newId);
 }

@@ -57,6 +57,11 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
                 if (condition.getCustomerId() <= 0) throw new IllegalArgumentException("올바른 거래처 ID가 필요합니다.");
                 params.put("customerId", condition.getCustomerId());
             }
+            if (condition.getMaterialId() != null) {
+                if (condition.getMaterialId() <= 0) throw new IllegalArgumentException("올바른 품목 ID가 필요합니다.");
+                params.put("materialId", condition.getMaterialId());
+            }
+            params.put("itemTypes", ItemTypeFilters.parse(condition.getItemTypes()));
             if (StringUtils.hasText(condition.getTradeType())) {
                 String tradeType = condition.getTradeType().trim();
                 if (!TRADE_TYPES.contains(tradeType)) {
@@ -138,9 +143,8 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
                 result.setMaterialCode(resolution.getMaterialCode());
                 result.setMaterialName(resolution.getMaterialName());
             }
-            boolean defaultPrice = safeText(row.getCustomerCode()).isEmpty();
             if (resolution.getCustomerId() == null) {
-                if (!defaultPrice) {
+                if (!safeText(row.getCustomerCode()).isEmpty()) {
                     addError(result, "CUSTOMER_NOT_FOUND", "엑셀 " + row.getSourceRowNumber()
                             + "행의 거래처코드가 현재 테넌트의 사용 가능한 거래처에 없습니다.");
                 }
@@ -153,7 +157,7 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
                 addError(result, "EXISTING_PRICE_KEY", "엑셀 " + row.getSourceRowNumber()
                         + "행의 품목·거래처·거래구분·적용시작일 단가가 이미 존재합니다.");
             }
-            if (resolution.getMaterialId() != null && (resolution.getCustomerId() != null || defaultPrice)
+            if (resolution.getMaterialId() != null && resolution.getCustomerId() != null
                     && TRADE_TYPES.contains(safeText(row.getTradeType()))
                     && validDate(safeText(row.getStartDt()))) {
                 String key = businessKey(resolution.getMaterialId(), resolution.getCustomerId(),
@@ -246,8 +250,8 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
         if (!validCode(row.getMaterialCode())) {
             addError(result, "INVALID_ITEM_CODE", "엑셀 " + sourceRow + "행의 품목코드를 입력해 주세요(최대 20자).");
         }
-        if (!safeText(row.getCustomerCode()).isEmpty() && !validCode(row.getCustomerCode())) {
-            addError(result, "INVALID_CUSTOMER_CODE", "엑셀 " + sourceRow + "행의 거래처코드는 최대 20자입니다.");
+        if (!validCode(row.getCustomerCode())) {
+            addError(result, "INVALID_CUSTOMER_CODE", "엑셀 " + sourceRow + "행의 거래처코드를 입력해 주세요(최대 20자).");
         }
         boolean hasUnitPrice = !safeText(row.getUnitPrice()).isEmpty();
         boolean hasForeignPrice = !safeText(row.getForeignUnitPrice()).isEmpty();
@@ -340,7 +344,7 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
             throws Exception {
         Map<String, Object> params = saveParams(tenantId, actor, payload);
         requireActiveMaterial(params);
-        if (params.get("customerId") != null) requireActiveCustomer(params);
+        requireActiveCustomer(params);
         requireKnownCodes(tenantId, payload, params);
         ensureUniqueKey(params, null);
         ensurePeriodAndClosePrevious(params, null);
@@ -365,8 +369,7 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
         // 기본 거래처 표시만 바뀐 저장은 단가 행(수정자·수정일시)을 건드리지 않는다.
         if (sameValues(existing, params)) return existing;
         if (!existing.getMaterialId().equals(params.get("materialId"))) requireActiveMaterial(params);
-        if (params.get("customerId") != null
-                && !params.get("customerId").equals(existing.getCustomerId())) {
+        if (!params.get("customerId").equals(existing.getCustomerId())) {
             requireActiveCustomer(params);
         }
         requireKnownCodes(tenantId, payload, params);
@@ -509,9 +512,11 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
     private Map<String, Object> saveParams(Long tenantId, String actor, ItemPartnerPriceSaveRequestVO payload) {
         Map<String, Object> params = tenantParams(tenantId);
         if (payload == null) throw new IllegalArgumentException("단가 저장 요청이 비어 있습니다.");
-        if (payload.getMaterialId() == null || payload.getMaterialId() <= 0
-                || payload.getCustomerId() != null && payload.getCustomerId() <= 0) {
-            throw new IllegalArgumentException("품목을 선택해 주세요. 거래처를 비우면 품목 기본단가로 저장됩니다.");
+        if (payload.getMaterialId() == null || payload.getMaterialId() <= 0) {
+            throw new IllegalArgumentException("품목을 선택해 주세요.");
+        }
+        if (payload.getCustomerId() == null || payload.getCustomerId() <= 0) {
+            throw new IllegalArgumentException("거래처를 선택해 주세요. 단가는 거래처별로 등록합니다.");
         }
         if (!TRADE_TYPES.contains(safeText(payload.getTradeType()))) {
             throw new IllegalArgumentException("거래구분은 매입 또는 매출이어야 합니다.");
@@ -615,7 +620,7 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
     }
 
     private String businessKey(Long materialId, Long customerId, String tradeType, String startDt) {
-        return materialId + "|" + (customerId == null ? "default" : customerId) + "|" + tradeType + "|" + startDt;
+        return materialId + "|" + customerId + "|" + tradeType + "|" + startDt;
     }
 
     private void addError(ItemPartnerPriceImportRowResultVO row, String code, String message) {
@@ -623,7 +628,7 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
     }
 
     private IllegalArgumentException duplicateKey() {
-        return new IllegalArgumentException("같은 품목·거래처(또는 기본단가)·거래구분·적용시작일의 단가가 이미 존재합니다.");
+        return new IllegalArgumentException("같은 품목·거래처·거래구분·적용시작일의 단가가 이미 존재합니다.");
     }
 
     private ResponseStatusException notFound() {

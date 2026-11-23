@@ -1,8 +1,12 @@
 export type ItemPriceCustomerRegisterFilter = 'ALL' | 'REGISTERED' | 'UNREGISTERED';
 
 export type ItemPriceCustomerFilters = {
+  /** 화면의 거래구분. 서버가 필수로 요구한다. */
+  tradeType?: '매입' | '매출';
   keyword?: string;
   registerFilter?: ItemPriceCustomerRegisterFilter;
+  /** 품목 계정분류 코드(쉼표 구분). 비우면 전체. */
+  itemTypes?: string;
   effectiveOn?: string;
 };
 

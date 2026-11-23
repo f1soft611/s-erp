@@ -93,12 +93,12 @@ public class PurchaseRequestConfirmServiceImpl extends EgovAbstractServiceImpl
         params.put("detailIds", ids);
         requireAllUnconfirmed(confirmDAO.selectDetailLocks(params), ids);
         List<PurchaseRequestConfirmDetailVO> details = confirmDAO.selectDetailsByIds(params);
-        applyDefaultSupplierPrices(tenantId, details, baseDt == null ? LocalDate.now() : baseDt);
+        applyPurchasePrices(tenantId, details, baseDt == null ? LocalDate.now() : baseDt);
         return details;
     }
 
-    /** 확정되지 않은 행에 품목의 기본 거래처와 그 거래처의 기준일 단가·부가세·통화·발주구분을 채운다(공통 단가 조회 서비스). */
-    private void applyDefaultSupplierPrices(Long tenantId, List<PurchaseRequestConfirmDetailVO> details,
+    /** 확정되지 않은 행에 품목의 구매처(거래처 1곳이면 그 거래처, 2곳 이상이면 기본 거래처)와 그 거래처의 기준일 단가·부가세·통화·발주구분을 채운다(공통 단가 조회 서비스). */
+    private void applyPurchasePrices(Long tenantId, List<PurchaseRequestConfirmDetailVO> details,
             LocalDate baseDt) throws Exception {
         Set<Long> materialIds = new LinkedHashSet<Long>();
         for (PurchaseRequestConfirmDetailVO detail : details) {
@@ -109,7 +109,7 @@ public class PurchaseRequestConfirmServiceImpl extends EgovAbstractServiceImpl
         if (materialIds.isEmpty()) {
             return;
         }
-        Map<Long, ItemPriceLookupVO> defaults = priceLookupService.findDefaultSupplierPrices(tenantId, materialIds,
+        Map<Long, ItemPriceLookupVO> defaults = priceLookupService.findPurchasePrices(tenantId, materialIds,
                 baseDt);
         for (PurchaseRequestConfirmDetailVO detail : details) {
             ItemPriceLookupVO found = detail.getConfirmQty() == null ? defaults.get(detail.getMaterialId()) : null;

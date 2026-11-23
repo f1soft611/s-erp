@@ -136,6 +136,7 @@ export async function fetchItemPartnerPrices(
   }
   if (filters.includeHistory) query.set('includeHistory', 'true');
   if (filters.customerId) query.set('customerId', String(filters.customerId));
+  if (filters.materialId) query.set('materialId', String(filters.materialId));
   const result = await apiGet<{ resultList?: unknown }>(
     `/api/v1/co/master/item-partner-prices${query.size ? `?${query}` : ''}`,
   );

@@ -11,12 +11,14 @@ import {
   Badge,
   Box,
   Button,
+  Checkbox,
   Chip,
   Divider,
   FormControl,
   FormHelperText,
   IconButton,
   InputLabel,
+  ListItemText,
   MenuItem,
   Paper,
   Portal,
@@ -151,6 +153,12 @@ function mergeSearchValues(
   values: Record<string, PageSearchFieldValue>,
 ): Record<string, PageSearchFieldValue> {
   return { ...defaults, ...values };
+}
+
+/** multiple select의 쉼표 구분 값을 선택 코드 배열로 바꾼다. */
+function splitMultiValue(value: PageSearchFieldValue | undefined): string[] {
+  if (value === null || value === undefined || typeof value === 'object') return [];
+  return String(value).split(',').map((item) => item.trim()).filter(Boolean);
 }
 
 function getDateValue(value: PageSearchFieldValue, key: 'from' | 'to'): string {
@@ -498,6 +506,59 @@ export function PageSearchArea({
                   : undefined
             }
           />
+        ) : field.type === 'select' && field.multiple ? (
+          <FormControl
+            size="small"
+            fullWidth
+            required={field.required}
+            error={requiredErrors[field.field]}
+          >
+            <InputLabel
+              id={`${field.field}-search-label`}
+              required={field.required}
+            >
+              {field.label}
+            </InputLabel>
+            <Select
+              multiple
+              labelId={`${field.field}-search-label`}
+              label={field.label}
+              value={splitMultiValue(value)}
+              onChange={(event) => {
+                const next = event.target.value;
+                const codes = typeof next === 'string' ? next.split(',') : next;
+                updateValue(field.field, codes.filter(Boolean).join(','));
+              }}
+              renderValue={(selected) => {
+                const labels = (selected as string[]).map(
+                  (code) => (field.options ?? []).find((option) => String(option.value) === code)?.label ?? code,
+                );
+                return labels.length ? labels.join(', ') : '전체';
+              }}
+              displayEmpty
+              inputProps={{ 'aria-label': field.label }}
+            >
+              {(field.options ?? []).map((option) => (
+                <MenuItem
+                  key={String(option.value)}
+                  value={String(option.value)}
+                  dense
+                >
+                  <Checkbox
+                    size="small"
+                    checked={splitMultiValue(value).includes(String(option.value))}
+                    tabIndex={-1}
+                    disableRipple
+                    sx={{ p: 0.5, mr: 0.5 }}
+                  />
+                  <ListItemText primary={option.label} />
+                </MenuItem>
+              ))}
+            </Select>
+            {requiredErrors[field.field] && (
+              <FormHelperText>필수 입력입니다.</FormHelperText>
+            )}
+          </FormControl>
         ) : field.type === 'select' || field.type === 'checkbox' ? (
           <FormControl
             size="small"
@@ -601,6 +662,12 @@ export function PageSearchArea({
     if (typeof value === 'object') return [];
     const displayValue = String(value).trim();
     if (!displayValue) return [];
+    if (field.type === 'select' && field.multiple) {
+      const labels = splitMultiValue(value).map(
+        (code) => field.options?.find((candidate) => String(candidate.value) === code)?.label ?? code,
+      );
+      return [{ field, value, displayValue: labels.join(', ') }];
+    }
     const option = field.options?.find(
       (candidate) => String(candidate.value) === displayValue,
     );

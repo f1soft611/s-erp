@@ -220,9 +220,10 @@ export function DashboardContent({
     );
   }
 
-  if (selectedModule.id === 'co' && currentPageKey === 'item-partner-prices') {
+  if (selectedModule.id === 'co' && (currentPageKey === 'item-purchase-prices' || currentPageKey === 'item-sales-prices')) {
     return (
       <ItemPartnerPriceManagementPage
+        tradeType={currentPageKey === 'item-sales-prices' ? '매출' : '매입'}
         selectedModule={selectedModule}
         currentMenuName={currentMenuName}
         content={content}

@@ -48,10 +48,6 @@ public class ItemPartnerPriceDAO extends EgovAbstractMapper {
         return selectList("ItemPartnerPriceDAO.selectOverviewMaterials", params);
     }
 
-    public List<ItemPartnerPriceVO> selectOverviewPrices(Map<String, Object> params) throws Exception {
-        return selectList("ItemPartnerPriceDAO.selectOverviewPrices", params);
-    }
-
     public List<ItemPriceCustomerOverviewRowVO> selectCustomerOverview(Map<String, Object> params) throws Exception {
         return selectList("ItemPartnerPriceDAO.selectCustomerOverview", params);
     }
@@ -100,6 +96,10 @@ public class ItemPartnerPriceDAO extends EgovAbstractMapper {
         return selectList("ItemPartnerPriceDAO.deleteOrphanDefaultSuppliers", params);
     }
 
+    public List<String> selectTradeTypesByPriceIds(Map<String, Object> params) throws Exception {
+        return selectList("ItemPartnerPriceDAO.selectTradeTypesByPriceIds", params);
+    }
+
     public List<Long> selectMaterialIdsByPriceIds(Map<String, Object> params) throws Exception {
         return selectList("ItemPartnerPriceDAO.selectMaterialIdsByPriceIds", params);
     }
@@ -112,7 +112,12 @@ public class ItemPartnerPriceDAO extends EgovAbstractMapper {
         return selectOne("ItemPartnerPriceDAO.selectLookupPrice", params);
     }
 
-    public List<ItemPriceLookupVO> selectDefaultSupplierPrices(Map<String, Object> params) throws Exception {
-        return selectList("ItemPartnerPriceDAO.selectDefaultSupplierPrices", params);
+    public List<ItemPriceLookupVO> selectPurchasePrices(Map<String, Object> params) throws Exception {
+        return selectList("ItemPartnerPriceDAO.selectPurchasePrices", params);
+    }
+
+    public List<ItemPriceOverviewRowVO> selectMaterialsMissingDefaultSupplier(Map<String, Object> params)
+            throws Exception {
+        return selectList("ItemPartnerPriceDAO.selectMaterialsMissingDefaultSupplier", params);
     }
 }

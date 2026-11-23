@@ -15,27 +15,35 @@ import type { PageSearchField, PageSearchFieldValue } from '../../../../shared/c
 import { useCommonConfirmDialog } from '../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import type { MenuPermission, ModuleItem, PageContent } from '../../../dashboard/types/dashboard';
-import { PRICE_HISTORY_FIELD, PRICE_REGISTER_FIELD, searchText } from './data/priceSearchFields';
+import {
+  PRICE_HISTORY_FIELD,
+  PRICE_ITEM_TYPE_FIELD,
+  PRICE_REGISTER_FIELD,
+  priceSearchDefaults,
+  searchText,
+} from './data/priceSearchFields';
 import { ItemPartnerPriceGrid } from './components/ItemPartnerPriceGrid';
 import { ItemPartnerPriceImportDialog } from './components/ItemPartnerPriceImportDialog';
 import { ItemPriceCustomerList } from './components/ItemPriceCustomerList';
 import { useItemPartnerPriceCodes } from './hooks/useItemPartnerPriceCodes';
 import { useItemPriceByCustomer } from './hooks/useItemPriceByCustomer';
 import { downloadItemPartnerPriceTemplate } from './services/itemPartnerPriceExcel.service';
-import type { ItemPartnerPriceRow } from './types/itemPartnerPrice.types';
+import type { ItemPartnerPriceRow, ItemPartnerPriceTradeType } from './types/itemPartnerPrice.types';
 import type { ItemPriceCustomerFilters, ItemPriceCustomerRegisterFilter, ItemPriceCustomerRow } from './types/itemPriceCustomer.types';
 
-const DETAIL_FIELDS: PageSearchField[] = [PRICE_REGISTER_FIELD, PRICE_HISTORY_FIELD];
-const DEFAULT_VALUES: Record<string, PageSearchFieldValue> = { registerFilter: 'ALL', includeHistory: 'N' };
+const DETAIL_FIELDS: PageSearchField[] = [PRICE_REGISTER_FIELD, PRICE_ITEM_TYPE_FIELD, PRICE_HISTORY_FIELD];
 
 function toFilters(keyword: string, values: Record<string, PageSearchFieldValue>): ItemPriceCustomerFilters {
   return {
     keyword: keyword.trim() || undefined,
     registerFilter: (searchText(values, 'registerFilter') || 'ALL') as ItemPriceCustomerRegisterFilter,
+    itemTypes: searchText(values, 'itemTypes') || undefined,
   };
 }
 
 type Props = {
+  /** 화면의 거래구분(매입단가등록=매입, 매출단가등록=매출). */
+  tradeType: ItemPartnerPriceTradeType;
   selectedModule: ModuleItem;
   currentMenuName: string;
   content: PageContent;
@@ -48,18 +56,22 @@ type Props = {
 
 /** 거래처 기준 탭: 좌측 거래처 목록에서 거래처를 고르면 우측에서 그 거래처의 특별단가를 조회·입력한다. */
 export function ItemPriceByCustomerPage({
-  selectedModule, currentMenuName, content, breadcrumbItems, selectedMenuPermissions,
+  tradeType, selectedModule, currentMenuName, content, breadcrumbItems, selectedMenuPermissions,
   isTenantAdmin = false, tabs, onDirtyChange,
 }: Props) {
   const codeOptions = useItemPartnerPriceCodes();
-  const management = useItemPriceByCustomer();
+  const management = useItemPriceByCustomer(tradeType);
   const { confirm, dialog: confirmDialog } = useCommonConfirmDialog();
   useUnsavedChangesBeforeUnload(management.hasChanges);
   useEffect(() => { onDirtyChange?.(management.hasChanges); }, [management.hasChanges, onDirtyChange]);
   const gridRef = useRef<F1GridRef<ItemPartnerPriceRow>>(null);
   const [keyword, setKeyword] = useState('');
-  const [detailValues, setDetailValues] = useState<Record<string, PageSearchFieldValue>>(DEFAULT_VALUES);
-  const [appliedValues, setAppliedValues] = useState<Record<string, PageSearchFieldValue>>(DEFAULT_VALUES);
+  const defaultValues = useMemo(
+    () => priceSearchDefaults(tradeType, { registerFilter: 'ALL', includeHistory: 'N' }),
+    [tradeType],
+  );
+  const [detailValues, setDetailValues] = useState<Record<string, PageSearchFieldValue>>(defaultValues);
+  const [appliedValues, setAppliedValues] = useState<Record<string, PageSearchFieldValue>>(defaultValues);
   const [revertKey, setRevertKey] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
   const canCreate = Boolean(isTenantAdmin && selectedMenuPermissions?.create);
@@ -119,7 +131,7 @@ export function ItemPriceByCustomerPage({
         visible: canCreate,
         disabled: management.saving,
         onClick: () => {
-          void downloadItemPartnerPriceTemplate(codeOptions).catch((cause) =>
+          void downloadItemPartnerPriceTemplate({ ...codeOptions, tradeType }).catch((cause) =>
             management.setError(cause instanceof Error ? cause.message : '엑셀 양식을 다운로드하지 못했습니다.'));
         },
       },
@@ -212,6 +224,7 @@ export function ItemPriceByCustomerPage({
           detailFields={DETAIL_FIELDS}
           detailValues={detailValues}
           appliedDetailValues={appliedValues}
+          defaultValues={defaultValues}
           onDetailValuesChange={setDetailValues}
           onDetailSearch={(values) => { void searchCustomers(values); }}
           detailLoading={management.customersLoading}
@@ -249,6 +262,7 @@ export function ItemPriceByCustomerPage({
                   gridKey={management.gridKey}
                   gridRef={gridRef}
                   codeOptions={codeOptions}
+                  tradeType={tradeType}
                   fixedCustomer={fixedCustomer}
                   onChangesChange={management.handleChangesChange}
                 />
@@ -261,6 +275,7 @@ export function ItemPriceByCustomerPage({
           onClose={() => setImportOpen(false)}
           onStage={(rows) => { void addImportedRows(rows); }}
           codeOptions={codeOptions}
+          tradeType={tradeType}
           stageLabel="저장"
         />
         {confirmDialog}

@@ -3,43 +3,38 @@ import type { F1GridChanges } from '../../../../../shared/components/f1-grid';
 import { useNotification } from '../../../../../shared/context/notification';
 import { useInitialLoadState } from '../../../../../shared/hooks/useInitialLoadState';
 import { getSystemDate } from '../../../../../shared/services/systemDateService';
+import { DEFAULT_ITEM_TYPES } from '../data/priceSearchFields';
+import { fetchItemPartnerPrices } from '../services/itemPartnerPrice.service';
+import { buildMaterialPriceBatch } from '../services/itemPriceCustomerChanges';
 import { fetchItemPriceOverview, saveItemPriceOverviewBatch } from '../services/itemPriceOverview.service';
-import {
-  buildItemPriceBatch,
-  buildItemPriceRemoveBatch,
-  type ItemPriceRemoveMode,
-} from '../services/itemPriceOverviewChanges';
-import type { ItemPartnerPriceBatchSaveInfo } from '../types/itemPartnerPrice.types';
-import type {
-  ItemPriceOverviewFilters,
-  ItemPriceOverviewRow,
-  ItemPriceSideKey,
-} from '../types/itemPriceOverview.types';
+import { toItemPartnerPricePayload } from './useItemPartnerPriceManagement';
+import type { ItemPartnerPriceRow, ItemPartnerPriceTradeType } from '../types/itemPartnerPrice.types';
+import type { ItemPriceOverviewFilters, ItemPriceOverviewRow } from '../types/itemPriceOverview.types';
 
-export function useItemPriceOverview(initialFilters: ItemPriceOverviewFilters = {}) {
+/**
+ * 품목 기준 탭: 품목 목록(마스터)과 선택한 품목의 거래처별 단가(디테일). 저장은 기존 일괄 저장 API를 쓴다.
+ * 거래처 기준 탭과 같은 구조이며, 단가는 항상 거래처에 붙는다(공통단가 없음).
+ */
+export function useItemPriceOverview(tradeType: ItemPartnerPriceTradeType) {
   const { showSuccess } = useNotification();
-  const initialFiltersRef = useRef(initialFilters);
-  const [rows, setRows] = useState<ItemPriceOverviewRow[]>([]);
-  const rowsRef = useRef<ItemPriceOverviewRow[]>([]);
+  const initialFiltersRef = useRef<ItemPriceOverviewFilters>({ tradeType, itemTypes: DEFAULT_ITEM_TYPES[tradeType] });
+  const [items, setItems] = useState<ItemPriceOverviewRow[]>([]);
+  const [itemFilters, setItemFilters] = useState<ItemPriceOverviewFilters>(initialFiltersRef.current);
+  const [itemsLoading, setItemsLoading] = useState(true);
+  const [selected, setSelected] = useState<ItemPriceOverviewRow | null>(null);
+  const [rows, setRows] = useState<ItemPartnerPriceRow[]>([]);
+  const rowsRef = useRef<ItemPartnerPriceRow[]>([]);
+  const [rowsLoading, setRowsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [gridKey, setGridKey] = useState(0);
+  const [listKey, setListKey] = useState(0);
   const [today, setToday] = useState('');
-  const [appliedFilters, setAppliedFilters] = useState<ItemPriceOverviewFilters>(initialFilters);
   const savingRef = useRef(false);
-  const loadVersion = useRef(0);
+  const itemVersion = useRef(0);
+  const rowVersion = useRef(0);
   const { start, succeed, fail, ...initialLoad } = useInitialLoadState();
-
-  /** 서버가 매입 단가가 없어져 기본 거래처를 자동 해제한 품목이 있으면 저장 성공 메시지에 함께 안내한다. */
-  const savedMessage = useCallback((base: string, info: ItemPartnerPriceBatchSaveInfo) => {
-    const names = info.clearedDefaultMaterialIds
-      .map((id) => rowsRef.current.find((row) => row.parentId === null && row.materialId === id))
-      .map((row) => row?.materialName)
-      .filter(Boolean);
-    return names.length ? `${base} 기본 거래처가 해제되었습니다: ${names.join(', ')}` : base;
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -47,41 +42,69 @@ export function useItemPriceOverview(initialFilters: ItemPriceOverviewFilters = 
     return () => { active = false; };
   }, []);
 
-  const loadRows = useCallback(async (filters: ItemPriceOverviewFilters) => {
-    const version = ++loadVersion.current;
+  const loadItems = useCallback(async (filters: ItemPriceOverviewFilters) => {
+    const version = ++itemVersion.current;
     start();
-    setLoading(true);
+    setItemsLoading(true);
     setError('');
     try {
-      const nextRows = await fetchItemPriceOverview(filters);
-      if (version !== loadVersion.current) return false;
-      rowsRef.current = nextRows;
-      setRows(nextRows);
-      setHasChanges(false);
-      setGridKey((key) => key + 1);
+      const next = await fetchItemPriceOverview(filters);
+      if (version !== itemVersion.current) return next;
+      setItems(next);
+      setListKey((key) => key + 1);
       succeed();
-      return true;
+      return next;
     } catch (cause) {
-      if (version === loadVersion.current) {
+      if (version === itemVersion.current) {
         fail(cause);
-        setError(cause instanceof Error ? cause.message : '품목 기준 단가를 불러오지 못했습니다.');
+        setError(cause instanceof Error ? cause.message : '품목 목록을 불러오지 못했습니다.');
       }
-      return false;
+      return null;
     } finally {
-      if (version === loadVersion.current) setLoading(false);
+      if (version === itemVersion.current) setItemsLoading(false);
     }
   }, [start, succeed, fail]);
 
-  useEffect(() => {
-    const active = loadVersion;
-    void loadRows(initialFiltersRef.current);
-    return () => { ++active.current; };
-  }, [loadRows]);
+  const loadRows = useCallback(async (materialId: number) => {
+    const version = ++rowVersion.current;
+    setRowsLoading(true);
+    setError('');
+    try {
+      // 품목 단가는 현재 적용 중·예정만 보여 준다(과거 이력은 "단가 이력 조회" 탭).
+      const next = await fetchItemPartnerPrices({ materialId, useAt: 'Y', tradeType });
+      if (version !== rowVersion.current) return;
+      rowsRef.current = next;
+      setRows(next);
+      setHasChanges(false);
+      setGridKey((key) => key + 1);
+    } catch (cause) {
+      if (version === rowVersion.current) {
+        setError(cause instanceof Error ? cause.message : '품목 단가를 불러오지 못했습니다.');
+      }
+    } finally {
+      if (version === rowVersion.current) setRowsLoading(false);
+    }
+  }, [tradeType]);
 
-  const applyFilters = useCallback((filters: ItemPriceOverviewFilters) => {
+  useEffect(() => {
+    const active = itemVersion;
+    void loadItems(initialFiltersRef.current);
+    return () => { ++active.current; };
+  }, [loadItems]);
+
+  const searchItems = useCallback((filters: ItemPriceOverviewFilters) => {
     if (savingRef.current) return;
-    setAppliedFilters(filters);
-    void loadRows(filters);
+    const next = { ...filters, tradeType };
+    setItemFilters(next);
+    void loadItems(next);
+  }, [loadItems, tradeType]);
+
+  const selectItem = useCallback((item: ItemPriceOverviewRow | null) => {
+    setSelected(item);
+    rowsRef.current = [];
+    setRows([]);
+    setHasChanges(false);
+    if (item) void loadRows(item.materialId);
   }, [loadRows]);
 
   const discardChanges = useCallback(() => {
@@ -89,82 +112,64 @@ export function useItemPriceOverview(initialFilters: ItemPriceOverviewFilters = 
     setGridKey((key) => key + 1);
   }, []);
 
-  const handleChangesChange = useCallback((changes: F1GridChanges<ItemPriceOverviewRow>) => {
+  const handleChangesChange = useCallback((changes: F1GridChanges<ItemPartnerPriceRow>) => {
     setHasChanges(Boolean(
       changes.insertedRows.length || changes.updatedRows.length || changes.deletedRows.length,
     ));
   }, []);
 
-  const saveChanges = useCallback(async (changes: F1GridChanges<ItemPriceOverviewRow>) => {
-    if (savingRef.current) return;
+  /** 저장 뒤 목록(거래처 수·기본 거래처)을 다시 읽고 선택 품목의 단가도 다시 읽는다. */
+  const refreshAfterSave = useCallback(async () => {
+    await loadItems(itemFilters);
+    if (selected) await loadRows(selected.materialId);
+  }, [itemFilters, selected, loadItems, loadRows]);
+
+  const saveChanges = useCallback(async (changes: F1GridChanges<ItemPartnerPriceRow>) => {
+    if (savingRef.current || !selected) return;
     savingRef.current = true;
     setSaving(true);
     setError('');
     try {
-      if (changes.deletedRows.length) throw new Error('단가 삭제는 지원하지 않습니다.');
-      const batch = buildItemPriceBatch(changes, rowsRef.current, today);
-      if (!batch.prices.insertedRows.length && !batch.prices.updatedRows.length) {
+      const batch = buildMaterialPriceBatch(changes, rowsRef.current, selected.materialId, today);
+      if (!batch.prices.insertedRows.length && !batch.prices.updatedRows.length && !batch.prices.deletedRows.length) {
         throw new Error('저장할 단가 변경 사항이 없습니다.');
       }
-      const info = await saveItemPriceOverviewBatch(batch);
-      showSuccess(savedMessage('단가를 저장했습니다.', info));
-      await loadRows(appliedFilters);
+      await saveItemPriceOverviewBatch(batch);
+      showSuccess('단가를 저장했습니다.');
+      await refreshAfterSave();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '단가를 저장하지 못했습니다.');
     } finally {
       savingRef.current = false;
       setSaving(false);
     }
-  }, [today, appliedFilters, loadRows, showSuccess, savedMessage]);
+  }, [selected, today, showSuccess, refreshAfterSave]);
 
-  /** 선택한 행의 구분별 단가를 삭제(오등록 정정) 또는 미사용 처리하고 다시 조회한다. */
-  const removePrices = useCallback(async (
-    row: ItemPriceOverviewRow,
-    sides: ItemPriceSideKey[],
-    mode: ItemPriceRemoveMode,
-  ) => {
+  /** 엑셀로 검증을 통과한 신규 단가를 바로 저장한다(품목·거래처코드는 엑셀 값을 그대로 쓴다). */
+  const saveImportedRows = useCallback(async (imported: ItemPartnerPriceRow[]) => {
     if (savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
     setError('');
     try {
-      const batch = buildItemPriceRemoveBatch(row, sides, mode);
-      const info = await saveItemPriceOverviewBatch(batch);
-      showSuccess(savedMessage(mode === 'delete' ? '단가를 삭제했습니다.' : '단가를 미사용 처리했습니다.', info));
-      await loadRows(appliedFilters);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '단가를 처리하지 못했습니다.');
-    } finally {
-      savingRef.current = false;
-      setSaving(false);
-    }
-  }, [appliedFilters, loadRows, showSuccess, savedMessage]);
-
-  /** 엑셀 업로드로 값이 바뀐 품목 행을 같은 규칙으로 저장하고 다시 조회한다. */
-  const applyImport = useCallback(async (updatedRows: ItemPriceOverviewRow[]) => {
-    if (savingRef.current) return;
-    savingRef.current = true;
-    setSaving(true);
-    setError('');
-    try {
-      const batch = buildItemPriceBatch(
-        { insertedRows: [], updatedRows, deletedRows: [] }, rowsRef.current, today,
-      );
-      const info = await saveItemPriceOverviewBatch(batch);
-      showSuccess(savedMessage(`엑셀의 단가 ${batch.prices.insertedRows.length + batch.prices.updatedRows.length}건을 저장했습니다.`, info));
-      await loadRows(appliedFilters);
+      const insertedRows = imported.map((row) => ({
+        ...toItemPartnerPricePayload(row),
+        priceId: String(row.priceId),
+      }));
+      await saveItemPriceOverviewBatch({ prices: { insertedRows, updatedRows: [], deletedRows: [] } });
+      showSuccess(`엑셀의 단가 ${insertedRows.length}건을 저장했습니다.`);
+      await refreshAfterSave();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '엑셀 단가를 저장하지 못했습니다.');
     } finally {
       savingRef.current = false;
       setSaving(false);
     }
-  }, [today, appliedFilters, loadRows, showSuccess, savedMessage]);
+  }, [showSuccess, refreshAfterSave]);
 
   return {
-    applyImport,
-    removePrices,
-    initialLoad, rows, error, setError, loading, saving, hasChanges, gridKey, today,
-    appliedFilters, applyFilters, discardChanges, handleChangesChange, saveChanges,
+    initialLoad, items, itemFilters, itemsLoading, selected, rows, rowsLoading,
+    error, setError, saving, hasChanges, gridKey, listKey, today,
+    searchItems, selectItem, discardChanges, handleChangesChange, saveChanges, saveImportedRows,
   };
 }

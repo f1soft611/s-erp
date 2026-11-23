@@ -156,6 +156,38 @@ class ItemPartnerPriceBatchServiceImplTest {
     }
 
     @Test
+    void rejectsPurchaseItemsWithTwoOrMoreCustomersAndNoDefaultSupplier() throws Exception {
+        when(service.createPrice(eq(9L), eq("101"), any())).thenReturn(new ItemPartnerPriceVO());
+        when(service.updatePrice(eq(9L), eq("101"), eq(12L), any())).thenReturn(new ItemPartnerPriceVO());
+        when(defaultSuppliers.findMaterialsMissingDefaultSupplier(eq(9L), any()))
+                .thenReturn(Arrays.asList("A001 밀가루", "A002 설탕", "A003 소금", "A004 후추"));
+
+        assertThatThrownBy(() -> batch.saveBatch(9L, "101", request()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("기본 거래처를 지정")
+                .hasMessageContaining("A001 밀가루").hasMessageContaining("A003 소금")
+                .hasMessageContaining("외 1건").hasMessageNotContaining("A004");
+        verify(defaultSuppliers).findMaterialsMissingDefaultSupplier(eq(9L), argThat(ids -> ids.contains(101L)));
+    }
+
+    @Test
+    void checksOnlyPurchaseMaterialsForTheDefaultSupplierRule() throws Exception {
+        when(service.createPrice(eq(9L), eq("101"), any())).thenReturn(new ItemPartnerPriceVO());
+        when(service.updatePrice(eq(9L), eq("101"), eq(12L), any())).thenReturn(new ItemPartnerPriceVO());
+        when(defaultSuppliers.findMaterialIdsByPriceIds(eq(9L), any(), eq("매입")))
+                .thenReturn(Collections.singletonList(300L));
+        ItemPartnerPriceBatchSaveRequestVO request = request();
+        request.getPrices().getInsertedRows().get(0).setTradeType("매출");
+        request.getPrices().getUpdatedRows().get(0).setTradeType("매출");
+
+        batch.saveBatch(9L, "101", request);
+
+        // 매출 행의 품목(101)은 제외되고, 삭제·수정되는 저장된 매입 단가의 품목(300)만 검증 대상이다.
+        verify(defaultSuppliers).findMaterialsMissingDefaultSupplier(eq(9L), argThat(ids ->
+                ids.size() == 1 && ids.contains(300L)));
+    }
+
+    @Test
     void falseFlagClearsOnlyWhenNoOtherSupplierIsBeingSet() throws Exception {
         when(service.createPrice(eq(9L), eq("101"), any())).thenReturn(new ItemPartnerPriceVO());
         when(service.updatePrice(eq(9L), eq("101"), eq(12L), any())).thenReturn(new ItemPartnerPriceVO());

@@ -272,7 +272,7 @@ class PurchaseRequestConfirmServiceImplTest {
         Map<Long, ItemPriceLookupVO> defaults = new HashMap<Long, ItemPriceLookupVO>();
         defaults.put(100L, found);
         LocalDate baseDt = LocalDate.of(2026, 11, 20);
-        when(priceLookupService.findDefaultSupplierPrices(eq(TENANT), any(Collection.class), eq(baseDt)))
+        when(priceLookupService.findPurchasePrices(eq(TENANT), any(Collection.class), eq(baseDt)))
                 .thenReturn(defaults);
         when(dao.selectDetailLocks(anyMap())).thenReturn(Arrays.asList(lock(51L, 5L, null), lock(61L, 6L, null),
                 lock(62L, 6L, null)));
@@ -289,7 +289,7 @@ class PurchaseRequestConfirmServiceImplTest {
         assertThat(result.get(1).getUnitPrice()).isNull();
         assertThat(result.get(2).getSupplierId()).isNull();
         ArgumentCaptor<Collection<Long>> materialIds = ArgumentCaptor.forClass((Class) Collection.class);
-        verify(priceLookupService).findDefaultSupplierPrices(eq(TENANT), materialIds.capture(), eq(baseDt));
+        verify(priceLookupService).findPurchasePrices(eq(TENANT), materialIds.capture(), eq(baseDt));
         assertThat(materialIds.getValue()).containsExactlyInAnyOrder(100L, 200L);
     }
 

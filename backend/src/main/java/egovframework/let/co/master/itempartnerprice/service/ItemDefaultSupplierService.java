@@ -17,6 +17,15 @@ public interface ItemDefaultSupplierService {
     /** 단가 ID들이 속한 품목 ID를 돌려준다. */
     List<Long> findMaterialIdsByPriceIds(Long tenantId, Collection<Long> priceIds) throws Exception;
 
+    /** 단가 ID들의 품목 ID 중 저장된 거래구분이 일치하는 행의 품목만. tradeType이 비면 전체. */
+    List<Long> findMaterialIdsByPriceIds(Long tenantId, Collection<Long> priceIds, String tradeType) throws Exception;
+
+    /**
+     * 사용 중 매입 단가 거래처가 2곳 이상인데 기본 거래처가 없는 품목을 "품목코드 품목명" 목록으로 돌려준다(저장 검증용).
+     * 없으면 빈 목록이다.
+     */
+    List<String> findMaterialsMissingDefaultSupplier(Long tenantId, Collection<Long> materialIds) throws Exception;
+
     /** 품목별 현재 기본 거래처 ID(품목 ID → 거래처 ID)를 돌려준다. */
     Map<Long, Long> findDefaultSupplierIds(Long tenantId, Collection<Long> materialIds) throws Exception;
 

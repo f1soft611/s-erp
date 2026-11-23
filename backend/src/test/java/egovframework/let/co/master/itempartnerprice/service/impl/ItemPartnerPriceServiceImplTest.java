@@ -136,13 +136,11 @@ class ItemPartnerPriceServiceImplTest {
     }
 
     @Test
-    void createWithoutCustomerSavesDefaultPriceAndSkipsCustomerLookup() throws Exception {
-        stubCreate();
+    void createRequiresACustomerBecauseCommonPricesAreRetired() throws Exception {
+        assertThatThrownBy(() -> service.createPrice(9L, "00101", validPayload(101L, null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("거래처");
 
-        service.createPrice(9L, "00101", validPayload(101L, null));
-
-        verify(dao, never()).selectActiveCustomer(anyMap());
-        verify(dao).insertItemPartnerPrice(argThat(params -> params.get("customerId") == null));
+        verify(dao, never()).insertItemPartnerPrice(anyMap());
     }
 
     @Test
@@ -331,7 +329,7 @@ class ItemPartnerPriceServiceImplTest {
     }
 
     @Test
-    void importAllowsBlankCustomerCodeAsDefaultPriceAndValidatesNewFields() throws Exception {
+    void importRejectsBlankCustomerCodeAndValidatesNewFields() throws Exception {
         ItemPartnerPriceImportRowVO blank = row(2);
         blank.setCustomerCode("");
         ItemPartnerPriceImportResolutionVO resolution = resolved(2);
@@ -348,7 +346,7 @@ class ItemPartnerPriceServiceImplTest {
         ItemPartnerPriceImportValidationVO result =
                 service.validateImport(9L, java.util.Arrays.asList(blank, bad));
 
-        assertThat(result.getRows().get(0).getErrors()).isEmpty();
+        assertThat(result.getRows().get(0).getErrors()).extracting("code").contains("INVALID_CUSTOMER_CODE");
         assertThat(result.getRows().get(1).getErrors()).extracting("code")
                 .contains("INVALID_CURRENCY", "INVALID_VAT_INCLUDED_AT");
     }

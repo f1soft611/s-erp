@@ -79,7 +79,7 @@ class ItemPriceLookupServiceImplTest {
     }
 
     @Test
-    void defaultSupplierWithoutValidPriceKeepsOnlyTheSupplier() throws Exception {
+    void purchaseSupplierWithoutValidPriceKeepsOnlyTheSupplier() throws Exception {
         ItemPriceLookupVO withPrice = new ItemPriceLookupVO();
         withPrice.setMaterialId(100L);
         withPrice.setSupplierId(7L);
@@ -91,9 +91,9 @@ class ItemPriceLookupServiceImplTest {
         noPrice.setSupplierId(8L);
         noPrice.setSupplierName("공급사8");
         noPrice.setOrderType("STALE");
-        when(dao.selectDefaultSupplierPrices(anyMap())).thenReturn(Arrays.asList(withPrice, noPrice));
+        when(dao.selectPurchasePrices(anyMap())).thenReturn(Arrays.asList(withPrice, noPrice));
 
-        Map<Long, ItemPriceLookupVO> result = service.findDefaultSupplierPrices(TENANT, Arrays.asList(100L, 200L, 300L), BASE);
+        Map<Long, ItemPriceLookupVO> result = service.findPurchasePrices(TENANT, Arrays.asList(100L, 200L, 300L), BASE);
 
         assertThat(result).containsOnlyKeys(100L, 200L);
         assertThat(result.get(100L).getCurrency()).isEqualTo("KRW");
@@ -106,10 +106,10 @@ class ItemPriceLookupServiceImplTest {
 
     @Test
     void emptyMaterialListSkipsTheQuery() throws Exception {
-        assertThat(service.findDefaultSupplierPrices(TENANT, Collections.<Long>emptyList(), BASE)).isEmpty();
-        assertThat(service.findDefaultSupplierPrices(TENANT, Arrays.asList((Long) null, 0L), BASE)).isEmpty();
+        assertThat(service.findPurchasePrices(TENANT, Collections.<Long>emptyList(), BASE)).isEmpty();
+        assertThat(service.findPurchasePrices(TENANT, Arrays.asList((Long) null, 0L), BASE)).isEmpty();
         verifyNoInteractions(dao);
-        assertThatThrownBy(() -> service.findDefaultSupplierPrices(TENANT, Arrays.asList(1L), null))
+        assertThatThrownBy(() -> service.findPurchasePrices(TENANT, Arrays.asList(1L), null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

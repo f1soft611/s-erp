@@ -67,11 +67,18 @@ public class ItemPartnerPriceBatchServiceImpl implements ItemPartnerPriceBatchSe
         for (ItemPartnerPriceChangeVO row : changes.getDeletedRows()) existingPriceIds.add(parsePriceId(row.getPriceId()));
         for (ItemPartnerPriceChangeVO row : changes.getUpdatedRows()) existingPriceIds.add(parsePriceId(row.getPriceId()));
         touchedMaterialIds.addAll(defaultSupplierService.findMaterialIdsByPriceIds(tenantId, existingPriceIds));
+        // 기본 거래처 필수 검증 대상: 매입 단가가 바뀌는 품목(저장된 거래구분 또는 요청 거래구분이 매입)
+        Set<Long> purchaseMaterialIds = new LinkedHashSet<Long>(
+                defaultSupplierService.findMaterialIdsByPriceIds(tenantId, existingPriceIds, PURCHASE));
         for (ItemPartnerPriceChangeVO row : changes.getInsertedRows()) {
-            if (row.getMaterialId() != null) touchedMaterialIds.add(row.getMaterialId());
+            if (row.getMaterialId() == null) continue;
+            touchedMaterialIds.add(row.getMaterialId());
+            if (isPurchase(row)) purchaseMaterialIds.add(row.getMaterialId());
         }
         for (ItemPartnerPriceChangeVO row : changes.getUpdatedRows()) {
-            if (row.getMaterialId() != null) touchedMaterialIds.add(row.getMaterialId());
+            if (row.getMaterialId() == null) continue;
+            touchedMaterialIds.add(row.getMaterialId());
+            if (isPurchase(row)) purchaseMaterialIds.add(row.getMaterialId());
         }
 
         ItemPartnerPriceBatchSaveResultVO result = new ItemPartnerPriceBatchSaveResultVO();
@@ -109,8 +116,28 @@ public class ItemPartnerPriceBatchServiceImpl implements ItemPartnerPriceBatchSe
 
         applyDefaultSupplierChanges(tenantId, actor, changes, setDefaults);
         result.getClearedDefaultMaterialIds().addAll(defaultSupplierService.clearOrphans(tenantId, touchedMaterialIds));
+        requireDefaultSupplierForMultiCustomer(tenantId, purchaseMaterialIds);
         refreshDefaultSupplierFlags(tenantId, result.getPrices());
         return result;
+    }
+
+    private boolean isPurchase(ItemPartnerPriceChangeVO row) {
+        return row.getTradeType() != null && PURCHASE.equals(row.getTradeType().trim());
+    }
+
+    /** 저장 반영 뒤 매입 단가 거래처가 2곳 이상인 품목은 기본 거래처가 있어야 한다. 위반하면 저장 전체를 되돌린다. */
+    private void requireDefaultSupplierForMultiCustomer(Long tenantId, Set<Long> purchaseMaterialIds)
+            throws Exception {
+        List<String> missing = defaultSupplierService.findMaterialsMissingDefaultSupplier(tenantId, purchaseMaterialIds);
+        if (missing.isEmpty()) return;
+        StringBuilder names = new StringBuilder();
+        for (int i = 0; i < missing.size() && i < 3; i++) {
+            if (i > 0) names.append(", ");
+            names.append(missing.get(i));
+        }
+        if (missing.size() > 3) names.append(" 외 ").append(missing.size() - 3).append("건");
+        throw new IllegalArgumentException(
+                "매입 거래처가 2곳 이상인 품목은 기본 거래처를 지정해야 합니다: " + names);
     }
 
     /**

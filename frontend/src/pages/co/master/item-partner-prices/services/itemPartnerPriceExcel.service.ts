@@ -5,6 +5,8 @@ import {
 
 export type ItemPartnerPriceCodeOption = { value: string; label: string };
 export type ItemPartnerPriceExcelOptions = {
+  /** 화면의 거래구분. 지정하면 양식 열(매출은 발주구분·기본거래처 없음)과 행 거래구분 검증을 그 구분에 맞춘다. */
+  tradeType?: '매입' | '매출';
   taxTypes?: ItemPartnerPriceCodeOption[];
   currencies?: ItemPartnerPriceCodeOption[];
   orderTypes?: ItemPartnerPriceCodeOption[];
@@ -51,16 +53,22 @@ function toCode(raw: string, options?: ItemPartnerPriceCodeOption[]): string {
   return byLabel ? byLabel.value : value;
 }
 
-function rowErrors(row: ItemPartnerPriceImportRow): string[] {
+function headersFor(tradeType?: '매입' | '매출'): string[] {
+  return tradeType === '매출' ? itemPartnerPriceHeaders.slice(0, 12) : [...itemPartnerPriceHeaders];
+}
+
+function rowErrors(row: ItemPartnerPriceImportRow, screenTradeType?: '매입' | '매출'): string[] {
   const errors: string[] = [];
   if (row.tradeType !== '매입' && row.tradeType !== '매출') {
     errors.push('거래구분은 매입 또는 매출이어야 합니다.');
+  } else if (screenTradeType && row.tradeType !== screenTradeType) {
+    errors.push(`이 화면은 ${screenTradeType} 단가만 등록할 수 있습니다.`);
   }
   if (!row.materialCode || row.materialCode.length > 20) {
     errors.push('품목코드는 텍스트로 입력해 주세요(최대 20자).');
   }
-  if (row.customerCode.length > 20) {
-    errors.push('거래처코드는 텍스트로 입력해 주세요(최대 20자). 비우면 품목 공통단가로 등록됩니다.');
+  if (!row.customerCode || row.customerCode.length > 20) {
+    errors.push('거래처코드는 텍스트로 입력해 주세요(최대 20자). 단가는 거래처별로 등록합니다.');
   }
   if (!row.unitPrice && !row.foreignUnitPrice) {
     errors.push('원화단가 또는 외화단가를 입력해 주세요.');
@@ -103,14 +111,15 @@ function rowErrors(row: ItemPartnerPriceImportRow): string[] {
 
 export function validateItemPartnerPriceImportRows(
   input: ItemPartnerPriceImportRow[],
+  tradeType?: '매입' | '매출',
 ): ItemPartnerPriceImportRow[] {
-  const rows = input.map((row) => ({ ...row, errors: rowErrors(row) }));
+  const rows = input.map((row) => ({ ...row, errors: rowErrors(row, tradeType) }));
   const seen = new Set<string>();
   for (const row of rows) {
     if (row.materialCode &&
         (row.tradeType === '매입' || row.tradeType === '매출') &&
         isValidDate(row.startDt)) {
-      const key = `${row.materialCode}|${row.customerCode || 'default'}|${row.tradeType}|${row.startDt}`;
+      const key = `${row.materialCode}|${row.customerCode}|${row.tradeType}|${row.startDt}`;
       if (seen.has(key)) row.errors.push('파일 내 다른 행과 같은 단가 키가 중복되었습니다.');
       else seen.add(key);
     }
@@ -124,14 +133,14 @@ export async function createItemPartnerPriceTemplateBlob(
   const ExcelJS = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('품목거래처별단가');
-  sheet.addRow([...itemPartnerPriceHeaders]);
+  sheet.addRow(headersFor(options.tradeType));
   sheet.views = [{ state: 'frozen', ySplit: 1 }];
   sheet.columns = [
     { width: 14 }, { width: 18, style: { numFmt: '@' } },
     { width: 18, style: { numFmt: '@' } }, { width: 16 },
     { width: 14 }, { width: 14 }, { width: 14 }, { width: 10 },
     { width: 16 }, { width: 16 }, { width: 18 }, { width: 12 },
-    { width: 14 }, { width: 14 },
+    ...(options.tradeType === '매출' ? [] : [{ width: 14 }, { width: 14 }]),
   ];
   const header = sheet.getRow(1);
   header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -141,7 +150,7 @@ export async function createItemPartnerPriceTemplateBlob(
     ['항목', '입력 안내'],
     ['거래구분', '매입 또는 매출'],
     ['품목코드 / 거래처코드', '코드는 텍스트 형식으로 입력하여 앞자리 0을 보존합니다.'],
-    ['거래처코드 비움', '거래처코드를 비우면 해당 품목의 공통단가(거래처 공통)로 등록됩니다. 특별 거래처만 거래처코드를 입력하세요.'],
+    ['거래처코드 필수', '단가는 항상 거래처에 붙습니다. 품목마다 단가를 등록할 거래처코드를 입력하세요.'],
     ['단가', '원화단가입니다. 0 이상, 정수부 13자리 이하, 소수 둘째 자리까지 입력합니다.'],
     ['부가세구분', `${labelList(options.taxTypes) || '공통코드 PURCHASE_TAX_TYPE'} 중 이름 또는 코드. 공란이면 과세(TAXABLE)입니다.`],
     ['부가세포함', 'Y 또는 N. 공란이면 N입니다.'],
@@ -149,11 +158,15 @@ export async function createItemPartnerPriceTemplateBlob(
     ['최소주문수량', '0 이상, 정수부 13자리 이하, 소수 둘째 자리까지 입력합니다.'],
     ['적용 시작일 / 적용 종료일', 'YYYY-MM-DD 또는 Excel 날짜 셀로 입력합니다. 종료일은 시작일보다 빠를 수 없습니다.'],
     ['사용여부', 'Y 또는 N. 공란이면 Y로 처리합니다.'],
-    ['발주구분', `매입 단가에만 입력합니다. ${labelList(options.orderTypes) || '공통코드 PURCHASE_ORDER_TYPE'} 중 이름 또는 코드. 공란이면 비워 둡니다.`],
-    ['기본거래처', 'Y이면 그 품목의 매입 기본 거래처로 지정합니다(거래처가 있는 매입 단가만, 품목당 한 거래처). 공란 또는 N이면 기본 거래처를 바꾸지 않습니다.'],
     ['등록 방식', '검증 오류가 한 행이라도 있으면 전체 행을 추가할 수 없습니다. 기존 단가 수정/업서트는 지원하지 않습니다.'],
-    ['적용 기간', '같은 품목·거래처(또는 기본)·거래구분에서 기간이 겹치면 저장되지 않습니다. 종료일이 없는 직전 단가는 새 적용시작일 전날로 자동 종료됩니다.'],
+    ['적용 기간', '같은 품목·거래처·거래구분에서 기간이 겹치면 저장되지 않습니다. 종료일이 없는 직전 단가는 새 적용시작일 전날로 자동 종료됩니다.'],
   ].forEach((row) => guide.addRow(row));
+  if (options.tradeType !== '매출') {
+    [
+      ['발주구분', `매입 단가에만 입력합니다. ${labelList(options.orderTypes) || '공통코드 PURCHASE_ORDER_TYPE'} 중 이름 또는 코드. 공란이면 비워 둡니다.`],
+      ['기본거래처', 'Y이면 그 품목의 매입 기본 거래처로 지정합니다(품목당 한 거래처). 한 품목의 거래처가 2곳 이상이면 기본 거래처가 반드시 있어야 하며, 공란 또는 N이면 기본 거래처를 바꾸지 않습니다.'],
+    ].forEach((row) => guide.addRow(row));
+  }
   guide.getRow(1).font = { bold: true };
   guide.columns = [{ width: 24 }, { width: 92 }];
   const buffer = await workbook.xlsx.writeBuffer();
@@ -240,11 +253,11 @@ export async function parseItemPartnerPriceWorkbook(
       defaultSupplier: cellValue(defaultSupplier).toUpperCase(),
       errors: [],
     };
-    row.errors = rowErrors(row);
+    row.errors = rowErrors(row, options.tradeType);
     rows.push(row);
   }
   if (!rows.length) throw new Error('엑셀에 검증할 단가 행이 없습니다.');
   if (rows.length > maxRows) throw new Error('엑셀은 한 번에 1,000행까지 등록할 수 있습니다.');
 
-  return validateItemPartnerPriceImportRows(rows);
+  return validateItemPartnerPriceImportRows(rows, options.tradeType);
 }

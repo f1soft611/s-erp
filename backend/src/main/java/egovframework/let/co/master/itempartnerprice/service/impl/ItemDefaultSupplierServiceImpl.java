@@ -35,6 +35,32 @@ public class ItemDefaultSupplierServiceImpl implements ItemDefaultSupplierServic
 
     @Override
     public List<Long> findMaterialIdsByPriceIds(Long tenantId, Collection<Long> priceIds) throws Exception {
+        return findMaterialIdsByPriceIds(tenantId, priceIds, null);
+    }
+
+    @Override
+    public List<String> findMaterialsMissingDefaultSupplier(Long tenantId, Collection<Long> materialIds)
+            throws Exception {
+        requireTenant(tenantId);
+        List<String> labels = new ArrayList<String>();
+        Set<Long> ids = positive(materialIds);
+        if (ids.isEmpty()) {
+            return labels;
+        }
+        Map<String, Object> params = tenantParams(tenantId);
+        params.put("materialIds", ids);
+        List<ItemPriceOverviewRowVO> rows = dao.selectMaterialsMissingDefaultSupplier(params);
+        if (rows != null) {
+            for (ItemPriceOverviewRowVO row : rows) {
+                labels.add(row.getMaterialCode() + " " + row.getMaterialName());
+            }
+        }
+        return labels;
+    }
+
+    @Override
+    public List<Long> findMaterialIdsByPriceIds(Long tenantId, Collection<Long> priceIds, String tradeType)
+            throws Exception {
         requireTenant(tenantId);
         Set<Long> ids = positive(priceIds);
         if (ids.isEmpty()) {
@@ -42,6 +68,9 @@ public class ItemDefaultSupplierServiceImpl implements ItemDefaultSupplierServic
         }
         Map<String, Object> params = tenantParams(tenantId);
         params.put("priceIds", ids);
+        if (StringUtils.hasText(tradeType)) {
+            params.put("tradeType", tradeType.trim());
+        }
         List<Long> found = dao.selectMaterialIdsByPriceIds(params);
         return found == null ? new ArrayList<Long>() : found;
     }

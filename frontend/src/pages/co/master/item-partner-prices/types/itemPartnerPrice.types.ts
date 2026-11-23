@@ -8,8 +8,12 @@ export type ItemPartnerPriceFilters = {
   useAt?: ItemPartnerPriceUseAt | '';
   /** true면 종료된 과거 단가도 조회한다. 기본은 현재 적용·예정 단가만. */
   includeHistory?: boolean;
-  /** 지정하면 그 거래처의 단가만(공통단가 제외) 조회한다. */
+  /** 지정하면 그 거래처의 단가만 조회한다. */
   customerId?: number;
+  /** 지정하면 그 품목의 단가만 조회한다. */
+  materialId?: number;
+  /** 품목 계정분류 코드(쉼표 구분). 비우면 전체. */
+  itemTypes?: string;
 };
 
 /** 현재(적용 중)·예정·과거(종료). 과거 행은 수정할 수 없다. */
@@ -21,7 +25,7 @@ export type ItemPartnerPriceRow = {
   materialId: number | null;
   materialCode: string;
   materialName: string;
-  /** null이면 품목 공통단가(거래처 공통). */
+  /** 저장된 단가는 항상 거래처가 있다. 새 행은 거래처를 고르기 전까지 null이다. */
   customerId: number | null;
   customerCode: string;
   customerName: string;

@@ -20,4 +20,10 @@ public class ItemPartnerPriceSearchCondition {
     private Long customerId;
     @Schema(description = "사용여부 Y/N")
     private String useAt;
+
+    @Schema(description = "품목 내부 ID. 지정하면 그 품목의 단가만")
+    private Long materialId;
+
+    @Schema(description = "품목 계정분류 코드(쉼표 구분: PRODUCT, SEMI, GOODS, RAW, SUB, SUPPLY). 비우면 전체", example = "RAW,SUB,SUPPLY")
+    private String itemTypes;
 }

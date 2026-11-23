@@ -33,6 +33,11 @@ export type PageSearchField = {
   required?: boolean;
   /** false이면 select 필드의 빈 값 "전체" 선택지를 숨긴다. */
   allowEmpty?: boolean;
+  /**
+   * true이면 select 필드를 여러 개 고를 수 있다. 값은 선택한 option.value를 쉼표(,)로 이은 문자열이고
+   * 아무것도 고르지 않으면 빈 문자열(전체)이다. option.value에는 쉼표를 쓰지 않는다.
+   */
+  multiple?: boolean;
   defaultValue?: F1GridDateRangeDefault;
   inputFormat?: F1GridInputFormat;
   sanitizeInput?: (value: string) => string;
