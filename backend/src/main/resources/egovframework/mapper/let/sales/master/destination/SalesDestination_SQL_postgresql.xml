@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="SalesDestinationDAO">
+    <sql id="columns">
+        sales_destination_id AS salesDestinationId, customer_id AS customerId,
+        destination_code AS destinationCode, destination_name AS destinationName,
+        business_no AS businessNo, address, contact_name AS contactName,
+        mobile_no AS mobileNo, telephone_no AS telephoneNo,
+        facsimile_no AS facsimileNo, remark
+    </sql>
+    <select id="customerExists" parameterType="map" resultType="boolean">
+        SELECT EXISTS (SELECT 1 FROM tb_customer_info
+            WHERE tenant_id = #{tenantId} AND customer_id = #{customerId})
+    </select>
+    <select id="customers" parameterType="map" resultType="egovframework.let.sales.master.destination.domain.model.SalesDestinationCustomerVO">
+        SELECT c.customer_id AS customerId, c.customer_code AS customerCode,
+            c.customer_name AS customerName,
+            EXISTS (SELECT 1 FROM tb_sales_destination d
+                    WHERE d.tenant_id = c.tenant_id AND d.customer_id = c.customer_id) AS hasDestination
+        FROM tb_customer_info c
+        WHERE c.tenant_id = #{tenantId}
+        <if test="keyword != null">
+            AND (c.customer_code ILIKE CONCAT('%', #{keyword}, '%')
+                OR c.customer_name ILIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY c.customer_code
+    </select>
+    <select id="list" parameterType="map" resultType="egovframework.let.sales.master.destination.domain.model.SalesDestinationVO">
+        SELECT <include refid="columns"/> FROM tb_sales_destination
+        WHERE tenant_id = #{tenantId} AND customer_id = #{customerId}
+        ORDER BY destination_code
+    </select>
+    <select id="find" parameterType="map" resultType="egovframework.let.sales.master.destination.domain.model.SalesDestinationVO">
+        SELECT <include refid="columns"/> FROM tb_sales_destination
+        WHERE tenant_id = #{tenantId} AND sales_destination_id = #{id}
+    </select>
+    <select id="insert" parameterType="map" resultType="long">
+        INSERT INTO tb_sales_destination
+            (tenant_id, customer_id, destination_code, destination_name, business_no,
+             address, contact_name, mobile_no, telephone_no, facsimile_no, remark, created_by)
+        VALUES
+            (#{tenantId}, #{customerId}, #{destinationCode}, #{destinationName}, #{businessNo},
+             #{address}, #{contactName}, #{mobileNo}, #{telephoneNo}, #{facsimileNo}, #{remark}, #{userId})
+        RETURNING sales_destination_id
+    </select>
+    <update id="update" parameterType="map">
+        UPDATE tb_sales_destination SET destination_name = #{destinationName}, business_no = #{businessNo},
+            address = #{address}, contact_name = #{contactName}, mobile_no = #{mobileNo},
+            telephone_no = #{telephoneNo}, facsimile_no = #{facsimileNo}, remark = #{remark},
+            updated_by = #{userId}, updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId} AND sales_destination_id = #{id} AND customer_id = #{customerId}
+    </update>
+    <select id="countOrders" parameterType="map" resultType="int">
+        SELECT COUNT(*) FROM tb_sales_order_hd
+        WHERE tenant_id = #{tenantId} AND sales_destination_id = #{id}
+    </select>
+    <delete id="delete" parameterType="map">
+        DELETE FROM tb_sales_destination
+        WHERE tenant_id = #{tenantId} AND sales_destination_id = #{id}
+    </delete>
+</mapper>

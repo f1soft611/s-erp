@@ -29,6 +29,7 @@ import { ItemPartnerPriceManagementPage } from '../../co/master/item-partner-pri
 import { WorkStandardRecipePage } from '../../co/work-standard/recipe/WorkStandardRecipePage';
 import { ProcessManagementPage } from '../../pr/process/ProcessManagementPage';
 import { SalesOrderCreatePage } from '../../sales/order/create/SalesOrderCreatePage';
+import { SalesDestinationPage } from '../../sales/master/destination/SalesDestinationPage';
 import { SalesOrderStatusPage } from '../../sales/order/status/SalesOrderStatusPage';
 import { QuotationCreatePage } from '../../sales/quotation/create/QuotationCreatePage';
 import { QuotationStatusPage } from '../../sales/quotation/status/QuotationStatusPage';
@@ -196,6 +197,11 @@ export function DashboardContent({
 }: DashboardContentProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+
+  if (selectedModule.id === 'sales' && currentPageKey === 'destinations') {
+    return <SalesDestinationPage selectedModule={selectedModule} currentMenuName={currentMenuName}
+      content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
+  }
 
   if (selectedModule.id === 'pr' && currentPageKey === 'process-management') {
     return <ProcessManagementPage selectedModule={selectedModule} currentMenuName={currentMenuName}

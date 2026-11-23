@@ -20,7 +20,7 @@ const SALES_ORDER_PATH = '/api/v1/sales/orders';
 const MAX_NUMERIC_15_2 = 9_999_999_999_999.99;
 
 export function validateSalesOrderInput(
-  input: Pick<SalesOrderCreateInput, 'orderDt' | 'deliveryDt' | 'customerId' | 'details'>,
+  input: Pick<SalesOrderCreateInput, 'orderDt' | 'deliveryDt' | 'customerId' | 'salesDestinationId' | 'billingCustomerId' | 'details'>,
 ): SalesOrderValidationErrors {
   const errors: SalesOrderValidationErrors = { detailRows: {}, detailMessages: [] };
 
@@ -36,6 +36,12 @@ export function validateSalesOrderInput(
     input.customerId < 1
   ) {
     errors.customerId = '거래처를 선택해 주세요.';
+  }
+  if (!Number.isSafeInteger(input.salesDestinationId) || (input.salesDestinationId ?? 0) < 1) {
+    errors.salesDestinationId = '납품처를 선택해 주세요.';
+  }
+  if (!Number.isSafeInteger(input.billingCustomerId) || (input.billingCustomerId ?? 0) < 1) {
+    errors.billingCustomerId = '매출처를 선택해 주세요.';
   }
   if (input.details.length === 0) {
     errors.details = '품목 상세를 1건 이상 입력해 주세요.';
@@ -84,6 +90,8 @@ export function buildSalesOrderCreatePayload(
   if (input.customerId == null) {
     throw new Error('거래처를 선택해 주세요.');
   }
+  if (input.salesDestinationId == null) throw new Error('납품처를 선택해 주세요.');
+  if (input.billingCustomerId == null) throw new Error('매출처를 선택해 주세요.');
   const details = input.details.map((row) => {
     if (row.materialId == null) {
       throw new Error('모든 상세 행의 품목을 선택해 주세요.');
@@ -100,6 +108,8 @@ export function buildSalesOrderCreatePayload(
   return {
     orderDt: input.orderDt,
     customerId: input.customerId,
+    salesDestinationId: input.salesDestinationId,
+    billingCustomerId: input.billingCustomerId,
     quotNo: toNullableText(input.quotNo),
     deliveryDt: input.deliveryDt || null,
     deliveryPlace: toNullableText(input.deliveryPlace),
@@ -156,6 +166,16 @@ export function toSalesOrderForm(order: SalesOrderItem): SalesOrderForm {
       id: order.customerId,
       code: order.customerCode ?? '',
       name: order.customerName ?? '',
+    },
+    destination: order.salesDestinationId == null ? null : {
+      id: order.salesDestinationId,
+      code: order.destinationCode ?? '',
+      name: order.destinationName ?? '',
+    },
+    billingCustomer: order.billingCustomerId == null ? null : {
+      id: order.billingCustomerId,
+      code: order.billingCustomerCode ?? '',
+      name: order.billingCustomerName ?? '',
     },
     header: {
       orderDt: order.orderDt,

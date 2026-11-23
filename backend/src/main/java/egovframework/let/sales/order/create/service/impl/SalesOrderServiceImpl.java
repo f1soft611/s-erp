@@ -71,6 +71,7 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         validatePrincipal(tenantId, userId);
         validatePayload(payload);
         validateCustomer(tenantId, payload.getCustomerId());
+        validateDestinationAndBilling(tenantId, payload);
         String deliveryPlanMode = salesDeliveryPlanService.lockModeForPlanCreation(tenantId);
 
         List<PreparedDetail> preparedDetails = prepareDetails(tenantId, payload);
@@ -82,6 +83,8 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         headerParams.put("orderNo", orderNo);
         headerParams.put("orderDt", payload.getOrderDt());
         headerParams.put("customerId", payload.getCustomerId());
+        headerParams.put("salesDestinationId", payload.getSalesDestinationId());
+        headerParams.put("billingCustomerId", payload.getBillingCustomerId());
         headerParams.put("quotNo", normalize(payload.getQuotNo()));
         headerParams.put("deliveryDt", payload.getDeliveryDt());
         headerParams.put("deliveryPlace", normalize(payload.getDeliveryPlace()));
@@ -126,6 +129,8 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         saved.setOrderNo(orderNo);
         saved.setOrderDt(payload.getOrderDt());
         saved.setCustomerId(payload.getCustomerId());
+        saved.setSalesDestinationId(payload.getSalesDestinationId());
+        saved.setBillingCustomerId(payload.getBillingCustomerId());
         saved.setQuotNo(normalize(payload.getQuotNo()));
         saved.setDeliveryDt(payload.getDeliveryDt());
         saved.setDeliveryPlace(normalize(payload.getDeliveryPlace()));
@@ -173,6 +178,7 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         validatePayload(payload);
         requireEditable(tenantId, salesOrderId);
         validateCustomer(tenantId, payload.getCustomerId());
+        validateDestinationAndBilling(tenantId, payload);
 
         List<PreparedDetail> preparedDetails = prepareDetails(tenantId, payload);
         List<SalesOrderDetailVO> existingDetails =
@@ -239,6 +245,8 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         Map<String, Object> headerParams = orderParams(tenantId, salesOrderId);
         headerParams.put("orderDt", payload.getOrderDt());
         headerParams.put("customerId", payload.getCustomerId());
+        headerParams.put("salesDestinationId", payload.getSalesDestinationId());
+        headerParams.put("billingCustomerId", payload.getBillingCustomerId());
         headerParams.put("quotNo", normalize(payload.getQuotNo()));
         headerParams.put("deliveryDt", payload.getDeliveryDt());
         headerParams.put("deliveryPlace", normalize(payload.getDeliveryPlace()));
@@ -337,6 +345,12 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
 
     private void validatePayload(SalesOrderCreateRequestVO payload) {
         validateHeader(payload);
+        if (payload.getSalesDestinationId() == null || payload.getSalesDestinationId() < 1L) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "납품처를 선택해 주세요.");
+        }
+        if (payload.getBillingCustomerId() == null || payload.getBillingCustomerId() < 1L) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "매출처를 선택해 주세요.");
+        }
         validateText(payload.getQuotNo(), 30, "견적번호");
         validateText(payload.getDeliveryPlace(), 200, "출하장소");
         validateText(payload.getDeliveryMethod(), 50, "배송방법");
@@ -346,6 +360,19 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
     private void validateCustomer(Long tenantId, Long customerId) throws Exception {
         if (!salesOrderDAO.existsCustomer(referenceParams(tenantId, customerId))) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "거래처를 찾을 수 없습니다.");
+        }
+    }
+
+    private void validateDestinationAndBilling(Long tenantId, SalesOrderCreateRequestVO payload) throws Exception {
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("tenantId", tenantId);
+        params.put("customerId", payload.getCustomerId());
+        params.put("id", payload.getSalesDestinationId());
+        if (!salesOrderDAO.existsDestination(params)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "거래처의 납품처를 찾을 수 없습니다.");
+        }
+        if (!salesOrderDAO.existsCustomer(referenceParams(tenantId, payload.getBillingCustomerId()))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "매출처를 찾을 수 없습니다.");
         }
     }
 

@@ -784,6 +784,18 @@
 
 ---
 
+### 납품처 마스터 및 수주 참조 (2026-11-23, 작성 중·미적용)
+
+- `tb_sales_destination`: `sales_destination_id`, `tenant_id`, `customer_id`,
+  `destination_code`, `destination_name`, `business_no`, `address`, `contact_name`,
+  `mobile_no`, `telephone_no`, `facsimile_no`, `remark` 및 생성·수정 이력을 가진다.
+  거래처는 테넌트 복합 FK로 참조하고 납품처코드는 테넌트별 유일하다.
+- `tb_sales_order_hd`에 nullable `sales_destination_id`, `billing_customer_id`를
+  추가한다. 납품처는 수주 거래처·테넌트와 복합 FK로 연결되고 매출처는
+  거래처·테넌트 복합 FK로 연결된다. 기존 주문은 변환하지 않는다.
+- DDL과 보호된 롤백은 [20261123 변경 이력](20261123/20261123_003_change_sales_destination.md)을
+  참고한다. 현재 작성 중이며 DB에 적용하지 않았다.
+
 ### tb_customer_info (MCP 확인: 2026-10-22)
 
 | 컬럼 | 타입 | NULL | 기본값 | 설명 |

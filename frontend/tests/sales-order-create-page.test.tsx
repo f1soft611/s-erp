@@ -49,6 +49,9 @@ vi.mock('../src/pages/sales/order/create/services/salesOrderMaster.service', () 
     { id: 71, code: 'QT-20261116-0001', name: '거래처 10', customerId: 10 },
   ]),
 }));
+vi.mock('../src/pages/sales/master/destination/services/salesDestination.service', () => ({
+  searchSalesDestinations: vi.fn(async () => [{ id: 90, code: 'D-90', name: '납품처 90' }]),
+}));
 
 const createSalesOrderMock = vi.mocked(createSalesOrder);
 const searchOrderCustomersMock = vi.mocked(searchOrderCustomers);
@@ -84,6 +87,14 @@ describe('sales order entry page', () => {
     searchOrderQuotationsMock.mockResolvedValue([
       { id: 71, code: 'QT-20261116-0001', name: '거래처 10', customerId: 10 },
     ]);
+  });
+
+  it('requires a customer before selecting a destination and shows the billing customer picker', async () => {
+    renderSalesOrderPage();
+    await screen.findByDisplayValue('2000-02-03');
+    expect(screen.getByRole('button', { name: '납품처 선택' })).toBeDisabled();
+    expect(screen.getByLabelText(/매출처/, { selector: 'input' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('납품장소')).not.toBeInTheDocument();
   });
 
   it('uses the server date as the initial order date for a new order', async () => {
@@ -181,7 +192,7 @@ describe('sales order entry page', () => {
     fireEvent.change(screen.getByLabelText('납기일자'), {
       target: { value: '2026-11-30' },
     });
-    await addAndCompleteDetail();
+    await addAndCompleteDetail(false);
 
     const row = screen.getByRole('row', { name: /order-line-.*행 선택/ });
     fireEvent.doubleClick(within(row).getAllByRole('gridcell')[3]);
@@ -239,7 +250,7 @@ describe('sales order entry page', () => {
 
   it('권한이 없으면 모든 기본정보에 읽기전용 배경을 표시한다', () => {
     renderSalesOrderPage({ read: true, create: false, update: false, delete: false });
-    for (const label of ['수주번호', '수주일자', '거래처', '견적번호', '납기일자', '납품장소', '수주상태', '비고']) {
+    for (const label of ['수주번호', '수주일자', '거래처', '납품처', '매출처', '견적번호', '납기일자', '수주상태', '비고']) {
       const input = screen.getByLabelText(new RegExp(label), { selector: 'input, textarea' });
       expect(getComputedStyle(input.closest('.MuiInputBase-root')!).backgroundColor).toBe('rgba(0, 0, 0, 0.12)');
     }
@@ -393,6 +404,7 @@ describe('sales order entry page', () => {
       expect(screen.getByRole('textbox', { name: '거래처' })).toHaveValue(
         'C-10 · 거래처 10',
       );
+      expect(screen.getByRole('textbox', { name: '납품처' })).toHaveValue('D-90 · 납품처 90');
     });
 
     fireEvent.click(screen.getByRole('button', { name: '거래처 선택' }));
@@ -403,6 +415,7 @@ describe('sales order entry page', () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText('견적번호')).toHaveValue('Q-LOADED');
+      expect(screen.getByRole('textbox', { name: '납품처' })).toHaveValue('');
     });
   }, 15000);
 
@@ -895,7 +908,17 @@ async function selectCustomer() {
   });
 }
 
-async function addAndCompleteDetail() {
+async function addAndCompleteDetail(selectRequired = true) {
+  if (selectRequired && (screen.getByRole('textbox', { name: '거래처' }) as HTMLInputElement).value) {
+    fireEvent.click(screen.getByRole('button', { name: '납품처 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'D-90 납품처 90 선택' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: '매출처 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'C-10 거래처 10 선택' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  }
   const deliveryDate = screen.getByLabelText('납기일자');
   if (!deliveryDate.value) {
     fireEvent.change(deliveryDate, { target: { value: '2026-11-30' } });
@@ -944,6 +967,12 @@ function loadedOrder(): SalesOrderItem {
     customerId: 10,
     customerCode: 'C-10',
     customerName: '거래처 10',
+    salesDestinationId: 90,
+    destinationCode: 'D-90',
+    destinationName: '납품처 90',
+    billingCustomerId: 10,
+    billingCustomerCode: 'C-10',
+    billingCustomerName: '거래처 10',
     quotNo: 'Q-LOADED',
     deliveryDt: null,
     deliveryPlace: null,
