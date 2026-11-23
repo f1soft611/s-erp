@@ -347,7 +347,7 @@ export function RevenueClosingPage({
               height: 40,
               '& .MuiOutlinedInput-root': {
                 height: '100%',
-                borderRadius: '0 6px 6px 0',
+                borderRadius: '0 4px 4px 0',
                 backgroundColor: theme.palette.background.paper,
               },
             })}

@@ -2586,7 +2586,7 @@ describe('Document write page', () => {
     ]);
     expect(agreementParticipants[0]).toHaveStyle({
       display: 'flex',
-      borderRadius: '6px',
+      borderRadius: '4px',
     });
     expect(agreementStage).toHaveTextContent('재무팀');
     expect(screen.getByTestId('approval-line-agreement-participant-76')
@@ -2595,7 +2595,7 @@ describe('Document write page', () => {
     expect(screen.getByTestId('approval-line-agreement-status-72')).toHaveTextContent('처리 중');
     expect(screen.getByTestId('approval-line-agreement-status-76')).toHaveTextContent('승인');
     expect(screen.getByTestId('approval-line-agreement-status-72'))
-      .toHaveStyle({ borderRadius: '6px' });
+      .toHaveStyle({ borderRadius: '4px' });
     const agreementWithoutDepartment = screen.getByTestId(
       'approval-line-agreement-participant-72',
     );
@@ -4131,8 +4131,8 @@ describe('Document write page', () => {
     expect(getComputedStyle(toolbar).columnGap).toBe('4px');
     expect(getComputedStyle(divider).marginRight).toBe('0px');
     expect(statusChip).toHaveClass('MuiChip-filled');
-    expect(statusChip).toHaveStyle({ borderRadius: '6px' });
-    expect(kindChip).toHaveStyle({ borderRadius: '6px' });
+    expect(statusChip).toHaveStyle({ borderRadius: '4px' });
+    expect(kindChip).toHaveStyle({ borderRadius: '4px' });
     expect(
       within(menu).queryByRole('menuitem', { name: '상신 취소' }),
     ).not.toBeInTheDocument();

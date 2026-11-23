@@ -569,7 +569,7 @@ function CommentItem({
                   variant={comment.systemEventBadge.variant}
                   sx={{
                     height: 20,
-                    borderRadius: '6px',
+                    borderRadius: '4px',
                     fontSize: '0.75rem',
                     '& .MuiChip-label': { px: 0.75 },
                   }}

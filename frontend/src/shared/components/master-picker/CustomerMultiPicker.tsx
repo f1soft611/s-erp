@@ -100,7 +100,7 @@ export function CustomerMultiPicker({
                   pl: 1,
                   pr: 0.25,
                   border: `1px solid ${theme.palette.divider}`,
-                  borderRadius: 999,
+                  borderRadius: 1,
                   backgroundColor: theme.palette.action.hover,
                 })}
               >

@@ -601,7 +601,7 @@ describe('shared feed components', () => {
     expect(badge).toHaveTextContent(label);
     expect(badge).toHaveClass(`MuiChip-color${color[0].toUpperCase()}${color.slice(1)}`);
     expect(badge).toHaveClass(`MuiChip-${variant}`);
-    expect(badge).toHaveStyle({ borderRadius: '6px', height: '20px' });
+    expect(badge).toHaveStyle({ borderRadius: '4px', height: '20px' });
     expect(badgeLabel).toHaveStyle({
       fontSize: '0.75rem',
       paddingLeft: '6px',
@@ -639,7 +639,7 @@ describe('shared feed components', () => {
       expect(badge).toHaveClass('MuiChip-colorError', 'MuiChip-outlined');
       expect(badge).toHaveStyle({
         borderColor: alpha(theme.palette.error.main, 0.7),
-        borderRadius: '6px',
+        borderRadius: '4px',
         color: theme.palette.error.main,
       });
     },

@@ -52,7 +52,7 @@ describe('ApprovalNoticePanel', () => {
     );
 
     expect(screen.getByText(item.status).closest('.MuiChip-root')).toHaveStyle({
-      borderRadius: '6px',
+      borderRadius: '4px',
     });
   });
 

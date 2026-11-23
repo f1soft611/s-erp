@@ -233,7 +233,7 @@ export function F1GridFormModal<T extends object>({
                 borderColor: 'divider',
                 borderLeft: 2,
                 borderLeftColor: 'primary.main',
-                borderRadius: '6px',
+                borderRadius: '4px',
                 boxShadow: '0 1px 0 rgba(15, 23, 42, 0.03)',
                 display: 'grid',
                 gap: 1.15,

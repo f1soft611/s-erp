@@ -95,7 +95,7 @@ export function CustomerClosingSummary({
         p: 1.25,
         display: 'flex',
         flexDirection: 'column',
-        borderRadius: 2,
+        borderRadius: 1,
         overflow: 'hidden',
       }}
     >
@@ -117,7 +117,7 @@ export function CustomerClosingSummary({
 
       {loading ? (
         <Stack role="status" aria-label="거래처 요약 불러오는 중" spacing={0.75} sx={{ minHeight: 0 }}>
-          <Paper variant="outlined" sx={{ p: 0.75, borderRadius: 1.5 }}>
+          <Paper variant="outlined" sx={{ p: 0.75, borderRadius: 1 }}>
             <Skeleton variant="text" width="38%" />
             <Skeleton variant="text" width="76%" height={26} />
           </Paper>
@@ -145,7 +145,7 @@ export function CustomerClosingSummary({
               width: '100%',
               mb: 0.85,
               p: 0.8,
-              borderRadius: 1.5,
+              borderRadius: 1,
               border: '1px solid',
               borderColor: selectedCustomerId === null ? 'primary.main' : 'divider',
               bgcolor: alpha(theme.palette.primary.main, selectedCustomerId === null ? 0.09 : 0.035),

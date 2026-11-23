@@ -157,7 +157,7 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
             onClick={() => setKeyword('')}><ClearIcon fontSize="small" /></IconButton> : null,
         } }}
         sx={(theme) => ({ width: '100%', height: 40, '& .MuiOutlinedInput-root': {
-          height: '100%', borderRadius: '0 6px 6px 0', backgroundColor: theme.palette.background.paper,
+          height: '100%', borderRadius: '0 4px 4px 0', backgroundColor: theme.palette.background.paper,
         } })}
       />}
       onDefaultSearch={searchDefault} detailFields={detailFields} detailValues={detailValues}
