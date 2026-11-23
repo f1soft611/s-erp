@@ -241,6 +241,65 @@ it('does not mark an unchanged empty nullable destination field dirty', async ()
   expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
 });
 
+it('formats and validates optional destination numbers in the row form', async () => {
+  render(<SalesDestinationPage
+    selectedModule={{ id: 'sales', name: '영업관리', icon: null, tree: [], menus: [] }}
+    currentMenuName="납품처 관리"
+    content={{ title: '납품처 관리', description: '', cards: [], items: [] }}
+    breadcrumbItems={['영업관리', '기준정보', '납품처 관리']}
+    selectedMenuPermissions={{ read: true, create: true, update: true, delete: true, excel: false }}
+  />);
+  fireEvent.click(await screen.findByRole('gridcell', { name: 'C10' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: '납품처 추가' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: '납품처 추가' }));
+  const dialog = screen.getByRole('dialog', { name: '납품처 등록' });
+  fireEvent.change(within(dialog).getByLabelText(/납품처명/), { target: { value: '납품처' } });
+  const businessNo = within(dialog).getByLabelText('사업자번호');
+  const mobileNo = within(dialog).getByLabelText('이동전화번호');
+  const telephoneNo = within(dialog).getByLabelText('전화번호');
+  const facsimileNo = within(dialog).getByLabelText('팩스번호');
+  fireEvent.change(businessNo, { target: { value: '123456789' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: '적용' }));
+  expect(screen.getByRole('dialog', { name: '납품처 등록' })).toBeInTheDocument();
+  expect(businessNo).toHaveAttribute('aria-invalid', 'true');
+  fireEvent.change(businessNo, { target: { value: '1234567890' } });
+  fireEvent.change(mobileNo, { target: { value: '010123' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: '적용' }));
+  expect(mobileNo).toHaveAttribute('aria-invalid', 'true');
+  fireEvent.change(mobileNo, { target: { value: '01012345678' } });
+  fireEvent.change(telephoneNo, { target: { value: '0212345678' } });
+  fireEvent.change(facsimileNo, { target: { value: '0311234567' } });
+  expect(businessNo).toHaveValue('123-45-67890');
+  expect(mobileNo).toHaveValue('010-1234-5678');
+  expect(telephoneNo).toHaveValue('02-1234-5678');
+  expect(facsimileNo).toHaveValue('031-123-4567');
+  fireEvent.click(within(dialog).getByRole('button', { name: '적용' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(screen.getByRole('gridcell', { name: '123-45-67890' })).toBeInTheDocument();
+});
+
+it('formats an existing destination telephone number during cell editing', async () => {
+  vi.mocked(fetchSalesDestinations).mockResolvedValue([{
+    salesDestinationId: 90, customerId: 10, destinationCode: 'D90', destinationName: '기존 납품처',
+    businessNo: null, address: null, contactName: null, mobileNo: null, telephoneNo: '0212345678',
+    facsimileNo: null, remark: null,
+  }]);
+  render(<SalesDestinationPage
+    selectedModule={{ id: 'sales', name: '영업관리', icon: null, tree: [], menus: [] }}
+    currentMenuName="납품처 관리"
+    content={{ title: '납품처 관리', description: '', cards: [], items: [] }}
+    breadcrumbItems={['영업관리', '기준정보', '납품처 관리']}
+    selectedMenuPermissions={{ read: true, create: true, update: true, delete: true, excel: false }}
+  />);
+  fireEvent.click(await screen.findByRole('gridcell', { name: 'C10' }));
+  fireEvent.doubleClick(await screen.findByRole('gridcell', { name: '0212345678' }));
+  const editor = screen.getByDisplayValue('0212345678');
+  fireEvent.change(editor, { target: { value: '0311234567' } });
+  expect(screen.getByDisplayValue('031-123-4567')).toBeInTheDocument();
+  fireEvent.keyDown(screen.getByDisplayValue('031-123-4567'), { key: 'Enter' });
+  expect(screen.getByRole('gridcell', { name: '031-123-4567' })).toBeInTheDocument();
+});
+
 it('keeps edited destination values visible while the quiet save refresh is pending', async () => {
   const initialDestination = {
     salesDestinationId: 90, customerId: 10, destinationCode: 'D90', destinationName: '기존 납품처',
