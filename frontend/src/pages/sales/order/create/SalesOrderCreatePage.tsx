@@ -792,8 +792,43 @@ export function SalesOrderCreatePage({
               error={Boolean(orderDateError || validationErrors?.orderDt)}
               helperText={orderDateError || validationErrors?.orderDt}
             />
+            <DateEditor
+              label="납기일자"
+              variant="outlined"
+              autoFocus={false}
+              required
+              value={deliveryDate}
+              onChange={(value) => {
+                setDeliveryDate(value);
+                setDeliveryDateError('');
+                clearValidationErrors();
+              }}
+              onBlur={() => {
+                const normalized = deliveryDate.trim() ? normalizeDateInput(deliveryDate) : '';
+                if (normalized) setDeliveryDate(normalized);
+                setDeliveryDateError(deliveryDate.trim() && !normalized
+                  ? '올바른 납기일자를 입력해 주세요.' : '');
+              }}
+              disabled={!isEditable}
+              error={Boolean(deliveryDateError)}
+              helperText={deliveryDateError}
+            />
+            <TextField
+              label="수주상태"
+              size="small"
+              value={getSalesOrderCodeLabel(
+                commonCodes.orderStatusOptions,
+                loadedOrder?.status ?? EDITABLE_ORDER_STATUS,
+              )}
+              slotProps={{ input: { readOnly: true } }}
+              sx={{ '& .MuiInputBase-root': { backgroundColor: 'action.disabledBackground' } }}
+            />
             <Box sx={{ gridColumn: '1 / -1', display: 'grid', gap: 2,
-              gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(3, minmax(0, 1fr))' },
+              gridTemplateColumns: {
+                xs: 'minmax(0, 1fr)',
+                sm: 'repeat(2, minmax(0, 1fr))',
+                lg: 'repeat(4, minmax(0, 1fr))',
+              },
               '& > .MuiStack-root': { mt: 0 },
               ...(!isEditable && { '& .MuiInputBase-root': { backgroundColor: 'action.disabledBackground' } }),
             }}>
@@ -859,27 +894,6 @@ export function SalesOrderCreatePage({
                 },
               }}
             />
-            <DateEditor
-              label="납기일자"
-              variant="outlined"
-              autoFocus={false}
-              required
-              value={deliveryDate}
-              onChange={(value) => {
-                setDeliveryDate(value);
-                setDeliveryDateError('');
-                clearValidationErrors();
-              }}
-              onBlur={() => {
-                const normalized = deliveryDate.trim() ? normalizeDateInput(deliveryDate) : '';
-                if (normalized) setDeliveryDate(normalized);
-                setDeliveryDateError(deliveryDate.trim() && !normalized
-                  ? '올바른 납기일자를 입력해 주세요.' : '');
-              }}
-              disabled={!isEditable}
-              error={Boolean(deliveryDateError)}
-              helperText={deliveryDateError}
-            />
             <TextField
               label="배송방법"
               size="small"
@@ -901,16 +915,6 @@ export function SalesOrderCreatePage({
                 </MenuItem>
               ))}
             </TextField>
-            <TextField
-              label="수주상태"
-              size="small"
-              value={getSalesOrderCodeLabel(
-                commonCodes.orderStatusOptions,
-                loadedOrder?.status ?? EDITABLE_ORDER_STATUS,
-              )}
-              slotProps={{ input: { readOnly: true } }}
-              sx={{ '& .MuiInputBase-root': { backgroundColor: 'action.disabledBackground' } }}
-            />
             <TextField
               label="비고"
               size="small"
