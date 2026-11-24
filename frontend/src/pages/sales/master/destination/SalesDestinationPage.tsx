@@ -109,8 +109,8 @@ export function SalesDestinationPage({ content, breadcrumbItems, selectedMenuPer
         <Splitter direction="horizontal" mobileMode="stacked" mobileBreakpoint={768}
           minSize={400} maxSize={1000} initialSize={430} ariaLabel="거래처와 납품처 영역 분리기">
         <Card variant="outlined" sx={{ borderRadius: 1, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }}>
-          <CardContent sx={{ p: 1, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden', '&:last-child': { pb: 1 } }}>
-          <Box sx={{ px: 1, py: 1.2, display: 'flex', justifyContent: 'space-between',
+          <CardContent sx={{ pt: 1, px: 2, pb: 2, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden', '&:last-child': { pb: 2 } }}>
+          <Box sx={{ py: 1.2, display: 'flex', justifyContent: 'space-between',
             alignItems: { xs: 'flex-start', sm: 'center' }, flexWrap: 'wrap', gap: 1 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>거래처 관리</Typography>
           </Box>
@@ -126,8 +126,8 @@ export function SalesDestinationPage({ content, breadcrumbItems, selectedMenuPer
           </CardContent>
         </Card>
         <Card variant="outlined" sx={{ borderRadius: 1, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }}>
-          <CardContent sx={{ p: 1, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden', '&:last-child': { pb: 1 } }}>
-          <Box sx={{ px: 1, py: 1.2, display: 'flex', justifyContent: 'space-between',
+          <CardContent sx={{ pt: 1, px: 2, pb: 2, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden', '&:last-child': { pb: 2 } }}>
+          <Box sx={{ py: 1.2, display: 'flex', justifyContent: 'space-between',
             alignItems: { xs: 'flex-start', sm: 'center' }, flexWrap: 'wrap', gap: 1 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>납품처 관리</Typography>
             <Typography variant="subtitle2" color="text.secondary" sx={{

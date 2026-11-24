@@ -222,6 +222,21 @@ describe('CommonCode management page', () => {
     );
   }
 
+  it('aligns each panel title and grid with a 16px inner gutter', async () => {
+    renderRealPage();
+    await screen.findByRole('grid', { name: '공통코드 그룹 트리' });
+    for (const [gridName, title] of [
+      ['공통코드 그룹 트리', '공통코드 그룹 관리'],
+      ['공통코드 상세코드', '공통코드 상세 관리'],
+    ]) {
+      const content = screen.getByRole('grid', { name: gridName }).closest('.MuiCardContent-root')!;
+      const style = getComputedStyle(content);
+      expect([style.paddingLeft, style.paddingRight, style.paddingBottom]).toEqual(['16px', '16px', '16px']);
+      const heading = within(content as HTMLElement).getByText(title).parentElement!;
+      expect([parseFloat(getComputedStyle(heading).paddingLeft), parseFloat(getComputedStyle(heading).paddingRight)]).toEqual([0, 0]);
+    }
+  });
+
   async function editDetailName(value: string) {
     const cell = await screen.findByRole('gridcell', { name: '거래명세서' });
     fireEvent.doubleClick(cell);
