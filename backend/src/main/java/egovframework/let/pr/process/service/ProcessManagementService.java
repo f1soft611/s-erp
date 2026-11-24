@@ -7,4 +7,6 @@ import egovframework.let.pr.process.domain.model.ProcessNodeVO;
 public interface ProcessManagementService {
     List<ProcessNodeVO> list(Long tenantId);
     List<ProcessNodeVO> save(Long tenantId, ProcessChangesVO changes);
+    List<ProcessNodeVO> listMasters(Long tenantId);
+    List<ProcessNodeVO> saveMasters(Long tenantId, ProcessChangesVO changes);
 }

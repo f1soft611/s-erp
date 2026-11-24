@@ -5,6 +5,7 @@
         <id property="id" column="id"/>
         <result property="parentId" column="parent_id"/>
         <result property="code" column="code"/>
+        <result property="processId" column="process_id"/>
         <result property="name" column="name"/>
         <result property="description" column="description"/>
         <result property="image" column="image"/>
@@ -19,36 +20,64 @@
         <result property="plannedEquipment" column="planned_equipment"/>
         <result property="actualEquipmentRequired" column="actual_equipment_required"/>
     </resultMap>
+    <!-- 작업장(g:)과 작업장에 연결된 공정(m:)을 트리 행으로 반환한다. 연결 행의 내용은 공정 마스터에서 읽는다. -->
     <select id="list" resultMap="node">
-        SELECT 'g:' || group_id AS id, NULL AS parent_id, group_id::text AS code,
-               name, description, NULL AS image, inactive,
-               false AS production_outsource, false AS purchase_outsource,
-               false AS inspection, false AS packing, false AS stock_management,
-               false AS previous_stock_out, false AS final_process, false AS planned_equipment,
-               false AS actual_equipment_required
-        FROM tb_process_group WHERE tenant_id = #{value}
-        UNION ALL
-        SELECT 'p:' || process_id, 'g:' || group_id, process_id::text,
+        SELECT id, parent_id, code, process_id, name, description, image, inactive,
+               production_outsource, purchase_outsource, inspection, packing, stock_management,
+               previous_stock_out, final_process, planned_equipment, actual_equipment_required
+        FROM (
+            SELECT 'g:' || group_id AS id, NULL AS parent_id, group_id::text AS code,
+                   NULL::bigint AS process_id, name, description, NULL AS image, inactive,
+                   false AS production_outsource, false AS purchase_outsource,
+                   false AS inspection, false AS packing, false AS stock_management,
+                   false AS previous_stock_out, false AS final_process, false AS planned_equipment,
+                   false AS actual_equipment_required,
+                   group_id AS group_key, 0 AS kind, 0 AS sort_seq, group_id AS entry_key
+            FROM tb_process_group WHERE tenant_id = #{value}
+            UNION ALL
+            SELECT 'm:' || m.map_id, 'g:' || m.group_id, p.process_id::text,
+                   p.process_id, p.name, p.description, p.image, p.inactive,
+                   p.production_outsource, p.purchase_outsource, p.inspection, p.packing, p.stock_management,
+                   p.previous_stock_out, p.final_process, p.planned_equipment, p.actual_equipment_required,
+                   m.group_id, 1, m.sort_seq, m.map_id
+            FROM tb_process_group_process m
+            JOIN tb_process p ON p.tenant_id = m.tenant_id AND p.process_id = m.process_id
+            WHERE m.tenant_id = #{value}
+        ) t
+        ORDER BY group_key, kind, sort_seq, entry_key
+    </select>
+    <select id="listMasters" resultMap="node">
+        SELECT 'p:' || process_id AS id, NULL AS parent_id, process_id::text AS code, process_id,
                name, description, image, inactive,
                production_outsource, purchase_outsource, inspection, packing, stock_management,
                previous_stock_out, final_process, planned_equipment, actual_equipment_required
         FROM tb_process WHERE tenant_id = #{value}
+        ORDER BY process_id
     </select>
     <select id="insertGroup" resultType="long" affectData="true" flushCache="true">
         INSERT INTO tb_process_group (tenant_id, name, description, inactive)
         VALUES (#{tenantId}, #{row.name}, #{row.description}, #{row.inactive})
         RETURNING group_id
     </select>
+    <!-- 같은 테넌트의 작업장과 사용 중인 공정만 연결한다. 이미 연결되었거나 대상이 없으면 결과가 없다. -->
+    <select id="insertMapping" resultType="long" affectData="true" flushCache="true">
+        INSERT INTO tb_process_group_process (tenant_id, group_id, process_id, sort_seq)
+        SELECT #{tenantId}, g.group_id, p.process_id, 0
+        FROM tb_process_group g
+        JOIN tb_process p ON p.tenant_id = g.tenant_id AND p.process_id = #{processId} AND p.inactive = false
+        WHERE g.tenant_id = #{tenantId} AND g.group_id = #{groupId}
+        ON CONFLICT (tenant_id, group_id, process_id) DO NOTHING
+        RETURNING map_id
+    </select>
     <select id="insertProcess" resultType="long" affectData="true" flushCache="true">
         INSERT INTO tb_process
-        (tenant_id, group_id, name, description, image, inactive, production_outsource,
+        (tenant_id, name, description, image, inactive, production_outsource,
          purchase_outsource, inspection, packing, stock_management, previous_stock_out,
          final_process, planned_equipment, actual_equipment_required)
-        SELECT #{tenantId}, group_id, #{row.name}, #{row.description}, #{row.image}, #{row.inactive},
-               #{row.productionOutsource}, #{row.purchaseOutsource}, #{row.inspection}, #{row.packing},
-               #{row.stockManagement}, #{row.previousStockOut}, #{row.finalProcess},
-               #{row.plannedEquipment}, #{row.actualEquipmentRequired}
-        FROM tb_process_group WHERE tenant_id = #{tenantId} AND group_id = #{groupId}
+        VALUES (#{tenantId}, #{row.name}, #{row.description}, #{row.image}, #{row.inactive},
+                #{row.productionOutsource}, #{row.purchaseOutsource}, #{row.inspection}, #{row.packing},
+                #{row.stockManagement}, #{row.previousStockOut}, #{row.finalProcess},
+                #{row.plannedEquipment}, #{row.actualEquipmentRequired})
         RETURNING process_id
     </select>
     <update id="updateGroup">
@@ -57,20 +86,23 @@
         WHERE tenant_id = #{tenantId} AND group_id = #{id}
     </update>
     <update id="updateProcess">
-        UPDATE tb_process SET group_id = #{groupId}, name = #{row.name}, description = #{row.description},
+        UPDATE tb_process SET name = #{row.name}, description = #{row.description},
             image = #{row.image}, inactive = #{row.inactive}, production_outsource = #{row.productionOutsource},
             purchase_outsource = #{row.purchaseOutsource}, inspection = #{row.inspection}, packing = #{row.packing},
             stock_management = #{row.stockManagement}, previous_stock_out = #{row.previousStockOut},
             final_process = #{row.finalProcess}, planned_equipment = #{row.plannedEquipment},
             actual_equipment_required = #{row.actualEquipmentRequired}, updated_at = CURRENT_TIMESTAMP
         WHERE tenant_id = #{tenantId} AND process_id = #{id}
-          AND EXISTS (SELECT 1 FROM tb_process_group g WHERE g.tenant_id = #{tenantId} AND g.group_id = #{groupId})
     </update>
     <delete id="deleteGroup">
         DELETE FROM tb_process_group g WHERE g.tenant_id = #{tenantId} AND g.group_id = #{id}
-          AND NOT EXISTS (SELECT 1 FROM tb_process p WHERE p.tenant_id = g.tenant_id AND p.group_id = g.group_id)
+          AND NOT EXISTS (SELECT 1 FROM tb_process_group_process m WHERE m.tenant_id = g.tenant_id AND m.group_id = g.group_id)
+    </delete>
+    <delete id="deleteMapping">
+        DELETE FROM tb_process_group_process WHERE tenant_id = #{tenantId} AND map_id = #{id}
     </delete>
     <delete id="deleteProcess">
-        DELETE FROM tb_process WHERE tenant_id = #{tenantId} AND process_id = #{id}
+        DELETE FROM tb_process p WHERE p.tenant_id = #{tenantId} AND p.process_id = #{id}
+          AND NOT EXISTS (SELECT 1 FROM tb_process_group_process m WHERE m.tenant_id = p.tenant_id AND m.process_id = p.process_id)
     </delete>
 </mapper>
