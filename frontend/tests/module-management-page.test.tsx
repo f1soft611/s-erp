@@ -471,6 +471,9 @@ describe('ModuleManagementPage', () => {
     expect(getComputedStyle(shell as HTMLElement).overflow).toBe('hidden');
     expect(getComputedStyle(shell as HTMLElement).minHeight).toBe('0px');
     expect(getComputedStyle(card as HTMLElement).minHeight).toBe('0px');
+    const cardContent = grid.closest('.MuiCardContent-root')!;
+    expect(getComputedStyle(cardContent).paddingTop).toBe('0px');
+    expect(getComputedStyle(cardContent).paddingLeft).toBe('0px');
   });
 
   it('shows a known icon select list and locks saved module codes from editing', () => {

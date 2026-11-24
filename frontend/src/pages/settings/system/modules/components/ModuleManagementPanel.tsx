@@ -429,6 +429,7 @@ export const ModuleManagementPanel = forwardRef<
         flexDirection: 'column',
         height: '100%',
         overflow: 'hidden',
+        p: 2,
       }}
     >
       <Card
@@ -440,11 +441,12 @@ export const ModuleManagementPanel = forwardRef<
           minHeight: 0,
           height: '100%',
           overflow: 'hidden',
+          bgcolor: 'transparent',
         }}
       >
         <CardContent
           sx={{
-            p: 1,
+            p: 0,
             display: 'flex',
             flexDirection: 'column',
             flex: 1,
@@ -452,7 +454,7 @@ export const ModuleManagementPanel = forwardRef<
             height: '100%',
             overflow: 'hidden',
             '&:last-child': {
-              pb: 1,
+              pb: 0,
             },
           }}
         >
