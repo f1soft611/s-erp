@@ -815,6 +815,7 @@ export const CommonCodeManagementPanel = forwardRef<
         flexDirection: 'column',
         height: '100%',
         overflow: 'hidden',
+        p: 2,
       }}
     >
       <Splitter

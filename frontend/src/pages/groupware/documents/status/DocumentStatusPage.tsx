@@ -76,7 +76,7 @@ export function DocumentStatusPage({
       <PageLoadBoundary {...search.defaultsInitialLoad} label="검색 기본값" onRetry={search.retryDefaults}>
       <PageLoadBoundary {...list.initialLoad} label="문서현황" onRetry={list.retry}>
       {search.dashboardScope && (
-        <Box sx={{ px: { xs: 1.5, sm: 3 }, pt: 1 }}>
+        <Box sx={{ px: 2, pt: 1 }}>
           <Chip
             size="small"
             label={`#${getDocumentApprovalScopeLabel(search.dashboardScope)}`}
@@ -101,13 +101,14 @@ export function DocumentStatusPage({
       <PageMessageArea
         message={search.defaultsError ?? list.error}
         onClose={list.clearError}
+        pageSpacing="outer"
       />
       {list.hasLoaded && !list.loading && !list.initialLoad.loading
         && !search.defaultsError && !list.error ? (
-        <SearchResultMessage resultCount={list.totalRowCount} />
+        <SearchResultMessage resultCount={list.totalRowCount} pageSpacing="outer" />
       ) : null}
       {search.defaultsError || list.error ? (
-        <Box sx={{ px: { xs: 1.5, sm: 3 }, pb: 1 }}>
+        <Box sx={{ px: 2, pb: 1 }}>
           <Button
             type="button"
             size="small"
@@ -119,10 +120,11 @@ export function DocumentStatusPage({
         </Box>
       ) : null}
       <Box
+        data-testid="document-status-content"
         sx={{
-          px: { xs: 1, sm: 2 },
+          px: 2,
           pb: 2,
-          pt: 1,
+          pt: search.defaultsError || list.error ? 0 : 2,
           display: 'flex',
           flexDirection: 'column',
           gap: 1,

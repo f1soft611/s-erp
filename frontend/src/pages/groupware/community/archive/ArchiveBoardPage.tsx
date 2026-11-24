@@ -549,7 +549,7 @@ export function ArchiveBoardPage({
         />
       </PageSearchArea>
 
-      <Box sx={{ px: { xs: 1.5, sm: 3 }, pt: 1.5, pb: 1 }}>
+      <Box sx={{ px: 2, pt: 2, pb: 2 }}>
         {defaultsError && (
           <Alert
             severity="error"
@@ -631,7 +631,7 @@ export function ArchiveBoardPage({
         !isQueryLoading &&
         !archiveList.error &&
         fileCount === 0 && (
-        <Box sx={{ px: { xs: 1.5, sm: 3 }, pb: 1 }}>
+        <Box sx={{ px: 2, pb: 2 }}>
           <Alert severity="info">조건에 맞는 파일이 없습니다.</Alert>
         </Box>
         )}
@@ -639,7 +639,7 @@ export function ArchiveBoardPage({
       {(mutations.isUploading ||
         mutations.isDeleting ||
         mutations.isUpdating) && (
-        <Box sx={{ px: { xs: 1.5, sm: 3 }, pb: 1 }}>
+        <Box sx={{ px: 2, pb: 2 }}>
           <Alert severity="info">요청 처리 중입니다.</Alert>
         </Box>
       )}
@@ -650,7 +650,7 @@ export function ArchiveBoardPage({
           flex: 1,
           minHeight: 0,
           minWidth: 0,
-          px: { xs: 1, sm: 2 },
+          px: 2,
           pb: 2,
           display: 'flex',
           flexDirection: 'column',

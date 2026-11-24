@@ -363,6 +363,7 @@ export function DraftFormManagementPage({
       <PageMessageArea
         message={management.error}
         onClose={() => management.setError('')}
+        pageSpacing="outer"
       />
       <PageMessageArea
         message={
@@ -374,6 +375,7 @@ export function DraftFormManagementPage({
         }
         severity="info"
         onClose={() => setCategoryNoticeDismissed(true)}
+        pageSpacing="outer"
       />
       <Box
         onKeyDownCapture={(event) => {
@@ -392,7 +394,7 @@ export function DraftFormManagementPage({
           flex: 1,
           minHeight: 280,
           minWidth: 0,
-          p: 1,
+          p: 2,
         }}
       >
         <DraftFormGrid

@@ -52,7 +52,7 @@ export function OverviewPage({ selectedModule, currentMenuName }: OverviewPagePr
         description="내 업무와 주요 경영 지표를 한눈에 확인합니다." />
       <Container maxWidth={false} data-testid="overview-scroll" sx={{
         flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden',
-        px: { xs: 1.5, sm: 3 }, py: { xs: 2, sm: 3 },
+        px: 2, py: 2,
       }}>
         <Stack spacing={{ xs: 3, sm: 3.5 }}>
           <Box sx={(theme) => ({

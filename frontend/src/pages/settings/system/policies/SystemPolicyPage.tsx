@@ -86,7 +86,7 @@ export function SystemPolicyPage({ isPlatformAdmin, selectedMenuPermissions, bre
           { label: '조회', icon: RefreshIcon, onClick: load, disabled: loading || Boolean(editor) || Boolean(deleting) },
           { label: '정책 추가', icon: AddIcon, visible: Boolean(selectedMenuPermissions?.create), disabled: loading || Boolean(editor) || Boolean(deleting), onClick: () => setEditor({ policy: null }) },
         ] }]} />
-      <Stack spacing={2.5} sx={{ flex: 1, minHeight: 0, minWidth: 0, overflowY: 'auto', p: 3 }}>
+      <Stack spacing={2.5} sx={{ flex: 1, minHeight: 0, minWidth: 0, overflowY: 'auto', p: 2 }}>
         <Paper variant="outlined" sx={{ p: 2, borderRadius: 1 }}>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { sm: 'center' } }}>
             <Chip label="플랫폼 관리자 전용" color="primary" variant="outlined" sx={{ alignSelf: 'start' }} />

@@ -443,7 +443,7 @@ export function CommonCodeManagementPage({
         onDetailSearch={handleDetailSearch}
         detailLoading={pageLoading || saving}
       />
-      <PageMessageArea message={error} onClose={() => setError('')} />
+      <PageMessageArea message={error} onClose={() => setError('')} pageSpacing="outer" />
       <CommonCodeManagementPanel
         ref={panelRef}
         groups={groups}

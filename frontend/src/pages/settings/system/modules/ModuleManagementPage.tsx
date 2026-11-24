@@ -254,7 +254,7 @@ export function ModuleManagementPage({
           })}
         />
       </PageSearchArea>
-      <PageMessageArea message={error} onClose={() => setError('')} />
+      <PageMessageArea message={error} onClose={() => setError('')} pageSpacing="outer" />
       <ModuleManagementPanel
         ref={modulePanelRef}
         modules={filteredModules}

@@ -257,7 +257,7 @@ export function RoleManagementPage({
           })}
         />
       </PageSearchArea>
-      <PageMessageArea message={error} onClose={() => setError('')} />
+      <PageMessageArea message={error} onClose={() => setError('')} pageSpacing="outer" />
       <RoleManagementPanel
         ref={rolePanelRef}
         roles={roles}
