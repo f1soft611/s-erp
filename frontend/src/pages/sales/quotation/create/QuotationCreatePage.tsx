@@ -553,7 +553,7 @@ export function QuotationCreatePage({
         sx={{
           display: 'flex', flex: 1, flexDirection: 'column', gap: 2, minHeight: 0,
           minWidth: 0, overflowX: 'hidden', overflowY: 'auto',
-          px: embedded ? 0 : { xs: 1, sm: 2 }, pt: embedded ? 0 : 1, pb: embedded ? 0 : 2,
+          px: embedded ? 0 : 2, pt: embedded ? 0 : 2, pb: embedded ? 0 : 2,
         }}
       >
         {dateError ? (
@@ -579,7 +579,7 @@ export function QuotationCreatePage({
         ) : null}
         {notice ? <Alert severity="success">{notice}</Alert> : null}
         {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
-        <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, minWidth: 0, borderRadius: 1 }}>
+        <Paper variant="outlined" sx={{ p: 2, minWidth: 0, borderRadius: 1 }}>
           <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 700 }}>견적 기본정보</Typography>
           <Box sx={{
             display: 'grid',
@@ -664,7 +664,7 @@ export function QuotationCreatePage({
         }}>
           <Box sx={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            flexWrap: 'wrap', gap: 1, p: { xs: 1.5, sm: 2 }, pb: 1,
+            flexWrap: 'wrap', gap: 1, p: 2, pb: 1,
           }}>
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>견적 상세</Typography>
@@ -682,7 +682,7 @@ export function QuotationCreatePage({
               </Box>
             ) : null}
           </Box>
-          <Box sx={{ flex: '1 0 260px', minHeight: 260, minWidth: 0, overflow: 'hidden', px: 1 }}>
+          <Box sx={{ flex: '1 0 260px', minHeight: 260, minWidth: 0, overflow: 'hidden', px: 2 }}>
             <QuotationDetailGrid
               key={gridKey} gridRef={gridRef} rows={gridRows}
               onChangesChange={handleChangesChange} onSelectionChange={setSelectedRowIds}
@@ -693,7 +693,7 @@ export function QuotationCreatePage({
           </Box>
           <Box aria-label="견적 금액 합계" sx={{
             display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(3, minmax(0, 1fr))' },
-            gap: 1, p: { xs: 1.5, sm: 2 },
+            gap: 1, p: 2,
           }}>
             <AmountSummary label="공급가액" amount={amounts.supplyAmt} />
             <AmountSummary label="부가세 (10%)" amount={amounts.vatAmt} />

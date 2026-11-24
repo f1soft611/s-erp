@@ -58,6 +58,9 @@ describe('quotation create page', () => {
     render(<RouterProvider router={router} />);
 
     expect(await screen.findByRole('region', { name: '견적 입력 내용' })).toBeInTheDocument();
+    expect(screen.getByRole('grid', { name: '견적 상세 목록' }).parentElement).toHaveStyle({
+      paddingLeft: '16px', paddingRight: '16px',
+    });
     await waitFor(() => expect(screen.getByDisplayValue('2026-11-16')).toBeInTheDocument());
     expect(screen.getByLabelText('견적번호')).toHaveValue('저장 시 자동 채번');
     expect(screen.getByRole('button', { name: '견적작성일 달력 열기' })).toBeInTheDocument();

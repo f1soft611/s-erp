@@ -133,13 +133,14 @@ export function QuotationStatusPage({
             message={search.defaultsError ?? list.error}
             onClose={list.clearError}
             horizontalPadding="grid"
+            salesSpacing="outer"
           />
           {showSearchResultMessage ? (
-            <SearchResultMessage resultCount={list.rows.length} horizontalPadding="grid" />
+            <SearchResultMessage resultCount={list.rows.length} horizontalPadding="grid" salesSpacing="outer" />
           ) : null}
-          <Box sx={{
-            px: { xs: 1, sm: 2 },
-            pt: showSearchResultMessage ? 0 : 1,
+          <Box data-testid="sales-status-content" sx={{
+            px: 2,
+            pt: 2,
             pb: 2,
             display: 'flex',
             flexDirection: 'column',

@@ -286,8 +286,13 @@ describe('sales order entry page', () => {
   it('renders the sales order form with its breadcrumb and API notice', () => {
     renderSalesOrderPage();
     expect(screen.getByRole('region', { name: '수주 입력 내용' })).toHaveStyle({
-      paddingTop: '8px',
+      paddingTop: '16px',
+      paddingLeft: '16px',
+      paddingRight: '16px',
       paddingBottom: '16px',
+    });
+    expect(screen.getByRole('grid', { name: '수주 상세 목록' }).parentElement).toHaveStyle({
+      paddingLeft: '16px', paddingRight: '16px',
     });
 
     const formGrid = screen.getByLabelText('수주번호')
@@ -503,7 +508,7 @@ describe('sales order entry page', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('수주 저장에 실패했습니다.');
     expect(alert.parentElement).toHaveStyle({
-      paddingTop: '8px',
+      paddingTop: '16px',
       paddingBottom: '16px',
     });
   }, 15000);

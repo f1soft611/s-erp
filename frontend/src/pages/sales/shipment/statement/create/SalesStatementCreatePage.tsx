@@ -35,12 +35,12 @@ export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
           disabled: pending || dirty, onClick: print }] },
       ]} /> : null}
     <Box role="region" aria-label="거래명세서 입력 내용" aria-busy={pending}
-      sx={{ px: embedded ? 0 : { xs: 1, sm: 2 }, pt: embedded ? 0 : 1, pb: embedded ? 0 : 2,
+      sx={{ px: embedded ? 0 : 2, pt: embedded ? 0 : 2, pb: embedded ? 0 : 2,
         display: 'flex', flexDirection: 'column',
         minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
       {notice ? <Alert severity="success">{notice}</Alert> : null}
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
-      <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, minWidth: 0, borderRadius: 1 }}>
+      <Paper variant="outlined" sx={{ p: 2, minWidth: 0, borderRadius: 1 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>거래명세서 기본정보</Typography>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' },
           columnGap: 2, rowGap: 1, '& > .MuiFormControl-root': { m: 0 } }}>
@@ -62,11 +62,11 @@ export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
         </Box>
       </Paper>
       <Paper variant="outlined" sx={{ display: 'flex', flexDirection: 'column', flex: '1 0 auto', minHeight: 320, minWidth: 0, borderRadius: 1, overflow: 'hidden', pb: 1 }}>
-        <Box sx={{ p: { xs: 1.5, sm: 2 }, pb: 1 }}>
+        <Box sx={{ p: 2, pb: 1 }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>거래명세서 상세</Typography>
           <Typography variant="caption" color="text.secondary">출하 품목과 금액을 저장 시점 기준으로 보관합니다.</Typography>
         </Box>
-        <Box sx={{ minHeight: 260, minWidth: 0, flex: '1 0 260px', overflow: 'hidden', px: 1 }}>
+        <Box sx={{ minHeight: 260, minWidth: 0, flex: '1 0 260px', overflow: 'hidden', px: 2 }}>
           <StatementDetailGrid
             rows={rows}
             selectable={!id}

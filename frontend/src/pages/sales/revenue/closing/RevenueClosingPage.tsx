@@ -358,8 +358,8 @@ export function RevenueClosingPage({
       {notice ? <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert> : null}
       <Box
         sx={{
-          px: { xs: 1, sm: 2 },
-          pt: 1,
+          px: 2,
+          pt: 2,
           pb: 2,
           display: 'grid',
           gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(0, 1fr) 320px' },

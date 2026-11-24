@@ -21,6 +21,20 @@ beforeEach(() => {
   vi.mocked(fetchSalesDestinations).mockResolvedValue([]);
 });
 
+it('outlines both customer and destination panels like the sales forms', async () => {
+  render(<SalesDestinationPage
+    selectedModule={{ id: 'sales', name: '영업관리', icon: null, tree: [], menus: [] }}
+    currentMenuName="납품처 관리"
+    content={{ title: '납품처 관리', description: '', cards: [], items: [] }}
+    breadcrumbItems={['영업관리', '납품처 관리']}
+    selectedMenuPermissions={{ read: true }}
+  />);
+  await screen.findByRole('grid', { name: '거래처 목록' });
+  for (const name of ['거래처 목록', '납품처 목록']) {
+    expect(screen.getByRole('grid', { name }).closest('.MuiCard-root')).toHaveClass('MuiPaper-outlined');
+  }
+});
+
 it('saves staged rows for the selected customer and reloads registration status', async () => {
   vi.mocked(saveDestinationBatch).mockResolvedValue(undefined);
   render(<SalesDestinationPage

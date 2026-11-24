@@ -266,6 +266,19 @@ describe('quotation status page', () => {
     expect(screen.getByRole('button', { name: '견적작성일 달력 열기' })).toBeDisabled();
   }, 15000);
 
+  it('restores a 16px grid gutter after the search result message is dismissed', async () => {
+    const element = <QuotationStatusPage selectedModule={moduleItem} currentMenuName="견적현황"
+      breadcrumbItems={[]} content={{ title: '견적현황', description: '', cards: [], items: [] }}
+      selectedMenuPermissions={{ read: true }} />;
+    render(<RouterProvider router={createMemoryRouter([{ path: '/', element }])} />);
+    const message = await screen.findByRole('status');
+    const content = message.parentElement?.nextElementSibling;
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(content).toHaveStyle({
+      paddingTop: '16px', paddingBottom: '16px', paddingLeft: '16px', paddingRight: '16px',
+    });
+  });
+
   it('submits the integrated keyword with required dates and restores it from the session', async () => {
     const element = <QuotationStatusPage selectedModule={moduleItem} currentMenuName="견적현황"
       breadcrumbItems={[]} content={{ title: '견적현황', description: '', cards: [], items: [] }}

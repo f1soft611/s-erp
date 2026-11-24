@@ -230,16 +230,18 @@ export function SalesDeliveryPlanStatusPage({
         sx={(theme) => ({ width: '100%', height: 40, '& .MuiOutlinedInput-root': {
           height: '100%', borderRadius: '0 4px 4px 0', backgroundColor: theme.palette.background.paper,
         } })} />} />
-    <Box data-testid="sales-status-content" sx={{ px: { xs: 1, sm: 2 }, pt: 1, pb: 2, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, gap: 1 }}>
+    <Box data-testid="sales-status-content" sx={{ px: 2, pt: 2, pb: 2, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1 }}>
       <PageMessageArea
         message={error}
         onClose={() => setError('')}
         horizontalPadding="none"
+        salesSpacing="contained"
       />
       {notice ? <Alert severity="success">{notice}</Alert> : null}
       <SearchResultMessage
         resultCount={rows.length}
         horizontalPadding="none"
+        salesSpacing="contained"
       />
       <Box data-testid="delivery-plan-status-grid-shell" sx={{ flex: 1, minHeight: 240, minWidth: 0, overflow: 'hidden' }}>
         <F1Grid storageKey="sales-delivery-plan-status-grid-v1" ariaLabel="출하계획 현황 목록" rows={rows} columns={columns} rowKey="salesDeliveryPlanDetailId" highlightKeyword={appliedKeyword}

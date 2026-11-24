@@ -36,14 +36,16 @@ export function SalesStatementStatusPage(props: StatementPageProps) {
       message={error}
       onClose={() => setError('')}
       horizontalPadding="grid"
+      salesSpacing="outer"
     />
     {loaded && !loading && !error ? (
       <SearchResultMessage
         resultCount={rows.length}
         horizontalPadding="grid"
+        salesSpacing="outer"
       />
     ) : null}
-    <Box data-testid="sales-status-content" sx={{ px: { xs: 1, sm: 2 }, pt: 1, pb: 2, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 360, flex: 1 }}>
+    <Box data-testid="sales-status-content" sx={{ px: 2, pt: 2, pb: 2, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 360, flex: 1 }}>
       <Box sx={{ flex: 1, minHeight: 320, minWidth: 0, overflow: 'hidden' }}>
         <F1Grid ariaLabel="거래명세서현황 목록" rows={rows} columns={columns} rowKey="salesStatementDetailId" highlightKeyword={appliedKeyword}
           storageKey="sales-statement-status-grid-v1" loading={loading} showCheckbox={false} height="100%"
