@@ -15,6 +15,20 @@ vi.mock('../src/pages/pr/process/services/processManagement.service', () => ({
 
 describe('공정관리', () => {
   beforeEach(() => vi.clearAllMocks());
+  it('keeps a 16px outer gutter around the process grid', async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <ProcessManagementPage selectedModule={{ id: 'pr', name: '생산관리' } as never}
+          currentMenuName="공정관리" content={{ description: '' } as never}
+          breadcrumbItems={[]} selectedMenuPermissions={{ read: true } as never} />
+      </MemoryRouter>,
+    );
+    await screen.findByRole('grid');
+    const content = container.firstElementChild!.lastElementChild!;
+    expect(getComputedStyle(content).paddingTop).toBe('16px');
+    expect(getComputedStyle(content).paddingLeft).toBe('16px');
+  }, 30000);
+
   it('aligns the search input with the icon under the application theme', async () => {
     render(
       <AppSettingsProvider>

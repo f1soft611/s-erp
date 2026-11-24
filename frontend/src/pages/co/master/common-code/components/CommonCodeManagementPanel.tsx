@@ -815,6 +815,7 @@ export const CommonCodeManagementPanel = forwardRef<
         flexDirection: 'column',
         height: '100%',
         overflow: 'hidden',
+        p: 2,
       }}
     >
       <Splitter
@@ -840,19 +841,20 @@ export const CommonCodeManagementPanel = forwardRef<
         >
           <CardContent
             sx={{
-              p: 1,
+              pt: 1,
+              px: 2,
+              pb: 2,
               display: 'flex',
               flexDirection: 'column',
               flex: 1,
               minHeight: 0,
               height: '100%',
               overflow: 'hidden',
-              '&:last-child': { pb: 1 },
+              '&:last-child': { pb: 2 },
             }}
           >
             <Box
               sx={{
-                px: 1,
                 py: 1.2,
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -941,19 +943,20 @@ export const CommonCodeManagementPanel = forwardRef<
         >
           <CardContent
             sx={{
-              p: 1,
+              pt: 1,
+              px: 2,
+              pb: 2,
               display: 'flex',
               flexDirection: 'column',
               flex: 1,
               minHeight: 0,
               height: '100%',
               overflow: 'hidden',
-              '&:last-child': { pb: 1 },
+              '&:last-child': { pb: 2 },
             }}
           >
             <Box
               sx={{
-                px: 1,
                 py: 1.2,
                 display: 'flex',
                 justifyContent: 'space-between',

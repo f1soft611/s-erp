@@ -8,12 +8,16 @@ type SearchResultMessageProps = {
   resultCount: number;
   horizontalPadding?: PageMessageHorizontalPadding;
   onDismiss?: () => void;
+  salesSpacing?: 'outer' | 'contained';
+  pageSpacing?: 'outer' | 'contained';
 };
 
 export function SearchResultMessage({
   resultCount,
   horizontalPadding,
   onDismiss,
+  salesSpacing,
+  pageSpacing,
 }: SearchResultMessageProps) {
   const [dismissed, setDismissed] = useState(false);
 
@@ -31,6 +35,8 @@ export function SearchResultMessage({
       role="status"
       compact
       horizontalPadding={horizontalPadding}
+      salesSpacing={salesSpacing}
+      pageSpacing={pageSpacing}
       onClose={() => {
         setDismissed(true);
         onDismiss?.();

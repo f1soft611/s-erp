@@ -199,8 +199,13 @@ it('groups selected detail lines from multiple same-customer deliveries into one
   vi.mocked(createStatement).mockResolvedValue(item);
   mount(<SalesStatementCreatePage {...props} />);
   expect(screen.getByRole('region', { name: '거래명세서 입력 내용' })).toHaveStyle({
-    paddingTop: '8px',
+    paddingTop: '16px',
+    paddingLeft: '16px',
+    paddingRight: '16px',
     paddingBottom: '16px',
+  });
+  expect(screen.getByRole('grid', { name: '거래명세서 상세 목록' }).parentElement).toHaveStyle({
+    paddingLeft: '16px', paddingRight: '16px',
   });
   fireEvent.click(screen.getByRole('button', { name: '출하 선택' }));
   const picker = screen.getByRole('dialog', { name: '출하 선택' });
@@ -290,9 +295,12 @@ it('opens the same registration form from status detail and prints its stored sn
     statementDt: '2026-11-09', deliveryNo: 'SD-1', customerCode: 'C1', customerName: '거래처', lineTotalAmt: 220 }]);
   mount(<SalesStatementStatusPage {...props} />);
   expect(screen.getByTestId('sales-status-content')).toHaveStyle({
-    paddingTop: '8px',
+    paddingTop: '16px',
     paddingBottom: '16px',
   });
+  const status = await screen.findByRole('status');
+  fireEvent.click(within(status).getByRole('button', { name: 'Close' }));
+  expect(screen.getByTestId('sales-status-content')).toHaveStyle({ paddingTop: '16px' });
   fireEvent.click(await screen.findByRole('button', { name: 'TS-1 상세 보기' }));
   const panel = await screen.findByRole('region', { name: '거래명세서 상세' });
   await within(panel).findByRole('table', { name: '거래명세서 품목 목록' });

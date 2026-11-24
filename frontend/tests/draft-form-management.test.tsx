@@ -457,10 +457,10 @@ describe('Draft form management page', () => {
 
     const grid = screen.getByRole('grid', { name: '기안양식 목록' });
     expect(grid.parentElement).toHaveStyle({
-      paddingTop: '8px',
-      paddingRight: '8px',
-      paddingBottom: '8px',
-      paddingLeft: '8px',
+      paddingTop: '16px',
+      paddingRight: '16px',
+      paddingBottom: '16px',
+      paddingLeft: '16px',
     });
   });
 

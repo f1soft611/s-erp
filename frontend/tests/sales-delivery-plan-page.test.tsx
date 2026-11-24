@@ -80,10 +80,15 @@ beforeEach(() => {
 it('uses the standard grid for the registration details', () => {
   render(<SalesDeliveryPlanCreatePage {...props} />);
   expect(screen.getByRole('region', { name: '출하계획 입력 내용' })).toHaveStyle({
-    paddingTop: '8px',
+    paddingTop: '16px',
+    paddingLeft: '16px',
+    paddingRight: '16px',
     paddingBottom: '16px',
   });
   expect(screen.getByRole('grid', { name: '출하계획 상세 목록' })).toBeInTheDocument();
+  expect(screen.getByRole('grid', { name: '출하계획 상세 목록' }).parentElement).toHaveStyle({
+    paddingLeft: '16px', paddingRight: '16px',
+  });
   expect(within(screen.getByRole('region', { name: '출하계획 입력 내용' }))
     .getByRole('button', { name: '수주 선택' }).closest('.MuiInputAdornment-root')).not.toBeNull();
 });
@@ -132,11 +137,15 @@ it('uses the standard grid for the status list', async () => {
   render(<SalesDeliveryPlanStatusPage {...props} />);
   const grid = await screen.findByRole('grid', { name: '출하계획 현황 목록' });
   expect(screen.getByTestId('sales-status-content')).toHaveStyle({
-    paddingTop: '8px',
+    paddingTop: '16px',
+    paddingLeft: '16px',
+    paddingRight: '16px',
     paddingBottom: '16px',
   });
   expect(grid.parentElement).not.toHaveClass('MuiPaper-outlined');
   expect(grid).toHaveStyle({ borderWidth: '1px' });
+  fireEvent.click(within(screen.getByRole('status')).getByRole('button', { name: 'Close' }));
+  expect(screen.getByTestId('sales-status-content')).toHaveStyle({ paddingTop: '16px' });
 });
 
 it('renders each item status row for one plan and opens the containing plan', async () => {
@@ -324,7 +333,7 @@ it('excludes quantities in other plans from an AUTO plan update limit', async ()
   expect(alert).toHaveTextContent('계획수량 합계가 수주수량을 초과했습니다.');
   expect(screen.queryByText(/출하계획이 수정되었습니다/)).not.toBeInTheDocument();
   expect(alert.parentElement).toBe(screen.getByRole('region', { name: '출하계획 입력 내용' }));
-  expect(alert.parentElement).toHaveStyle({ paddingTop: '8px', paddingBottom: '16px' });
+  expect(alert.parentElement).toHaveStyle({ paddingTop: '16px', paddingBottom: '16px' });
   expect(updateDeliveryPlan).toHaveBeenCalledTimes(1);
 }, 15000);
 

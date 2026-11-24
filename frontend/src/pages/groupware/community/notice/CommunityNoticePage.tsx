@@ -397,7 +397,7 @@ export function CommunityNoticePage({
 
       <PageLoadBoundary {...initialLoad} label="공지사항"
         onRetry={() => { void loadNoticePosts(); }}>
-      <PageMessageArea message={errorMessage ?? ''} onClose={() => setErrorMessage(null)} />
+      <PageMessageArea message={errorMessage ?? ''} onClose={() => setErrorMessage(null)} pageSpacing="outer" />
 
       <Box
         ref={setScrollRoot}
@@ -406,7 +406,8 @@ export function CommunityNoticePage({
         <Container
           maxWidth="xl"
           sx={{
-            py: 3,
+            p: 2,
+            pt: errorMessage ? 0 : 2,
             minHeight: '100%',
             boxSizing: 'border-box',
             display: 'flex',

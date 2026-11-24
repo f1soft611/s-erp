@@ -813,6 +813,7 @@ export const RoleManagementPanel = forwardRef<
         flexDirection: 'column',
         height: '100%',
         overflow: 'hidden',
+        p: 2,
       }}
     >
       <Splitter

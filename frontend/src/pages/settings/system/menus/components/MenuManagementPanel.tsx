@@ -368,6 +368,7 @@ export const MenuManagementPanel = forwardRef<
         flexDirection: 'column',
         height: '100%',
         overflow: 'hidden',
+        p: 2,
       }}
     >
       <Card
@@ -379,11 +380,12 @@ export const MenuManagementPanel = forwardRef<
           minHeight: 0,
           height: '100%',
           overflow: 'hidden',
+          bgcolor: 'transparent',
         }}
       >
         <CardContent
           sx={{
-            p: 1,
+            p: 0,
             display: 'flex',
             flexDirection: 'column',
             flex: 1,
@@ -391,49 +393,10 @@ export const MenuManagementPanel = forwardRef<
             height: '100%',
             overflow: 'hidden',
             '&:last-child': {
-              pb: 1,
+              pb: 0,
             },
           }}
         >
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: { xs: 'flex-start', sm: 'center' },
-              flexWrap: 'wrap',
-              gap: 1,
-            }}
-          >
-            {/* <Typography sx={{ fontWeight: 700 }}>메뉴 관리</Typography> */}
-            {/* <Box
-              role="toolbar"
-              aria-label="메뉴 그리드 제어"
-              sx={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                alignItems: 'center',
-                gap: 0.5,
-                ml: 'auto',
-              }}
-            >
-              <IconButton
-                size="small"
-                aria-label="전체 펼치기"
-                disabled={!selectedModule || saving}
-                onClick={() => treeRef.current?.expandAll()}
-              >
-                <UnfoldMoreIcon fontSize="small" />
-              </IconButton>
-              <IconButton
-                size="small"
-                aria-label="전체 접기"
-                disabled={!selectedModule || saving}
-                onClick={() => treeRef.current?.collapseAll()}
-              >
-                <UnfoldLessIcon fontSize="small" />
-              </IconButton>
-            </Box> */}
-          </Box>
           {message ? (
             <Box
               sx={{

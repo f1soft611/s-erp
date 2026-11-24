@@ -584,7 +584,10 @@ it('confirms deletion before requesting and resets to a new direct document', as
 it('matches order registration sections and keeps document actions in the page header', () => {
   mount(<SalesDeliveryCreatePage {...props} />);
   const input = screen.getByRole('region', { name: '출하 입력 내용' });
-  expect(input).toHaveStyle({ paddingTop: '8px', paddingBottom: '16px' });
+  expect(input).toHaveStyle({ paddingTop: '16px', paddingBottom: '16px', paddingLeft: '16px', paddingRight: '16px' });
+  expect(screen.getByRole('grid', { name: '출하 상세 목록' }).parentElement).toHaveStyle({
+    paddingLeft: '16px', paddingRight: '16px',
+  });
   expect(within(input).getByText('출하 기본정보')).toBeInTheDocument();
   expect(within(input).getByText('출하 상세')).toBeInTheDocument();
   expect(input).not.toContainElement(screen.getByRole('button', { name: '저장', exact: true }));
@@ -610,5 +613,9 @@ it('matches order status quick search behavior and result message', async () => 
   expect(screen.getByTestId('sales-status-content')).toHaveStyle({
     paddingTop: '0px',
     paddingBottom: '16px',
+  });
+  fireEvent.click(within(screen.getByRole('status')).getByRole('button', { name: 'Close' }));
+  expect(screen.getByTestId('sales-status-content')).toHaveStyle({
+    paddingTop: '16px', paddingLeft: '16px', paddingRight: '16px', paddingBottom: '16px',
   });
 });

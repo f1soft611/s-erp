@@ -218,7 +218,7 @@ export function SalesDeliveryCreatePage({
   return <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
     {!embedded ? <PageHeader breadcrumbItems={breadcrumbItems.length ? breadcrumbItems : [currentMenuName]} description={content.description} actionGroups={actions} /> : null}
     <Box role="region" aria-label="출하 입력 내용" aria-busy={pending || loading}
-      sx={{ px: embedded ? 0 : { xs: 1, sm: 2 }, pt: embedded ? 0 : 1, pb: embedded ? 0 : 2,
+      sx={{ px: embedded ? 0 : 2, pt: embedded ? 0 : 2, pb: embedded ? 0 : 2,
         display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
       {notice ? <Alert severity="success">{notice}</Alert> : null}
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
@@ -226,7 +226,7 @@ export function SalesDeliveryCreatePage({
       {loading ? <Typography role="status">출하를 불러오는 중입니다.</Typography> : null}
       <PageLoadBoundary loading={loading} error={loadError ? 'server' : null} label="출하등록"
         onRetry={() => savedId && void load(savedId)}>
-        <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, minWidth: 0, borderRadius: 1 }}>
+        <Paper variant="outlined" sx={{ p: 2, minWidth: 0, borderRadius: 1 }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>출하 기본정보</Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' }, columnGap: 2, rowGap: 1,
             '& > .MuiFormControl-root': { m: 0 }, '& > .MuiStack-root': { mt: 0 } }}>
@@ -273,7 +273,7 @@ export function SalesDeliveryCreatePage({
           </Box>
         </Paper>
         <Paper variant="outlined" sx={{ display: 'flex', flexDirection: 'column', flex: '1 0 auto', minHeight: 320, minWidth: 0, borderRadius: 1, overflow: 'hidden' }}>
-        <Box data-testid="sales-delivery-detail-toolbar" sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 1, alignItems: 'center', p: { xs: 1.5, sm: 2 }, pb: 1 }}>
+        <Box data-testid="sales-delivery-detail-toolbar" sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 1, alignItems: 'center', p: 2, pb: 1 }}>
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>출하 상세</Typography>
             <Typography variant="caption" color="text.secondary">{mode === 'view' ? '출하 품목 내역입니다.' : '행을 추가해 품목을 선택하세요. 마우스 오른쪽 버튼으로 행을 삭제할 수 있습니다.'}</Typography>
@@ -294,11 +294,11 @@ export function SalesDeliveryCreatePage({
           </> : null}
           </Box>
         </Box>
-        <Box sx={{ flex: '1 0 260px', minHeight: 260, minWidth: 0, overflow: 'hidden', px: 1 }}>
+        <Box sx={{ flex: '1 0 260px', minHeight: 260, minWidth: 0, overflow: 'hidden', px: 2 }}>
           <DeliveryDetailGrid key={gridKey} gridRef={grid} rows={rows} disabled={!editable} source={form.deliveryType === 'ORDER'}
             onChanges={handleChanges} onSelection={setSelectedIds} onMaterial={openMaterial} />
         </Box>
-        <Box aria-label="출하 금액 합계" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 1, p: { xs: 1.5, sm: 2 } }}>
+        <Box aria-label="출하 금액 합계" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 1, p: 2 }}>
           {([['공급가 합계', totals.supply], ['부가세 합계', totals.vat], ['총 합계', totals.total]] as const).map(([label, amount]) => (
             <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1, px: 1.5, py: 1 }}>
               <Typography variant="body2" color="text.secondary">{label}</Typography>

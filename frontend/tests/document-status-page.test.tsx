@@ -145,6 +145,16 @@ describe('document status page', () => {
     });
   });
 
+  it('restores the 16px content gutter when the result message is dismissed', async () => {
+    renderDocumentStatusPage('read', true);
+    const status = await screen.findByRole('status');
+    const content = status.parentElement!.nextElementSibling!;
+    expect(getComputedStyle(status.parentElement!).paddingLeft).toBe('16px');
+    fireEvent.click(within(status).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(getComputedStyle(content).paddingTop).toBe('16px');
+  });
+
   it('shows all three breadcrumb levels for document status', async () => {
     renderDocumentStatusPage('read');
 

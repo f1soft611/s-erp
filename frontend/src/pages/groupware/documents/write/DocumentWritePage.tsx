@@ -216,7 +216,7 @@ export function DocumentWritePage({
         <Container
           maxWidth="xl"
           sx={{
-            py: { xs: 1.5, sm: 2.5 },
+            p: 2,
             minHeight: '100%',
             boxSizing: 'border-box',
           }}

@@ -244,9 +244,9 @@ export function WorkStandardRecipePage({
           overflowY: 'auto',
         }}
       >
-        <PageMessageArea message={error} onClose={() => setError('')} horizontalPadding="grid" />
+        <PageMessageArea message={error} onClose={() => setError('')} pageSpacing="outer" />
         {hasLoaded && !loading && !error ? (
-          <SearchResultMessage resultCount={items.length} horizontalPadding="grid" />
+          <SearchResultMessage resultCount={items.length} pageSpacing="outer" />
         ) : null}
         <Box
           role="region"
@@ -260,7 +260,7 @@ export function WorkStandardRecipePage({
             },
             gap: 2,
             minWidth: 0,
-            px: { xs: 1, sm: 2 },
+            px: 2,
             // 메시지가 있으면 PageMessageArea의 인접 형제 규칙으로 0이 되고, 닫히면 상단 여백이 복원된다.
             pt: 2,
             pb: 2,

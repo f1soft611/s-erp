@@ -12,6 +12,8 @@ type PageMessageAreaProps = {
   role?: 'alert' | 'status';
   compact?: boolean;
   horizontalPadding?: PageMessageHorizontalPadding;
+  salesSpacing?: 'outer' | 'contained';
+  pageSpacing?: 'outer' | 'contained';
 };
 
 function normalizePageMessage(message: string): string {
@@ -40,8 +42,11 @@ export function PageMessageArea({
   role = 'alert',
   compact = false,
   horizontalPadding,
+  salesSpacing,
+  pageSpacing,
 }: PageMessageAreaProps) {
   const normalizedMessage = normalizePageMessage(message);
+  const spacing = pageSpacing ?? salesSpacing;
 
   if (!normalizedMessage) return null;
 
@@ -49,13 +54,15 @@ export function PageMessageArea({
     <Box
       sx={{
         px:
-          horizontalPadding === 'grid'
+          spacing && horizontalPadding !== 'none'
+            ? 2
+            : horizontalPadding === 'grid'
             ? { xs: 1, sm: 2 }
             : horizontalPadding === 'none'
               ? 0
               : { xs: 1.5, sm: 3 },
-        pt: compact ? 1 : 2,
-        pb: compact ? 1 : 2,
+        pt: spacing === 'contained' ? 0 : spacing ? 2 : compact ? 1 : 2,
+        pb: spacing ? 2 : compact ? 1 : 2,
         '& + .MuiBox-root': { pt: 0 },
       }}
     >

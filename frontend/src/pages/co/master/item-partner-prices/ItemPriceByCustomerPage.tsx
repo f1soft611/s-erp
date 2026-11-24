@@ -229,9 +229,9 @@ export function ItemPriceByCustomerPage({
           onDetailSearch={(values) => { void searchCustomers(values); }}
           detailLoading={management.customersLoading}
         />
-        <PageMessageArea message={management.error} onClose={() => management.setError('')} />
+        <PageMessageArea message={management.error} onClose={() => management.setError('')} pageSpacing="outer" />
         <Box sx={{
-          display: 'flex', flex: 1, minHeight: 280, minWidth: 0, gap: 1, p: 1,
+          display: 'flex', flex: 1, minHeight: 280, minWidth: 0, gap: 1, p: 2,
           flexDirection: { xs: 'column', md: 'row' },
         }}>
           <Box sx={{ flex: { md: '0 0 500px' }, minWidth: 0, minHeight: { xs: 260, md: 0 }, height: { xs: 300, md: 'auto' } }}>

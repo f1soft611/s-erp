@@ -164,8 +164,8 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
       appliedDetailValues={searchSession?.detailValues ?? {}}
       onDetailValuesChange={setDetailValues} onDetailSearch={searchDetails} detailLoading={management.loading}
     />
-    <PageMessageArea message={management.error} onClose={() => management.setError('')} />
-    <Box sx={{ flex: 1, minHeight: 280, minWidth: 0, p: 1 }}>
+    <PageMessageArea message={management.error} onClose={() => management.setError('')} pageSpacing="outer" />
+    <Box sx={{ flex: 1, minHeight: 280, minWidth: 0, p: 2 }}>
       <MaterialGrid rows={management.rows} columns={columns}
         highlightKeyword={management.appliedFilters.keyword}
         canCreate={canCreate && !management.loading && !management.saving}

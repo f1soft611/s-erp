@@ -398,7 +398,10 @@ describe('sales order status page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.getByTestId('sales-status-content')).toHaveStyle({
-      paddingTop: '8px',
+      paddingTop: '16px',
+      paddingLeft: '16px',
+      paddingRight: '16px',
+      paddingBottom: '16px',
     });
 
     fireEvent.click(screen.getByRole('button', { name: '조회' }));
@@ -414,8 +417,8 @@ describe('sales order status page', () => {
     renderStatusPage();
     const message = await screen.findByRole('status');
     expect(message.parentElement).toHaveStyle({
-      paddingTop: '8px',
-      paddingBottom: '8px',
+      paddingTop: '16px',
+      paddingBottom: '16px',
     });
 
     const gridArea = screen.getByRole('grid', { name: '수주현황 목록' })

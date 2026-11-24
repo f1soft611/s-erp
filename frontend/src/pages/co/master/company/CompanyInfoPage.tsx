@@ -239,7 +239,7 @@ export function CompanyInfoPage({
         label="회사정보"
         onRetry={() => void loadCompanyInfo()}
       >
-        <PageMessageArea message={visibleError} onClose={() => setError('')} />
+        <PageMessageArea message={visibleError} onClose={() => setError('')} pageSpacing="outer" />
         <Box role="region" aria-label="회사정보 입력 영역"
           sx={{ flex: 1, minHeight: 0, minWidth: 0, width: '100%', overflowY: 'auto' }}>
         <Box
@@ -247,7 +247,8 @@ export function CompanyInfoPage({
           onSubmit={handleSubmit}
           sx={{
             display: 'grid', gap: 2, alignContent: 'start',
-            p: { xs: 1.5, sm: 3 },
+            p: 2,
+            pt: visibleError ? 0 : 2,
             minWidth: 0, width: '100%', maxWidth: 1120, mx: 'auto',
           }}
         >

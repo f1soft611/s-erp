@@ -183,7 +183,7 @@ export function SalesDeliveryPlanCreatePage({
     <PageHeader breadcrumbItems={breadcrumbItems.length ? breadcrumbItems : [currentMenuName]}
       description={content.description} actionGroups={actions} />
     <Box role="region" aria-label="출하계획 입력 내용"
-      sx={{ px: { xs: 1, sm: 2 }, pt: 1, pb: 2,
+      sx={{ px: 2, pt: 2, pb: 2,
         display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
       {notice ? <Alert severity="success">{notice}</Alert> : null}
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}

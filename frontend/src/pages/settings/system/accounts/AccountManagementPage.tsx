@@ -157,8 +157,8 @@ export function AccountManagementPage({
           onDetailSearch={runSearch}
           detailLoading={management.loading}
         />
-        <PageMessageArea message={management.error} onClose={() => management.setError('')} />
-        <Box sx={{ flex: 1, minHeight: 320, minWidth: 0, p: 1 }}>
+        <PageMessageArea message={management.error} onClose={() => management.setError('')} pageSpacing="outer" />
+        <Box sx={{ flex: 1, minHeight: 320, minWidth: 0, p: 2 }}>
           <AccountGrid
             rows={management.rows}
             loading={management.loading}

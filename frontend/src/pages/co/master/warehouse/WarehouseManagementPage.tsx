@@ -292,8 +292,9 @@ export function WarehouseManagementPage({
       <PageMessageArea
         message={management.error}
         onClose={() => management.setError('')}
+        pageSpacing="outer"
       />
-      <Box sx={{ flex: 1, minHeight: 280, minWidth: 0, p: 1 }}>
+      <Box sx={{ flex: 1, minHeight: 280, minWidth: 0, p: 2 }}>
         <WarehouseGrid
           rows={management.rows}
           columns={columns}

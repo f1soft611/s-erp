@@ -644,7 +644,7 @@ export function MenuManagementPage({
           </Select>
         </FormControl>
       </PageSearchArea>
-      <PageMessageArea message={error} onClose={() => setError('')} />
+      <PageMessageArea message={error} onClose={() => setError('')} pageSpacing="outer" />
       {hasRequiredSelection ? (
         <MenuManagementPanel
           ref={menuPanelRef}

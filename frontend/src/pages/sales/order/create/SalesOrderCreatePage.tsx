@@ -704,8 +704,8 @@ export function SalesOrderCreatePage({
           minWidth: 0,
           overflowX: 'hidden',
           overflowY: 'auto',
-          px: embedded ? 0 : { xs: 1, sm: 2 },
-          pt: embedded ? 0 : 1,
+          px: embedded ? 0 : 2,
+          pt: embedded ? 0 : 2,
           pb: embedded ? 0 : 2,
         }}
       >
@@ -735,7 +735,7 @@ export function SalesOrderCreatePage({
         {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
         <Paper
           variant="outlined"
-          sx={{ p: { xs: 1.5, sm: 2 }, minWidth: 0, borderRadius: 1 }}
+          sx={{ p: 2, minWidth: 0, borderRadius: 1 }}
         >
           <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 700 }}>
             수주 기본정보
@@ -949,7 +949,7 @@ export function SalesOrderCreatePage({
               justifyContent: 'space-between',
               flexWrap: 'wrap',
               gap: 1,
-              p: { xs: 1.5, sm: 2 },
+              p: 2,
               pb: 1,
             }}
           >
@@ -991,7 +991,7 @@ export function SalesOrderCreatePage({
             </Box>
             )}
           </Box>
-          <Box sx={{ flex: '1 0 260px', minHeight: 260, minWidth: 0, overflow: 'hidden', px: 1 }}>
+          <Box sx={{ flex: '1 0 260px', minHeight: 260, minWidth: 0, overflow: 'hidden', px: 2 }}>
             <SalesOrderDetailGrid
               key={gridKey}
               gridRef={gridRef}
@@ -1014,7 +1014,7 @@ export function SalesOrderCreatePage({
                 sm: 'repeat(3, minmax(0, 1fr))',
               },
               gap: 1,
-              p: { xs: 1.5, sm: 2 },
+              p: 2,
             }}
           >
             <AmountSummary label="공급가 합계" amount={amounts.supplyAmount} />

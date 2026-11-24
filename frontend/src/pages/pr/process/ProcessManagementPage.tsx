@@ -48,8 +48,8 @@ export function ProcessManagementPage({ selectedModule, currentMenuName, content
           },
         })} />}
         onDefaultSearch={() => { if (!management.dirty) management.setAppliedQuery(management.query); }} />
-      <PageMessageArea message={management.error} onClose={() => management.setError('')} horizontalPadding="grid" />
-      <Box sx={{ flex: 1, minHeight: 0, minWidth: 0, px: { xs: 1, sm: 2 }, py: 1 }}>
+      <PageMessageArea message={management.error} onClose={() => management.setError('')} pageSpacing="outer" />
+      <Box sx={{ flex: 1, minHeight: 0, minWidth: 0, p: 2 }}>
         <ProcessManagementTree treeRef={management.treeRef} rows={management.visibleRows} version={management.version}
           loading={management.loading} saving={management.saving} filtered={Boolean(management.appliedQuery)}
           canCreate={canCreate} canUpdate={canUpdate} canDelete={canDelete} onSelection={management.onSelection}

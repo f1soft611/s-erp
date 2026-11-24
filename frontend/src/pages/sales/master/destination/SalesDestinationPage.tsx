@@ -104,13 +104,13 @@ export function SalesDestinationPage({ content, breadcrumbItems, selectedMenuPer
         sx={(theme) => ({ width: '100%', height: 40, '& .MuiOutlinedInput-root': {
           height: '100%', borderRadius: '0 4px 4px 0', backgroundColor: theme.palette.background.paper,
         } })} />} onDefaultSearch={() => { void search(); }} />
-      <PageMessageArea message={state.error} onClose={() => state.setError('')} />
-      <Box sx={{ display: 'flex', flex: 1, minHeight: 280, minWidth: 0, p: 1 }}>
+      <PageMessageArea message={state.error} onClose={() => state.setError('')} salesSpacing="outer" />
+      <Box sx={{ display: 'flex', flex: 1, minHeight: 280, minWidth: 0, p: 2 }}>
         <Splitter direction="horizontal" mobileMode="stacked" mobileBreakpoint={768}
           minSize={400} maxSize={1000} initialSize={430} ariaLabel="거래처와 납품처 영역 분리기">
-        <Card sx={{ boxShadow: 'none', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }}>
-          <CardContent sx={{ p: 1, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden', '&:last-child': { pb: 1 } }}>
-          <Box sx={{ px: 1, py: 1.2, display: 'flex', justifyContent: 'space-between',
+        <Card variant="outlined" sx={{ borderRadius: 1, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }}>
+          <CardContent sx={{ pt: 1, px: 2, pb: 2, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden', '&:last-child': { pb: 2 } }}>
+          <Box sx={{ py: 1.2, display: 'flex', justifyContent: 'space-between',
             alignItems: { xs: 'flex-start', sm: 'center' }, flexWrap: 'wrap', gap: 1 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>거래처 관리</Typography>
           </Box>
@@ -125,9 +125,9 @@ export function SalesDestinationPage({ content, breadcrumbItems, selectedMenuPer
           </Box>
           </CardContent>
         </Card>
-        <Card sx={{ boxShadow: 'none', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }}>
-          <CardContent sx={{ p: 1, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden', '&:last-child': { pb: 1 } }}>
-          <Box sx={{ px: 1, py: 1.2, display: 'flex', justifyContent: 'space-between',
+        <Card variant="outlined" sx={{ borderRadius: 1, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }}>
+          <CardContent sx={{ pt: 1, px: 2, pb: 2, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden', '&:last-child': { pb: 2 } }}>
+          <Box sx={{ py: 1.2, display: 'flex', justifyContent: 'space-between',
             alignItems: { xs: 'flex-start', sm: 'center' }, flexWrap: 'wrap', gap: 1 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>납품처 관리</Typography>
             <Typography variant="subtitle2" color="text.secondary" sx={{
