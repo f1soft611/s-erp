@@ -3462,6 +3462,34 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
     expect(ref.current?.getActiveRows()[0].price).toBe('1.234');
   });
 
+  it('opens an exact decimal editor with the same digits the cell displays', () => {
+    type Line = { id: string; price: string; qty: string; fixed: string; long: string };
+    const ref = createRef<F1GridRef<Line>>();
+    render(<F1Grid ref={ref} rowKey="id"
+      rows={[{ id: 'a', price: '3.220000', qty: '2.000000', fixed: '1234.500000', long: '1.230400' }]}
+      columns={[
+        { field: 'price', headerName: '단가', type: 'decimal', editable: true, decimalPlaces: 2, exactDecimal: true },
+        { field: 'qty', headerName: '수량', type: 'number', editable: true, decimalPlaces: 0, exactDecimal: true },
+        { field: 'fixed', headerName: '고정', type: 'decimal', editable: true, decimalPlaces: 3, exactDecimal: true },
+        { field: 'long', headerName: '초과', type: 'decimal', editable: true, decimalPlaces: 2, exactDecimal: true },
+      ]} />);
+    const open = (name: string) => {
+      fireEvent.doubleClick(screen.getByRole('gridcell', { name }));
+      const editor = document.querySelector('input.MuiInputBase-input') as HTMLInputElement;
+      const shown = editor.value;
+      fireEvent.keyDown(editor, { key: 'Enter' });
+      return shown;
+    };
+    expect(open('3.22')).toBe('3.22');
+    expect(open('2')).toBe('2');
+    expect(open('1,234.500')).toBe('1234.500');
+    expect(open('1.230400')).toBe('1.230400');
+    expect(ref.current?.getActiveRows()[0]).toEqual({
+      id: 'a', price: '3.220000', qty: '2.000000', fixed: '1234.500000', long: '1.230400',
+    });
+    expect(ref.current?.getChanges?.().updatedRows ?? []).toHaveLength(0);
+  });
+
   it('copies selected rows as tab-separated clipboard text', () => {
     render(<F1Grid rows={itemRows} columns={itemColumns} rowKey="id" />);
     fireEvent.click(screen.getByLabelText('line-1 행 선택'));

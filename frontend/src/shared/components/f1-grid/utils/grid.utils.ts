@@ -277,7 +277,6 @@ function formatExactNumericValue<T extends object>(column: F1GridColumn<T>, valu
   const text = String(value ?? '');
   const match = text.match(/^([+-]?)(?:(\d+)(?:\.(\d*))?|\.(\d+))$/);
   if (!match || text.length > 256) return text;
-  const sign = match[1] === '-' ? '-' : '';
   const integer = match[2] ?? '0';
   const fraction = match[3] ?? match[4] ?? '';
   const places = Number.isInteger(column.decimalPlaces)
@@ -290,12 +289,20 @@ function formatExactNumericValue<T extends object>(column: F1GridColumn<T>, valu
   const remainder = units % divisor;
   if ((column.rounding === 'UP' && remainder > 0n) ||
       ((column.rounding ?? 'HALF_UP') === 'HALF_UP' && remainder * 2n >= divisor)) adjusted += 1n;
+  const sign = match[1] === '-' && adjusted !== 0n ? '-' : '';
   const digits = adjusted.toString().padStart(places + 1, '0');
   const whole = (places ? digits.slice(0, -places) : digits).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   let tail = places ? digits.slice(-places) : '';
   if (column.trailingZeros === 'AUTO' || column.decimalPlaces === undefined) tail = tail.replace(/0+$/, '');
   const currency = column.format === 'currency' ? '₩' : '';
   return `${sign}${currency}${whole}${tail ? `.${tail}` : ''}`;
+}
+
+/** 정밀 소수 셀의 편집 시작 문자열. 값이 바뀌지 않는 범위에서 셀 표시와 같은 자릿수로 맞춘다. */
+export function getExactEditValue<T extends object>(column: F1GridColumn<T>, value: unknown): string {
+  const text = String(value ?? '');
+  if (!column.exactDecimal || !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) return text;
+  return formatExactNumericValue(column, text, true).replace(/[,₩]/g, '');
 }
 
 export function getGridDateValue(value: unknown): Date | undefined {

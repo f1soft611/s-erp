@@ -71,6 +71,7 @@ import {
 import { getGridMergeInfo } from '../merge/GridRowMerge';
 import {
   getAutoFitColumnWidth,
+  getExactEditValue,
   getGridColumnTracks,
   getGridRowId,
   getStateKey,
@@ -1743,7 +1744,7 @@ function F1GridInner<T extends object>(
       column.type === 'user'
         ? ((row[column.field] as F1GridDraftValue | undefined) ??
             (column.form?.multiple ? [] : null))
-        : String(row[column.field] ?? ''),
+        : getExactEditValue(column, row[column.field]),
     );
     finishEditLifecycle(context);
   }
@@ -1799,7 +1800,11 @@ function F1GridInner<T extends object>(
             column.type === 'currency'
           ? draftText.trim() === ''
             ? null
-            : column.exactDecimal ? draftText : Number(draftText)
+            : column.exactDecimal
+              ? row && draftText === getExactEditValue(column, row[column.field])
+                ? row[column.field]
+                : draftText
+              : Number(draftText)
           : column.type === 'date'
             ? normalizeDateInput(draftText)
             : (matchedAutocompleteOption?.value ??

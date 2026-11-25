@@ -17,3 +17,13 @@ it('retains excess input digits visibly in an editable exact column', () => {
   };
   expect(getCellDisplayValue(column, '1.2345')).toBe('1.2345');
 });
+
+it('does not show a negative sign when a read-only exact value rounds to zero', () => {
+  const column: F1GridColumn<{ amount: string }> = {
+    field: 'amount', headerName: '금액', type: 'decimal', exactDecimal: true, decimalPlaces: 2, rounding: 'HALF_UP',
+  };
+  expect(getCellDisplayValue(column, '-0.004')).toBe('0.00');
+  expect(getCellDisplayValue({ ...column, rounding: 'DOWN' }, '-0.009')).toBe('0.00');
+  expect(getCellDisplayValue(column, '-0.005')).toBe('-0.01');
+  expect(getCellDisplayValue(column, '-0.00')).toBe('0.00');
+});
