@@ -46,10 +46,18 @@ class SalesDecimalPostgresIntegrationTest {
         @Bean
         DataSource dataSource() throws Exception {
             DriverManagerDataSource source = new DriverManagerDataSource(
-                    System.getenv("SALES_DECIMAL_TEST_URL"), "postgres", "");
+                    System.getenv("SALES_DECIMAL_TEST_URL"), "postgres",
+                    System.getenv().getOrDefault("SALES_DECIMAL_TEST_PASSWORD", ""));
             JdbcTemplate jdbc = new JdbcTemplate(source);
             if (!"sales_decimal_isolated_test".equals(jdbc.queryForObject("SELECT current_database()", String.class))) {
                 throw new IllegalStateException("An isolated test database is required");
+            }
+            // 격리 DB(이름 검증 통과 후)에서만 이전 실행이 남긴 테스트 테이블을 정리한다.
+            for (String table : new String[] { "tb_customer_info", "tb_material_info", "tb_sales_destination",
+                    "tb_sales_order_hd", "tb_sales_order_dt", "tb_sales_quotation_hd", "tb_sales_quotation_dt",
+                    "tb_sales_delivery_hd", "tb_sales_delivery_dt", "tb_sales_delivery_plan_dt",
+                    "tb_sales_statement_hd", "tb_sales_statement_dt" }) {
+                jdbc.execute("DROP TABLE IF EXISTS " + table + " CASCADE");
             }
             jdbc.execute("CREATE TABLE tb_customer_info (customer_id bigint, tenant_id bigint)");
             jdbc.execute("CREATE TABLE tb_material_info (material_id bigint, tenant_id bigint, material_code text, material_name text)");
