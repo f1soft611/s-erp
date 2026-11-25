@@ -8,7 +8,13 @@ import { ApiNetworkError } from '../src/shared/services/apiErrors';
 const api = vi.hoisted(() => ({
   apiGet: vi.fn(), apiPost: vi.fn(), apiPut: vi.fn(), apiDelete: vi.fn(),
 }));
-vi.mock('../src/shared/services/apiClient', () => api);
+vi.mock('../src/shared/services/apiClient', () => ({
+  ...api,
+  // 영업 서비스는 정밀 소수 응답용 함수를 사용하므로 같은 mock으로 위임한다.
+  apiGetWithExactDecimals: (path: string) => api.apiGet(path),
+  apiPostWithExactDecimals: (path: string, data: unknown) => api.apiPost(path, data),
+  apiPutWithExactDecimals: (path: string, data: unknown) => api.apiPut(path, data),
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();

@@ -186,8 +186,9 @@ function renderStatusPage(
 }
 
 async function openOrderDetailPanel() {
+  // 목록 최초 렌더링은 단독 실행에서도 0.4~1초가 걸려 기본 1초 대기는 병렬 실행 부하에서 경계에 걸린다.
   fireEvent.click(
-    await screen.findByRole('button', { name: 'SO-20261027-0001 상세 보기' }),
+    await screen.findByRole('button', { name: 'SO-20261027-0001 상세 보기' }, { timeout: 5000 }),
   );
   return screen.findByRole('region', { name: '수주 상세' });
 }
