@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { apiGet, apiPost } from '../src/shared/services/apiClient';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { apiGet, apiPost, apiPut } from '../src/shared/services/apiClient';
 import { QuotationCreatePage } from '../src/pages/sales/quotation/create/QuotationCreatePage';
 import {
   calculateQuotationLineAmount,
@@ -95,6 +95,95 @@ describe('quotation create page', () => {
         /공급가액\s*1\.234567\s*부가세 \(10%\)\s*0\.123457\s*총액\s*1\.358024/,
       ));
     } finally { strict.mockRestore(); standard.mockRestore(); }
+  });
+
+  describe('saving a loaded quotation', () => {
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    const loaded = (remark: string) => ({ item: {
+      quotationId: 21, quotationNo: 'QT-OLD', quotationDt: '2026-11-16',
+      customerId: 10, customerCode: 'C-10', customerName: '고객 10', writer: true, remark,
+      details: [{ quotationDetailId: 1, materialId: null, materialName: '품목',
+        quotationQty: '2', unitPrice: '1.234567', lineAmt: '2.469134' }],
+    } });
+
+    function renderEdit(getRemark: () => string) {
+      const rules = { SALES: {
+        number: { places: 0, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+        decimal: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+        currency: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const },
+      } };
+      vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue(rules);
+      vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+      const lookup = apiGetMock.getMockImplementation()!;
+      apiGetMock.mockImplementation((path: string) => path === '/api/v1/sales/quotations/21'
+        ? Promise.resolve(loaded(getRemark())) : lookup(path));
+      const router = createMemoryRouter([{ path: '/', element: <GridDecimalModuleProvider moduleCode="SALES">
+        <QuotationCreatePage selectedModule={moduleItem} currentMenuName="견적서작성"
+          content={{ title: '견적서작성', description: '', cards: [], items: [] }}
+          breadcrumbItems={[]} selectedMenuPermissions={{ read: true, update: true }}
+          quotationId={21} mode="edit" />
+      </GridDecimalModuleProvider> }]);
+      render(<RouterProvider router={router} />);
+    }
+
+    async function editRemark(text: string) {
+      await screen.findByDisplayValue('QT-OLD');
+      fireEvent.change(screen.getByRole('textbox', { name: '비고' }), { target: { value: text } });
+      await waitFor(() => expect(screen.getByRole('button', { name: '저장', exact: true })).toBeEnabled());
+    }
+
+    it('shows progress, blocks duplicate submits, confirms success and clears the dirty state', async () => {
+      let savedRemark = '';
+      let finishSave!: (value: unknown) => void;
+      vi.mocked(apiPut).mockReset();
+      vi.mocked(apiPut).mockImplementation(() => new Promise((resolve) => { finishSave = resolve; }));
+      renderEdit(() => savedRemark);
+      await editRemark('새 비고');
+
+      fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+      await waitFor(() => expect(screen.getByRole('region', { name: '견적 입력 내용' })).toHaveAttribute('aria-busy', 'true'));
+      expect(screen.getByRole('button', { name: '저장', exact: true })).toBeDisabled();
+      fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+      expect(vi.mocked(apiPut)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(apiPut).mock.calls[0][0]).toBe('/api/v1/sales/quotations/21');
+      expect(screen.getByRole('textbox', { name: '비고' })).toHaveValue('새 비고');
+
+      savedRemark = '새 비고';
+      await act(async () => { finishSave({ item: { quotationId: 21, quotationNo: 'QT-OLD' } }); });
+      expect(await screen.findByText('견적이 수정되었습니다. 견적번호: QT-OLD')).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByRole('region', { name: '견적 입력 내용' })).toHaveAttribute('aria-busy', 'false'));
+      expect(screen.getByRole('textbox', { name: '비고' })).toHaveValue('새 비고');
+      expect(screen.getByRole('button', { name: '저장', exact: true })).toBeDisabled();
+      const unload = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(unload);
+      expect(unload.defaultPrevented).toBe(false);
+    });
+
+    it('shows a save failure, keeps the entered values and allows a retry that succeeds', async () => {
+      let savedRemark = '';
+      vi.mocked(apiPut).mockReset();
+      vi.mocked(apiPut).mockRejectedValueOnce(new Error('서버가 저장하지 못했습니다.'))
+        .mockResolvedValueOnce({ item: { quotationId: 21, quotationNo: 'QT-OLD' } });
+      renderEdit(() => savedRemark);
+      await editRemark('재시도 비고');
+
+      fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+      expect(await screen.findByText('서버가 저장하지 못했습니다.')).toBeInTheDocument();
+      expect(screen.queryByText(/견적이 수정되었습니다/)).not.toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: '비고' })).toHaveValue('재시도 비고');
+      expect(screen.getByRole('button', { name: '저장', exact: true })).toBeEnabled();
+      const unload = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(unload);
+      expect(unload.defaultPrevented).toBe(true);
+
+      savedRemark = '재시도 비고';
+      fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+      expect(await screen.findByText('견적이 수정되었습니다. 견적번호: QT-OLD')).toBeInTheDocument();
+      expect(screen.queryByText('서버가 저장하지 못했습니다.')).not.toBeInTheDocument();
+      expect(vi.mocked(apiPut)).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole('button', { name: '저장', exact: true })).toBeDisabled();
+    });
   });
 
   it('uses the system business date and presents the quotation header and manual line flow', async () => {
