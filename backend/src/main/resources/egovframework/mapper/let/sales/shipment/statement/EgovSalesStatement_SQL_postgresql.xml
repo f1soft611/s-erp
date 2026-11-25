@@ -169,7 +169,7 @@
         SELECT h.sales_statement_id AS "salesStatementId", h.sales_delivery_id AS "salesDeliveryId",
                h.statement_no AS "statementNo", to_char(h.statement_dt, 'YYYY-MM-DD') AS "statementDt",
                h.delivery_no AS "deliveryNo", to_char(h.delivery_dt, 'YYYY-MM-DD') AS "deliveryDt", h.delivery_type AS "deliveryType",
-               h.order_no AS "orderNo", h.customer_id AS "customerId",
+               h.order_no AS "orderNo", delivery.customer_id AS "customerId",
                h.supplier_name AS "supplierName",
                h.supplier_business_no AS "supplierBusinessNo", h.supplier_president_name AS "supplierPresidentName",
                h.supplier_business_type AS "supplierBusinessType", h.supplier_business_category AS "supplierBusinessCategory",
@@ -185,6 +185,8 @@
                to_char(h.created_at, 'YYYY-MM-DD HH24:MI') AS "createdAt",
                u.user_nm AS "createdByName", la.profile_image AS "createdByProfileImage"
         FROM tb_sales_statement_hd h
+        JOIN tb_sales_delivery_hd delivery ON delivery.sales_delivery_id = h.sales_delivery_id
+            AND delivery.tenant_id = h.tenant_id
         LEFT JOIN tb_tenant t ON t.tenant_id = h.tenant_id
         LEFT JOIN tb_login_account la ON la.login_code = h.created_by AND la.tenant_id = h.tenant_id
         LEFT JOIN tb_user u ON u.login_id = la.login_id AND u.tenant_id = la.tenant_id

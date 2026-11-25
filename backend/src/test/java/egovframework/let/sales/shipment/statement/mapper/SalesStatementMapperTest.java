@@ -58,7 +58,11 @@ class SalesStatementMapperTest {
         String read = configuration.getMappedStatement("SalesStatementDAO.selectHeader")
                 .getBoundSql(params).getSql();
         assertThat(read).contains("h.supplier_name", "h.customer_name", "COALESCE(h.supplier_stamp_image, t.stamp_image)",
-                "t.tenant_id = h.tenant_id", "h.use_at = 'Y'");
+                "t.tenant_id = h.tenant_id", "h.use_at = 'Y'",
+                "delivery.customer_id AS \"customerId\"",
+                "delivery.sales_delivery_id = h.sales_delivery_id",
+                "delivery.tenant_id = h.tenant_id")
+                .doesNotContain("h.customer_id AS \"customerId\"");
         String readDetails = configuration.getMappedStatement("SalesStatementDAO.selectDetails")
                 .getBoundSql(params).getSql();
         assertThat(readDetails).contains("salesDeliveryDetailId", "sourceDeliveryNo", "sourceDeliveryDt");
