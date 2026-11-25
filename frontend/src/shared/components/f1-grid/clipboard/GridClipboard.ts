@@ -36,6 +36,7 @@ export function coerceClipboardValue<T extends object>(
   ) {
     if (value.trim() === '') return '';
 
+    if (column.exactDecimal) return value.replace(/,/g, '').trim();
     const numericValue = Number(value.replace(/,/g, ''));
     return Number.isFinite(numericValue) ? numericValue : undefined;
   }

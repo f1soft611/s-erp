@@ -152,6 +152,19 @@ describe('F1-Grid Excel export cell types', () => {
     vi.restoreAllMocks();
   });
 
+  it('exports exact decimals and their summary as text without losing digits', async () => {
+    const exactColumns: F1GridColumn<ExportRow>[] = [{
+      field: 'amount', headerName: 'Amount', type: 'decimal', exactDecimal: true,
+      decimalPlaces: 6, summaryType: 'sum',
+    }];
+    const rows = [{ amount: '1234567890123.100001' }, { amount: '0.000002' }] as ExportRow[];
+    const sheet = (await readExportedWorkbook(rows, exactColumns, 'bottom')).getWorksheet('Sheet1')!;
+    expect(sheet.getCell('A2').value).toBe('1234567890123.100001');
+    expect(sheet.getCell('A4').value).toBe('1234567890123.100003');
+    expect(sheet.getCell('A2').numFmt).toBe('@');
+    expect(sheet.getCell('A4').numFmt).toBe('@');
+  });
+
   it.each([undefined, 'top', 'bottom'] as const)('exports displayed row numbers with summary dock %s', async (dock) => {
     const rowNumberColumns: F1GridColumn<ExportRow>[] = [
       { field: 'rowNumber', headerName: 'No', type: 'rownumber', getValue: () => 999 },

@@ -12,10 +12,10 @@ export type RevenueClosingDetailRow = {
   materialCode: string;
   materialName: string;
   closingStatus: RevenueClosingStatus;
-  quantity: number;
-  salesAmount: number;
-  vatAmount: number;
-  totalAmount: number;
+  quantity: number | string;
+  salesAmount: number | string;
+  vatAmount: number | string;
+  totalAmount: number | string;
 };
 
 export type RevenueClosingCustomerSummaryRow = {

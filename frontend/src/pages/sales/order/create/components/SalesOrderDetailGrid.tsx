@@ -12,6 +12,7 @@ import {
   type SalesOrderDetailRow,
 } from '../data/salesOrderDetail';
 import type { SalesOrderCodeOption } from '../../services/salesOrderCommonCode.service';
+import { usePolicyDecimalRule } from '../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
 
 type Props = {
   gridRef: RefObject<F1GridRef<SalesOrderDetailRow> | null>;
@@ -36,6 +37,8 @@ export function SalesOrderDetailGrid({
   onCalculationError,
   disabled = false,
 }: Props) {
+  const policy = usePolicyDecimalRule();
+  const amountRule = policy && ('places' in policy ? policy : policy.currency);
   const columns = useMemo(
     () =>
       createSalesOrderDetailColumns(
@@ -43,8 +46,10 @@ export function SalesOrderDetailGrid({
         disabled,
         progressStatusOptions,
         onCalculationError,
+        amountRule,
+        policy,
       ),
-    [disabled, onCalculationError, onOpenMaterialPicker, progressStatusOptions],
+    [amountRule, disabled, onCalculationError, onOpenMaterialPicker, policy, progressStatusOptions],
   );
 
   return (

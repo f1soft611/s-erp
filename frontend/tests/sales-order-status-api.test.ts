@@ -6,9 +6,10 @@ import {
 } from '../src/pages/sales/order/status/services/salesOrderStatus.service';
 import type { SalesOrderStatusRow } from '../src/pages/sales/order/status/types/salesOrderStatus.types';
 
-vi.mock('../src/shared/services/apiClient', () => ({
-  apiGet: vi.fn(),
-}));
+vi.mock('../src/shared/services/apiClient', () => {
+  const apiGet = vi.fn();
+  return { apiGet, apiGetWithExactDecimals: (path: string) => apiGet(path) };
+});
 
 const apiGetMock = vi.mocked(apiGet);
 

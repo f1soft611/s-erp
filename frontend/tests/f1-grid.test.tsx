@@ -3379,6 +3379,89 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
     ]);
   });
 
+  it('recalculates numeric callback values in order when pasting multiple cells', () => {
+    type Line = { id: string; quantity: number; price: number; total: number };
+    const ref = createRef<F1GridRef<Line>>();
+    render(<F1Grid ref={ref} rowKey="id" rows={[{ id: 'a', quantity: 1, price: 2, total: 2 }]}
+      columns={[
+        { field: 'quantity', headerName: '수량', type: 'number', editable: true,
+          onValueChange: (row, value) => ({ quantity: Number(value), total: Number(value) * row.price }) },
+        { field: 'price', headerName: '단가', type: 'decimal', editable: true,
+          onValueChange: (row, value) => ({ price: Number(value), total: row.quantity * Number(value) }) },
+        { field: 'total', headerName: '금액', type: 'decimal' },
+      ]} />);
+    const cell = screen.getByRole('gridcell', { name: '1' });
+    fireEvent.click(cell);
+    fireEvent.paste(cell, { clipboardData: { getData: () => '3\t4' } });
+    expect(ref.current?.getActiveRows()).toEqual([{ id: 'a', quantity: 3, price: 4, total: 12 }]);
+  });
+
+  it('preserves exact decimal strings during editing and paste', () => {
+    type Line = { id: string; price: string };
+    const ref = createRef<F1GridRef<Line>>();
+    render(<F1Grid ref={ref} rowKey="id" rows={[{ id: 'a', price: '1.000000' }]}
+      columns={[{ field: 'price', headerName: '단가', type: 'decimal', editable: true,
+        decimalPlaces: 6, exactDecimal: true }]} />);
+    const cell = screen.getByRole('gridcell', { name: '1.000000' });
+    fireEvent.doubleClick(cell);
+    const editor = document.querySelector('input.MuiInputBase-input') as HTMLInputElement;
+    fireEvent.change(editor, { target: { value: '1234567890123.100001' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    expect(ref.current?.getActiveRows()[0].price).toBe('1234567890123.100001');
+    const updated = screen.getByRole('gridcell', { name: '1,234,567,890,123.100001' });
+    fireEvent.click(updated);
+    fireEvent.paste(updated, { clipboardData: { getData: () => '1234567890123.100003' } });
+    expect(ref.current?.getActiveRows()[0].price).toBe('1234567890123.100003');
+  });
+
+  it('rejects a decimal point in an exact integer cell without changing its value', () => {
+    type Line = { id: string; qty: string };
+    const ref = createRef<F1GridRef<Line>>();
+    render(<F1Grid ref={ref} rowKey="id" rows={[{ id: 'a', qty: '1' }]}
+      columns={[{ field: 'qty', headerName: '수량', type: 'number', editable: true,
+        decimalPlaces: 0, exactDecimal: true }]} />);
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '1' }));
+    const editor = document.querySelector('input.MuiInputBase-input') as HTMLInputElement;
+    const decimalKey = new KeyboardEvent('keydown', { key: '.', bubbles: true, cancelable: true });
+    fireEvent(editor, decimalKey);
+    expect(decimalKey.defaultPrevented).toBe(true);
+    fireEvent.change(editor, { target: { value: '1.5' } });
+    expect(editor.value).toBe('1');
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    expect(ref.current?.getActiveRows()[0].qty).toBe('1');
+  });
+
+  it('rejects excess exact decimal digits without changing the existing value', () => {
+    type Line = { id: string; price: string };
+    const ref = createRef<F1GridRef<Line>>();
+    render(<F1Grid ref={ref} rowKey="id" rows={[{ id: 'a', price: '1.234' }]}
+      columns={[{ field: 'price', headerName: '단가', type: 'decimal', editable: true,
+        decimalPlaces: 3, exactDecimal: true }]} />);
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '1.234' }));
+    const editor = document.querySelector('input.MuiInputBase-input') as HTMLInputElement;
+    fireEvent.change(editor, { target: { value: '1.2345' } });
+    expect(editor.value).toBe('1.234');
+    fireEvent.change(editor, { target: { value: '2.345' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    expect(ref.current?.getActiveRows()[0].price).toBe('2.345');
+  });
+
+  it('lets an existing over-precision value be corrected without losing digits automatically', () => {
+    type Line = { id: string; price: string };
+    const ref = createRef<F1GridRef<Line>>();
+    render(<F1Grid ref={ref} rowKey="id" rows={[{ id: 'a', price: '1.23456' }]}
+      columns={[{ field: 'price', headerName: '단가', type: 'decimal', editable: true,
+        decimalPlaces: 3, exactDecimal: true }]} />);
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '1.23456' }));
+    const editor = document.querySelector('input.MuiInputBase-input') as HTMLInputElement;
+    expect(editor.value).toBe('1.23456');
+    fireEvent.change(editor, { target: { value: '1.2345' } });
+    expect(editor.value).toBe('1.2345');
+    fireEvent.change(editor, { target: { value: '1.234' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    expect(ref.current?.getActiveRows()[0].price).toBe('1.234');
+  });
+
   it('copies selected rows as tab-separated clipboard text', () => {
     render(<F1Grid rows={itemRows} columns={itemColumns} rowKey="id" />);
     fireEvent.click(screen.getByLabelText('line-1 행 선택'));
@@ -4960,6 +5043,26 @@ describe('F1-GRID sorting', () => {
         { field: 'order', direction: 'asc' },
       ]).map((row) => row.id),
     ).toEqual([3, 2, 1]);
+  });
+
+  it('sorts and filters exact decimal columns by numeric value without rounding', () => {
+    type Line = { value: string };
+    const column: F1GridColumn<Line> = {
+      field: 'value', headerName: 'Value', type: 'decimal', exactDecimal: true,
+    };
+    const data = [
+      { value: '1234567890123.100003' },
+      { value: '2' },
+      { value: '1234567890123.100001' },
+    ];
+    expect(sortGridRows(data, [{ field: 'value', direction: 'asc' }], [column]))
+      .toEqual([data[1], data[2], data[0]]);
+    expect(matchesGridFilter(data[2], {
+      field: 'value', operator: 'lessThan', value: '1234567890123.100003',
+    }, column)).toBe(true);
+    expect(matchesGridFilter(data[0], {
+      field: 'value', operator: 'equals', value: '1234567890123.100001',
+    }, column)).toBe(false);
   });
 
   it('reports the sort direction and multi-column order for a field', () => {

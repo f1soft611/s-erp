@@ -34,6 +34,7 @@ test-docs.log
 !tsconfig*.json
 !vercel.json
 !vite.config.ts
+!src/shared/config/decimal-column-contract.json
 
 # Editor directories and files
 .vscode/*

@@ -3,6 +3,7 @@ package egovframework.let.sales.shipment.delivery.domain.model;
 import java.io.Serializable;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -20,4 +21,6 @@ public class SalesDeliveryRequestVO implements Serializable {
     private String remark;
     private boolean overDeliveryConfirmed;
     private List<SalesDeliveryDetailRequestVO> details;
+    private Map<String, Object> decimalPolicy;
+    private Map<String, Object> decimalColumns;
 }

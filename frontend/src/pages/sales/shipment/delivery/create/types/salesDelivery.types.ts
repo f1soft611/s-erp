@@ -1,4 +1,6 @@
 import type { MenuPermission, ModuleItem, PageContent } from '../../../../../dashboard/types/dashboard';
+import type { GridDecimalModuleRule } from '../../../../../../shared/services/gridDecimalPolicy.service';
+import type { DecimalColumn } from '../../../../../../shared/services/decimalColumnContract';
 
 export type DeliveryType = 'DIRECT' | 'ORDER';
 export type DeliveryDetail = {
@@ -18,6 +20,13 @@ export type DeliveryDetail = {
   vatAmt: number;
   totalAmt: number;
 };
+type ExactDeliveryDetail = Omit<DeliveryDetail, 'deliveryQty' | 'unitPrice' | 'supplyAmt' | 'vatAmt' | 'totalAmt'> & {
+  deliveryQty: number | string;
+  unitPrice: number | string;
+  supplyAmt: number | string;
+  vatAmt: number | string;
+  totalAmt: number | string;
+};
 export type DeliveryItem = {
   salesDeliveryId: number;
   deliveryNo: string;
@@ -31,17 +40,22 @@ export type DeliveryItem = {
   deliveryPlace: string | null;
   deliveryMethod: string | null;
   remark: string | null;
-  totalAmt: number;
+  totalAmt: number | string;
   createdBy?: string | null;
   createdByName?: string | null;
   createdByProfileImage?: string | null;
   createdAt?: string | null;
   writer?: boolean | null;
-  details: DeliveryDetail[];
+  details: ExactDeliveryDetail[];
 };
-export type DeliveryRow = Omit<DeliveryDetail, 'salesDeliveryDetailId' | 'lineNo' | 'materialId'> & {
+export type DeliveryRow = Omit<DeliveryDetail, 'salesDeliveryDetailId' | 'lineNo' | 'materialId' | 'deliveryQty' | 'unitPrice' | 'supplyAmt' | 'vatAmt' | 'totalAmt'> & {
   rowId: string;
   materialId: number | null;
+  deliveryQty: number | string;
+  unitPrice: number | string;
+  supplyAmt: number | string;
+  vatAmt: number | string;
+  totalAmt: number | string;
 };
 export type DeliveryForm = {
   deliveryDt: string;
@@ -57,10 +71,12 @@ export type DeliveryForm = {
   details: DeliveryRow[];
 };
 export type DeliveryPayload = Pick<DeliveryForm, 'deliveryDt' | 'deliveryType' | 'salesOrderId' | 'deliveryPlace' | 'deliveryMethod' | 'remark'> & {
+  decimalPolicy?: GridDecimalModuleRule;
+  decimalColumns?: Readonly<Record<string, DecimalColumn>>;
   customerId: number;
   overDeliveryConfirmed?: boolean;
   details: { materialId: number; salesOrderId: number | null; salesOrderDetailId: number | null; salesDeliveryPlanDetailId: number | null;
-    deliveryQty: number; unitPrice: number; vatAmt: number }[];
+    deliveryQty: number | string; unitPrice: number | string; vatAmt: number | string }[];
 };
 export type SourceOrderRow = {
   salesOrderId: number;
@@ -80,12 +96,12 @@ export type SourceOrderRow = {
   materialCode: string;
   materialName: string;
   unit: string | null;
-  orderQty: number;
-  shippedQty: number;
-  plannedQty: number;
-  deliveredQty: number;
-  remainingQty: number;
-  unitPrice: number;
+  orderQty: number | string;
+  shippedQty: number | string;
+  plannedQty: number | string;
+  deliveredQty: number | string;
+  remainingQty: number | string;
+  unitPrice: number | string;
 };
 export type SourceOrderSearchFilters = {
   keyword: string;
@@ -98,7 +114,7 @@ export type SourceOrderSearchFilters = {
   planDtFrom: string;
   planDtTo: string;
 };
-export type DeliveryStatusRow = Omit<DeliveryItem, 'details' | 'totalAmt'> & DeliveryDetail;
+export type DeliveryStatusRow = Omit<DeliveryItem, 'details' | 'totalAmt'> & ExactDeliveryDetail;
 export type DeliveryFilters = {
   deliveryDtFrom: string;
   deliveryDtTo: string;

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { apiDelete, apiGet, apiPost, apiPut } from '../src/shared/services/apiClient';
+import { apiDelete, apiGet, apiGetWithExactDecimals, apiPostWithExactDecimals, apiPutWithExactDecimals } from '../src/shared/services/apiClient';
 import {
   buildSalesOrderCreatePayload,
   createSalesOrder,
@@ -21,13 +21,15 @@ import type { SalesOrderDetailRow } from '../src/pages/sales/order/create/data/s
 vi.mock('../src/shared/services/apiClient', () => ({
   apiDelete: vi.fn(),
   apiGet: vi.fn(),
-  apiPost: vi.fn(),
-  apiPut: vi.fn(),
+  apiGetWithExactDecimals: vi.fn(),
+  apiPostWithExactDecimals: vi.fn(),
+  apiPutWithExactDecimals: vi.fn(),
 }));
 
-const apiPostMock = vi.mocked(apiPost);
+const apiPostMock = vi.mocked(apiPostWithExactDecimals);
 const apiGetMock = vi.mocked(apiGet);
-const apiPutMock = vi.mocked(apiPut);
+const apiGetExactMock = vi.mocked(apiGetWithExactDecimals);
+const apiPutMock = vi.mocked(apiPutWithExactDecimals);
 const apiDeleteMock = vi.mocked(apiDelete);
 
 describe('sales order create API', () => {
@@ -46,6 +48,98 @@ describe('sales order create API', () => {
     });
     expect(errors.salesDestinationId).toBe('납품처를 선택해 주세요.');
     expect(errors.billingCustomerId).toBe('매출처를 선택해 주세요.');
+  });
+
+  it('validates quantities and prices with their respective policy scales', () => {
+    const policy = {
+      number: { places: 0, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const },
+      decimal: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const },
+      currency: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const },
+    };
+    const input = {
+      orderDt: '2026-10-27', deliveryDt: '2026-11-27', customerId: 10,
+      salesDestinationId: 90, billingCustomerId: 11,
+      details: [detailRow({ orderQty: 1, unitPrice: 1.234, supplyAmount: 1.234, vatAmount: 0.123, totalAmount: 1.357 })],
+    };
+    expect(validateSalesOrderInput(input, policy).detailMessages).toEqual([]);
+    expect(buildSalesOrderCreatePayload({ ...input, quotNo: null, deliveryPlace: null, deliveryMethod: null,
+      remark: null }, policy)).toHaveProperty('decimalPolicy', policy);
+    expect(buildSalesOrderCreatePayload({ ...input, quotNo: null, deliveryPlace: null, deliveryMethod: null,
+      remark: null }, policy)).toHaveProperty('decimalColumns.unitPrice.type', 'decimal');
+    expect(validateSalesOrderInput({ ...input, details: [detailRow({ orderQty: 1, unitPrice: 1.234,
+      supplyAmount: 1.234, vatAmount: 0.2, totalAmount: 1.434 })] }, policy).detailMessages).toEqual([]);
+    expect(validateSalesOrderInput({ ...input, details: [detailRow({ orderQty: 1.5 })] }, policy).detailMessages.join()).toContain('수량');
+    expect(validateSalesOrderInput({ ...input, details: [detailRow({ unitPrice: 1.2345 })] }, policy).detailMessages.join()).toContain('단가');
+    expect(validateSalesOrderInput({ ...input, details: [detailRow({ orderQty: 1, unitPrice: 1.234,
+      supplyAmount: 1.23, vatAmount: 0.123, totalAmount: 1.353 })] }, policy).detailMessages.join()).toContain('재계산');
+  });
+
+  it('validates prices and calculated amounts using distinct decimal and currency policies', () => {
+    const policy = {
+      number: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const },
+      decimal: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      currency: { places: 2, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const },
+    };
+    const input = {
+      orderDt: '2026-10-27', deliveryDt: '2026-11-27', customerId: 10,
+      salesDestinationId: 90, billingCustomerId: 11,
+      details: [detailRow({ orderQty: '1.234', unitPrice: '1.235', supplyAmount: '1.52', vatAmount: '0.15', totalAmount: '1.67' })],
+    };
+    expect(validateSalesOrderInput(input, policy).detailMessages).toEqual([]);
+    expect(validateSalesOrderInput({ ...input, details: [{ ...input.details[0], vatAmount: '0.151' }] }, policy).detailMessages.join()).toContain('부가세');
+    expect(validateSalesOrderInput({ ...input, details: [{ ...input.details[0], unitPrice: '1.2351' }] }, policy).detailMessages.join()).toContain('단가');
+  });
+
+  it('validates order inputs and calculated amounts against each shared column rule', async () => {
+    const contracts = await import('../src/shared/services/decimalColumnContract');
+    const original = contracts.getDecimalColumnContract('sales.order');
+    const spy = vi.spyOn(contracts, 'getDecimalColumnContract').mockReturnValue({
+      ...original,
+      unitPrice: { type: 'decimal', places: 4 },
+      supplyAmount: { type: 'currency', places: 2, rounding: 'HALF_UP' },
+      vatAmount: { type: 'currency', places: 1, rounding: 'HALF_UP' },
+      totalAmount: { type: 'currency', places: 3, rounding: 'DOWN' },
+    });
+    try {
+      const policy = { places: 3, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const };
+      const row = detailRow({ orderQty: '1', unitPrice: '1.235', supplyAmount: '1.24', vatAmount: '0.1', totalAmount: '1.340' });
+      const input = { orderDt: '2026-10-27', deliveryDt: '2026-11-27', customerId: 10,
+        salesDestinationId: 90, billingCustomerId: 11, details: [row] };
+      expect(validateSalesOrderInput(input, policy).detailMessages).toEqual([]);
+      expect(validateSalesOrderInput({ ...input, details: [{ ...row, vatAmount: '0.11' }] }, policy).detailMessages.join()).toContain('부가세');
+    } finally { spy.mockRestore(); }
+  });
+
+  it('validates and transmits exact sales decimals without changing their digits', () => {
+    const policy = {
+      number: { places: 0, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      decimal: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      currency: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+    };
+    const row = detailRow({
+      orderQty: '1', unitPrice: '1234567890123.100001',
+      supplyAmount: '1234567890123.100001', vatAmount: '123456789012.310000',
+      totalAmount: '1358024679135.410001',
+    });
+    const input = {
+      orderDt: '2026-10-27', deliveryDt: '2026-11-27', customerId: 10,
+      salesDestinationId: 90, billingCustomerId: 11,
+      quotNo: null, deliveryPlace: null, deliveryMethod: null, remark: null, details: [row],
+    };
+    expect(validateSalesOrderInput(input, policy).detailMessages).toEqual([]);
+    expect(buildSalesOrderCreatePayload(input, policy).details[0].unitPrice).toBe('1234567890123.100001');
+  });
+
+  it('keeps exact decimal strings when a saved order is mapped back to the edit form', () => {
+    const order = savedOrderItem();
+    order.details[0] = { ...order.details[0], unitPrice: '1234567890123.100001',
+      supplyAmt: '1234567890123.100001', vatAmt: '123456789012.310000',
+      totalAmt: '1358024679135.410001' };
+    const row = toSalesOrderForm(order).rows[0];
+    expect(row.unitPrice).toBe('1234567890123.100001');
+    expect(row.supplyAmount).toBe('1234567890123.100001');
+    expect(row.vatAmount).toBe('123456789012.310000');
+    expect(row.totalAmount).toBe('1358024679135.410001');
   });
 
   it('rejects missing header fields and incomplete detail rows', () => {
@@ -153,7 +247,7 @@ describe('sales order create API', () => {
     };
 
     await expect(createSalesOrder(payload)).resolves.toEqual(saved);
-    expect(apiPostMock).toHaveBeenCalledWith('/api/v1/sales/orders', payload);
+    expect(apiPostMock).toHaveBeenCalledWith('/api/v1/sales/orders', payload, expect.arrayContaining(['unitPrice']));
 
     apiPostMock.mockResolvedValue({});
     await expect(createSalesOrder(payload)).rejects.toThrow(
@@ -163,12 +257,12 @@ describe('sales order create API', () => {
 
   it('loads, updates and deletes an order by id', async () => {
     const order = savedOrderItem();
-    apiGetMock.mockResolvedValue({ item: order } satisfies SalesOrderResponse);
+    apiGetExactMock.mockResolvedValue({ item: order } satisfies SalesOrderResponse);
     apiPutMock.mockResolvedValue({ item: order } satisfies SalesOrderResponse);
     apiDeleteMock.mockResolvedValue({ message: '삭제' });
 
     await expect(getSalesOrder(300)).resolves.toEqual(order);
-    expect(apiGetMock).toHaveBeenCalledWith('/api/v1/sales/orders/300');
+    expect(apiGetExactMock).toHaveBeenCalledWith('/api/v1/sales/orders/300', expect.arrayContaining(['unitPrice']));
 
     const payload = buildSalesOrderCreatePayload({
       orderDt: '2026-10-27',
@@ -183,12 +277,12 @@ describe('sales order create API', () => {
       details: [detailRow()],
     });
     await expect(updateSalesOrder(300, payload)).resolves.toEqual(order);
-    expect(apiPutMock).toHaveBeenCalledWith('/api/v1/sales/orders/300', payload);
+    expect(apiPutMock).toHaveBeenCalledWith('/api/v1/sales/orders/300', payload, expect.arrayContaining(['unitPrice']));
 
     await deleteSalesOrder(300);
     expect(apiDeleteMock).toHaveBeenCalledWith('/api/v1/sales/orders/300');
 
-    apiGetMock.mockResolvedValue({});
+    apiGetExactMock.mockResolvedValue({});
     await expect(getSalesOrder(300)).rejects.toThrow('수주 조회 응답에 수주 정보가 없습니다.');
   });
 

@@ -12,11 +12,11 @@ export type StatementDetail = {
   materialName: string | null;
   materialSpec: string | null;
   unit: string | null;
-  deliveryQty: number;
-  unitPrice: number;
-  supplyAmt: number;
-  vatAmt: number;
-  totalAmt: number;
+  deliveryQty: number | string;
+  unitPrice: number | string;
+  supplyAmt: number | string;
+  vatAmt: number | string;
+  totalAmt: number | string;
 };
 
 export type StatementItem = {
@@ -49,7 +49,7 @@ export type StatementItem = {
   customerAddress?: string | null;
   customerTelephoneNo?: string | null;
   customerFacsimileNo?: string | null;
-  totalAmt: number;
+  totalAmt: number | string;
   remark?: string | null;
   createdBy?: string | null;
   createdByName?: string | null;
@@ -65,7 +65,7 @@ export type StatementSource = {
   deliveryDt: string;
   deliveryType: 'DIRECT' | 'ORDER';
   customerName: string;
-  totalAmt: number;
+  totalAmt: number | string;
   salesDeliveryDetailIds: number[];
 };
 
@@ -78,7 +78,7 @@ export type StatementStatusRow = StatementDetail & {
   sourceDeliveryDt?: string | null;
   customerCode: string;
   customerName: string;
-  lineTotalAmt: number;
+  lineTotalAmt: number | string;
 };
 
 export type StatementPayload = {

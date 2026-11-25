@@ -2,6 +2,7 @@ import { Link } from '@mui/material';
 import { F1GridHighlightText } from '../../../../../shared/components/f1-grid';
 import type { F1GridColumn } from '../../../../../shared/components/f1-grid/types/grid.types';
 import type { SalesOrderStatusRow } from '../types/salesOrderStatus.types';
+import { getDecimalColumnContract } from '../../../../../shared/services/decimalColumnContract';
 import {
   getSalesOrderCodeLabel,
   type SalesOrderCodeOption,
@@ -17,19 +18,28 @@ export type SalesOrderStatusColumnOptions = {
 const amountColumn = (
   field: keyof SalesOrderStatusRow,
   headerName: string,
-  type: 'decimal' | 'currency',
+  type: 'number' | 'decimal' | 'currency',
   width = 120,
-): F1GridColumn<SalesOrderStatusRow> => ({
+): F1GridColumn<SalesOrderStatusRow> => {
+  const fieldMap: Partial<Record<keyof SalesOrderStatusRow, string>> = {
+    orderQty: 'orderQty', unitPrice: 'unitPrice', supplyAmt: 'supplyAmount',
+    vatAmt: 'vatAmount', totalAmt: 'totalAmount',
+  };
+  const contractField = fieldMap[field];
+  const column = contractField ? getDecimalColumnContract('sales.order')[contractField] : undefined;
+  const { type: contractType, ...decimal } = column ?? { type };
+  return ({
   field,
   headerName,
-  type,
-  // 수량(decimal)은 소수점을 지정하지 않아 정책 관리의 모듈 소수점을 따른다.
-  // decimalPlaces: type === 'currency' ? 2 : undefined,
+  type: contractType,
+  decimal,
+  exactDecimal: true,
   width,
   align: 'right',
   editable: false,
   search: { hidden: true },
-});
+  });
+};
 
 export function createSalesOrderStatusColumns({
   onOpenOrder,
@@ -169,7 +179,7 @@ export function createSalesOrderStatusColumns({
     {
       field: 'lineNo',
       headerName: '행',
-      // type: 'number',
+      type: 'number',
       width: 60,
       align: 'center',
       editable: false,
@@ -213,8 +223,8 @@ export function createSalesOrderStatusColumns({
       editable: false,
       search: { hidden: true },
     },
-    { ...amountColumn('orderQty', '주문수량', 'decimal'), summaryType: 'sum' },
-    amountColumn('unitPrice', '단가', 'currency', 130),
+    { ...amountColumn('orderQty', '주문수량', 'number'), summaryType: 'sum' },
+    amountColumn('unitPrice', '단가', 'decimal', 130),
     { ...amountColumn('supplyAmt', '공급가', 'currency', 130), summaryType: 'sum' },
     { ...amountColumn('vatAmt', '부가세', 'currency', 120), summaryType: 'sum' },
     { ...amountColumn('totalAmt', '합계', 'currency', 140), summaryType: 'sum' },
@@ -227,7 +237,7 @@ export function createSalesOrderStatusColumns({
       editable: false,
       search: { label: '납기일자', order: 8, span: 2, group: '부가날짜' },
     },
-    amountColumn('shippedQty', '출하수량', 'decimal'),
+    amountColumn('shippedQty', '출하수량', 'number'),
     {
       field: 'remark',
       headerName: '비고',

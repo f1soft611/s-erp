@@ -10,6 +10,10 @@ import { PageSearchArea } from '../../../../../shared/components/PageSearchArea'
 import { PostDetailPanel } from '../../../../../shared/components/feed/PostDetailPanel';
 import { PageAreaOverlay } from '../../../../../shared/components/view-mode/PageAreaOverlay';
 import { F1Grid, F1GridHighlightText, type F1GridColumn, type F1GridRef } from '../../../../../shared/components/f1-grid';
+import { usePolicyDecimalStatus } from '../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
+import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
+import { SalesDecimalPolicyError } from '../../../shared/SalesDecimalPolicyError';
+import { formatSalesOrderAmount, subtractExactSalesDecimals } from '../../../order/create/data/salesOrderAmounts';
 import { useCommonConfirmDialog } from '../../../../../shared/hooks/useCommonConfirmDialog';
 import { DeliveryPlanForm } from '../components/DeliveryPlanForm';
 import type { PageSearchField, PageSearchFieldValue } from '../../../../../shared/components/page-search/searchFields';
@@ -49,6 +53,12 @@ function InfoGroup({ title, children }: { title: string; children: ReactNode }) 
 export function SalesDeliveryPlanStatusPage({
   currentMenuName, content, breadcrumbItems, selectedModule, selectedMenuPermissions: permissions,
 }: DeliveryPlanPageProps) {
+  const policyState = usePolicyDecimalStatus();
+  const policy = policyState.rule;
+  const policyReady = policyState.status === 'ready' || policyState.status === 'unmanaged';
+  const quantityRule = policy && ('places' in policy ? policy : policy.number);
+  const plannedColumn = getDecimalColumnContract('sales.deliveryPlan').plannedQty;
+  const plannedRule = policy && resolveDecimalColumn(plannedColumn, policy);
   const { confirm, dialog } = useCommonConfirmDialog();
   const [filters, setFilters] = useState<DeliveryPlanFilters>(() => defaultDeliveryPlanFilters());
   const [rows, setRows] = useState<DeliveryPlanStatusRow[]>([]);
@@ -111,18 +121,20 @@ export function SalesDeliveryPlanStatusPage({
   }, []);
 
   const save = async () => {
-    if (!selected) return;
+    if (!selected || !policyReady) return;
     const request = {
+      ...(policy ? { decimalPolicy: policy, decimalColumns: getDecimalColumnContract('sales.deliveryPlan') } : {}),
       details: (editGridRef.current?.getActiveRows() ?? editRows).map((row) => ({
         salesDeliveryPlanDetailId: row.salesDeliveryPlanDetailId,
         salesOrderId: row.salesOrderId,
         salesOrderDetailId: row.salesOrderDetailId,
         planDt: row.planDt,
-        plannedQty: Number(row.plannedQty),
+        plannedQty: row.plannedQty,
       })),
     };
-    const message = validateDeliveryPlan(request, details);
-    if (message) { setError(message); return; }
+    const message = validateDeliveryPlan(request, details, plannedRule);
+    const gridValid = editGridRef.current?.validate() ?? true;
+    if (message || !gridValid) { if (message) setError(message); return; }
     setLoading(true);
     setError('');
     try {
@@ -157,11 +169,13 @@ export function SalesDeliveryPlanStatusPage({
     { field: 'planDt', headerName: '계획일', type: 'date', width: 100, align: 'center' },
     { field: 'materialCode', headerName: '품목코드', width: 120, align: 'center', highlightSearch: true },
     { field: 'materialName', headerName: '품목명', width: 180, align: 'left', highlightSearch: true },
-    { field: 'orderQty', headerName: '수주수량', type: 'decimal', width: 110, align: 'right' },
-    { field: 'plannedQty', headerName: '계획수량', type: 'decimal', width: 110, align: 'right' },
-    { field: 'deliveredQty', headerName: '출하수량', type: 'decimal', width: 110, align: 'right' },
-    { field: 'remainingQty', headerName: '출하잔량', type: 'decimal', width: 110, align: 'right' },
-  ], [open]);
+    { field: 'orderQty', headerName: '수주수량', type: 'number', exactDecimal: true, width: 110, align: 'right' },
+    { field: 'plannedQty', headerName: '계획수량', type: plannedColumn.type,
+      decimal: { places: plannedColumn.places, rounding: plannedColumn.rounding, trailingZeros: plannedColumn.trailingZeros },
+      exactDecimal: true, width: 110, align: 'right' },
+    { field: 'deliveredQty', headerName: '출하수량', type: 'number', exactDecimal: true, width: 110, align: 'right' },
+    { field: 'remainingQty', headerName: '출하잔량', type: 'number', exactDecimal: true, width: 110, align: 'right' },
+  ], [open, plannedColumn]);
   if (!permissions?.read) return <Alert severity="warning">출하계획 현황 조회 권한이 없습니다.</Alert>;
 
   const canEdit = Boolean(permissions.update || registrationCanUpdate(selectedModule.tree));
@@ -190,6 +204,17 @@ export function SalesDeliveryPlanStatusPage({
   const selectedCustomerNames = customerNames || (selected && 'customerName' in selected ? selected.customerName : '');
   const selectedCustomerCodes = customerCodes || (selected && 'customerCode' in selected ? selected.customerCode : '');
   const selectedPlanDates = planDates;
+  const formatQuantity = (value: number | string, rule = quantityRule) => {
+    try { return rule ? formatSalesOrderAmount(value, rule)
+      : typeof value === 'string' ? formatSalesOrderAmount(value, { places: 2, rounding: 'HALF_UP', trailingZeros: 'AUTO' }) : value.toLocaleString(); }
+    catch { return '표현 불가'; }
+  };
+  const formatDifference = (left: number | string, right: number | string) => {
+    try {
+      return formatQuantity(subtractExactSalesDecimals(String(left), String(right),
+        quantityRule ?? { places: 2, rounding: 'HALF_UP' }));
+    } catch { return '표현 불가'; }
+  };
   const detailTable = <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflowX: 'auto' }}>
     <Table size="small" sx={{ minWidth: 660, '& .MuiTableCell-head': { bgcolor: 'action.hover', color: 'text.secondary', fontWeight: 700, whiteSpace: 'nowrap' },
       '& .MuiTableBody-root .MuiTableRow-root:last-child .MuiTableCell-root': { borderBottom: 0 } }} aria-label="출하계획 상세 목록">
@@ -201,11 +226,11 @@ export function SalesDeliveryPlanStatusPage({
         <TableCell><Typography variant="caption" color="text.secondary">{detail.materialCode}</Typography></TableCell>
         <TableCell sx={{ minWidth: 120 }}><Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{detail.materialName}</Typography></TableCell>
         <TableCell>{detail.planDt ?? '-'}</TableCell>
-        <TableCell align="right">{Number(detail.orderQty).toLocaleString()}</TableCell>
-        <TableCell align="right">{Number(detail.plannedQty).toLocaleString()}</TableCell>
-        <TableCell align="right">{Number(detail.deliveredQty).toLocaleString()}</TableCell>
-        <TableCell align="right">{Math.max(Number(detail.plannedQty) - Number(detail.deliveredQty), 0).toLocaleString()}</TableCell>
-        <TableCell align="right">{Math.max(Number(detail.deliveredQty) - Number(detail.plannedQty), 0).toLocaleString()}</TableCell>
+        <TableCell align="right">{formatQuantity(detail.orderQty)}</TableCell>
+        <TableCell align="right">{formatQuantity(detail.plannedQty, plannedRule)}</TableCell>
+        <TableCell align="right">{formatQuantity(detail.deliveredQty)}</TableCell>
+        <TableCell align="right">{formatDifference(detail.plannedQty, detail.deliveredQty)}</TableCell>
+        <TableCell align="right">{formatDifference(detail.deliveredQty, detail.plannedQty)}</TableCell>
       </TableRow>)}</TableBody>
     </Table>
   </TableContainer>;
@@ -297,13 +322,14 @@ export function SalesDeliveryPlanStatusPage({
       </PostDetailPanel></PageAreaOverlay> : null}
     {selected && dialogMode ? <CommonDialog open title={dialogMode === 'edit' ? '출하계획 수정' : '출하계획 상세보기'}
       onClose={closeDialog} size="lg" bodyMode="fill" paperHeight="min(900px, 92vh)" fullScreenOnMobile
-      actions={dialogMode === 'edit' ? <><Button variant="contained" disabled={loading} onClick={() => void save()}>저장</Button>
+      actions={dialogMode === 'edit' ? <><Button variant="contained" disabled={loading || !policyReady} onClick={() => void save()}>저장</Button>
         <Button disabled={loading} onClick={closeDialog}>취소</Button></> : <Button onClick={closeDialog}>닫기</Button>}>
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <Box sx={{ p: 0, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
         <PageMessageArea message={error} onClose={() => setError('')} />
+        <SalesDecimalPolicyError status={policyState.status} />
         <DeliveryPlanForm gridRef={editGridRef} storageKey="sales-delivery-plan-status-details-v1" planNo={selected.planNo} orderNo={selectedOrderNumbers} orderDt={selectedOrderDates}
-          customerName={selectedCustomerNames} rows={editRows} setRows={setEditRows} editable={dialogMode === 'edit' && !loading}
+          customerName={selectedCustomerNames} rows={editRows} setRows={setEditRows} editable={dialogMode === 'edit' && !loading && policyReady}
           canSelectOrder={false} onSelectOrder={() => undefined} />
       </Box>
       </Box>

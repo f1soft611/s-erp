@@ -2,9 +2,11 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { apiPost } from '../src/shared/services/apiClient';
 import { createStatement } from '../src/pages/sales/shipment/statement/services/salesStatement.service';
 
-vi.mock('../src/shared/services/apiClient', () => ({
-  apiGet: vi.fn(), apiPost: vi.fn(), apiPut: vi.fn(), apiDelete: vi.fn(),
-}));
+vi.mock('../src/shared/services/apiClient', () => {
+  const apiPost = vi.fn();
+  return { apiGet: vi.fn(), apiPost, apiPut: vi.fn(), apiDelete: vi.fn(),
+    apiPostWithExactDecimals: (path: string, payload: unknown) => apiPost(path, payload) };
+});
 
 beforeEach(() => vi.clearAllMocks());
 

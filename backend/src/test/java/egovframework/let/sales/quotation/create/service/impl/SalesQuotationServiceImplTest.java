@@ -12,29 +12,142 @@ import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import egovframework.let.common.idsequence.service.IdSequenceService;
 import egovframework.let.sales.quotation.create.domain.model.*;
 import egovframework.let.sales.quotation.create.domain.repository.SalesQuotationDAO;
+import egovframework.let.system.policies.service.SystemPolicyService;
+import egovframework.com.cmm.DecimalColumnContract;
 
 class SalesQuotationServiceImplTest {
     private SalesQuotationDAO dao;
     private IdSequenceService sequence;
+    private SystemPolicyService policy;
     private SalesQuotationServiceImpl service;
 
     @BeforeEach
     void setup() throws Exception {
         dao = mock(SalesQuotationDAO.class);
         sequence = mock(IdSequenceService.class);
-        service = new SalesQuotationServiceImpl(dao, sequence);
+        policy = mock(SystemPolicyService.class);
+        service = new SalesQuotationServiceImpl(dao, sequence, policy);
+        Map<String, Object> legacy = new java.util.HashMap<>();
+        legacy.put("places", 2);
+        legacy.put("rounding", "HALF_UP");
+        when(policy.getGridDecimals(71L)).thenReturn(Collections.singletonMap("SALES", legacy));
         when(dao.existsCustomer(anyMap())).thenReturn(true);
         when(dao.existsMaterial(anyMap())).thenReturn(true);
         when(dao.insertHeader(anyMap())).thenReturn(300L);
         when(dao.insertDetail(anyMap())).thenReturn(400L);
         when(sequence.nextValue("SALES_QUOTATION_NO", "71", "20261116")).thenReturn(1L);
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "SALES_DECIMAL_COLUMN_FIXTURE", matches = "true")
+    void calculatesQuotationWithSharedColumnFixture() throws Exception {
+        Map<String, Object> rule = new java.util.HashMap<>();
+        rule.put("places", 3);
+        rule.put("rounding", "DOWN");
+        when(policy.getGridDecimals(71L)).thenReturn(Collections.singletonMap("SALES", rule));
+        SalesQuotationCreateRequestVO payload = request();
+        payload.setDecimalColumns(DecimalColumnContract.forDocument("sales.quotation"));
+        payload.setDetails(Arrays.asList(line(null, "direct", "1", "1.235"), line(null, "direct", "1", "1.235")));
+        SalesQuotationVO result = service.createQuotation(71L, "writer", payload);
+        assertThat(result.getDetails().get(0).getLineAmt()).isEqualByComparingTo("1.235");
+        assertThat(result.getSupplyAmt()).isEqualByComparingTo("2.47");
+        assertThat(result.getVatAmt()).isEqualByComparingTo("0.2");
+        assertThat(result.getTotalAmt()).isEqualByComparingTo("2.670");
+        verify(dao, times(2)).insertDetail(argThat(params ->
+                new BigDecimal("1.235").compareTo((BigDecimal) params.get("lineAmt")) == 0));
+    }
+
+    @Test
+    void rejectsStaleDecimalPolicyBeforePersisting() throws Exception {
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        ObjectNode json = mapper.valueToTree(request());
+        json.set("decimalPolicy", mapper.readTree("{\"places\":3,\"rounding\":\"DOWN\"}"));
+        SalesQuotationCreateRequestVO payload = mapper.treeToValue(json, SalesQuotationCreateRequestVO.class);
+
+        assertThatThrownBy(() -> service.createQuotation(71L, "writer", payload))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+        verify(dao, never()).insertHeader(anyMap());
+    }
+
+    @Test
+    void rejectsMismatchedColumnContract() throws Exception {
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        ObjectNode json = mapper.valueToTree(request());
+        json.set("decimalColumns", mapper.readTree("{\"unitPrice\":{\"type\":\"decimal\",\"places\":6}}"));
+        SalesQuotationCreateRequestVO payload = mapper.treeToValue(json, SalesQuotationCreateRequestVO.class);
+        assertThatThrownBy(() -> service.createQuotation(71L, "writer", payload))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        verify(dao, never()).insertHeader(anyMap());
+    }
+
+    @Test
+    void acceptsMatchingTypedSnapshot() throws Exception {
+        Map<String, Object> legacyRule = new java.util.HashMap<>();
+        legacyRule.put("places", 2);
+        legacyRule.put("rounding", "HALF_UP");
+        Map<String, Object> snapshot = new java.util.HashMap<>();
+        snapshot.put("number", legacyRule);
+        snapshot.put("decimal", legacyRule);
+        snapshot.put("currency", legacyRule);
+        SalesQuotationCreateRequestVO payload = request();
+        payload.setDecimalPolicy(snapshot);
+        assertThat(service.createQuotation(71L, "writer", payload)).isNotNull();
+    }
+
+    @Test
+    void rejectsTypedSnapshotWithoutCurrencyRule() throws Exception {
+        Map<String, Object> legacyRule = new java.util.HashMap<>();
+        legacyRule.put("places", 2);
+        legacyRule.put("rounding", "HALF_UP");
+        Map<String, Object> snapshot = new java.util.HashMap<>();
+        snapshot.put("number", legacyRule);
+        snapshot.put("decimal", legacyRule);
+        SalesQuotationCreateRequestVO payload = request();
+        payload.setDecimalPolicy(snapshot);
+        assertThatThrownBy(() -> service.createQuotation(71L, "writer", payload))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+        verify(dao, never()).insertHeader(anyMap());
+    }
+
+    @Test
+    void calculatesQuotationWithTypedDecimalPolicy() throws Exception {
+        Map<String, Object> qty = new java.util.HashMap<>();
+        qty.put("places", 3);
+        Map<String, Object> amount = new java.util.HashMap<>();
+        amount.put("places", 3);
+        amount.put("rounding", "DOWN");
+        Map<String, Object> typed = new java.util.HashMap<>();
+        typed.put("number", qty);
+        typed.put("decimal", amount);
+        typed.put("currency", amount);
+        when(policy.getGridDecimals(71L)).thenReturn(Collections.singletonMap("SALES", typed));
+        SalesQuotationCreateRequestVO r = request();
+        r.setDetails(Collections.singletonList(line(null, "direct", "1.234", "1.235")));
+
+        SalesQuotationVO saved = service.createQuotation(71L, "writer", r);
+
+        assertThat(saved.getDetails().get(0).getUnitPrice()).isEqualByComparingTo("1.235");
+        assertThat(saved.getDetails().get(0).getLineAmt()).isEqualByComparingTo("1.523");
+        assertThat(saved.getVatAmt()).isEqualByComparingTo("0.152");
+        assertThat(saved.getTotalAmt()).isEqualByComparingTo("1.675");
     }
 
     @Test

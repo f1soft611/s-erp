@@ -4,18 +4,22 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiGet } from '../src/shared/services/apiClient';
 import { QuotationStatusPage } from '../src/pages/sales/quotation/status/QuotationStatusPage';
+import { QuotationStatusDetailPanel } from '../src/pages/sales/quotation/status/components/QuotationStatusDetailPanel';
+import * as decimalContext from '../src/shared/components/f1-grid/core/gridDecimalPolicyContext';
+import * as decimalColumns from '../src/shared/services/decimalColumnContract';
 import { useQuotationStatusDetail } from '../src/pages/sales/quotation/status/hooks/useQuotationStatusDetail';
 import { useQuotationStatusList } from '../src/pages/sales/quotation/status/hooks/useQuotationStatusList';
 import type { QuotationStatusFilters, QuotationStatusRow } from '../src/pages/sales/quotation/status/types/quotationStatus.types';
 import type { QuotationItem } from '../src/pages/sales/quotation/create/types/quotation.types';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
 
-vi.mock('../src/shared/services/apiClient', () => ({
-  apiGet: vi.fn(),
-  apiPost: vi.fn(),
-  apiPut: vi.fn(),
-  apiDelete: vi.fn(),
-}));
+vi.mock('../src/shared/services/apiClient', () => {
+  const apiGet = vi.fn();
+  return {
+    apiGet, apiPost: vi.fn(), apiPut: vi.fn(), apiDelete: vi.fn(),
+    apiGetWithExactDecimals: (path: string) => apiGet(path),
+  };
+});
 
 const apiGetMock = vi.mocked(apiGet);
 const statusRow: QuotationStatusRow = {
@@ -93,6 +97,27 @@ const moduleItem: ModuleItem = {
   ],
   menus: [],
 };
+
+it('formats quotation detail and header using their shared field rules', () => {
+  const rule = { places: 3, rounding: 'DOWN', trailingZeros: 'FIXED' } as const;
+  const policy = vi.spyOn(decimalContext, 'usePolicyDecimalRule').mockReturnValue({ number: rule, decimal: rule, currency: rule });
+  const original = decimalColumns.getDecimalColumnContract('sales.quotation');
+  const columns = vi.spyOn(decimalColumns, 'getDecimalColumnContract').mockReturnValue({
+    ...original, quotationQty: { type: 'number', places: 1 }, unitPrice: { type: 'decimal', places: 2 },
+    lineAmt: { type: 'currency', places: 1 }, supplyAmt: { type: 'currency', places: 2 },
+    vatAmt: { type: 'currency', places: 1 }, totalAmt: { type: 'currency', places: 0 },
+  });
+  try {
+    render(<QuotationStatusDetailPanel quotation={quotation} loading={false} error="" canEdit={false}
+      onClose={() => undefined} onView={() => undefined} onEdit={() => undefined} />);
+    expect(screen.getByText('2.0', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('5.00', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('10.0', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('10.00', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('1.0', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('11', { exact: true })).toBeInTheDocument();
+  } finally { columns.mockRestore(); policy.mockRestore(); }
+});
 
 describe('quotation status page', () => {
   beforeEach(() => {

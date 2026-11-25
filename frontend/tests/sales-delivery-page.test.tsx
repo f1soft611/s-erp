@@ -7,6 +7,9 @@ import { SourceOrderPicker } from '../src/pages/sales/shipment/delivery/create/c
 import { createDelivery, getDelivery, updateDelivery, getDeliveryStatus, searchSourceOrders, deleteDelivery, OverDeliveryConfirmationRequired } from '../src/pages/sales/shipment/delivery/create/services/salesDelivery.service';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
 import { getSystemDate } from '../src/shared/services/systemDateService';
+import { GridDecimalModuleProvider } from '../src/shared/components/f1-grid/core/GridDecimalPolicy';
+import * as decimalPolicyService from '../src/shared/services/gridDecimalPolicy.service';
+import * as decimalColumns from '../src/shared/services/decimalColumnContract';
 
 vi.mock('../src/shared/services/systemDateService', async (original) => ({
   ...await original<object>(),
@@ -63,6 +66,90 @@ it('uses the server date as the initial delivery date for a new delivery', async
   expect(await screen.findByDisplayValue('2000-02-03')).toBeInTheDocument();
   expect(getSystemDate).toHaveBeenCalledOnce();
 });
+it('blocks shipment editing and saving when the policy request fails', async () => {
+  const policy = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockRejectedValue(new Error('offline'));
+  try {
+    mount(<GridDecimalModuleProvider moduleCode="SALES"><SalesDeliveryCreatePage {...props} salesDeliveryId={1} /></GridDecimalModuleProvider>);
+    expect(await screen.findByText('소수점 정책을 불러오지 못했습니다. 다시 조회해 주세요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '저장', exact: true })).toBeDisabled();
+    expect(updateDelivery).not.toHaveBeenCalled();
+  } finally {
+    policy.mockRestore();
+  }
+});
+it('allows shipment editing after retrying a failed policy lookup', async () => {
+  const policy = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict')
+    .mockRejectedValue(new Error('offline'));
+  vi.mocked(getDelivery).mockResolvedValue({ ...item, writer: true } as Awaited<ReturnType<typeof getDelivery>>);
+  try {
+    mount(<GridDecimalModuleProvider moduleCode="SALES"><SalesDeliveryCreatePage {...props} salesDeliveryId={1} /></GridDecimalModuleProvider>);
+    expect(await screen.findByText('소수점 정책을 불러오지 못했습니다. 다시 조회해 주세요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '저장', exact: true })).toBeDisabled();
+    policy.mockResolvedValue({});
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '저장', exact: true })).toBeEnabled());
+    expect(screen.queryByText('소수점 정책을 불러오지 못했습니다. 다시 조회해 주세요.')).not.toBeInTheDocument();
+  } finally { policy.mockRestore(); }
+});
+it('preserves an exact price edited in the delivery grid', async () => {
+  const rules = { SALES: {
+    number: { places: 0, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+    decimal: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+    currency: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+  } };
+  const strict = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue(rules);
+  const standard = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+  vi.mocked(getDelivery).mockResolvedValue({ ...item, writer: true } as Awaited<ReturnType<typeof getDelivery>>);
+  vi.mocked(updateDelivery).mockResolvedValue(item as Awaited<ReturnType<typeof updateDelivery>>);
+  try {
+    mount(<GridDecimalModuleProvider moduleCode="SALES"><SalesDeliveryCreatePage {...props} salesDeliveryId={1} /></GridDecimalModuleProvider>);
+    await screen.findByDisplayValue('SD-1');
+    const row = screen.getByRole('row', { name: /delivery-2 행 선택/ });
+    const cells = within(row).getAllByRole('gridcell');
+    fireEvent.doubleClick(cells.find((cell) => cell.textContent === '100.000000')!);
+    const editor = screen.getByRole('spinbutton');
+    fireEvent.change(editor, { target: { value: '1234567890123.100001' } });
+    fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+    expect(row).toHaveTextContent('1,234,567,890,123.100001');
+    fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+    await waitFor(() => expect(updateDelivery).toHaveBeenCalledWith(1, expect.objectContaining({
+      details: [expect.objectContaining({ unitPrice: '1234567890123.100001' })],
+    })));
+  } finally { strict.mockRestore(); standard.mockRestore(); }
+}, 15000);
+it('uses shipment column overrides for editing, calculations and header display', async () => {
+  const rules = { SALES: {
+    number: { places: 0, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+    decimal: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+    currency: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+  } };
+  const strict = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue(rules);
+  const standard = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+  const original = decimalColumns.getDecimalColumnContract('sales.delivery');
+  const columns = vi.spyOn(decimalColumns, 'getDecimalColumnContract').mockReturnValue({
+    ...original, deliveryQty: { type: 'number', places: 1 },
+    supplyAmt: { type: 'currency', places: 1, rounding: 'HALF_UP' },
+    vatAmt: { type: 'currency', places: 2, rounding: 'HALF_UP' },
+    totalAmt: { type: 'currency', places: 3 }, deliveryTotal: { type: 'currency', places: 1 },
+  });
+  vi.mocked(getDelivery).mockResolvedValue({ ...item, writer: true } as Awaited<ReturnType<typeof getDelivery>>);
+  try {
+    mount(<GridDecimalModuleProvider moduleCode="SALES"><SalesDeliveryCreatePage {...props} salesDeliveryId={1} /></GridDecimalModuleProvider>);
+    await screen.findByDisplayValue('SD-1');
+    const row = screen.getByRole('row', { name: /delivery-2 행 선택/ });
+    await waitFor(() => expect(within(row).getByText('200.0', { exact: true })).toBeInTheDocument());
+    expect(within(screen.getByLabelText('출하 금액 합계')).getByText('220.0', { exact: true })).toBeInTheDocument();
+    const cells = within(row).getAllByRole('gridcell');
+    fireEvent.doubleClick(cells.find((cell) => cell.textContent === '100.000')!);
+    const editor = screen.getByRole('spinbutton');
+    fireEvent.change(editor, { target: { value: '1.235' } });
+    fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+    expect(within(row).getByText('2.5', { exact: true })).toBeInTheDocument();
+    expect(within(row).getByText('0.25', { exact: true })).toBeInTheDocument();
+    expect(within(row).getByText('2.750', { exact: true })).toBeInTheDocument();
+    expect(within(screen.getByLabelText('출하 금액 합계')).getByText('2.7', { exact: true })).toBeInTheDocument();
+  } finally { columns.mockRestore(); strict.mockRestore(); standard.mockRestore(); }
+}, 15000);
 it('does not use the browser date when the server delivery date cannot be loaded', async () => {
   vi.mocked(getSystemDate).mockRejectedValueOnce(new Error('offline'));
   mount(<SalesDeliveryCreatePage {...props} />);
@@ -118,6 +205,29 @@ it('shows the delivery creator name, profile image, and registration time in sta
   expect(within(panel).getByText('작성자 · 등록 2026-11-16 13:00')).toBeInTheDocument();
   expect(within(panel).getByRole('img', { name: '홍길동' })).toHaveAttribute('src', '/profile/user01.png');
 });
+it('uses shipment field overrides in status and detail displays', async () => {
+  const rule = { places: 3, trailingZeros: 'FIXED', rounding: 'DOWN' } as const;
+  const rules = { SALES: { number: rule, decimal: rule, currency: rule } };
+  const strict = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue(rules);
+  const standard = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+  const original = decimalColumns.getDecimalColumnContract('sales.delivery');
+  const columns = vi.spyOn(decimalColumns, 'getDecimalColumnContract').mockReturnValue({
+    ...original, deliveryQty: { type: 'number', places: 1 },
+    unitPrice: { type: 'decimal', places: 2 },
+    totalAmt: { type: 'currency', places: 2 }, deliveryTotal: { type: 'currency', places: 1 },
+  });
+  vi.mocked(getDeliveryStatus).mockResolvedValue([{ ...item, ...item.details[0] }] as Awaited<ReturnType<typeof getDeliveryStatus>>);
+  try {
+    mount(<GridDecimalModuleProvider moduleCode="SALES"><SalesDeliveryStatusPage {...props} /></GridDecimalModuleProvider>);
+    fireEvent.click(await screen.findByRole('button', { name: 'SD-1 상세 보기' }));
+    const panel = await screen.findByRole('region', { name: '출하 상세' });
+    const table = await within(panel).findByRole('table', { name: '출하 품목 목록' });
+    expect(within(table).getByText('2.0', { exact: true })).toBeInTheDocument();
+    expect(within(table).getByText('100.00', { exact: true })).toBeInTheDocument();
+    expect(within(table).getByText('220.00', { exact: true })).toBeInTheDocument();
+    expect(within(panel).getByText('220.0', { exact: true })).toBeInTheDocument();
+  } finally { columns.mockRestore(); strict.mockRestore(); standard.mockRestore(); }
+}, 15000);
 it('opens the sales order selector using the icon inside the order field', () => {
   mount(<SalesDeliveryCreatePage {...props} />);
   fireEvent.mouseDown(screen.getByRole('combobox', { name: '출하구분' }));

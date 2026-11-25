@@ -6,9 +6,12 @@ import {
 } from '../src/pages/sales/shipment/deliveryplan/services/salesDeliveryPlan.service';
 import type { DeliveryPlanRequest, PlanSourceOrderRow } from '../src/pages/sales/shipment/deliveryplan/types/salesDeliveryPlan.types';
 
-vi.mock('../src/shared/services/apiClient', () => ({
-  apiGet: vi.fn(), apiPost: vi.fn(), apiPut: vi.fn(),
-}));
+vi.mock('../src/shared/services/apiClient', () => {
+  const apiGet = vi.fn(); const apiPost = vi.fn(); const apiPut = vi.fn();
+  return { apiGet, apiPost, apiPut, apiGetWithExactDecimals: (path: string) => apiGet(path),
+    apiPostWithExactDecimals: (path: string, value: unknown) => apiPost(path, value),
+    apiPutWithExactDecimals: (path: string, value: unknown) => apiPut(path, value) };
+});
 
 const source: PlanSourceOrderRow = {
   salesOrderId: 7, salesOrderDetailId: 70, orderNo: 'SO-7', orderDt: '2026-11-04',
@@ -40,6 +43,25 @@ describe('sales delivery plan contract', () => {
   it('validates split capacity using the remaining source quantity', () => {
     const partiallyPlanned = { ...source, remainingPlanQty: 8 };
     expect(validateDeliveryPlan(request, [partiallyPlanned])).toContain('초과');
+  });
+
+  it('uses the quantity policy and compares split quantities without floating-point drift', () => {
+    const rule = { places: 3, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const };
+    const split = { details: [
+      { ...request.details[0], plannedQty: 0.1 },
+      { ...request.details[1], plannedQty: 0.2 },
+    ] };
+    expect(validateDeliveryPlan(split, [{ ...source, remainingPlanQty: 0.3 }], rule)).toBe('');
+    expect(validateDeliveryPlan({ details: [{ ...request.details[0], plannedQty: 0.123 }] }, [source], rule)).toBe('');
+    expect(validateDeliveryPlan({ details: [{ ...request.details[0], plannedQty: 0.1234 }] }, [source], rule)).toContain('수량');
+    expect(validateDeliveryPlan({ details: [{ ...request.details[0], plannedQty: 0.1 }] }, [source], { ...rule, places: 0 })).toContain('수량');
+  });
+
+  it('compares precise split quantities to capacity without converting to floating point', () => {
+    const rule = { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const };
+    const details = [{ ...request.details[0], plannedQty: '1234567890123.100001' }];
+    expect(validateDeliveryPlan({ details }, [{ ...source, remainingPlanQty: '1234567890123.100001' }], rule)).toBe('');
+    expect(validateDeliveryPlan({ details }, [{ ...source, remainingPlanQty: '1234567890123.100000' }], rule)).toContain('초과');
   });
 
   it('validates different orders independently when detail IDs match', () => {

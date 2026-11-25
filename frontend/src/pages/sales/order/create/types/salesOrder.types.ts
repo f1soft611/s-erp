@@ -1,15 +1,19 @@
 import type { MasterPickerOption } from '../../../../../shared/components/master-picker/masterPicker.types';
-import type { SalesOrderDetailRow } from '../data/salesOrderDetail';
+import type { GridDecimalModuleRule } from '../../../../../shared/services/gridDecimalPolicy.service';
+import type { DecimalColumn } from '../../../../../shared/services/decimalColumnContract';
+import type { SalesOrderDecimalValue, SalesOrderDetailRow } from '../data/salesOrderDetail';
 
 export type SalesOrderCreateDetailPayload = {
   materialId: number;
-  orderQty: number;
-  unitPrice: number;
-  vatAmt: number;
+  orderQty: SalesOrderDecimalValue;
+  unitPrice: SalesOrderDecimalValue;
+  vatAmt: SalesOrderDecimalValue;
   deliveryDt: string | null;
 };
 
 export type SalesOrderCreatePayload = {
+  decimalPolicy?: GridDecimalModuleRule;
+  decimalColumns?: Readonly<Record<string, DecimalColumn>>;
   orderDt: string;
   customerId: number;
   salesDestinationId: number;
@@ -49,7 +53,7 @@ export type SalesOrderCreated = {
   orderNo: string;
   orderDt: string;
   customerId: number;
-  totalAmt: number;
+  totalAmt: SalesOrderDecimalValue;
 };
 
 export type SalesOrderCreateResponse = {
@@ -62,13 +66,13 @@ export type SalesOrderDetailItem = {
   materialId: number;
   materialCode: string | null;
   materialName: string | null;
-  orderQty: number;
-  unitPrice: number;
-  supplyAmt: number;
-  vatAmt: number | null;
-  totalAmt: number;
+  orderQty: SalesOrderDecimalValue;
+  unitPrice: SalesOrderDecimalValue;
+  supplyAmt: SalesOrderDecimalValue;
+  vatAmt: SalesOrderDecimalValue | null;
+  totalAmt: SalesOrderDecimalValue;
   deliveryDt: string | null;
-  shippedQty: number | null;
+  shippedQty: SalesOrderDecimalValue | null;
   lineStatus: string | null;
 };
 
@@ -90,7 +94,7 @@ export type SalesOrderItem = {
   deliveryPlace: string | null;
   deliveryMethod: string | null;
   status: string;
-  totalAmt: number | null;
+  totalAmt: SalesOrderDecimalValue | null;
   remark: string | null;
   createdBy?: string | null;
   createdByName?: string | null;

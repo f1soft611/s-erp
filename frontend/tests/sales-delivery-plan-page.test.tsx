@@ -11,6 +11,9 @@ import type { DeliveryPlanItem, DeliveryPlanStatusRow, PlanSourceOrderRow } from
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
 import type { F1GridRef } from '../src/shared/components/f1-grid';
 import { AppSettingsContext } from '../src/shared/context/appSettings';
+import { GridDecimalModuleProvider } from '../src/shared/components/f1-grid/core/GridDecimalPolicy';
+import * as decimalPolicyService from '../src/shared/services/gridDecimalPolicy.service';
+import * as decimalColumns from '../src/shared/services/decimalColumnContract';
 
 vi.mock('../src/pages/sales/shipment/deliveryplan/services/salesDeliveryPlan.service', async (original) => ({
   ...await original<object>(),
@@ -77,6 +80,66 @@ beforeEach(() => {
   vi.mocked(updateDeliveryPlan).mockResolvedValue(plan);
 });
 
+it('blocks plan editing and saving when the decimal policy cannot be loaded', async () => {
+  const policy = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockRejectedValue(new Error('offline'));
+  try {
+    render(<GridDecimalModuleProvider moduleCode="SALES"><SalesDeliveryPlanCreatePage {...props} /></GridDecimalModuleProvider>);
+    expect(await screen.findByText('소수점 정책을 불러오지 못했습니다. 다시 조회해 주세요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '수주 선택' })).toBeDisabled();
+  } finally { policy.mockRestore(); }
+});
+
+it('sends the loaded policy when saving a delivery plan', async () => {
+  const rule = { places: 0, trailingZeros: 'FIXED', rounding: 'HALF_UP' } as const;
+  const decimalPolicy = { number: rule, decimal: { ...rule, places: 3 }, currency: { ...rule, places: 3 } };
+  const policy = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue({ SALES: decimalPolicy });
+  try {
+    render(<GridDecimalModuleProvider moduleCode="SALES"><SalesDeliveryPlanCreatePage {...props} deliveryPlanMode="AUTO" /></GridDecimalModuleProvider>);
+    await waitFor(() => expect(screen.getByRole('button', { name: '수주 선택' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '수주 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
+    fireEvent.click(await screen.findByRole('button', { name: 'SO-7', exact: true }));
+    await waitFor(() => expect(screen.getByLabelText('계획번호')).toHaveValue('DP-9'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: '수정 저장', exact: true }));
+    await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledWith(9, expect.objectContaining({
+      decimalPolicy, decimalColumns: { plannedQty: { type: 'number' } },
+    })));
+  } finally { policy.mockRestore(); }
+});
+
+it('uses the planned quantity column override for input and saving', async () => {
+  const rule = { places: 0, trailingZeros: 'FIXED', rounding: 'DOWN' } as const;
+  const decimalPolicy = { number: rule, decimal: { ...rule, places: 3 }, currency: { ...rule, places: 3 } };
+  const strict = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue({ SALES: decimalPolicy });
+  const standard = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue({ SALES: decimalPolicy });
+  const columns = vi.spyOn(decimalColumns, 'getDecimalColumnContract').mockReturnValue({
+    plannedQty: { type: 'number', places: 1 },
+  });
+  try {
+    render(<GridDecimalModuleProvider moduleCode="SALES"><SalesDeliveryPlanCreatePage {...props} deliveryPlanMode="AUTO" /></GridDecimalModuleProvider>);
+    await waitFor(() => expect(screen.getByRole('button', { name: '수주 선택' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '수주 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
+    fireEvent.click(await screen.findByRole('button', { name: 'SO-7', exact: true }));
+    await waitFor(() => expect(screen.getByLabelText('계획번호')).toHaveValue('DP-9'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    const grid = screen.getByRole('grid', { name: '출하계획 상세 목록' });
+    const cell = planCell(grid, 0, 5);
+    fireEvent.doubleClick(cell);
+    const editor = cell.querySelector('input')!;
+    fireEvent.change(editor, { target: { value: '7.12' } });
+    expect(editor).not.toHaveValue(7.12);
+    fireEvent.change(editor, { target: { value: '7.1' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: '수정 저장', exact: true }));
+    await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledWith(9, expect.objectContaining({
+      decimalColumns: { plannedQty: { type: 'number', places: 1 } },
+      details: [expect.objectContaining({ plannedQty: '7.1' })],
+    })));
+  } finally { columns.mockRestore(); strict.mockRestore(); standard.mockRestore(); }
+}, 15000);
+
 it('uses the standard grid for the registration details', () => {
   render(<SalesDeliveryPlanCreatePage {...props} />);
   expect(screen.getByRole('region', { name: '출하계획 입력 내용' })).toHaveStyle({
@@ -118,6 +181,72 @@ it('opens plan details by clicking the plan number like shipment status', async 
   fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
   const panel = await screen.findByRole('region', { name: '출하계획 상세' });
   expect(within(panel).getByRole('button', { name: '출하계획 더보기' })).toBeInTheDocument();
+});
+
+it('formats status detail quantities and decimal differences using the quantity policy', async () => {
+    const policy = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue({
+      SALES: {
+        number: { places: 3, rounding: 'DOWN', trailingZeros: 'FIXED' },
+        decimal: { places: 3, rounding: 'HALF_UP', trailingZeros: 'FIXED' },
+        currency: { places: 3, rounding: 'HALF_UP', trailingZeros: 'FIXED' },
+      },
+    });
+    vi.mocked(getDeliveryPlan).mockResolvedValue({
+      ...plan, details: [{ ...plan.details[0], orderQty: 0.3, plannedQty: 0.3, deliveredQty: 0.1 }],
+    });
+    try {
+      render(<GridDecimalModuleProvider moduleCode="SALES"><SalesDeliveryPlanStatusPage {...props} /></GridDecimalModuleProvider>);
+      fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
+      const table = await screen.findByRole('table', { name: '출하계획 상세 목록' });
+      await waitFor(() => {
+        const cells = within(within(table).getAllByRole('row')[1]).getAllByRole('cell');
+        expect(cells.slice(3).map((cell) => cell.textContent)).toEqual(['0.300', '0.300', '0.100', '0.200', '0.000']);
+      });
+    } finally { policy.mockRestore(); }
+});
+
+it('displays the planned quantity with its column override in status detail', async () => {
+  const rule = { places: 0, trailingZeros: 'FIXED', rounding: 'DOWN' } as const;
+  const strict = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue({
+    SALES: { number: rule, decimal: rule, currency: rule },
+  });
+  const columns = vi.spyOn(decimalColumns, 'getDecimalColumnContract').mockReturnValue({
+    plannedQty: { type: 'number', places: 2 },
+  });
+  vi.mocked(getDeliveryPlan).mockResolvedValue({
+    ...plan, details: [{ ...plan.details[0], plannedQty: '1.25' }],
+  });
+  try {
+    render(<GridDecimalModuleProvider moduleCode="SALES"><SalesDeliveryPlanStatusPage {...props} /></GridDecimalModuleProvider>);
+    fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
+    const table = await screen.findByRole('table', { name: '출하계획 상세 목록' });
+    await waitFor(() => {
+      const cells = within(within(table).getAllByRole('row')[1]).getAllByRole('cell');
+      expect(cells[4]).toHaveTextContent(/^1\.25$/);
+    });
+  } finally { columns.mockRestore(); strict.mockRestore(); }
+});
+
+it('displays exact plan quantities and their small difference in status detail', async () => {
+  const rules = { SALES: {
+    number: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+    decimal: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+    currency: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+  } };
+  const strict = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue(rules);
+  const standard = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+  vi.mocked(getDeliveryPlan).mockResolvedValue({ ...plan, details: [{ ...plan.details[0],
+    orderQty: '1234567890123.100001', plannedQty: '1234567890123.100001', deliveredQty: '1234567890123.100000' }] });
+  try {
+    render(<GridDecimalModuleProvider moduleCode="SALES"><SalesDeliveryPlanStatusPage {...props} /></GridDecimalModuleProvider>);
+    fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
+    const table = await screen.findByRole('table', { name: '출하계획 상세 목록' });
+    await waitFor(() => {
+      const cells = within(table).getAllByRole('row')[1].querySelectorAll('td');
+      expect(cells[4]).toHaveTextContent('1,234,567,890,123.100001');
+      expect(cells[6]).toHaveTextContent('0.000001');
+    });
+  } finally { strict.mockRestore(); standard.mockRestore(); }
 });
 
 it('shows the detail response writer profile instead of the status list writer', async () => {
@@ -292,6 +421,7 @@ it('splits a fully planned AUTO order and can save the split again', async () =>
   fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
   fireEvent.click(await screen.findByRole('button', { name: 'SO-7', exact: true }));
   await waitFor(() => expect(screen.getByLabelText('계획번호')).toHaveValue('DP-9'));
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   let grid = await screen.findByRole('grid', { name: '출하계획 상세 목록' });
   editCell(grid, 0, 5, '5');
   fireEvent.click(within(grid).getByRole('button', { name: '분할' }));
@@ -337,6 +467,52 @@ it('excludes quantities in other plans from an AUTO plan update limit', async ()
   expect(updateDeliveryPlan).toHaveBeenCalledTimes(1);
 }, 15000);
 
+it('allows an AUTO plan to use the exact decimal remaining capacity', async () => {
+  vi.mocked(searchPlanSourceOrders).mockResolvedValue([{ ...source, orderQty: 1, remainingPlanQty: 0.3 }]);
+  vi.mocked(getDeliveryPlanByOrder).mockResolvedValue({
+    ...plan, details: [{ ...plan.details[0], orderQty: 1, plannedQty: 0.6 }],
+  });
+  render(<SalesDeliveryPlanCreatePage {...props} deliveryPlanMode="AUTO" />);
+  fireEvent.click(screen.getByRole('button', { name: '수주 선택' }));
+  fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
+  fireEvent.click(await screen.findByRole('button', { name: 'SO-7', exact: true }));
+  await waitFor(() => expect(screen.getByLabelText('계획번호')).toHaveValue('DP-9'));
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  editCell(screen.getByRole('grid', { name: '출하계획 상세 목록' }), 0, 5, '0.9');
+  fireEvent.click(screen.getByRole('button', { name: '수정 저장', exact: true }));
+  await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledWith(9, expect.objectContaining({
+    details: [expect.objectContaining({ plannedQty: 0.9 })],
+  })));
+});
+
+it('preserves the exact editable capacity of an AUTO plan', async () => {
+    const rules = { SALES: {
+      number: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      decimal: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      currency: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+    } };
+    const strict = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue(rules);
+    const standard = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+    vi.mocked(searchPlanSourceOrders).mockResolvedValue([{ ...source, orderQty: '1234567890123.100001', remainingPlanQty: '0.000001' }]);
+    vi.mocked(getDeliveryPlanByOrder).mockResolvedValue({
+      ...plan, details: [{ ...plan.details[0], orderQty: '1234567890123.100001', plannedQty: '1234567890123.100000' }],
+    });
+    try {
+      render(<GridDecimalModuleProvider moduleCode="SALES"><SalesDeliveryPlanCreatePage {...props} deliveryPlanMode="AUTO" /></GridDecimalModuleProvider>);
+      await waitFor(() => expect(screen.getByRole('button', { name: '수주 선택' })).toBeEnabled());
+      fireEvent.click(screen.getByRole('button', { name: '수주 선택' }));
+      fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
+      fireEvent.click(await screen.findByRole('button', { name: 'SO-7', exact: true }));
+      await waitFor(() => expect(screen.getByLabelText('계획번호')).toHaveValue('DP-9'));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      editCell(screen.getByRole('grid', { name: '출하계획 상세 목록' }), 0, 5, '1234567890123.100001');
+      fireEvent.click(screen.getByRole('button', { name: '수정 저장', exact: true }));
+      await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledWith(9, expect.objectContaining({
+        details: [expect.objectContaining({ plannedQty: '1234567890123.100001' })],
+      })));
+    } finally { strict.mockRestore(); standard.mockRestore(); }
+}, 15000);
+
 it('registers only selected source item rows from multiple orders with their remaining quantities', async () => {
   vi.mocked(searchPlanSourceOrders).mockResolvedValue([
     { ...source, remainingPlanQty: 6 },
@@ -374,6 +550,37 @@ it('registers only selected source item rows from multiple orders with their rem
   expect(within(screen.getByRole('region', { name: '출하계획 입력 내용' }))
     .getByRole('textbox', { name: '수주번호' })).toHaveValue('');
 });
+
+it('preserves selected source capacity in a new plan request', async () => {
+  const rules = { SALES: {
+    number: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+    decimal: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+    currency: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+  } };
+  const strict = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue(rules);
+  const standard = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+  vi.mocked(searchPlanSourceOrders).mockResolvedValue([{ ...source, orderQty: '1234567890123.100001',
+    remainingPlanQty: '1234567890123.100001' }]);
+  try {
+    render(<GridDecimalModuleProvider moduleCode="SALES"><SalesDeliveryPlanCreatePage {...props}
+      selectedMenuPermissions={{ read: true, create: true, update: false, delete: false, excel: false }} /></GridDecimalModuleProvider>);
+    await waitFor(() => expect(screen.getByRole('button', { name: '수주 선택' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '수주 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
+    const grid = await screen.findByRole('grid', { name: '계획대상 수주 품목 목록' });
+    const row = within(grid).getAllByRole('row').find((entry) => within(entry).queryByText('품목', { exact: true }))!;
+    expect(within(row).getAllByText('1,234,567,890,123.100001')).toHaveLength(2);
+    fireEvent.click(within(row).getByRole('checkbox'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '선택', exact: true }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(within(screen.getByRole('grid', { name: '출하계획 상세 목록' }))
+      .getAllByText('1,234,567,890,123.100001').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+    await waitFor(() => expect(createDeliveryPlan).toHaveBeenCalledWith(expect.objectContaining({
+      details: [expect.objectContaining({ plannedQty: '1234567890123.100001' })],
+    })));
+  } finally { strict.mockRestore(); standard.mockRestore(); }
+}, 15000);
 
 it('matches search control dimensions and provides explicit item selection actions', async () => {
   render(<SalesDeliveryPlanCreatePage {...props} />);

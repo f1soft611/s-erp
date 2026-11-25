@@ -2,15 +2,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiGet, apiPost, apiPut, apiDelete } from '../src/shared/services/apiClient';
 import { ApiResponseError } from '../src/shared/services/apiErrors';
 import {
-  buildDeliveryPayload, validateDelivery, sourceOrderForm, createDelivery,
+  buildDeliveryPayload, validateDelivery, sourceOrderForm, createDelivery, deliveryAmounts,
   getDelivery, updateDelivery, deleteDelivery, searchSourceOrders, getDeliveryStatus,
   defaultDeliveryFilters, validDeliveryPeriod, restoreDeliveryFilters,
 } from '../src/pages/sales/shipment/delivery/create/services/salesDelivery.service';
 import type { DeliveryForm, SourceOrderRow } from '../src/pages/sales/shipment/delivery/create/types/salesDelivery.types';
 
-vi.mock('../src/shared/services/apiClient', () => ({
-  apiGet: vi.fn(), apiPost: vi.fn(), apiPut: vi.fn(), apiDelete: vi.fn(),
-}));
+vi.mock('../src/shared/services/apiClient', () => {
+  const apiGet = vi.fn();
+  const apiPost = vi.fn();
+  const apiPut = vi.fn();
+  return { apiGet, apiGetWithExactDecimals: (path: string) => apiGet(path),
+    apiPost, apiPut, apiDelete: vi.fn(),
+    apiPostWithExactDecimals: (path: string, payload: unknown) => apiPost(path, payload),
+    apiPutWithExactDecimals: (path: string, payload: unknown) => apiPut(path, payload) };
+});
 
 export const source: SourceOrderRow = {
   salesOrderId: 7, salesOrderDetailId: 70, salesDeliveryPlanDetailId: 700, orderNo: 'SO-7', orderDt: '2026-11-04',
@@ -27,6 +33,58 @@ function form(): DeliveryForm {
 
 describe('sales delivery contract', () => {
   beforeEach(() => vi.clearAllMocks());
+  it('calculates and validates delivery values under the current type rules', () => {
+    const policy = {
+      number: { places: 3, rounding: 'HALF_UP', trailingZeros: 'FIXED' },
+      decimal: { places: 3, rounding: 'DOWN', trailingZeros: 'FIXED' },
+      currency: { places: 2, rounding: 'HALF_UP', trailingZeros: 'FIXED' },
+    } as const;
+    const amounts = deliveryAmounts(1.234, 1.235, undefined, policy.currency);
+    expect(amounts).toEqual({ supplyAmt: 1.52, vatAmt: 0.15, totalAmt: 1.67 });
+    const delivery = { ...form(), details: [{ ...form().details[0], deliveryQty: 1.234, unitPrice: 1.235, ...amounts }] };
+    expect(validateDelivery(delivery, policy)).toBe('');
+    expect(buildDeliveryPayload(delivery, policy)).toHaveProperty('decimalPolicy', policy);
+    expect(buildDeliveryPayload(delivery, policy)).toHaveProperty('decimalColumns.supplyAmt.type', 'currency');
+    expect(validateDelivery({ ...delivery, details: [{ ...delivery.details[0], vatAmt: 0.2, totalAmt: 1.72 }] }, policy)).toBe('');
+    expect(validateDelivery({ ...delivery, details: [{ ...delivery.details[0], unitPrice: 1.2345 }] }, policy)).toContain('단가');
+    expect(validateDelivery({ ...delivery, details: [{ ...delivery.details[0], supplyAmt: 1.53, totalAmt: 1.67 }] }, policy)).toContain('재계산');
+    expect(validateDelivery({ ...delivery, details: [{ ...delivery.details[0], vatAmt: 0.151 }] }, policy)).toContain('VAT');
+  });
+
+  it('calculates and validates delivery amounts using shared column rules', async () => {
+    const contracts = await import('../src/shared/services/decimalColumnContract');
+    const original = contracts.getDecimalColumnContract('sales.delivery');
+    const spy = vi.spyOn(contracts, 'getDecimalColumnContract').mockReturnValue({
+      ...original,
+      deliveryQty: { type: 'number', places: 1 },
+      supplyAmt: { type: 'currency', places: 2, rounding: 'HALF_UP' },
+      vatAmt: { type: 'currency', places: 1, rounding: 'HALF_UP' },
+      totalAmt: { type: 'currency', places: 3, rounding: 'DOWN' },
+    });
+    try {
+      const rule = { places: 3, rounding: 'DOWN' as const, trailingZeros: 'FIXED' as const };
+      const amounts = deliveryAmounts('1', '1.235', undefined, rule);
+      expect(amounts).toEqual({ supplyAmt: '1.24', vatAmt: '0.1', totalAmt: '1.340' });
+      const delivery = { ...form(), details: [{ ...form().details[0], deliveryQty: '1', unitPrice: '1.235', ...amounts }] };
+      expect(validateDelivery(delivery, rule)).toBe('');
+      expect(validateDelivery({ ...delivery, details: [{ ...delivery.details[0], deliveryQty: '1.01' }] }, rule)).toContain('출하수량');
+    } finally { spy.mockRestore(); }
+  });
+  it('preserves exact source order values through calculation and delivery validation', () => {
+    const policy = {
+      number: { places: 0, rounding: 'DOWN', trailingZeros: 'FIXED' },
+      decimal: { places: 6, rounding: 'DOWN', trailingZeros: 'FIXED' },
+      currency: { places: 6, rounding: 'DOWN', trailingZeros: 'FIXED' },
+    } as const;
+    const result = sourceOrderForm([{ ...source, remainingQty: '1', unitPrice: '1234567890123.100001' }],
+      '2026-11-04', policy.decimal);
+    expect(result.details[0]).toMatchObject({
+      deliveryQty: '1', unitPrice: '1234567890123.100001',
+      supplyAmt: '1234567890123.100001', vatAmt: '123456789012.310000', totalAmt: '1358024679135.410001',
+    });
+    expect(validateDelivery(result, policy)).toBe('');
+    expect(buildDeliveryPayload(result, policy).details[0].unitPrice).toBe('1234567890123.100001');
+  });
   it('loads multiple source orders with per-line references and combined order numbers', () => {
     const result = sourceOrderForm([
       source,

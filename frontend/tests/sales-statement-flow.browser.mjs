@@ -13,11 +13,13 @@ await mkdir(screenshotDirectory, { recursive: true });
 
 const source = {
   salesDeliveryId: 1, deliveryNo: 'SD-TEST-1', deliveryDt: '2026-11-16',
-  deliveryType: 'DIRECT', customerName: '검증 거래처', totalAmt: 220,
+  deliveryType: 'DIRECT', customerId: 5, customerName: '검증 거래처', totalAmt: '1234567890123.100001',
+  salesDeliveryDetailIds: [2],
 };
 const detail = {
-  salesStatementDetailId: 2, lineNo: 1, materialCode: 'M-TEST', materialName: '검증 품목',
-  materialSpec: 'TEST', unit: 'EA', deliveryQty: 2, unitPrice: 100, supplyAmt: 200, vatAmt: 20, totalAmt: 220,
+  salesStatementDetailId: 2, salesDeliveryDetailId: 2, lineNo: 1, materialCode: 'M-TEST', materialName: '검증 품목',
+  materialSpec: 'TEST', unit: 'EA', deliveryQty: '1', unitPrice: '1234567890123.100001',
+  supplyAmt: '1234567890123.100001', vatAmt: '0', totalAmt: '1234567890123.100001',
 };
 let item = {
   ...source, salesStatementId: 3, statementNo: 'TS-TEST-1', statementDt: '2026-11-16',
@@ -43,6 +45,7 @@ async function mount(kind) {
     const ReactDOM = (await import('/node_modules/.vite/deps/react-dom_client.js')).default;
     const { SalesStatementCreatePage } = await import('/src/pages/sales/shipment/statement/create/SalesStatementCreatePage.tsx');
     const { SalesStatementStatusPage } = await import('/src/pages/sales/shipment/statement/status/SalesStatementStatusPage.tsx');
+    const { GridDecimalModuleProvider } = await import('/src/shared/components/f1-grid/core/GridDecimalPolicy.tsx');
     const routerUrl = performance.getEntriesByType('resource')
       .map((entry) => entry.name)
       .find((url) => url.includes('/node_modules/.vite/deps/react-router-dom.js?v='));
@@ -59,7 +62,8 @@ async function mount(kind) {
     window.__statementRoot = ReactDOM.createRoot(document.getElementById('root'));
     const component = pageKind === 'create' ? SalesStatementCreatePage : SalesStatementStatusPage;
     const router = createMemoryRouter([{ path: '/', element: React.createElement(component, props) }]);
-    window.__statementRoot.render(React.createElement(RouterProvider, { router }));
+    window.__statementRoot.render(React.createElement(GridDecimalModuleProvider, { moduleCode: 'SALES' },
+      React.createElement(RouterProvider, { router })));
   }, kind);
 }
 
@@ -93,6 +97,10 @@ try {
       headers, contentType: 'application/json', body: JSON.stringify({ resultCode: 200, result }),
     });
     if (url.pathname === '/api/v1/common/system-date') return reply({ today: '2026-11-16' });
+    if (url.pathname === '/api/v1/system/policies/grid-decimals') {
+      const rule = { places: 6, trailingZeros: 'FIXED', rounding: 'DOWN' };
+      return reply({ item: { SALES: { number: rule, decimal: rule, currency: rule } } });
+    }
     const base = '/api/v1/sales/statements';
     if (url.pathname === `${base}/source-deliveries`) return reply({ items: [source] });
     if (url.pathname === '/api/v1/sales/deliveries/1') return reply({ item: {
@@ -107,7 +115,7 @@ try {
     if (url.pathname === `${base}/3`) return reply({ item });
     if (url.pathname === `${base}/status`) return reply({ items: [{
       ...detail, salesStatementId: 3, statementNo: item.statementNo, statementDt: item.statementDt,
-      deliveryNo: source.deliveryNo, customerCode: 'C-TEST', customerName: source.customerName, lineTotalAmt: 220,
+      deliveryNo: source.deliveryNo, customerCode: 'C-TEST', customerName: source.customerName, lineTotalAmt: source.totalAmt,
     }] });
     unexpectedRequests.push(`${method} ${url.pathname}`);
     return route.abort();
@@ -124,9 +132,13 @@ try {
     await page.getByRole('button', { name: '출하 선택' }).click();
     const picker = page.getByRole('dialog', { name: '출하 선택', exact: true });
     await picker.getByRole('button', { name: '검색', exact: true }).click();
-    await picker.getByRole('button', { name: source.deliveryNo }).click();
+    await picker.getByRole('row').filter({ hasText: source.deliveryNo }).getByRole('checkbox').check();
+    await picker.getByRole('button', { name: '선택 완료' }).click();
     await page.waitForFunction((value) =>
       Array.from(document.querySelectorAll('input')).some((input) => input.value === value), source.deliveryNo);
+    const details = page.getByRole('grid', { name: '거래명세서 상세 목록' });
+    await details.getByRole('row').filter({ hasText: 'M-TEST' }).getByRole('checkbox').check();
+    await details.getByText('1,234,567,890,123.100001').first().waitFor();
     await page.getByRole('button', { name: '저장', exact: true }).click();
     await page.waitForFunction((value) =>
       Array.from(document.querySelectorAll('input')).some((input) => input.value === value), item.statementNo);
@@ -136,7 +148,22 @@ try {
     await page.getByRole('button', { name: `${item.statementNo} 상세 보기` }).click();
     const panel = page.getByRole('region', { name: '거래명세서 상세', exact: true });
     await panel.getByRole('table', { name: '거래명세서 품목 목록' }).waitFor();
+    await panel.getByText('1,234,567,890,123.100001').first().waitFor();
     await screenshot('detail', width);
+    assert.equal(await panel.locator('[aria-label="거래명세서 요약"]').evaluate((summary) => {
+      const total = [...summary.querySelectorAll('h5')].find((node) => node.textContent === '1,234,567,890,123.100001');
+      if (!total) return false;
+      const range = document.createRange();
+      range.selectNodeContents(total);
+      const text = range.getBoundingClientRect();
+      const bounds = summary.getBoundingClientRect();
+      return text.left >= bounds.left && text.right <= bounds.right;
+    }), true, `Statement total must fit its summary at ${width}px.`);
+    assert.equal(await panel.getByRole('columnheader', { name: '품목코드' }).evaluate((header) => {
+      const range = document.createRange();
+      range.selectNodeContents(header);
+      return range.getClientRects().length;
+    }), 1, `Item code header must not wrap at ${width}px.`);
     await panel.getByRole('button', { name: '거래명세서 더보기' }).click();
     await page.getByRole('menuitem', { name: '수정', exact: true }).click();
     const editor = page.getByRole('dialog', { name: '거래명세서 수정', exact: true });
@@ -153,6 +180,7 @@ try {
     const preview = page.getByRole('dialog', { name: '거래명세표 미리보기' });
     await preview.waitFor();
     assert.equal(await preview.locator('.statement-print-copy').count(), 2);
+    await preview.getByText('1,234,567,890,123.100001', { exact: false }).first().waitFor();
     await screenshot('print', width);
     if (width === 1280) {
       const printHost = page.locator('body > .statement-print-host');

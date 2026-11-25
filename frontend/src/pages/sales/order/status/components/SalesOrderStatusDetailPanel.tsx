@@ -16,6 +16,9 @@ import type { ReactNode } from 'react';
 import { PostDetailPanel } from '../../../../../shared/components/feed/PostDetailPanel';
 import { ProfileAvatar } from '../../../../../shared/components/ProfileAvatar';
 import { PageAreaOverlay } from '../../../../../shared/components/view-mode/PageAreaOverlay';
+import { usePolicyDecimalRule } from '../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
+import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
+import { formatSalesOrderAmount, type SalesAmountRule } from '../../create/data/salesOrderAmounts';
 import type { SalesOrderItem } from '../../create/types/salesOrder.types';
 import { SalesOrderActionsMenu } from './SalesOrderActionsMenu';
 import {
@@ -44,10 +47,12 @@ const STATUS_COLORS: Record<string, 'default' | 'primary' | 'info' | 'success' |
   취소: 'error',
 };
 
-function formatAmount(value: number | null | undefined, fractionDigits = 0) {
+function formatAmount(value: number | string | null | undefined, rule?: SalesAmountRule) {
   if (value == null) return '-';
+  if (rule) return formatSalesOrderAmount(value, rule);
+  if (typeof value === 'string') return formatSalesOrderAmount(value, { places: 2, rounding: 'HALF_UP', trailingZeros: 'AUTO' });
   return Number(value).toLocaleString('ko-KR', {
-    minimumFractionDigits: fractionDigits,
+    minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
 }
@@ -101,6 +106,12 @@ export function SalesOrderStatusDetailPanel({
   onView,
   onEdit,
 }: SalesOrderStatusDetailPanelProps) {
+  const policy = usePolicyDecimalRule();
+  const contract = getDecimalColumnContract('sales.order');
+  const quantityRule = policy && resolveDecimalColumn(contract.orderQty, policy);
+  const priceRule = policy && resolveDecimalColumn(contract.unitPrice, policy);
+  const amountRule = policy && resolveDecimalColumn(contract.totalAmount, policy);
+  const totalRule = policy && resolveDecimalColumn(contract.orderTotal, policy);
   const writerName = order?.createdByName || order?.createdBy || '-';
 
   return (
@@ -192,7 +203,7 @@ export function SalesOrderStatusDetailPanel({
                   component="div"
                   sx={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}
                 >
-                  {formatAmount(order.totalAmt)}
+                  {formatAmount(order.totalAmt, totalRule)}
                 </Typography>
               </Box>
             </Box>
@@ -273,10 +284,10 @@ export function SalesOrderStatusDetailPanel({
                               {detail.materialName ?? '-'}
                             </Typography>
                           </TableCell>
-                          <TableCell align="right">{formatAmount(detail.orderQty)}</TableCell>
-                          <TableCell align="right">{formatAmount(detail.unitPrice)}</TableCell>
+                          <TableCell align="right">{formatAmount(detail.orderQty, quantityRule)}</TableCell>
+                          <TableCell align="right">{formatAmount(detail.unitPrice, priceRule)}</TableCell>
                           <TableCell align="right" sx={{ fontWeight: 700 }}>
-                            {formatAmount(detail.totalAmt)}
+                            {formatAmount(detail.totalAmt, amountRule)}
                           </TableCell>
                           <TableCell align="center">{detail.deliveryDt || '-'}</TableCell>
                           <TableCell align="center">

@@ -64,6 +64,7 @@ public class SystemPolicyServiceImpl extends EgovAbstractServiceImpl implements 
             Collections.unmodifiableSet(new HashSet<String>(Arrays.asList("FIXED", "AUTO")));
     private static final Set<String> GRID_ROUNDING_MODES =
             Collections.unmodifiableSet(new HashSet<String>(Arrays.asList("HALF_UP", "UP", "DOWN")));
+    private static final List<String> GRID_NUMERIC_TYPES = Arrays.asList("number", "decimal", "currency");
 
     private static final Set<String> BUILT_IN_CODES =
             Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(DELIVERY_PLAN_MODE, OVER_DELIVERY_POLICY)));
@@ -222,27 +223,56 @@ public class SystemPolicyServiceImpl extends EgovAbstractServiceImpl implements 
             String moduleCode = policy.getPolicyCode().substring(GRID_DECIMAL_PREFIX.length());
             try {
                 JsonNode node = MAPPER.readTree(policy.getValueJson());
-                JsonNode placesNode = node.isObject() ? node.get("places") : node;
-                if (placesNode == null || !placesNode.isNumber()) {
+                if (moduleCode.isEmpty()) {
                     continue;
                 }
-                BigDecimal value = placesNode.decimalValue();
-                int places = value.intValue();
-                if (moduleCode.length() == 0 || value.compareTo(BigDecimal.ZERO) < 0 || places > MAX_GRID_DECIMALS) {
-                    continue;
+                if (node.isObject() && node.has("number")) {
+                    Map<String, Object> rules = new LinkedHashMap<String, Object>();
+                    for (String type : GRID_NUMERIC_TYPES) {
+                        Map<String, Object> rule = gridDecimalEntry(node.get(type));
+                        if (rule == null) {
+                            rules.clear();
+                            break;
+                        }
+                        rules.put(type, rule);
+                    }
+                    if (!rules.isEmpty()) {
+                        result.put(moduleCode, rules);
+                    }
+                } else {
+                    Map<String, Object> entry = gridDecimalEntry(node);
+                    if (entry != null) {
+                        result.put(moduleCode, entry);
+                    }
                 }
-                String zeros = node.isObject() && node.has("trailingZeros") ? node.get("trailingZeros").asText() : "FIXED";
-                String rounding = node.isObject() && node.has("rounding") ? node.get("rounding").asText() : "HALF_UP";
-                Map<String, Object> entry = new LinkedHashMap<String, Object>();
-                entry.put("places", places);
-                entry.put("trailingZeros", GRID_ZERO_MODES.contains(zeros) ? zeros : "FIXED");
-                entry.put("rounding", GRID_ROUNDING_MODES.contains(rounding) ? rounding : "HALF_UP");
-                result.put(moduleCode, entry);
             } catch (Exception ex) {
                 // 잘못된 정책 값은 무시하고 화면 기본값을 사용한다.
             }
         }
         return result;
+    }
+
+    private Map<String, Object> gridDecimalEntry(JsonNode node) {
+        if (node == null) {
+            return null;
+        }
+        JsonNode placesNode = node.isObject() ? node.get("places") : node;
+        if (placesNode == null || !placesNode.isNumber()) {
+            return null;
+        }
+        BigDecimal value = placesNode.decimalValue();
+        int places = value.intValue();
+        if (value.compareTo(BigDecimal.ZERO) < 0 || places > MAX_GRID_DECIMALS
+                || value.compareTo(BigDecimal.valueOf(places)) != 0) {
+            return null;
+        }
+        String zeros = node.isObject() && node.has("trailingZeros") ? node.get("trailingZeros").asText() : "FIXED";
+        String rounding = node.isObject() && node.has("rounding") ? node.get("rounding").asText() : "HALF_UP";
+        Map<String, Object> entry = new LinkedHashMap<String, Object>();
+        entry.put("places", places);
+        entry.put("trailingZeros", GRID_ZERO_MODES.contains(zeros) ? zeros : "FIXED");
+        entry.put("rounding", GRID_ROUNDING_MODES.contains(rounding) ? rounding : "HALF_UP");
+        return entry;
     }
 
     @Override
@@ -489,8 +519,21 @@ public class SystemPolicyServiceImpl extends EgovAbstractServiceImpl implements 
             }
         } else if ("NUMBER".equals(type)) {
             if (code != null && code.startsWith(GRID_DECIMAL_PREFIX) && value.isObject()) {
-                validateGridDecimalValue(value, request.getMinValue(), request.getMaxValue());
-                value = normalizeGridDecimalValue(value);
+                if (value.has("number")) {
+                    com.fasterxml.jackson.databind.node.ObjectNode rules = MAPPER.createObjectNode();
+                    for (String numericType : GRID_NUMERIC_TYPES) {
+                        JsonNode rule = value.get(numericType);
+                        if (rule == null || !rule.isObject()) {
+                            throw badRequest("숫자 타입별 소수점 설정이 모두 필요합니다.");
+                        }
+                        validateGridDecimalValue(rule, request.getMinValue(), request.getMaxValue());
+                        rules.set(numericType, normalizeGridDecimalValue(rule));
+                    }
+                    value = rules;
+                } else {
+                    validateGridDecimalValue(value, request.getMinValue(), request.getMaxValue());
+                    value = normalizeGridDecimalValue(value);
+                }
             } else {
                 validateNumber(value, request.getMinValue(), request.getMaxValue());
             }

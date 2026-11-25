@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiGet, apiPost } from '../src/shared/services/apiClient';
@@ -7,13 +7,20 @@ import {
   calculateQuotationLineAmount,
 } from '../src/pages/sales/quotation/create/data/quotationDetail';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
+import { GridDecimalModuleProvider } from '../src/shared/components/f1-grid/core/GridDecimalPolicy';
+import * as decimalPolicyService from '../src/shared/services/gridDecimalPolicy.service';
 
-vi.mock('../src/shared/services/apiClient', () => ({
-  apiGet: vi.fn(),
-  apiPost: vi.fn(),
-  apiPut: vi.fn(),
-  apiDelete: vi.fn(),
-}));
+vi.mock('../src/shared/services/apiClient', () => {
+  const apiGet = vi.fn();
+  const apiPost = vi.fn();
+  const apiPut = vi.fn();
+  return {
+    apiGet, apiPost, apiPut, apiDelete: vi.fn(),
+    apiGetWithExactDecimals: (path: string) => apiGet(path),
+    apiPostWithExactDecimals: (path: string, payload: unknown) => apiPost(path, payload),
+    apiPutWithExactDecimals: (path: string, payload: unknown) => apiPut(path, payload),
+  };
+});
 
 const apiGetMock = vi.mocked(apiGet);
 const apiPostMock = vi.mocked(apiPost);
@@ -40,6 +47,54 @@ describe('quotation create page', () => {
         itemCode: 'API_CODE', itemNm: 'API 표시명', sortOrder: 1, useAt: 'Y',
       }] });
     });
+  });
+
+  it('disables quotation editing and saving when the decimal policy cannot be loaded', async () => {
+    const policy = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockRejectedValue(new Error('offline'));
+    try {
+      const router = createMemoryRouter([{ path: '/', element: <GridDecimalModuleProvider moduleCode="SALES">
+        <QuotationCreatePage selectedModule={moduleItem} currentMenuName="견적서작성"
+          content={{ title: '견적서작성', description: '', cards: [], items: [] }}
+          breadcrumbItems={[]} selectedMenuPermissions={{ read: true, create: true }} />
+      </GridDecimalModuleProvider> }]);
+      render(<RouterProvider router={router} />);
+      expect(await screen.findByText('소수점 정책을 불러오지 못했습니다. 다시 조회해 주세요.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '저장', exact: true })).toBeDisabled();
+    } finally { policy.mockRestore(); }
+  });
+
+  it('updates loaded quotation totals when the currency policy arrives later', async () => {
+    const rules = { SALES: {
+      number: { places: 0, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      decimal: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      currency: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const },
+    } };
+    let resolvePolicy!: (value: typeof rules) => void;
+    const strict = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict')
+      .mockImplementation(() => new Promise((resolve) => { resolvePolicy = resolve; }));
+    const standard = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+    const lookup = apiGetMock.getMockImplementation()!;
+    apiGetMock.mockImplementation((path: string) => path === '/api/v1/sales/quotations/21'
+      ? Promise.resolve({ item: {
+        quotationId: 21, quotationNo: 'QT-OLD', quotationDt: '2026-11-16',
+        customerId: 10, customerCode: 'C-10', customerName: '고객 10', writer: true,
+        details: [{ quotationDetailId: 1, materialId: null, materialName: '품목',
+          quotationQty: '1', unitPrice: '1.234567', lineAmt: '1.234567' }],
+      } }) : lookup(path));
+    try {
+      const router = createMemoryRouter([{ path: '/', element: <GridDecimalModuleProvider moduleCode="SALES">
+        <QuotationCreatePage selectedModule={moduleItem} currentMenuName="견적서작성"
+          content={{ title: '견적서작성', description: '', cards: [], items: [] }}
+          breadcrumbItems={[]} selectedMenuPermissions={{ read: true, update: true }}
+          quotationId={21} mode="edit" />
+      </GridDecimalModuleProvider> }]);
+      render(<RouterProvider router={router} />);
+      await screen.findByDisplayValue('QT-OLD');
+      await act(async () => { resolvePolicy(rules); });
+      await waitFor(() => expect(screen.getByLabelText('견적 금액 합계')).toHaveTextContent(
+        /공급가액\s*1\.234567\s*부가세 \(10%\)\s*0\.123457\s*총액\s*1\.358024/,
+      ));
+    } finally { strict.mockRestore(); standard.mockRestore(); }
   });
 
   it('uses the system business date and presents the quotation header and manual line flow', async () => {

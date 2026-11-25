@@ -18,6 +18,9 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import egovframework.let.common.idsequence.service.IdSequenceService;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliverySourceOrderHeaderVO;
@@ -27,20 +30,85 @@ import egovframework.let.sales.shipment.deliveryplan.domain.model.SalesDeliveryP
 import egovframework.let.sales.shipment.deliveryplan.domain.model.SalesDeliveryPlanStatusSearchVO;
 import egovframework.let.sales.shipment.deliveryplan.domain.model.SalesDeliveryPlanVO;
 import egovframework.let.sales.shipment.deliveryplan.domain.repository.SalesDeliveryPlanDAO;
+import egovframework.let.system.policies.service.SystemPolicyService;
 
 class SalesDeliveryPlanServiceImplTest {
     @Mock
     private SalesDeliveryPlanDAO dao;
     @Mock
     private IdSequenceService sequenceService;
+    @Mock
+    private SystemPolicyService policy;
     private SalesDeliveryPlanServiceImpl service;
 
     @BeforeEach
     void setUp() throws Exception {
         MockitoAnnotations.openMocks(this);
-        service = new SalesDeliveryPlanServiceImpl(dao, sequenceService);
+        service = new SalesDeliveryPlanServiceImpl(dao, sequenceService, policy);
+        java.util.Map<String, Object> legacy = new java.util.HashMap<>();
+        legacy.put("places", 2);
+        when(policy.getGridDecimals(71L)).thenReturn(Collections.singletonMap("SALES", legacy));
         when(dao.selectTenantMode(71L)).thenReturn("MANUAL");
         when(dao.lockTenantModeForPlanCreation(71L)).thenReturn("MANUAL");
+    }
+
+    @Test
+    void rejectsStaleDecimalPolicyBeforePersisting() throws Exception {
+        when(dao.lockSourceOrder(anyMap())).thenReturn(order());
+        when(dao.selectOrderLines(anyMap())).thenReturn(Collections.singletonList(orderLine()));
+        when(dao.insertPlanHeader(anyMap())).thenReturn(701L);
+        when(dao.insertPlanDetail(anyMap())).thenReturn(801L);
+        when(dao.selectPlanHeader(anyMap())).thenReturn(new SalesDeliveryPlanVO());
+        when(sequenceService.nextValue(org.mockito.ArgumentMatchers.eq("SALES_DELIVERY_PLAN_NO"),
+                org.mockito.ArgumentMatchers.eq("71"), org.mockito.ArgumentMatchers.anyString())).thenReturn(1L);
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        ObjectNode json = mapper.valueToTree(request(detail(null, 801L, "1")));
+        json.set("decimalPolicy", mapper.readTree("{\"places\":3,\"rounding\":\"DOWN\"}"));
+        SalesDeliveryPlanRequestVO payload = mapper.treeToValue(json, SalesDeliveryPlanRequestVO.class);
+        assertThatThrownBy(() -> service.create(71L, "user01", payload))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        verify(dao, never()).insertPlanHeader(anyMap());
+    }
+
+    @Test
+    void rejectsMismatchedColumnContract() throws Exception {
+        when(dao.lockSourceOrder(anyMap())).thenReturn(order());
+        when(dao.selectOrderLines(anyMap())).thenReturn(Collections.singletonList(orderLine()));
+        when(dao.insertPlanHeader(anyMap())).thenReturn(701L);
+        when(dao.insertPlanDetail(anyMap())).thenReturn(801L);
+        when(dao.selectPlanHeader(anyMap())).thenReturn(new SalesDeliveryPlanVO());
+        when(sequenceService.nextValue(org.mockito.ArgumentMatchers.eq("SALES_DELIVERY_PLAN_NO"),
+                org.mockito.ArgumentMatchers.eq("71"), org.mockito.ArgumentMatchers.anyString())).thenReturn(1L);
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        ObjectNode json = mapper.valueToTree(request(detail(null, 801L, "1")));
+        json.set("decimalColumns", mapper.readTree("{\"plannedQty\":{\"type\":\"number\",\"places\":6}}"));
+        SalesDeliveryPlanRequestVO payload = mapper.treeToValue(json, SalesDeliveryPlanRequestVO.class);
+        assertThatThrownBy(() -> service.create(71L, "user01", payload))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        verify(dao, never()).insertPlanHeader(anyMap());
+    }
+
+    @Test
+    void automaticPlanPersistsQuantityAtPolicyPrecision() throws Exception {
+        java.util.Map<String, Object> qty = new java.util.HashMap<>();
+        qty.put("places", 3);
+        java.util.Map<String, Object> typed = new java.util.HashMap<>();
+        typed.put("number", qty);
+        when(policy.getGridDecimals(71L)).thenReturn(Collections.singletonMap("SALES", typed));
+        when(dao.lockTenantModeForPlanCreation(71L)).thenReturn("AUTO");
+        when(dao.lockSourceOrder(anyMap())).thenReturn(order());
+        when(dao.selectOrderLines(anyMap())).thenReturn(Collections.singletonList(orderLine()));
+        when(dao.insertPlanHeader(anyMap())).thenReturn(701L);
+        when(dao.insertPlanDetail(anyMap())).thenReturn(801L);
+        when(sequenceService.nextValue(org.mockito.ArgumentMatchers.eq("SALES_DELIVERY_PLAN_NO"),
+                org.mockito.ArgumentMatchers.eq("71"), org.mockito.ArgumentMatchers.anyString())).thenReturn(1L);
+        service.createAutomaticPlan(71L, "user01", request(detail(null, 801L, "1.234")));
+        verify(dao).insertPlanDetail(org.mockito.ArgumentMatchers.argThat(
+                params -> new BigDecimal("1.234").compareTo((BigDecimal) params.get("plannedQty")) == 0));
     }
 
     @Test

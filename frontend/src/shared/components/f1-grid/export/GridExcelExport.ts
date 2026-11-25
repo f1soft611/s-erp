@@ -118,6 +118,10 @@ function getTypedExcelCell<T extends object>(
     case 'number':
     case 'decimal':
     case 'currency': {
+      if (column.exactDecimal) {
+        cell = { value: String(rawValue), numFmt: '@' };
+        break;
+      }
       const numeric = getNumberOrText(rawValue);
       const value =
         column.rounding && typeof numeric === 'number'
@@ -188,7 +192,7 @@ export async function exportGridRowsToExcel<T extends object>(
       excelCell.font = { bold: true };
       excelCell.alignment = getGridCellAlignment(column);
       if (values[index] !== undefined) {
-        excelCell.numFmt = getNumericFormat(column, values[index]);
+        excelCell.numFmt = column.exactDecimal ? '@' : getNumericFormat(column, values[index]);
       }
     });
   };

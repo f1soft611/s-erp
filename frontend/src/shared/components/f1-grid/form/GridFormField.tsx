@@ -81,7 +81,7 @@ export function GridFormField<T extends object>({
     column.type === 'currency';
   const numberDraft = useF1GridNumberDraft(
     String(displayedValue ?? ''),
-    column.decimalPlaces,
+    column.exactDecimal ? undefined : column.decimalPlaces,
   );
   const options = column.options ?? [];
   const isRequired = Boolean(column.required);
@@ -451,7 +451,7 @@ export function GridFormField<T extends object>({
         }
         const nextTextValue = numberDraft.normalizeInput(event.target.value);
         const nextValue =
-          isNumber && nextTextValue !== ''
+          isNumber && !column.exactDecimal && nextTextValue !== ''
             ? Number(nextTextValue)
             : nextTextValue;
         applyValue(nextValue);

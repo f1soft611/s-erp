@@ -1,0 +1,29 @@
+{
+  "sales.order": {
+    "orderQty": { "type": "number", "places": 1 },
+    "unitPrice": { "type": "decimal" },
+    "supplyAmount": { "type": "currency", "places": 2, "rounding": "HALF_UP" },
+    "vatAmount": { "type": "currency", "places": 1, "rounding": "HALF_UP" },
+    "totalAmount": { "type": "currency", "places": 3, "rounding": "DOWN" },
+    "orderTotal": { "type": "currency", "places": 1, "rounding": "DOWN" }
+  },
+  "sales.quotation": {
+    "quotationQty": { "type": "number", "places": 1 },
+    "unitPrice": { "type": "decimal" },
+    "lineAmt": { "type": "currency", "places": 3 },
+    "supplyAmt": { "type": "currency", "places": 2, "rounding": "HALF_UP" },
+    "vatAmt": { "type": "currency", "places": 1, "rounding": "HALF_UP" },
+    "totalAmt": { "type": "currency", "places": 3, "rounding": "DOWN" }
+  },
+  "sales.delivery": {
+    "deliveryQty": { "type": "number", "places": 1 },
+    "unitPrice": { "type": "decimal" },
+    "supplyAmt": { "type": "currency", "places": 2, "rounding": "HALF_UP" },
+    "vatAmt": { "type": "currency", "places": 1, "rounding": "HALF_UP" },
+    "totalAmt": { "type": "currency", "places": 3, "rounding": "DOWN" },
+    "deliveryTotal": { "type": "currency", "places": 1, "rounding": "DOWN" }
+  },
+  "sales.deliveryPlan": {
+    "plannedQty": { "type": "number" }
+  }
+}

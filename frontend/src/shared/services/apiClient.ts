@@ -8,6 +8,7 @@ import {
   resolveApiBaseUrl,
 } from './authService';
 import { ApiNetworkError, ApiResponseError, isRequestAborted } from './apiErrors';
+import { parseJsonWithExactDecimals } from './exactDecimalJson';
 export { ApiNetworkError, ApiResponseError } from './apiErrors';
 
 const API_BASE_URL = resolveApiBaseUrl();
@@ -109,7 +110,7 @@ async function getAuthorizedAuth() {
   return auth;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, exactDecimalFields?: readonly string[]): Promise<T> {
   const auth = await getAuthorizedAuth();
 
   const headers: Record<string, string> = {
@@ -132,7 +133,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const rawText = await receive(() => response.text());
   let body: ApiEnvelope<T> = {};
   try {
-    body = rawText ? ((JSON.parse(rawText) as ApiEnvelope<T>) ?? {}) : {};
+    body = rawText ? (((exactDecimalFields
+      ? parseJsonWithExactDecimals(rawText, exactDecimalFields)
+      : JSON.parse(rawText)) as ApiEnvelope<T>) ?? {}) : {};
   } catch (cause) {
     if (response.ok) throw cause;
     throw new ApiResponseError('요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.', response.status);
@@ -158,6 +161,12 @@ export const apiGet = <T>(
   path: string,
   signal?: AbortSignal,
 ): Promise<T> => request<T>(path, signal ? { signal } : undefined);
+
+export const apiGetWithExactDecimals = <T>(
+  path: string,
+  fields: readonly string[],
+  signal?: AbortSignal,
+): Promise<T> => request<T>(path, signal ? { signal } : undefined, fields);
 
 export async function apiGetEventStream(path: string, signal: AbortSignal): Promise<Response> {
   const auth = await getAuthorizedAuth();
@@ -225,6 +234,10 @@ export async function apiDownload(
 export const apiPost = <T>(path: string, data: unknown): Promise<T> =>
   request<T>(path, { method: 'POST', body: JSON.stringify(data) });
 
+export const apiPostWithExactDecimals = <T>(
+  path: string, data: unknown, fields: readonly string[],
+): Promise<T> => request<T>(path, { method: 'POST', body: JSON.stringify(data) }, fields);
+
 export const apiPostFormData = <T>(
   path: string,
   formData: FormData,
@@ -232,6 +245,10 @@ export const apiPostFormData = <T>(
 
 export const apiPut = <T>(path: string, data: unknown): Promise<T> =>
   request<T>(path, { method: 'PUT', body: JSON.stringify(data) });
+
+export const apiPutWithExactDecimals = <T>(
+  path: string, data: unknown, fields: readonly string[],
+): Promise<T> => request<T>(path, { method: 'PUT', body: JSON.stringify(data) }, fields);
 
 export const apiDelete = <T>(path: string): Promise<T> =>
   request<T>(path, { method: 'DELETE' });

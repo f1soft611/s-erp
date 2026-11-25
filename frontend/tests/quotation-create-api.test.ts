@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { apiDelete, apiGet, apiPost, apiPut } from '../src/shared/services/apiClient';
+import { apiDelete, apiGetWithExactDecimals, apiPostWithExactDecimals, apiPutWithExactDecimals } from '../src/shared/services/apiClient';
 import {
   buildQuotationPayload,
   createQuotation,
@@ -26,9 +26,9 @@ import type { MaterialRow } from '../src/pages/co/master/materials/types/materia
 
 vi.mock('../src/shared/services/apiClient', () => ({
   apiDelete: vi.fn(),
-  apiGet: vi.fn(),
-  apiPost: vi.fn(),
-  apiPut: vi.fn(),
+  apiGetWithExactDecimals: vi.fn(),
+  apiPostWithExactDecimals: vi.fn(),
+  apiPutWithExactDecimals: vi.fn(),
 }));
 vi.mock('../src/pages/co/master/customers/services/customerManagement.service', () => ({
   fetchCustomers: vi.fn(),
@@ -38,15 +38,86 @@ vi.mock('../src/pages/co/master/materials/services/materialManagement.service', 
 }));
 
 const apiDeleteMock = vi.mocked(apiDelete);
-const apiGetMock = vi.mocked(apiGet);
-const apiPostMock = vi.mocked(apiPost);
-const apiPutMock = vi.mocked(apiPut);
+const apiGetMock = vi.mocked(apiGetWithExactDecimals);
+const apiPostMock = vi.mocked(apiPostWithExactDecimals);
+const apiPutMock = vi.mocked(apiPutWithExactDecimals);
 const fetchCustomersMock = vi.mocked(fetchCustomers);
 const fetchMaterialsMock = vi.mocked(fetchMaterials);
 
 describe('quotation create API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('validates quantity and price using their own policy scales', () => {
+    const policy = {
+      number: { places: 0, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const },
+      decimal: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const },
+      currency: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const },
+    };
+    const input = { quotationDt: '2026-11-16', customerId: 10,
+      details: [detailRow({ quotationQty: 1, unitPrice: 1.234, lineAmt: 1.234 })] };
+    expect(validateQuotationInput(input, policy).detailMessages).toEqual([]);
+    expect(buildQuotationPayload(input, policy)).toHaveProperty('decimalPolicy', policy);
+    expect(buildQuotationPayload(input, policy)).toHaveProperty('decimalColumns.lineAmt.type', 'currency');
+    expect(validateQuotationInput({ ...input, details: [detailRow({ quotationQty: 1.5 })] }, policy).detailMessages.join()).toContain('수량');
+    expect(validateQuotationInput({ ...input, details: [detailRow({ unitPrice: 1.2345 })] }, policy).detailMessages.join()).toContain('단가');
+    expect(validateQuotationInput({ ...input, details: [detailRow({ quotationQty: 1, unitPrice: 1.234, lineAmt: 1.23 })] }, policy).detailMessages.join()).toContain('재계산');
+  });
+
+  it('validates quotation values against the shared column rules', async () => {
+    const contracts = await import('../src/shared/services/decimalColumnContract');
+    const original = contracts.getDecimalColumnContract('sales.quotation');
+    const spy = vi.spyOn(contracts, 'getDecimalColumnContract').mockReturnValue({
+      ...original,
+      quotationQty: { type: 'number', places: 1 },
+      lineAmt: { type: 'currency', places: 2, rounding: 'HALF_UP' },
+    });
+    try {
+      const policy = { places: 3, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const };
+      const input = { quotationDt: '2026-11-16', customerId: 10,
+        details: [detailRow({ quotationQty: '1.0', unitPrice: '1.255', lineAmt: '1.26' })] };
+      expect(validateQuotationInput(input, policy).detailMessages).toEqual([]);
+      expect(validateQuotationInput({ ...input, details: [{ ...input.details[0], quotationQty: '1.01' }] }, policy).detailMessages.join()).toContain('수량');
+    } finally { spy.mockRestore(); }
+  });
+
+  it('validates exact decimal string values without a number conversion', () => {
+    const policy = {
+      number: { places: 0, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      decimal: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      currency: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+    };
+    const input = { quotationDt: '2026-11-16', customerId: 10,
+      details: [detailRow({ quotationQty: '1', unitPrice: '1234567890123.100001', lineAmt: '1234567890123.100001' })] };
+    expect(validateQuotationInput(input, policy).detailMessages).toEqual([]);
+    expect(buildQuotationPayload(input, policy).details[0].unitPrice).toBe('1234567890123.100001');
+  });
+
+  it('uses the currency rule for calculated lines and the decimal rule for prices', () => {
+    const policy = {
+      number: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const },
+      decimal: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      currency: { places: 2, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const },
+    };
+    const input = { quotationDt: '2026-11-16', customerId: 10,
+      details: [detailRow({ quotationQty: '1.234', unitPrice: '1.235', lineAmt: '1.52' })] };
+    expect(validateQuotationInput(input, policy).detailMessages).toEqual([]);
+    expect(validateQuotationInput({ ...input, details: [{ ...input.details[0], unitPrice: '1.2351' }] }, policy).detailMessages.join()).toContain('단가');
+    expect(validateQuotationInput({ ...input, details: [{ ...input.details[0], lineAmt: '1.523' }] }, policy).detailMessages.join()).toContain('견적금액');
+  });
+
+  it('rejects a quotation whose calculated aggregate exceeds the supported range', () => {
+    const policy = {
+      number: { places: 0, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      decimal: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      currency: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+    };
+    const input = { quotationDt: '2026-11-16', customerId: 10, details: [
+      detailRow({ quotationQty: '1', unitPrice: '5000000000000', lineAmt: '5000000000000' }),
+      detailRow({ rowId: 'line-2', quotationQty: '1', unitPrice: '5000000000000', lineAmt: '5000000000000' }),
+    ] };
+    expect(validateQuotationInput(input, policy).detailMessages.join()).toContain('합계');
   });
 
   it('accepts a manually entered line without a material ID but validates name, quantity, and price', () => {
@@ -242,11 +313,11 @@ describe('quotation create API', () => {
     apiDeleteMock.mockResolvedValue({});
 
     await expect(createQuotation(payload)).resolves.toEqual(item);
-    expect(apiPostMock).toHaveBeenCalledWith('/api/v1/sales/quotations', payload);
+    expect(apiPostMock).toHaveBeenCalledWith('/api/v1/sales/quotations', payload, expect.any(Array));
     await expect(getQuotation(21)).resolves.toEqual(item);
-    expect(apiGetMock).toHaveBeenCalledWith('/api/v1/sales/quotations/21');
+    expect(apiGetMock).toHaveBeenCalledWith('/api/v1/sales/quotations/21', expect.any(Array));
     await expect(updateQuotation(21, payload)).resolves.toEqual(item);
-    expect(apiPutMock).toHaveBeenCalledWith('/api/v1/sales/quotations/21', payload);
+    expect(apiPutMock).toHaveBeenCalledWith('/api/v1/sales/quotations/21', payload, expect.any(Array));
     await deleteQuotation(21);
     expect(apiDeleteMock).toHaveBeenCalledWith('/api/v1/sales/quotations/21');
   });

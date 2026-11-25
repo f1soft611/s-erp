@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiGet, apiPut } from '../src/shared/services/apiClient';
 import { SalesOrderStatusPage } from '../src/pages/sales/order/status/SalesOrderStatusPage';
 import { SalesOrderStatusGrid } from '../src/pages/sales/order/status/components/SalesOrderStatusGrid';
+import { SalesOrderStatusDetailPanel } from '../src/pages/sales/order/status/components/SalesOrderStatusDetailPanel';
+import * as decimalContext from '../src/shared/components/f1-grid/core/gridDecimalPolicyContext';
+import * as decimalColumns from '../src/shared/services/decimalColumnContract';
 import { useSalesOrderStatusDetail } from '../src/pages/sales/order/status/hooks/useSalesOrderStatusDetail';
 import { useSalesOrderStatusList } from '../src/pages/sales/order/status/hooks/useSalesOrderStatusList';
 import { createSalesOrderStatusColumns } from '../src/pages/sales/order/status/data/salesOrderStatusColumns';
@@ -12,12 +15,20 @@ import type { SalesOrderStatusFilters, SalesOrderStatusRow } from '../src/pages/
 import type { SalesOrderItem } from '../src/pages/sales/order/create/types/salesOrder.types';
 import type { MenuPermission, ModuleItem } from '../src/pages/dashboard/types/dashboard';
 
-vi.mock('../src/shared/services/apiClient', () => ({
-  apiGet: vi.fn(),
-  apiPost: vi.fn(),
-  apiPut: vi.fn(),
-  apiDelete: vi.fn(),
-}));
+vi.mock('../src/shared/services/apiClient', () => {
+  const get = vi.fn();
+  const put = vi.fn();
+  const post = vi.fn();
+  return {
+    apiGet: get,
+    apiGetWithExactDecimals: (path: string) => get(path),
+    apiPost: post,
+    apiPostWithExactDecimals: (path: string, data: unknown) => post(path, data),
+    apiPut: put,
+    apiPutWithExactDecimals: (path: string, data: unknown) => put(path, data),
+    apiDelete: vi.fn(),
+  };
+});
 vi.mock('../src/pages/sales/order/services/salesOrderCommonCode.service', () => ({
   fetchSalesOrderCommonCodes: vi.fn(),
   getSalesOrderCodeLabel: (options: Array<{ value: string; label: string }>, value?: string | null) =>
@@ -111,6 +122,25 @@ function createOrderItem(overrides: Partial<SalesOrderItem> = {}): SalesOrderIte
 }
 
 let orderItem: SalesOrderItem = createOrderItem();
+
+it('formats order detail values with their shared field rules', () => {
+  const rule = { places: 3, rounding: 'DOWN', trailingZeros: 'FIXED' } as const;
+  const policy = vi.spyOn(decimalContext, 'usePolicyDecimalRule').mockReturnValue({ number: rule, decimal: rule, currency: rule });
+  const original = decimalColumns.getDecimalColumnContract('sales.order');
+  const columns = vi.spyOn(decimalColumns, 'getDecimalColumnContract').mockReturnValue({
+    ...original, orderQty: { type: 'number', places: 1 }, unitPrice: { type: 'decimal', places: 2 },
+    totalAmount: { type: 'currency', places: 2 }, orderTotal: { type: 'currency', places: 1 },
+  });
+  try {
+    render(<SalesOrderStatusDetailPanel order={createOrderItem()} loading={false} error="" canEdit={false}
+      orderStatusOptions={[]} progressStatusOptions={[]} deliveryMethodOptions={[]}
+      onClose={() => undefined} onView={() => undefined} onEdit={() => undefined} />);
+    expect(screen.getByText('2.0', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('100.00', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('220.00', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('220.0', { exact: true })).toBeInTheDocument();
+  } finally { columns.mockRestore(); policy.mockRestore(); }
+});
 
 const salesModule: ModuleItem = {
   id: 'sales',

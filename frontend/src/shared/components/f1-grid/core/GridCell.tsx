@@ -177,8 +177,8 @@ const GridCellInner = <T extends object>({
     () =>
       column.type === 'rownumber'
         ? String(rowIndex + 1)
-        : getCellDisplayValue(column, value as T[keyof T]),
-    [column, rowIndex, value],
+        : getCellDisplayValue(column, value as T[keyof T], editable),
+    [column, editable, rowIndex, value],
   );
   const customCellProps = useMemo(
     () => column.getCellProps?.(cellRenderContext) ?? {},

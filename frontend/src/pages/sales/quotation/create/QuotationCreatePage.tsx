@@ -32,6 +32,10 @@ import type {
   PageContent,
 } from '../../../dashboard/types/dashboard';
 import { getSystemDate } from '../../../../shared/services/systemDateService';
+import { usePolicyDecimalStatus } from '../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
+import { SalesDecimalPolicyError } from '../../shared/SalesDecimalPolicyError';
+import { formatSalesOrderAmount, type SalesAmountRule } from '../../order/create/data/salesOrderAmounts';
+import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../shared/services/decimalColumnContract';
 import { searchQuotationCustomers, searchQuotationMaterials } from './services/quotationMaster.service';
 import {
   buildQuotationPayload,
@@ -56,6 +60,7 @@ import type {
 } from './types/quotation.types';
 import {
   resolveActiveQuotationRows,
+  calculateQuotationTotals,
   type OpenMaterialPicker,
   type QuotationDetailRow,
 } from './data/quotationDetail';
@@ -135,13 +140,6 @@ function quotationMaterialSnapshot(option: MasterPickerOption): Partial<Quotatio
   };
 }
 
-function calculateTotals(rows: QuotationDetailRow[]) {
-  const supplyAmt = rows.reduce((total, row) => total + Number(row.lineAmt || 0), 0);
-  const roundedSupply = Math.round((supplyAmt + Number.EPSILON) * 100) / 100;
-  const vatAmt = Math.round((roundedSupply * 0.1 + Number.EPSILON) * 100) / 100;
-  return { supplyAmt: roundedSupply, vatAmt, totalAmt: roundedSupply + vatAmt };
-}
-
 export function QuotationCreatePage({
   selectedModule,
   currentMenuName,
@@ -157,6 +155,21 @@ export function QuotationCreatePage({
   onEmbeddedActionsChange,
 }: Props) {
   const { confirm, dialog } = useCommonConfirmDialog();
+  const policyState = usePolicyDecimalStatus();
+  const policy = policyState.rule;
+  const amountRule = policy && ('places' in policy ? policy : policy.currency);
+  const summaryRules = useMemo(() => {
+    if (!policy) return undefined;
+    const contract = getDecimalColumnContract('sales.quotation');
+    return {
+      supply: resolveDecimalColumn(contract.supplyAmt, policy),
+      vat: resolveDecimalColumn(contract.vatAmt, policy),
+      total: resolveDecimalColumn(contract.totalAmt, policy),
+    };
+  }, [policy]);
+  const amountRuleRef = useRef(amountRule);
+  const policyRef = useRef(policy);
+  useEffect(() => { amountRuleRef.current = amountRule; policyRef.current = policy; }, [amountRule, policy]);
   const gridRef = useRef<F1GridRef<QuotationDetailRow>>(null);
   const savingRef = useRef(false);
   const initialDate = '';
@@ -187,7 +200,7 @@ export function QuotationCreatePage({
   const [loadedQuotation, setLoadedQuotation] = useState<QuotationItem | null>(null);
   const [gridRows, setGridRows] = useState<QuotationDetailRow[]>([]);
   const [gridKey, setGridKey] = useState(0);
-  const [amounts, setAmounts] = useState(EMPTY_AMOUNTS);
+  const [amounts, setAmounts] = useState<ReturnType<typeof calculateQuotationTotals> | null>(EMPTY_AMOUNTS);
   const [isLoadingQuotation, setIsLoadingQuotation] = useState(quotationId != null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
@@ -204,6 +217,7 @@ export function QuotationCreatePage({
   const canDelete = Boolean(selectedMenuPermissions?.delete);
   const hasPermissionForMode = loadedQuotation ? canUpdate && Boolean(loadedQuotation.writer) : canCreate;
   const isEditable = !isReadOnly && !isLoadingQuotation && !isSaving && !isLocked
+    && (policyState.status === 'ready' || policyState.status === 'unmanaged')
     && (loadedQuotation !== null || Boolean(businessDate)) && hasPermissionForMode;
   const isDeletable = !isReadOnly && loadedQuotation !== null && !isSaving && !isLocked
     && canDelete && Boolean(loadedQuotation.writer);
@@ -284,7 +298,7 @@ export function QuotationCreatePage({
     }));
     setGridRows(form.rows);
     setGridKey((key) => key + 1);
-    setAmounts(calculateTotals(form.rows));
+    setAmounts(calculateQuotationTotals(form.rows, amountRuleRef.current, policyRef.current));
     setHasDetailChanges(false);
     setSelectedRowIds([]);
     setValidationErrors(null);
@@ -338,7 +352,13 @@ export function QuotationCreatePage({
   const handleChangesChange = useCallback(
     (changes: F1GridChanges<QuotationDetailRow>) => {
       const activeRows = resolveActiveQuotationRows(gridRows, changes);
-      setAmounts(calculateTotals(activeRows));
+      try {
+        setAmounts(calculateQuotationTotals(activeRows, amountRule, policy));
+        setError('');
+      } catch {
+        setAmounts(null);
+        setError('견적 합계를 계산할 수 없습니다. 입력 금액을 확인해 주세요.');
+      }
       setHasDetailChanges(
         changes.insertedRows.length > 0 || changes.updatedRows.length > 0 || changes.deletedRows.length > 0,
       );
@@ -347,8 +367,17 @@ export function QuotationCreatePage({
         gridValidationActiveRef.current = !(gridRef.current?.validate() ?? true);
       }
     },
-    [clearValidationErrors, gridRows],
+    [amountRule, clearValidationErrors, gridRows, policy],
   );
+
+  useEffect(() => {
+    if (!amountRule || !policy) return;
+    try {
+      setAmounts(calculateQuotationTotals(gridRef.current?.getActiveRows() ?? gridRows, amountRule, policy));
+    } catch {
+      setAmounts(null);
+    }
+  }, [amountRule, gridRows, policy]);
 
   const openMaterialPicker: OpenMaterialPicker = useCallback((applyPatch) => {
     setMaterialPickerApply(
@@ -402,7 +431,7 @@ export function QuotationCreatePage({
       remark,
       details: gridRef.current?.getActiveRows() ?? [],
     };
-    const errors = validateQuotationInput(input);
+    const errors = validateQuotationInput(input, policy);
     const isGridValid = gridRef.current?.validate() ?? true;
     gridValidationActiveRef.current = !isGridValid;
     const validationMessages = [
@@ -415,7 +444,7 @@ export function QuotationCreatePage({
     setIsSaving(true);
     setNotice('');
     try {
-      const payload = buildQuotationPayload(input);
+      const payload = buildQuotationPayload(input, policy);
       const saved = loadedQuotation
         ? await updateQuotation(loadedQuotation.quotationId, payload)
         : await createQuotation(payload);
@@ -436,7 +465,7 @@ export function QuotationCreatePage({
     }
   }, [
     applyLoadedQuotation, currencyCode, customer, customerReference, hasUnsavedChanges,
-    incoterms, isEditable, loadedQuotation, onSaved, paymentTerm, quotationDt, remark,
+    incoterms, isEditable, loadedQuotation, onSaved, paymentTerm, policy, quotationDt, remark,
     submitDt, validTerm,
   ]);
 
@@ -578,6 +607,7 @@ export function QuotationCreatePage({
           </Alert>
         ) : null}
         {notice ? <Alert severity="success">{notice}</Alert> : null}
+        <SalesDecimalPolicyError status={policyState.status} />
         {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
         <Paper variant="outlined" sx={{ p: 2, minWidth: 0, borderRadius: 1 }}>
           <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 700 }}>견적 기본정보</Typography>
@@ -689,15 +719,16 @@ export function QuotationCreatePage({
               onOpenMaterialPicker={openMaterialPicker}
               unitOptions={codesLoading || codesError ? [] : commonCodes.ITEM_UNIT}
               disabled={!isEditable}
+              onCalculationError={(cause) => setError(cause.message)}
             />
           </Box>
           <Box aria-label="견적 금액 합계" sx={{
             display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(3, minmax(0, 1fr))' },
             gap: 1, p: 2,
           }}>
-            <AmountSummary label="공급가액" amount={amounts.supplyAmt} />
-            <AmountSummary label="부가세 (10%)" amount={amounts.vatAmt} />
-            <AmountSummary label="총액" amount={amounts.totalAmt} />
+            <AmountSummary label="공급가액" amount={amounts?.supplyAmt} rule={summaryRules?.supply ?? amountRule} />
+            <AmountSummary label="부가세 (10%)" amount={amounts?.vatAmt} rule={summaryRules?.vat ?? amountRule} />
+            <AmountSummary label="총액" amount={amounts?.totalAmt} rule={summaryRules?.total ?? amountRule} />
           </Box>
         </Paper>
       </Box>
@@ -738,7 +769,7 @@ function QuotationRouteLeaveGuard({ when }: { when: boolean }) {
   );
 }
 
-function AmountSummary({ label, amount }: { label: string; amount: number }) {
+function AmountSummary({ label, amount, rule }: { label: string; amount?: number | string; rule?: SalesAmountRule }) {
   return (
     <Box sx={{
       display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1,
@@ -746,7 +777,7 @@ function AmountSummary({ label, amount }: { label: string; amount: number }) {
     }}>
       <Typography variant="body2" color="text.secondary">{label}</Typography>
       <Typography variant="body1" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-        {amount.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        {amount == null ? '-' : formatSalesOrderAmount(amount, rule)}
       </Typography>
     </Box>
   );

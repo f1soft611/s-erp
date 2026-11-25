@@ -19,6 +19,8 @@ import type {
 import type { MenuPermission } from '../src/pages/dashboard/types/dashboard';
 import { getSystemDate } from '../src/shared/services/systemDateService';
 import { fetchSalesOrderCommonCodes } from '../src/pages/sales/order/services/salesOrderCommonCode.service';
+import { GridDecimalModuleProvider } from '../src/shared/components/f1-grid/core/GridDecimalPolicy';
+import * as decimalPolicyService from '../src/shared/services/gridDecimalPolicy.service';
 
 vi.mock('../src/shared/services/systemDateService', () => ({
   getSystemDate: vi.fn(),
@@ -87,6 +89,148 @@ describe('sales order entry page', () => {
     searchOrderQuotationsMock.mockResolvedValue([
       { id: 71, code: 'QT-20261116-0001', name: '거래처 10', customerId: 10 },
     ]);
+  });
+
+  it('disables order editing and saving when the decimal policy cannot be loaded', async () => {
+    const policy = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockRejectedValue(new Error('offline'));
+    try {
+      const router = createMemoryRouter([{ path: '/', element: <GridDecimalModuleProvider moduleCode="SALES">
+        <SalesOrderCreatePage {...salesOrderPageProps} selectedMenuPermissions={{ read: true, create: true }} />
+      </GridDecimalModuleProvider> }]);
+      render(<RouterProvider router={router} />);
+      expect(await screen.findByText('소수점 정책을 불러오지 못했습니다. 다시 조회해 주세요.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '저장', exact: true })).toBeDisabled();
+    } finally { policy.mockRestore(); }
+  });
+
+  it('updates loaded order totals when the currency policy arrives after the order', async () => {
+    const rules = { SALES: {
+      number: { places: 0, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      decimal: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      currency: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+    } };
+    let resolvePolicy!: (value: typeof rules) => void;
+    const strict = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict')
+      .mockImplementation(() => new Promise((resolve) => { resolvePolicy = resolve; }));
+    const standard = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+    try {
+      const loaded = loadedOrder();
+      loaded.details[0].supplyAmt = '1.234567';
+      loaded.details[0].vatAmt = '0.123456';
+      loaded.details[0].totalAmt = '1.358023';
+      getSalesOrderMock.mockResolvedValue(loaded);
+      const router = createMemoryRouter([{ path: '/', element: <GridDecimalModuleProvider moduleCode="SALES">
+        <SalesOrderCreatePage {...salesOrderPageProps} mode="edit" salesOrderId={300}
+          selectedMenuPermissions={{ read: true, update: true }} />
+      </GridDecimalModuleProvider> }]);
+      render(<RouterProvider router={router} />);
+      await screen.findByDisplayValue('SO-20261027-0001');
+      await act(async () => { resolvePolicy(rules); });
+      await waitFor(() => expect(screen.getByLabelText('수주 금액 합계')).toHaveTextContent(
+        /공급가 합계\s*1\.234567\s*부가세 합계\s*0\.123456\s*총 합계\s*1\.358023/,
+      ));
+    } finally { strict.mockRestore(); standard.mockRestore(); }
+  });
+
+  it('updates totals from edited rows when the currency policy changes', async () => {
+    const rules = { SALES: {
+      number: { places: 0, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      decimal: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      currency: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+    } };
+    const strict = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue(rules);
+    const standard = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+    try {
+      const loaded = loadedOrder();
+      loaded.details[0].supplyAmt = '200.000';
+      loaded.details[0].vatAmt = '20.000';
+      loaded.details[0].totalAmt = '220.000';
+      getSalesOrderMock.mockResolvedValue(loaded);
+      const router = createMemoryRouter([{ path: '/', element: <GridDecimalModuleProvider moduleCode="SALES">
+        <SalesOrderCreatePage {...salesOrderPageProps} mode="edit" salesOrderId={300}
+          selectedMenuPermissions={{ read: true, update: true }} />
+      </GridDecimalModuleProvider> }]);
+      render(<RouterProvider router={router} />);
+      await screen.findByDisplayValue('SO-20261027-0001');
+      await waitFor(() => expect(screen.getByRole('button', { name: '상세 행 추가' })).toBeEnabled());
+      const row = screen.getByRole('row', { name: /order-line-450 행 선택/ });
+      fireEvent.doubleClick(within(row).getAllByRole('gridcell')[6]);
+      fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '30.123' } });
+      fireEvent.keyDown(screen.getByRole('spinbutton'), { key: 'Enter', code: 'Enter' });
+      await waitFor(() => expect(screen.getByLabelText('수주 금액 합계')).toHaveTextContent('230.123'));
+      const updated = { SALES: { ...rules.SALES, currency: { ...rules.SALES.currency, places: 2 } } };
+      strict.mockResolvedValue(updated);
+      standard.mockResolvedValue(updated);
+      await act(async () => { decimalPolicyService.resetGridDecimalPolicyCache(); });
+      await waitFor(() => expect(screen.getByLabelText('수주 금액 합계')).toHaveTextContent(
+        /공급가 합계\s*200\.00\s*부가세 합계\s*30\.12\s*총 합계\s*230\.12/,
+      ));
+    } finally { strict.mockRestore(); standard.mockRestore(); }
+  });
+
+  it('saves an exact six-place price without losing digits after grid editing', async () => {
+    const rules = { SALES: {
+      number: { places: 0, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      decimal: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      currency: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+    } };
+    const strict = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue(rules);
+    const standard = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+    try {
+      const loaded = loadedOrder();
+      loaded.deliveryDt = '2026-11-30';
+      loaded.details[0].orderQty = 1;
+      getSalesOrderMock.mockResolvedValue(loaded);
+      updateSalesOrderMock.mockResolvedValue(loaded);
+      const router = createMemoryRouter([{ path: '/', element: <GridDecimalModuleProvider moduleCode="SALES">
+        <SalesOrderCreatePage {...salesOrderPageProps} mode="edit" salesOrderId={300}
+          selectedMenuPermissions={{ read: true, update: true }} />
+      </GridDecimalModuleProvider> }]);
+      render(<RouterProvider router={router} />);
+      await screen.findByDisplayValue('SO-20261027-0001');
+      await waitFor(() => expect(screen.getByRole('button', { name: '상세 행 추가' })).toBeEnabled());
+      const row = screen.getByRole('row', { name: /order-line-450 행 선택/ });
+      fireEvent.doubleClick(within(row).getAllByRole('gridcell')[4]);
+      const editor = screen.getByRole('spinbutton');
+      fireEvent.change(editor, { target: { value: '1234567890123.100001' } });
+      fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+      expect(within(row).getAllByRole('gridcell')[4]).toHaveTextContent('1,234,567,890,123.100001');
+      fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+      await waitFor(() => expect(updateSalesOrderMock).toHaveBeenCalledWith(300, expect.objectContaining({
+        details: [expect.objectContaining({ unitPrice: '1234567890123.100001' })],
+      })));
+    } finally { strict.mockRestore(); standard.mockRestore(); }
+  });
+
+  it('rejects fractional quantity input under the zero-place policy', async () => {
+    const rules = { SALES: {
+      number: { places: 0, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      decimal: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      currency: { places: 3, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+    } };
+    const strict = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue(rules);
+    const standard = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+    try {
+      const loaded = loadedOrder();
+      loaded.deliveryDt = '2026-11-30';
+      getSalesOrderMock.mockResolvedValue(loaded);
+      const router = createMemoryRouter([{ path: '/', element: <GridDecimalModuleProvider moduleCode="SALES">
+        <SalesOrderCreatePage {...salesOrderPageProps} mode="edit" salesOrderId={300}
+          selectedMenuPermissions={{ read: true, update: true }} />
+      </GridDecimalModuleProvider> }]);
+      render(<RouterProvider router={router} />);
+      await screen.findByDisplayValue('SO-20261027-0001');
+      await waitFor(() => expect(screen.getByRole('button', { name: '상세 행 추가' })).toBeEnabled());
+      const row = screen.getByRole('row', { name: /order-line-450 행 선택/ });
+      fireEvent.doubleClick(within(row).getAllByRole('gridcell')[3]);
+      const editor = screen.getByRole('spinbutton');
+      fireEvent.change(editor, { target: { value: '1.5' } });
+      expect(editor).toHaveValue(2);
+      const save = screen.getByRole('button', { name: '저장', exact: true });
+      fireEvent.mouseDown(save);
+      expect(within(row).getAllByRole('gridcell')[3]).toHaveTextContent('2');
+      expect(updateSalesOrderMock).not.toHaveBeenCalled();
+    } finally { strict.mockRestore(); standard.mockRestore(); }
   });
 
   it('orders the header fields according to the requested entry layout', async () => {

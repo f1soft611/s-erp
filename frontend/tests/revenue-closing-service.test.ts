@@ -5,10 +5,10 @@ import {
   searchRevenueClosings,
 } from '../src/pages/sales/revenue/closing/services/revenueClosing.service';
 
-vi.mock('../src/shared/services/apiClient', () => ({
-  apiGet: vi.fn(),
-  apiPost: vi.fn(),
-}));
+vi.mock('../src/shared/services/apiClient', () => {
+  const apiGet = vi.fn();
+  return { apiGet, apiPost: vi.fn(), apiGetWithExactDecimals: (path: string) => apiGet(path) };
+});
 
 beforeEach(() => {
   vi.clearAllMocks();

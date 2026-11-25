@@ -223,10 +223,11 @@ function F1GridInner<T extends object>(
           return column;
         }
         const own = column.decimal;
-        const places = own?.places ?? column.decimalPlaces ?? policyRule?.places;
+        const typeRule = policyRule && ('places' in policyRule ? policyRule : policyRule[column.type]);
+        const places = own?.places ?? column.decimalPlaces ?? typeRule?.places;
         const trailingZeros =
-          own?.trailingZeros ?? column.trailingZeros ?? policyRule?.trailingZeros;
-        const rounding = own?.rounding ?? column.rounding ?? policyRule?.rounding;
+          own?.trailingZeros ?? column.trailingZeros ?? typeRule?.trailingZeros;
+        const rounding = own?.rounding ?? column.rounding ?? typeRule?.rounding;
         if (
           places === column.decimalPlaces &&
           trailingZeros === column.trailingZeros &&
@@ -633,7 +634,7 @@ function F1GridInner<T extends object>(
     !queryWorkerFailed &&
     projectedRows.length >= Math.max(1, queryWorkerThreshold) &&
     (filterState.length > 0 || sortState.length > 0) &&
-    columns.every((column) => !column.getValue) &&
+    columns.every((column) => !column.getValue && !column.exactDecimal) &&
     typeof Worker !== 'undefined';
 
   useEffect(() => {
@@ -721,8 +722,8 @@ function F1GridInner<T extends object>(
     () =>
       dataSource || queryWorkerEligible || disableSorting
         ? filteredRows
-        : sortGridRows(filteredRows, sortState),
-    [dataSource, disableSorting, filteredRows, queryWorkerEligible, sortState],
+        : sortGridRows(filteredRows, sortState, columns),
+    [columns, dataSource, disableSorting, filteredRows, queryWorkerEligible, sortState],
   );
   const rowIndexById = useMemo(
     () =>
@@ -1587,11 +1588,11 @@ function F1GridInner<T extends object>(
     );
     if (startRowIndex < 0) return;
 
-    setData((current) => {
-      let next = current;
-      const targetRows = current.rows.filter(
+    {
+      let next = data;
+      const targetRows = data.rows.filter(
         (row) =>
-          current.stateById[getStateKey(getGridRowId(row, rowKey))] !==
+          data.stateById[getStateKey(getGridRowId(row, rowKey))] !==
           'deleted',
       );
       parseGridTsv(text).forEach((values, valueRowIndex) => {
@@ -1603,10 +1604,11 @@ function F1GridInner<T extends object>(
         }
         if (!targetRow) return;
         const changes: Partial<T> = {};
+        let workingRow = targetRow;
         values.forEach((rawValue, valueColumnIndex) => {
           const column =
             visibleColumns[focusedCell.columnIndex + valueColumnIndex];
-          if (!column || !isCellEditable(column, targetRow)) return;
+          if (!column || !isCellEditable(column, workingRow)) return;
           const normalizedValue = normalizeF1GridInput(
             rawValue,
             column.inputFormat,
@@ -1614,7 +1616,12 @@ function F1GridInner<T extends object>(
           );
           const value = coerceClipboardValue(normalizedValue, column);
           if (value !== undefined) {
-            (changes as Record<keyof T, unknown>)[column.field] = value;
+            const numeric = column.type === 'number' || column.type === 'decimal' || column.type === 'currency';
+            const patch = numeric && column.onValueChange
+              ? column.onValueChange(workingRow, value)
+              : { [column.field]: value } as Partial<T>;
+            Object.assign(changes, patch);
+            workingRow = { ...workingRow, ...patch };
           }
         });
         if (Object.keys(changes).length > 0) {
@@ -1626,8 +1633,8 @@ function F1GridInner<T extends object>(
           );
         }
       });
-      return next;
-    });
+      setData(next);
+    }
   }
 
   function selectRow(
@@ -1792,7 +1799,7 @@ function F1GridInner<T extends object>(
             column.type === 'currency'
           ? draftText.trim() === ''
             ? null
-            : Number(draftText)
+            : column.exactDecimal ? draftText : Number(draftText)
           : column.type === 'date'
             ? normalizeDateInput(draftText)
             : (matchedAutocompleteOption?.value ??

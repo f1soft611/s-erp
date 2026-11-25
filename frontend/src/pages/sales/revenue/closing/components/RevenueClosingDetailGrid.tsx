@@ -35,10 +35,10 @@ const columns: F1GridColumn<RevenueClosingDetailRow>[] = [
         label={row.closingStatus === 'CLOSED' ? '마감' : '미마감'}
       />
     ) },
-  { field: 'quantity', headerName: '수량', type: 'decimal', width: 120, align: 'right' },
-  { field: 'salesAmount', headerName: '매출금액', type: 'currency', width: 140, align: 'right' },
-  { field: 'vatAmount', headerName: '부가세', type: 'currency', width: 130, align: 'right' },
-  { field: 'totalAmount', headerName: '합계', type: 'currency', width: 140, align: 'right' },
+  { field: 'quantity', headerName: '수량', type: 'number', exactDecimal: true, width: 120, align: 'right' },
+  { field: 'salesAmount', headerName: '매출금액', type: 'currency', exactDecimal: true, width: 140, align: 'right' },
+  { field: 'vatAmount', headerName: '부가세', type: 'currency', exactDecimal: true, width: 130, align: 'right' },
+  { field: 'totalAmount', headerName: '합계', type: 'currency', exactDecimal: true, width: 140, align: 'right' },
 ];
 
 export function RevenueClosingDetailGrid({

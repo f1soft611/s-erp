@@ -21,6 +21,9 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import egovframework.let.sales.order.create.domain.model.SalesOrderCreateRequestVO;
 import egovframework.let.sales.order.create.domain.model.SalesOrderDetailCreateRequestVO;
@@ -30,6 +33,7 @@ import egovframework.let.sales.order.create.domain.repository.SalesOrderDAO;
 import egovframework.let.common.idsequence.service.IdSequenceService;
 import egovframework.let.sales.shipment.deliveryplan.service.SalesDeliveryPlanService;
 import egovframework.let.sales.shipment.deliveryplan.domain.model.SalesDeliveryPlanRequestVO;
+import egovframework.let.system.policies.service.SystemPolicyService;
 
 class SalesOrderServiceImplTest {
 
@@ -42,12 +46,16 @@ class SalesOrderServiceImplTest {
     @Mock
     private SalesDeliveryPlanService salesDeliveryPlanService;
 
+    @Mock
+    private SystemPolicyService systemPolicyService;
+
     private SalesOrderServiceImpl service;
 
     @BeforeEach
     void setUp() throws Exception {
         MockitoAnnotations.openMocks(this);
-        service = new SalesOrderServiceImpl(salesOrderDAO, idSequenceService, salesDeliveryPlanService);
+        service = new SalesOrderServiceImpl(salesOrderDAO, idSequenceService, salesDeliveryPlanService, systemPolicyService);
+        when(systemPolicyService.getGridDecimals(71L)).thenReturn(Collections.singletonMap("SALES", rule(2, "HALF_UP")));
         when(salesDeliveryPlanService.getMode(71L)).thenReturn("MANUAL");
         when(salesDeliveryPlanService.lockModeForPlanCreation(71L)).thenReturn("MANUAL");
         when(salesOrderDAO.existsCustomer(anyMap())).thenReturn(true);
@@ -59,6 +67,122 @@ class SalesOrderServiceImplTest {
         when(salesOrderDAO.countDeliveryReferences(anyMap())).thenReturn(0);
         when(idSequenceService.nextValue("SALES_ORDER_NO", "71", "20261027"))
                 .thenReturn(1L);
+    }
+
+    @Test
+    void acceptsExactDecimalStringsInOrderRequest() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        SalesOrderDetailCreateRequestVO detail = mapper.readValue(
+                "{\"orderQty\":\"1\",\"unitPrice\":\"1234567890123.100001\",\"vatAmt\":\"0.000001\"}",
+                SalesOrderDetailCreateRequestVO.class);
+        assertThat(detail.getUnitPrice()).isEqualByComparingTo("1234567890123.100001");
+        assertThat(detail.getVatAmt()).isEqualByComparingTo("0.000001");
+    }
+
+    @Test
+    void rejectsStaleDecimalPolicyBeforePersisting() throws Exception {
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        ObjectNode json = mapper.valueToTree(validPayload());
+        json.set("decimalPolicy", mapper.readTree("{\"places\":3,\"rounding\":\"DOWN\"}"));
+        SalesOrderCreateRequestVO payload = mapper.treeToValue(json, SalesOrderCreateRequestVO.class);
+        assertThatThrownBy(() -> service.createOrder(71L, "user01", payload))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        verify(salesOrderDAO, org.mockito.Mockito.never()).insertOrderHeader(anyMap());
+    }
+
+    @Test
+    void rejectsMismatchedColumnContractBeforePersisting() throws Exception {
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        ObjectNode json = mapper.valueToTree(validPayload());
+        json.set("decimalColumns", mapper.readTree("{\"unitPrice\":{\"type\":\"decimal\",\"places\":6}}"));
+        SalesOrderCreateRequestVO payload = mapper.treeToValue(json, SalesOrderCreateRequestVO.class);
+        assertThatThrownBy(() -> service.createOrder(71L, "user01", payload))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        verify(salesOrderDAO, org.mockito.Mockito.never()).insertOrderHeader(anyMap());
+    }
+
+    @Test
+    void appliesTypedPolicyWithoutRoundingTheEnteredPriceFirst() throws Exception {
+        Map<String, Object> typed = new java.util.HashMap<>();
+        typed.put("number", rule(3, "HALF_UP"));
+        typed.put("decimal", rule(3, "DOWN"));
+        typed.put("currency", rule(3, "HALF_UP"));
+        when(systemPolicyService.getGridDecimals(71L)).thenReturn(Collections.singletonMap("SALES", typed));
+        SalesOrderCreateRequestVO payload = validPayload();
+        payload.getDetails().get(0).setOrderQty(new BigDecimal("1.234"));
+        payload.getDetails().get(0).setUnitPrice(new BigDecimal("1.235"));
+        payload.getDetails().get(0).setVatAmt(null);
+
+        SalesOrderVO saved = service.createOrder(71L, "user01", payload);
+
+        assertThat(saved.getDetails().get(0).getUnitPrice()).isEqualByComparingTo("1.235");
+        assertThat(saved.getDetails().get(0).getSupplyAmt()).isEqualByComparingTo("1.524");
+        assertThat(saved.getDetails().get(0).getVatAmt()).isEqualByComparingTo("0.152");
+        assertThat(saved.getTotalAmt()).isEqualByComparingTo("1.676");
+    }
+
+    @Test
+    void appliesCurrencyPolicyToCalculatedAmountsAndDecimalPolicyToPrice() throws Exception {
+        Map<String, Object> typed = new java.util.HashMap<>();
+        typed.put("number", rule(3, "HALF_UP"));
+        typed.put("decimal", rule(3, "DOWN"));
+        typed.put("currency", rule(2, "HALF_UP"));
+        when(systemPolicyService.getGridDecimals(71L)).thenReturn(Collections.singletonMap("SALES", typed));
+        SalesOrderCreateRequestVO payload = validPayload();
+        payload.getDetails().get(0).setOrderQty(new BigDecimal("1.234"));
+        payload.getDetails().get(0).setUnitPrice(new BigDecimal("1.235"));
+        payload.getDetails().get(0).setVatAmt(null);
+
+        SalesOrderVO saved = service.createOrder(71L, "user01", payload);
+
+        assertThat(saved.getDetails().get(0).getUnitPrice()).isEqualByComparingTo("1.235");
+        assertThat(saved.getDetails().get(0).getSupplyAmt()).isEqualByComparingTo("1.52");
+        assertThat(saved.getDetails().get(0).getVatAmt()).isEqualByComparingTo("0.15");
+        assertThat(saved.getTotalAmt()).isEqualByComparingTo("1.67");
+    }
+
+    @Test
+    void rejectsStaleCurrencyPolicyBeforePersisting() throws Exception {
+        Map<String, Object> typed = new java.util.HashMap<>();
+        typed.put("number", rule(0, "HALF_UP"));
+        typed.put("decimal", rule(3, "DOWN"));
+        typed.put("currency", rule(2, "HALF_UP"));
+        when(systemPolicyService.getGridDecimals(71L)).thenReturn(Collections.singletonMap("SALES", typed));
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+        ObjectNode json = mapper.valueToTree(validPayload());
+        json.set("decimalPolicy", mapper.readTree("{\"number\":{\"places\":0,\"rounding\":\"HALF_UP\"},"
+                + "\"decimal\":{\"places\":3,\"rounding\":\"DOWN\"},"
+                + "\"currency\":{\"places\":3,\"rounding\":\"HALF_UP\"}}"));
+        SalesOrderCreateRequestVO payload = mapper.treeToValue(json, SalesOrderCreateRequestVO.class);
+        assertThatThrownBy(() -> service.createOrder(71L, "user01", payload))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        verify(salesOrderDAO, org.mockito.Mockito.never()).insertOrderHeader(anyMap());
+    }
+
+    @Test
+    void rejectsInputsBeyondTheirTypePolicyRatherThanChangingThem() throws Exception {
+        Map<String, Object> typed = new java.util.HashMap<>();
+        typed.put("number", rule(0, "HALF_UP"));
+        typed.put("decimal", rule(3, "HALF_UP"));
+        typed.put("currency", rule(3, "HALF_UP"));
+        when(systemPolicyService.getGridDecimals(71L)).thenReturn(Collections.singletonMap("SALES", typed));
+        SalesOrderCreateRequestVO payload = validPayload();
+        payload.getDetails().get(0).setOrderQty(new BigDecimal("1.5"));
+        assertThatThrownBy(() -> service.createOrder(71L, "user01", payload))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("주문수량");
+        verify(salesOrderDAO, org.mockito.Mockito.never()).insertOrderHeader(anyMap());
+    }
+
+    private static Map<String, Object> rule(int places, String rounding) {
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("places", places);
+        result.put("rounding", rounding);
+        return result;
     }
 
     @Test

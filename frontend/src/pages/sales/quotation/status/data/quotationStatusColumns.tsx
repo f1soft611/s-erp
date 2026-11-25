@@ -2,6 +2,7 @@ import { Link } from '@mui/material';
 import { F1GridHighlightText } from '../../../../../shared/components/f1-grid';
 import type { F1GridColumn } from '../../../../../shared/components/f1-grid/types/grid.types';
 import type { QuotationStatusRow } from '../types/quotationStatus.types';
+import { getDecimalColumnContract } from '../../../../../shared/services/decimalColumnContract';
 
 export type QuotationStatusColumnOptions = {
   onOpenQuotation?: (row: QuotationStatusRow) => void;
@@ -10,17 +11,23 @@ export type QuotationStatusColumnOptions = {
 const amountColumn = (
   field: keyof QuotationStatusRow,
   headerName: string,
-  type: 'decimal' | 'currency',
+  type: 'number' | 'decimal' | 'currency',
   width = 130,
-): F1GridColumn<QuotationStatusRow> => ({
+): F1GridColumn<QuotationStatusRow> => {
+  const column = getDecimalColumnContract('sales.quotation')[field];
+  const { type: contractType, ...decimal } = column ?? { type };
+  return ({
   field,
   headerName,
-  type,
+  type: contractType,
+  decimal,
+  exactDecimal: true,
   width,
   align: 'right',
   editable: false,
   search: { hidden: true },
-});
+  });
+};
 
 export function createQuotationStatusColumns({
   onOpenQuotation,
@@ -164,8 +171,8 @@ export function createQuotationStatusColumns({
       editable: false,
       search: { hidden: true },
     },
-    { ...amountColumn('quotationQty', '견적수량', 'decimal'), summaryType: 'sum' },
-    amountColumn('unitPrice', '견적단가', 'currency'),
+    { ...amountColumn('quotationQty', '견적수량', 'number'), summaryType: 'sum' },
+    amountColumn('unitPrice', '견적단가', 'decimal'),
     { ...amountColumn('lineAmt', '견적금액', 'currency'), summaryType: 'sum' },
     amountColumn('supplyAmt', '공급가액', 'currency'),
     amountColumn('vatAmt', '부가세', 'currency'),

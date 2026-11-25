@@ -1,5 +1,5 @@
 import type { PageSearchFieldValue } from '../../../../../shared/components/page-search/searchFields';
-import { apiGet } from '../../../../../shared/services/apiClient';
+import { apiGetWithExactDecimals } from '../../../../../shared/services/apiClient';
 import type {
   QuotationStatusFilters,
   QuotationStatusListResponse,
@@ -49,8 +49,9 @@ export async function searchQuotationStatus(
     if (value) params.append(key, value);
   });
   const query = params.toString();
-  const response = await apiGet<QuotationStatusListResponse>(
+  const response = await apiGetWithExactDecimals<QuotationStatusListResponse>(
     query ? `${QUOTATION_STATUS_PATH}?${query}` : QUOTATION_STATUS_PATH,
+    ['quotationQty', 'unitPrice', 'lineAmt', 'supplyAmt', 'vatAmt', 'totalAmt'],
   );
   return response?.resultList ?? [];
 }

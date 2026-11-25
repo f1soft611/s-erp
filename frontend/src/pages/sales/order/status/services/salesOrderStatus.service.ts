@@ -1,5 +1,5 @@
 import type { PageSearchFieldValue } from '../../../../../shared/components/page-search/searchFields';
-import { apiGet } from '../../../../../shared/services/apiClient';
+import { apiGetWithExactDecimals } from '../../../../../shared/services/apiClient';
 import type {
   SalesOrderStatusFilters,
   SalesOrderStatusListResponse,
@@ -117,8 +117,9 @@ export async function searchSalesOrderStatus(
     if (value) params.append(key, value);
   });
   const query = params.toString();
-  const response = await apiGet<SalesOrderStatusListResponse>(
+  const response = await apiGetWithExactDecimals<SalesOrderStatusListResponse>(
     query ? `${SALES_ORDER_STATUS_PATH}?${query}` : SALES_ORDER_STATUS_PATH,
+    ['orderQty', 'unitPrice', 'supplyAmt', 'vatAmt', 'totalAmt', 'shippedQty'],
   );
   return response?.resultList ?? [];
 }

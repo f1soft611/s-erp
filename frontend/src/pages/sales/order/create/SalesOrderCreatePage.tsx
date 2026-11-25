@@ -39,7 +39,10 @@ import type {
   PageContent,
 } from '../../../dashboard/types/dashboard';
 import { getSystemDate } from '../../../../shared/services/systemDateService';
-import { sumSalesOrderAmounts } from './data/salesOrderAmounts';
+import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../shared/services/decimalColumnContract';
+import { formatSalesOrderAmount, sumExactSalesAmounts, type SalesAmountRule } from './data/salesOrderAmounts';
+import { usePolicyDecimalStatus } from '../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
+import { SalesDecimalPolicyError } from '../../shared/SalesDecimalPolicyError';
 import { getSalesOrderCodeLabel } from '../services/salesOrderCommonCode.service';
 import { useSalesOrderCommonCodes } from '../hooks/useSalesOrderCommonCodes';
 import {
@@ -140,6 +143,21 @@ export function SalesOrderCreatePage({
   onEmbeddedActionsChange,
 }: Props) {
   const { confirm, dialog } = useCommonConfirmDialog();
+  const policyState = usePolicyDecimalStatus();
+  const policy = policyState.rule;
+  const amountRule = policy && ('places' in policy ? policy : policy.currency);
+  const summaryRules = useMemo(() => {
+    if (!policy) return undefined;
+    const contract = getDecimalColumnContract('sales.order');
+    return {
+      supplyAmount: resolveDecimalColumn(contract.supplyAmount, policy),
+      vatAmount: resolveDecimalColumn(contract.vatAmount, policy),
+      totalAmount: resolveDecimalColumn(contract.orderTotal, policy),
+    };
+  }, [policy]);
+  const amountRuleRef = useRef(amountRule);
+  const summaryRulesRef = useRef(summaryRules);
+  useEffect(() => { amountRuleRef.current = amountRule; summaryRulesRef.current = summaryRules; }, [amountRule, summaryRules]);
   const {
     codes: commonCodes,
     loading: commonCodesLoading,
@@ -171,7 +189,7 @@ export function SalesOrderCreatePage({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [quotationPickerOpen, setQuotationPickerOpen] = useState(false);
   const [selectedRowIds, setSelectedRowIds] = useState<(string | number)[]>([]);
-  const [amounts, setAmounts] = useState(EMPTY_AMOUNTS);
+  const [amounts, setAmounts] = useState<{ supplyAmount: number | string; vatAmount: number | string; totalAmount: number | string }>(EMPTY_AMOUNTS);
   const [isSaving, setIsSaving] = useState(false);
   const [loadedOrder, setLoadedOrder] = useState<SalesOrderItem | null>(null);
   const [gridRows, setGridRows] = useState<SalesOrderDetailRow[]>([]);
@@ -208,6 +226,7 @@ export function SalesOrderCreatePage({
     !isLoadingOrder &&
     !isSaving &&
     !isLocked &&
+    (policyState.status === 'ready' || policyState.status === 'unmanaged') &&
     isOrderEditableState &&
     hasPermissionForMode;
   const isDeletable =
@@ -265,7 +284,7 @@ export function SalesOrderCreatePage({
         billingCustomerId: nextBillingCustomer?.id ?? null });
       setGridRows(rows);
       setGridKey((key) => key + 1);
-      setAmounts(rows.length > 0 ? sumSalesOrderAmounts(rows) : EMPTY_AMOUNTS);
+      setAmounts(rows.length > 0 ? sumExactSalesAmounts(rows, amountRuleRef.current ?? { places: 2, rounding: 'HALF_UP' }, summaryRulesRef.current) : EMPTY_AMOUNTS);
       setHasDetailChanges(false);
       setSelectedRowIds([]);
       setValidationErrors(null);
@@ -352,22 +371,35 @@ export function SalesOrderCreatePage({
 
   const handleChangesChange = useCallback(
     (changes: F1GridChanges<SalesOrderDetailRow>) => {
-      setAmounts(
-        sumSalesOrderAmounts(resolveActiveSalesOrderRows(gridRows, changes)),
-      );
+      try {
+        setAmounts(sumExactSalesAmounts(resolveActiveSalesOrderRows(gridRows, changes),
+          amountRule ?? { places: 2, rounding: 'HALF_UP' }, summaryRules));
+        setError('');
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : '합계를 계산할 수 없습니다.');
+      }
       setHasDetailChanges(
         changes.insertedRows.length > 0 ||
           changes.updatedRows.length > 0 ||
           changes.deletedRows.length > 0,
       );
       clearValidationErrors();
-      setError('');
       if (gridValidationActiveRef.current) {
         gridValidationActiveRef.current = !(gridRef.current?.validate() ?? true);
       }
     },
-    [clearValidationErrors, gridRows],
+    [amountRule, clearValidationErrors, gridRows, summaryRules],
   );
+
+  useEffect(() => {
+    if (!amountRule) return;
+    try {
+      const rows = gridRef.current?.getActiveRows() ?? gridRows;
+      setAmounts(sumExactSalesAmounts(rows, amountRule, summaryRules));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '합계를 계산할 수 없습니다.');
+    }
+  }, [amountRule, gridRows, summaryRules]);
 
   const handleCalculationError = useCallback((cause: Error) => {
     setError(cause.message);
@@ -445,7 +477,7 @@ export function SalesOrderCreatePage({
       remark,
       details: gridRef.current?.getActiveRows() ?? [],
     };
-    const errors = validateSalesOrderInput(input);
+    const errors = validateSalesOrderInput(input, policy);
     if (nextOrderDateError) errors.orderDt = nextOrderDateError;
     errors.deliveryDt = nextDeliveryDateError;
     const isGridValid = gridRef.current?.validate() ?? true;
@@ -469,7 +501,7 @@ export function SalesOrderCreatePage({
     savingRef.current = true;
     setIsSaving(true);
     setNotice('');
-    const payload = buildSalesOrderCreatePayload(input);
+    const payload = buildSalesOrderCreatePayload(input, policy);
     try {
       if (loadedOrder) {
         const updated = await updateSalesOrder(
@@ -517,6 +549,7 @@ export function SalesOrderCreatePage({
     loadedOrder,
     onSaved,
     orderDate,
+    policy,
     quotationNumber,
     remark,
   ]);
@@ -719,6 +752,7 @@ export function SalesOrderCreatePage({
           </Alert>
         )}
         {notice && <Alert severity="success">{notice}</Alert>}
+        <SalesDecimalPolicyError status={policyState.status} />
         {commonCodesError || missingCommonCodes ? (
           <Alert
             severity="error"
@@ -1017,9 +1051,9 @@ export function SalesOrderCreatePage({
               p: 2,
             }}
           >
-            <AmountSummary label="공급가 합계" amount={amounts.supplyAmount} />
-            <AmountSummary label="부가세 합계" amount={amounts.vatAmount} />
-            <AmountSummary label="총 합계" amount={amounts.totalAmount} />
+            <AmountSummary label="공급가 합계" amount={amounts.supplyAmount} rule={summaryRules?.supplyAmount ?? amountRule} />
+            <AmountSummary label="부가세 합계" amount={amounts.vatAmount} rule={summaryRules?.vatAmount ?? amountRule} />
+            <AmountSummary label="총 합계" amount={amounts.totalAmount} rule={summaryRules?.totalAmount ?? amountRule} />
           </Box>
         </Paper>
       </Box>
@@ -1081,7 +1115,7 @@ function SalesOrderRouteLeaveGuard({ when }: { when: boolean }) {
   );
 }
 
-function AmountSummary({ label, amount }: { label: string; amount: number }) {
+function AmountSummary({ label, amount, rule }: { label: string; amount: number | string; rule?: SalesAmountRule }) {
   return (
     <Box
       sx={{
@@ -1103,10 +1137,7 @@ function AmountSummary({ label, amount }: { label: string; amount: number }) {
         variant="body1"
         sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}
       >
-        {amount.toLocaleString('ko-KR', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}
+        {formatSalesOrderAmount(amount, rule)}
       </Typography>
     </Box>
   );

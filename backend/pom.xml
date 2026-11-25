@@ -508,6 +508,13 @@
 				<directory>src/main/resources</directory>
 				<filtering>true</filtering>
 			</resource>
+			<resource>
+				<directory>../frontend/src/shared/config</directory>
+				<includes>
+					<include>decimal-column-contract.json</include>
+				</includes>
+				<filtering>false</filtering>
+			</resource>
 		</resources>
 
 		<!-- 테스트 리소스도 filtering 적용 -->

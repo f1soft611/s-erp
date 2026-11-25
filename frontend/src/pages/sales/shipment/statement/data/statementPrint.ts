@@ -1,8 +1,26 @@
 import type { StatementDetail } from '../types/salesStatement.types';
+import { addExactSalesDecimals, addSalesOrderAmounts, formatSalesOrderAmount, type SalesAmountRule } from '../../../order/create/data/salesOrderAmounts';
 
 export const ROWS_PER_PAGE = 12;
 export const text = (value: string | null | undefined) => value || '-';
-export const amount = (value: number) => Number(value).toLocaleString('ko-KR', { maximumFractionDigits: 2 });
+export const amount = (value: number | string, rule?: SalesAmountRule) => rule
+  ? formatSalesOrderAmount(value, rule)
+  : typeof value === 'string'
+    ? formatSalesOrderAmount(value, { places: 2, rounding: 'HALF_UP', trailingZeros: 'AUTO' })
+    : value.toLocaleString('ko-KR', { maximumFractionDigits: 2 });
+export function printSum(values: (number | string)[], rule?: SalesAmountRule): number | string | undefined {
+  try {
+    if (values.some((value) => typeof value === 'string')) {
+      return values.reduce<string>((sum, value) => addExactSalesDecimals(sum, String(value),
+        { places: 6, rounding: 'HALF_UP' }), '0');
+    }
+    if (!rule) return values.reduce<number>((sum, value) => sum + Number(value), 0);
+    return values.reduce<number>((sum, value) => addSalesOrderAmounts(sum, Number(value),
+      { places: 6, rounding: 'HALF_UP' }, '인쇄 합계'), 0);
+  } catch {
+    return undefined;
+  }
+}
 export const rowLines = (row: StatementDetail) =>
   Math.max(1, Math.ceil(`${text(row.materialName)} [${text(row.materialSpec)}] ${text(row.materialCode)}`.length / 25));
 

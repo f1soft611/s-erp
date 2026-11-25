@@ -1,8 +1,8 @@
 import {
   apiDelete,
-  apiGet,
-  apiPost,
-  apiPut,
+  apiGetWithExactDecimals,
+  apiPostWithExactDecimals,
+  apiPutWithExactDecimals,
 } from '../../../../../shared/services/apiClient';
 import type {
   SalesOrderCreateInput,
@@ -14,15 +14,34 @@ import type {
   SalesOrderResponse,
   SalesOrderValidationErrors,
 } from '../types/salesOrder.types';
+import { addExactSalesDecimals, isExactSalesPolicyNumber, multiplyExactSalesDecimals } from '../data/salesOrderAmounts';
+import { compareGridExactDecimals } from '../../../../../shared/components/f1-grid/utils/gridExactDecimal';
+import type { SalesOrderDecimalValue } from '../data/salesOrderDetail';
+import type { GridDecimalModuleRule } from '../../../../../shared/services/gridDecimalPolicy.service';
+import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
 
 const SALES_ORDER_PATH = '/api/v1/sales/orders';
+const ORDER_DECIMAL_FIELDS = ['orderQty', 'unitPrice', 'supplyAmt', 'vatAmt', 'totalAmt', 'shippedQty'] as const;
 
 const MAX_NUMERIC_15_2 = 9_999_999_999_999.99;
 
 export function validateSalesOrderInput(
   input: Pick<SalesOrderCreateInput, 'orderDt' | 'deliveryDt' | 'customerId' | 'salesDestinationId' | 'billingCustomerId' | 'details'>,
+  policy?: GridDecimalModuleRule,
 ): SalesOrderValidationErrors {
   const errors: SalesOrderValidationErrors = { detailRows: {}, detailMessages: [] };
+  const contract = getDecimalColumnContract('sales.order');
+  const quantityRule = policy && resolveDecimalColumn(contract.orderQty, policy);
+  const priceRule = policy && resolveDecimalColumn(contract.unitPrice, policy);
+  const supplyRule = policy && resolveDecimalColumn(contract.supplyAmount, policy);
+  const vatRule = policy && resolveDecimalColumn(contract.vatAmount, policy);
+  const totalRule = policy && resolveDecimalColumn(contract.totalAmount, policy);
+  const quantityValid = (value: SalesOrderDecimalValue) => quantityRule
+    ? isExactSalesPolicyNumber(String(value), quantityRule.places) : isNumeric15_2(Number(value));
+  const amountValid = (value: SalesOrderDecimalValue, places?: number) => places !== undefined
+    ? isExactSalesPolicyNumber(String(value), places) : isNumeric15_2(Number(value));
+  const priceValid = (value: SalesOrderDecimalValue) => priceRule
+    ? isExactSalesPolicyNumber(String(value), priceRule.places) : isNumeric15_2(Number(value));
 
   if (!input.orderDt.trim()) {
     errors.orderDt = '수주일자를 입력해 주세요.';
@@ -56,20 +75,32 @@ export function validateSalesOrderInput(
     ) {
       messages.push('품목을 선택해 주세요.');
     }
-    if (!isNumeric15_2(row.orderQty) || row.orderQty <= 0) {
+    if (!quantityValid(row.orderQty) || Number(row.orderQty) <= 0) {
       messages.push('주문수량은 0보다 큰 유효한 값이어야 합니다.');
     }
-    if (!isNumeric15_2(row.unitPrice) || row.unitPrice < 0) {
+    if (!priceValid(row.unitPrice) || Number(row.unitPrice) < 0) {
       messages.push('단가는 0 이상의 유효한 값이어야 합니다.');
     }
-    if (!isNumeric15_2(row.vatAmount) || row.vatAmount < 0) {
+    if (!amountValid(row.vatAmount, vatRule?.places) || Number(row.vatAmount) < 0) {
       messages.push('부가세는 0 이상의 유효한 값이어야 합니다.');
     }
     if (
-      !isNumeric15_2(row.supplyAmount) ||
-      !isNumeric15_2(row.totalAmount)
+      !amountValid(row.supplyAmount, supplyRule?.places) ||
+      !amountValid(row.totalAmount, totalRule?.places)
     ) {
       messages.push('계산된 금액이 허용 범위를 초과했습니다.');
+    }
+    if (supplyRule && totalRule && quantityValid(row.orderQty) && priceValid(row.unitPrice) && amountValid(row.vatAmount, vatRule?.places)) {
+      try {
+        const supply = multiplyExactSalesDecimals(String(row.orderQty), String(row.unitPrice), supplyRule);
+        const total = addExactSalesDecimals(supply, String(row.vatAmount), totalRule);
+        if (compareGridExactDecimals(row.supplyAmount, supply) !== 0 ||
+          compareGridExactDecimals(row.totalAmount, total) !== 0) {
+          messages.push('현재 정책에 맞게 금액을 재계산해 주세요.');
+        }
+      } catch {
+        messages.push('계산된 금액이 허용 범위 또는 정밀도를 초과했습니다.');
+      }
     }
     if (messages.length > 0) {
       errors.detailRows[row.rowId] = messages.join(' ');
@@ -86,6 +117,7 @@ export function validateSalesOrderInput(
 
 export function buildSalesOrderCreatePayload(
   input: SalesOrderCreateInput,
+  decimalPolicy?: GridDecimalModuleRule,
 ): SalesOrderCreatePayload {
   if (input.customerId == null) {
     throw new Error('거래처를 선택해 주세요.');
@@ -106,6 +138,7 @@ export function buildSalesOrderCreatePayload(
   });
 
   return {
+    ...(decimalPolicy ? { decimalPolicy, decimalColumns: getDecimalColumnContract('sales.order') } : {}),
     orderDt: input.orderDt,
     customerId: input.customerId,
     salesDestinationId: input.salesDestinationId,
@@ -122,9 +155,10 @@ export function buildSalesOrderCreatePayload(
 export async function createSalesOrder(
   payload: SalesOrderCreatePayload,
 ): Promise<SalesOrderCreated> {
-  const response = await apiPost<SalesOrderCreateResponse>(
+  const response = await apiPostWithExactDecimals<SalesOrderCreateResponse>(
     SALES_ORDER_PATH,
     payload,
+    ORDER_DECIMAL_FIELDS,
   );
   if (response.item == null) {
     throw new Error('수주 저장 응답에 생성된 주문이 없습니다.');
@@ -133,8 +167,9 @@ export async function createSalesOrder(
 }
 
 export async function getSalesOrder(salesOrderId: number): Promise<SalesOrderItem> {
-  const response = await apiGet<SalesOrderResponse>(
+  const response = await apiGetWithExactDecimals<SalesOrderResponse>(
     `${SALES_ORDER_PATH}/${salesOrderId}`,
+    ORDER_DECIMAL_FIELDS,
   );
   if (response.item == null) {
     throw new Error('수주 조회 응답에 수주 정보가 없습니다.');
@@ -146,9 +181,10 @@ export async function updateSalesOrder(
   salesOrderId: number,
   payload: SalesOrderCreatePayload,
 ): Promise<SalesOrderItem> {
-  const response = await apiPut<SalesOrderResponse>(
+  const response = await apiPutWithExactDecimals<SalesOrderResponse>(
     `${SALES_ORDER_PATH}/${salesOrderId}`,
     payload,
+    ORDER_DECIMAL_FIELDS,
   );
   if (response.item == null) {
     throw new Error('수주 수정 응답에 수주 정보가 없습니다.');
@@ -190,13 +226,13 @@ export function toSalesOrderForm(order: SalesOrderItem): SalesOrderForm {
       materialId: detail.materialId,
       materialCode: detail.materialCode ?? '',
       materialName: detail.materialName ?? '',
-      orderQty: Number(detail.orderQty),
-      unitPrice: Number(detail.unitPrice),
-      supplyAmount: Number(detail.supplyAmt),
-      vatAmount: Number(detail.vatAmt ?? 0),
-      totalAmount: Number(detail.totalAmt),
+      orderQty: detail.orderQty,
+      unitPrice: detail.unitPrice,
+      supplyAmount: detail.supplyAmt,
+      vatAmount: detail.vatAmt ?? 0,
+      totalAmount: detail.totalAmt,
       deliveryDt: detail.deliveryDt ?? '',
-      shippedQty: Number(detail.shippedQty ?? 0),
+      shippedQty: detail.shippedQty ?? 0,
       lineStatus: detail.lineStatus ?? '',
     })),
   };

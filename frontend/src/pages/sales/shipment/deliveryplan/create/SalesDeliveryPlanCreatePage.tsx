@@ -7,6 +7,12 @@ import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { PageHeader } from '../../../../../shared/components/PageHeader';
 import { PageMessageArea } from '../../../../../shared/components/PageMessageArea';
 import { F1Grid, type F1GridColumn, type F1GridRef } from '../../../../../shared/components/f1-grid';
+import { usePolicyDecimalStatus } from '../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
+import type { GridDecimalModuleRule } from '../../../../../shared/services/gridDecimalPolicy.service';
+import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
+import { SalesDecimalPolicyError } from '../../../shared/SalesDecimalPolicyError';
+import { addExactSalesDecimals, addSalesOrderAmounts } from '../../../order/create/data/salesOrderAmounts';
+import { compareGridExactDecimals } from '../../../../../shared/components/f1-grid/utils/gridExactDecimal';
 import { DeliveryPlanForm } from '../components/DeliveryPlanForm';
 import type { PermissionActionGroupDefinition } from '../../../../../shared/components/PermissionGroup';
 import type { DeliveryPlanRequest, DeliveryPlanPageProps, PlanRow, PlanSourceOrderRow } from '../types/salesDeliveryPlan.types';
@@ -16,8 +22,9 @@ function sourceKey(row: Pick<PlanSourceOrderRow, 'salesOrderId' | 'salesOrderDet
   return `${row.salesOrderId}:${row.salesOrderDetailId}`;
 }
 
-function createRequest(rows: PlanRow[]): DeliveryPlanRequest {
+function createRequest(rows: PlanRow[], decimalPolicy?: GridDecimalModuleRule): DeliveryPlanRequest {
   return {
+    ...(decimalPolicy ? { decimalPolicy, decimalColumns: getDecimalColumnContract('sales.deliveryPlan') } : {}),
     details: rows.map(({ salesDeliveryPlanDetailId, salesOrderId, salesOrderDetailId, planDt, plannedQty }) => ({
       salesDeliveryPlanDetailId, salesOrderId, salesOrderDetailId, planDt, plannedQty,
     })),
@@ -28,6 +35,10 @@ export function SalesDeliveryPlanCreatePage({
   currentMenuName, content, breadcrumbItems, selectedMenuPermissions: permissions,
   deliveryPlanMode = 'MANUAL',
 }: DeliveryPlanPageProps) {
+  const policyState = usePolicyDecimalStatus();
+  const policy = policyState.rule;
+  const policyReady = policyState.status === 'ready' || policyState.status === 'unmanaged';
+  const quantityRule = policy && resolveDecimalColumn(getDecimalColumnContract('sales.deliveryPlan').plannedQty, policy);
   const [sourceOpen, setSourceOpen] = useState(false);
   const [keyword, setKeyword] = useState('');
   const [sourceRows, setSourceRows] = useState<PlanSourceOrderRow[]>([]);
@@ -44,9 +55,9 @@ export function SalesDeliveryPlanCreatePage({
   const [planNo, setPlanNo] = useState('');
   const [planId, setPlanId] = useState<number | null>(null);
   const canRead = Boolean(permissions?.read);
-  const canSelectOrder = canRead && !saving
+  const canSelectOrder = canRead && !saving && policyReady
     && (deliveryPlanMode === 'AUTO' ? Boolean(permissions?.update) : Boolean(permissions?.create));
-  const canWrite = canRead && !saving
+  const canWrite = canRead && !saving && policyReady
     && (planId === null ? deliveryPlanMode === 'MANUAL' && Boolean(permissions?.create)
       : Boolean(permissions?.update));
   const search = async () => {
@@ -73,10 +84,10 @@ export function SalesDeliveryPlanCreatePage({
     setRows(selected.map((row, index) => ({
       rowId: `${sourceKey(row)}-${index}`, salesDeliveryPlanDetailId: null,
       salesOrderId: row.salesOrderId, salesOrderDetailId: row.salesOrderDetailId,
-      planDt: row.planDt, plannedQty: Number(row.remainingPlanQty ?? row.orderQty),
+      planDt: row.planDt, plannedQty: row.remainingPlanQty ?? row.orderQty,
       materialId: row.materialId, materialCode: row.materialCode, materialName: row.materialName,
       unit: row.unit, orderNo: row.orderNo, customerName: row.customerName,
-      orderQty: Number(row.orderQty), remainingPlanQty: Number(row.remainingPlanQty ?? row.orderQty),
+      orderQty: row.orderQty, remainingPlanQty: row.remainingPlanQty ?? row.orderQty,
     })));
     setPlanNo('');
     setPlanId(null);
@@ -88,16 +99,23 @@ export function SalesDeliveryPlanCreatePage({
     setLoading(true);
     try {
       const saved = await getDeliveryPlanByOrder(selected[0].salesOrderId);
-      const currentTotals = new Map<string, number>();
+      const currentTotals = new Map<string, string>();
       for (const detail of saved.details) {
         const key = sourceKey(detail);
-        currentTotals.set(key, (currentTotals.get(key) ?? 0) + Number(detail.plannedQty));
+        currentTotals.set(key, addExactSalesDecimals(currentTotals.get(key) ?? '0', String(detail.plannedQty),
+          { places: 6, rounding: 'DOWN' }));
       }
-      setSelectedSources(selected.map((row) => ({
-        ...row,
-        remainingPlanQty: row.remainingPlanQty == null ? Number(row.orderQty)
-          : Math.min(Number(row.orderQty), Number(row.remainingPlanQty) + (currentTotals.get(sourceKey(row)) ?? 0)),
-      })));
+      setSelectedSources(selected.map((row) => {
+        if (row.remainingPlanQty == null) return { ...row, remainingPlanQty: row.orderQty };
+        const total = currentTotals.get(sourceKey(row)) ?? '0';
+        if (typeof row.remainingPlanQty !== 'string' && typeof row.orderQty !== 'string') {
+          return { ...row, remainingPlanQty: Math.min(row.orderQty, addSalesOrderAmounts(row.remainingPlanQty,
+            Number(total), { places: 6, rounding: 'DOWN' }, '수정 가능 계획수량')) };
+        }
+        const capacity = addExactSalesDecimals(String(row.remainingPlanQty), total, { places: 6, rounding: 'DOWN' });
+        return { ...row, remainingPlanQty: (compareGridExactDecimals(capacity, row.orderQty) ?? 1) > 0
+          ? row.orderQty : capacity };
+      }));
       setPlanId(saved.salesDeliveryPlanId);
       setPlanNo(saved.planNo);
       setRows(planRowsFromDetails(saved.details));
@@ -110,9 +128,10 @@ export function SalesDeliveryPlanCreatePage({
   const save = async () => {
     if (!canWrite) return;
     setNotice('');
-    const currentRequest = createRequest(gridRef.current?.getActiveRows() ?? rows);
-    const message = validateDeliveryPlan(currentRequest, selectedSources);
-    if (message) { setError(message); return; }
+    const currentRequest = createRequest(gridRef.current?.getActiveRows() ?? rows, policy);
+    const message = validateDeliveryPlan(currentRequest, selectedSources, quantityRule);
+    const gridValid = gridRef.current?.validate() ?? true;
+    if (message || !gridValid) { if (message) setError(message); return; }
     setSaving(true);
     setError('');
     try {
@@ -173,8 +192,8 @@ export function SalesDeliveryPlanCreatePage({
     { field: 'lineNo', headerName: '수주상세', width: 90, align: 'center' },
     { field: 'materialCode', headerName: '품목코드', width: 110, align: 'center' },
     { field: 'materialName', headerName: '품목명', width: 150, align: 'left' },
-    { field: 'orderQty', headerName: '수주수량', type: 'decimal', width: 110, align: 'right' },
-    { field: 'remainingPlanQty', headerName: '계획잔량', type: 'decimal', width: 110, align: 'right' },
+    { field: 'orderQty', headerName: '수주수량', type: 'number', exactDecimal: true, width: 110, align: 'right' },
+    { field: 'remainingPlanQty', headerName: '계획잔량', type: 'number', exactDecimal: true, width: 110, align: 'right' },
   ];
 
   if (!canRead) return <Alert severity="warning">출하계획등록 조회 권한이 없습니다.</Alert>;
@@ -186,6 +205,7 @@ export function SalesDeliveryPlanCreatePage({
       sx={{ px: 2, pt: 2, pb: 2,
         display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
       {notice ? <Alert severity="success">{notice}</Alert> : null}
+      <SalesDecimalPolicyError status={policyState.status} />
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
       <DeliveryPlanForm key={formVersion} gridRef={gridRef} storageKey="sales-delivery-plan-create-details-v1" planNo={planNo} orderNo={selectedOrderNo} orderDt={selectedOrderDates}
         customerName={selectedCustomers} rows={rows} setRows={setRows} editable={canWrite}

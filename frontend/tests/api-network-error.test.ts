@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { apiGet, apiGetEventStream } from '../src/shared/services/apiClient';
+import { apiGet, apiGetEventStream, apiGetWithExactDecimals, apiPostWithExactDecimals } from '../src/shared/services/apiClient';
 import { ApiNetworkError, ApiResponseError } from '../src/shared/services/apiErrors';
 
 vi.mock('../src/shared/services/authService', () => ({
@@ -14,6 +14,38 @@ vi.mock('../src/shared/services/authService', () => ({
 afterEach(() => vi.unstubAllGlobals());
 
 describe('API connection failure classification', () => {
+  it('preserves selected decimal JSON tokens without changing identifiers or quoted strings', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+      '{"resultCode":"200","result":{"id":17,"unitPrice":1234567890123.100001,"note":"\\"unitPrice\\": 3.14","details":[{"unitPrice":1.234567e-3,"id":2}]}}',
+    )));
+    await expect(apiGetWithExactDecimals('/synthetic', ['unitPrice'])).resolves.toEqual({
+      id: 17,
+      unitPrice: '1234567890123.100001',
+      note: '"unitPrice": 3.14',
+      details: [{ unitPrice: '0.001234567', id: 2 }],
+    });
+  });
+
+  it('still rejects malformed JSON when exact decimal parsing is requested', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+      '{"result":{"unitPrice":123.4x}}',
+    )));
+    await expect(apiGetWithExactDecimals('/synthetic', ['unitPrice'])).rejects.toBeInstanceOf(SyntaxError);
+  });
+
+  it('sends exact decimal request strings and preserves decimal tokens in the response', async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response(
+      '{"resultCode":"200","result":{"unitPrice":1234567890123.100001}}',
+    ));
+    vi.stubGlobal('fetch', fetch);
+    await expect(apiPostWithExactDecimals('/synthetic', {
+      unitPrice: '1234567890123.100001',
+    }, ['unitPrice'])).resolves.toEqual({ unitPrice: '1234567890123.100001' });
+    expect(fetch).toHaveBeenCalledWith('/synthetic', expect.objectContaining({
+      method: 'POST', body: '{"unitPrice":"1234567890123.100001"}',
+    }));
+  });
+
   it('does not start a stream when its account was aborted during authorization', async () => {
     const fetch = vi.fn();
     vi.stubGlobal('fetch', fetch);
