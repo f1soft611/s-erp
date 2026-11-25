@@ -49,7 +49,7 @@
 
 ### 거래명세서: tb_sales_statement_hd / tb_sales_statement_dt
 
-20261124_004 적용 전 타입을 아래에 표시한다. 적용안은 수량·금액 컬럼을 `numeric(19,6)`으로 확장하며 실제 DB에는 적용하지 않았다.
+20261124_004 적용 후 대상 수량·금액 컬럼 타입을 표시한다. 읽기 전용 DB MCP로 대상 컬럼을 확인했다.
 공통 [확장 SQL](20261124/20261124_004_expand_sales_decimals.sql), [안전 롤백](20261124/20261124_004_rollback_sales_decimals.sql), [변경 이력](20261124/20261124_004_change_sales_decimals.md).
 
 | 테이블 | 컬럼 | 타입 | 설명 |
@@ -63,14 +63,14 @@
 | hd | supplier_stamp_image | text | 발행 시점 회사 직인 이미지 스냅샷 |
 | hd | customer_code, customer_name, customer_business_no, customer_president_name | varchar | 거래처 식별·사업자정보 스냅샷 |
 | hd | customer_business_type, customer_business_category, customer_post_code, customer_address, customer_telephone_no, customer_facsimile_no | varchar | 거래처 업종·업태·주소·연락처 스냅샷 |
-| hd | total_amt | numeric(15,2) | 출하 합계 스냅샷 |
+| hd | total_amt | numeric(19,6) | 출하 합계 스냅샷 |
 | hd | remark, use_at, created_by, created_at, updated_by, updated_at | varchar, char, timestamp | 비고·사용 여부·변경 이력 |
 | dt | sales_statement_detail_id | bigint | 상세 PK |
 | dt | sales_statement_id, tenant_id | bigint | 명세서 헤더 복합 FK |
 | dt | sales_delivery_detail_id | bigint | 원본 출하 상세 ID, nullable; `(tenant_id, sales_delivery_detail_id)` unique로 중복 발행 방지 |
 | dt | line_no | integer | 명세서 내 행 번호 |
 | dt | material_code, material_name, material_spec, unit | varchar | 품목 정보 스냅샷 |
-| dt | delivery_qty, unit_price, supply_amt, vat_amt, total_amt | numeric(15,2) | 출하 수량과 금액 스냅샷 |
+| dt | delivery_qty, unit_price, supply_amt, vat_amt, total_amt | numeric(19,6) | 출하 수량과 금액 스냅샷 |
 
 - 매출마감 batch는 거래처별 한 헤더에 여러 출하 상세를 묶을 수 있다. 헤더 `sales_delivery_id`는 대표 출하이며 상세의 원본 출하 상세 ID가 실제 출처를 식별한다.
 - 기존 헤더의 `(tenant_id, sales_delivery_id)` 활성 unique index를 상세의 `(tenant_id, sales_delivery_detail_id)` 부분 unique index로 대체한다. 명세서 soft-delete 시 상세 원본 ID 연결을 해제해 재발행을 허용한다.
@@ -906,11 +906,11 @@
 
 ### tb_sales_order_hd / tb_sales_order_dt
 
-20261124_004 적용 전 타입을 아래에 표시한다. 적용안은 수량·금액 컬럼을 `numeric(19,6)`으로 확장하며 실제 DB에는 적용하지 않았다.
+20261124_004 적용 후 대상 수량·금액 컬럼 타입을 표시한다. 읽기 전용 DB MCP로 대상 컬럼을 확인했다.
 
 `20261026_008` 생성 DDL을 기준으로 한다. 2026-10-28 기본 MCP 메타데이터에서 두 테이블의 존재와 컬럼을 확인했다.
 아래 audit 타입은 `20261028_009` 변경 후 계약이며, 조회 당시 실제 DB의 `created_by`, `updated_by`는 아직 `varchar(10)`이다.
-이번 확장 SQL은 실제 DB에 적용하지 않았다.
+이번 확장 SQL은 사용자가 실제 DB에 적용했다.
 
 | 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
 | --- | --- | --- | --- | --- |
@@ -924,7 +924,7 @@
 |  | `delivery_place` | `varchar(200)` | NULL | 납품장소 |
 |  | `delivery_method` | `varchar(50)` | NULL | 배송방법 |
 |  | `status` | `varchar(20)` | NOT NULL, `수주등록` | 수주상태 |
-|  | `total_amt` | `numeric(15,2)` | NULL, `0` | 수주 총금액 |
+|  | `total_amt` | `numeric(19,6)` | NULL, `0` | 수주 총금액 |
 |  | `remark` | `varchar(500)` | NULL | 비고 |
 |  | `use_at` | `char(1)` | NOT NULL, `Y` | 사용 여부 (`Y`/`N`) |
 |  | `created_by`, `updated_by` | `varchar(100)` (변경 적용 후) | NULL | 생성/수정 로그인 코드; 원본 `tb_login_account.login_code`와 길이 일치 |
@@ -935,7 +935,7 @@
 |  | `tenant_id` | `bigint` | NOT NULL | 헤더와 동일 tenant인지 복합 FK로 보장 |
 |  | `line_no` | `int` | NOT NULL | 수주 라인 번호 |
 |  | `material_id` | `bigint` | NOT NULL | 품목 FK |
-|  | `order_qty`, `unit_price`, `supply_amt`, `vat_amt`, `total_amt`, `shipped_qty` | `numeric(15,2)` | 주문/금액 NOT NULL, VAT/출하수량 NULL 기본 `0` | 수량 및 금액 |
+|  | `order_qty`, `unit_price`, `supply_amt`, `vat_amt`, `total_amt`, `shipped_qty` | `numeric(19,6)` | 주문/금액 NOT NULL, VAT/출하수량 NULL 기본 `0` | 수량 및 금액 |
 |  | `delivery_dt` | `date` | NULL | 라인 납기일자 |
 |  | `line_status` | `varchar(20)` | NULL, `대기` | 라인 상태 |
 
@@ -945,11 +945,11 @@
 - [생성 SQL](20261026/20261026_008_create_sales_order_schema.sql), [롤백 SQL](20261026/20261026_008_rollback_sales_order_schema.sql), [변경 이력](20261026/20261026_008_change_sales_order_schema.md) 및 [backend 사본](../../backend/DATABASE/20261026) 참고.
 - 감사 사용자 길이 보정: [확장 SQL](20261028/20261028_009_expand_sales_order_audit_columns.sql), [안전 롤백](20261028/20261028_009_rollback_sales_order_audit_columns.sql), [변경 이력](20261028/20261028_009_change_sales_order_audit_columns.md). 신규 환경에서도 기존 생성 DDL 후 확장 SQL을 적용한다.
 
-### tb_sales_quotation_hd / tb_sales_quotation_dt (2026-11-16, 미적용)
+### tb_sales_quotation_hd / tb_sales_quotation_dt (2026-11-16)
 
-20261124_004 적용 전 타입을 아래에 표시한다. 적용안은 수량·금액 컬럼을 `numeric(19,6)`으로 확장하며 실제 DB에는 적용하지 않았다.
+20261124_004 적용 후 대상 수량·금액 컬럼 타입을 표시한다. 읽기 전용 DB MCP로 대상 컬럼을 확인했다.
 
-`20261116_002`에서 견적 헤더·상세 저장 구조를 추가한다. 기본 DB MCP에서 기존 견적 테이블은 없고, 관련 수주·품목·거래처·ID 시퀀스 테이블의 컬럼을 확인했다. 아래 테이블은 설계된 변경이며 실제 DB에는 적용하지 않았다.
+`20261116_002`에서 견적 헤더·상세 저장 구조를 추가한다. 최초 확인 당시 견적 테이블이 없었으나 현재 기본 DB MCP에서 테이블과 대상 수량·금액 컬럼이 확인되었다. 나머지 상세 계약은 설계 기준이다.
 
 | 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
 |---|---|---|---|---|
@@ -961,7 +961,7 @@
 |  | `customer_id` | `bigint` | NOT NULL | 거래처 FK |
 |  | `customer_reference`, `incoterms`, `payment_term`, `valid_term`, `currency_code` | `varchar` | NULL | 견적 참조·조건·화폐 |
 |  | `remark` | `varchar(500)` | NULL | 비고 |
-|  | `supply_amt`, `vat_amt`, `total_amt` | `numeric(15,2)` | NOT NULL, 기본 `0` | 공급가·부가세·총액 |
+|  | `supply_amt`, `vat_amt`, `total_amt` | `numeric(19,6)` | NOT NULL, 기본 `0` | 공급가·부가세·총액 |
 |  | `use_at` | `char(1)` | NOT NULL, 기본 `Y` | 사용 여부 (`Y`/`N`) |
 |  | `created_by`, `updated_by` | `varchar(100)` | NULL | 생성/수정 로그인 코드 |
 |  | `created_at` | `timestamp without time zone` | NOT NULL, `CURRENT_TIMESTAMP` | 생성 일시 |
@@ -974,18 +974,18 @@
 |  | `material_name` | `varchar(200)` | NOT NULL | 품목명 스냅샷 |
 |  | `material_spec` | `varchar(100)` | NULL | 품목규격 스냅샷 |
 |  | `unit` | `varchar(6)` | NULL | 단위 스냅샷 |
-|  | `quotation_qty`, `unit_price`, `line_amt` | `numeric(15,2)` | NOT NULL | 수량·단가·상세 금액 |
+|  | `quotation_qty`, `unit_price`, `line_amt` | `numeric(19,6)` | NOT NULL | 수량·단가·상세 금액 |
 |  | `remark` | `varchar(500)` | NULL | 상세 비고 |
 
 - 헤더의 `(tenant_id, quotation_no)`와 상세의 `(quotation_id, line_no)`는 unique이며, 헤더-상세 및 선택 품목 FK는 tenant 일치 범위를 포함한다.
 - 수주 `tb_sales_order_hd.quot_no`는 기존 optional string 계약을 유지하며 이 변경에서 수정하지 않는다.
 - [생성 SQL](20261116/20261116_002_create_sales_quotation_schema.sql), [롤백 SQL](20261116/20261116_002_rollback_sales_quotation_schema.sql), [변경 이력](20261116/20261116_002_change_sales_quotation_schema.md) 및 [backend 사본](../../backend/DATABASE/20261116) 참고.
 
-### tb_sales_delivery_hd / tb_sales_delivery_dt (2026-11-04, 미적용)
+### tb_sales_delivery_hd / tb_sales_delivery_dt (2026-11-04)
 
-20261124_004 적용 전 타입을 아래에 표시한다. 적용안은 수량·금액 컬럼을 `numeric(19,6)`으로 확장하며 실제 DB에는 적용하지 않았다.
+20261124_004 적용 후 대상 수량·금액 컬럼 타입을 표시한다. 읽기 전용 DB MCP로 대상 컬럼을 확인했다.
 
-수주 연계 납품과 수주 없는 직납품을 별도 문서로 관리한다. 기본 DB MCP에서 기존 수주/거래처/품목의 컬럼·복합 FK 대상키를 확인했고, 신규 납품 테이블은 아직 존재하지 않는다.
+수주 연계 납품과 수주 없는 직납품을 별도 문서로 관리한다. 최초 확인 당시 납품 테이블이 없었으나 현재 기본 DB MCP에서 테이블과 대상 수량·금액 컬럼이 확인되었다. 나머지 상세 계약은 설계 기준이다.
 
 | 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
 |---|---|---|---|---|
@@ -997,7 +997,7 @@
 | | `customer_id` | `bigint` | NOT NULL | tenant 복합 거래처 FK |
 | | `sales_order_id` | `bigint` | NULL | 대표 수주 ID, 직납품 NULL |
 | | `delivery_place`, `delivery_method` | `varchar(200)`, `varchar(50)` | NULL | 납품장소/배송방법 |
-| | `total_amt` | `numeric(15,2)` | NOT NULL, 0 | 상세 합계 합산 |
+| | `total_amt` | `numeric(19,6)` | NOT NULL, 0 | 상세 합계 합산 |
 | | `remark` | `varchar(500)` | NULL | 비고 |
 | | `use_at` | `char(1)` | NOT NULL, Y | 논리삭제 시 N |
 | | `created_by`, `updated_by` | `varchar(100)` | NULL | 등록/수정 로그인 코드 |
@@ -1008,9 +1008,9 @@
 | | `line_no` | `integer` | NOT NULL | 양수, 문서 내 유일 순번 |
 | | `material_id` | `bigint` | NOT NULL | tenant 복합 품목 FK |
 | | `sales_order_id`, `sales_order_detail_id` | `bigint` | NULL | 수주납품은 행별 원 수주 및 수주상세 ID 필수 |
-| | `delivery_qty` | `numeric(15,2)` | NOT NULL | 양수 납품수량 |
-| | `unit_price`, `supply_amt`, `total_amt` | `numeric(15,2)` | NOT NULL | 비음수 단가/공급가/합계 |
-| | `vat_amt` | `numeric(15,2)` | NOT NULL, 0 | 비음수 부가세 |
+| | `delivery_qty` | `numeric(19,6)` | NOT NULL | 양수 납품수량 |
+| | `unit_price`, `supply_amt`, `total_amt` | `numeric(19,6)` | NOT NULL | 비음수 단가/공급가/합계 |
+| | `vat_amt` | `numeric(19,6)` | NOT NULL, 0 | 비음수 부가세 |
 | | `revenue_closed_at` | `timestamp without time zone` | NULL | 명시적 매출마감 일시; 일반 명세서 발행으로 설정하지 않음 |
 | | `revenue_closed_by` | `varchar(100)` | NULL | 명시적 매출마감 사용자 |
 
@@ -1021,11 +1021,11 @@
 - `revenue_closed_at`/`revenue_closed_by`는 [20261120_002](20261120/20261120_002_change_sales_statement_detail_source_and_revenue_closing.md) 스키마 변경안으로 추가된다. 기존 발행 이력은 마감으로 backfill하지 않아 OPEN 상태를 유지한다.
 - 납품 저장/수정/삭제는 수주 헤더 잠금 후 기존 `shipped_qty`를 증감한다. 논리삭제 후에도 납품상세 이력은 유지되며 연결 수주의 상세 재생성/삭제는 차단한다.
 - 다중 수주 출하는 동일 거래처 수주만 한 문서로 묶으며 헤더에는 첫 상세의 대표 수주 ID를, 상세에는 각 행의 실제 수주 ID를 저장한다. [20261112_008 변경 이력 및 롤백](20261112/20261112_008_change_multi_order_sales_delivery_schema.md).
-- [DDL/메뉴/롤백 및 변경이력](20261104/20261104_001_change_sales_delivery_schema.md), [backend 사본](../../backend/DATABASE/20261104), [상세사양](../spec/20261104/20261104_001_납품관리_상세사양서.md). 스크립트 작성만 수행하며 실제 DB에는 적용하지 않는다.
+- [DDL/메뉴/롤백 및 변경이력](20261104/20261104_001_change_sales_delivery_schema.md), [backend 사본](../../backend/DATABASE/20261104), [상세사양](../spec/20261104/20261104_001_납품관리_상세사양서.md).
 
-### tb_sales_delivery_plan_hd / tb_sales_delivery_plan_dt (2026-11-05, 2026-11-12, 미적용)
+### tb_sales_delivery_plan_hd / tb_sales_delivery_plan_dt (2026-11-05, 2026-11-12)
 
-20261124_004 적용 전 타입을 아래에 표시한다. 적용안은 수량 컬럼을 `numeric(19,6)`으로 확장하며 실제 DB에는 적용하지 않았다.
+20261124_004 적용 후 대상 수량 컬럼 타입을 표시한다. 읽기 전용 DB MCP로 대상 컬럼을 확인했다.
 
 테넌트의 `delivery_plan_mode`에 따라 수주 저장 시 계획을 자동 생성하거나 사용자가 수동 등록한다. 2026-11-12 변경안에서 계획 헤더는 단일 수주를 참조하지 않고 여러 수주의 상세 행을 담을 수 있으며, 각 계획상세가 원 수주와 수주상세를 참조한다.
 
@@ -1043,7 +1043,7 @@
 | | `sales_order_id`, `sales_order_detail_id`, `material_id` | `bigint` | NOT NULL | 행별 원 수주/수주상세/품목 복합 FK |
 | | `line_no` | `integer` | NOT NULL | 계획서 안 순번 |
 | | `plan_dt` | `date` | NULL | 계획 납기일; NULL은 미정 |
-| | `planned_qty`, `delivered_qty` | `numeric(15,2)` | 계획 양수, 납품 누계 기본 0 | 계획 및 실납품수량 |
+| | `planned_qty`, `delivered_qty` | `numeric(19,6)` | 계획 양수, 납품 누계 기본 0 | 계획 및 실납품수량 |
 | | `created_by`, `updated_by` | `varchar(100)` | NULL | 등록/수정 로그인 코드 |
 | | `created_at`, `updated_at` | `timestamp without time zone` | 생성 시 CURRENT_TIMESTAMP, 수정 NULL | 감사 일시 |
 | `tb_sales_delivery_dt` | `sales_delivery_plan_detail_id` | `bigint` | NULL | ORDER 상세 필수, DIRECT 상세 NULL; 계획 상세 복합 FK |
@@ -1052,7 +1052,7 @@
 - 2026-11-12 마이그레이션은 헤더의 `sales_order_id`, 수주당 헤더 unique, 헤더 수주 FK/index 및 그 보조 not-null check를 제거한다. 상세-헤더 FK는 `(sales_delivery_plan_id, tenant_id)`로 바꾸고, 상세별 원 수주/수주상세 FK는 유지한다.
 - 납품상세는 계획상세/tenant/order/order detail 복합 FK를 사용한다. 기존 문서 내 source unique는 계획상세 기준 unique로 바뀐다.
 - migration은 모든 기존 주문과 주문상세를 초기 계획으로 변환하고 기존 ORDER 납품행을 해당 계획상세에 연결한다. 계획 delivered_qty는 `shipped_qty` 현재값으로 초기화한다.
-- [20261105 DDL·계획상세 변경 및 메뉴/롤백 이력](20261105/20261105_002_change_sales_delivery_planning_schema.md), [20261112 다중수주 계획 스키마 변경 이력](20261112/20261112_009_change_multi_order_sales_delivery_plan_schema.md), [backend 사본](../../backend/DATABASE), [상세사양](../spec/20261105/20261105_002_납품계획_연계_납품흐름_개편_상세사양서.md). SQL은 작성만 했으며 실제 DB에는 적용하지 않았다.
+- [20261105 DDL·계획상세 변경 및 메뉴/롤백 이력](20261105/20261105_002_change_sales_delivery_planning_schema.md), [20261112 다중수주 계획 스키마 변경 이력](20261112/20261112_009_change_multi_order_sales_delivery_plan_schema.md), [backend 사본](../../backend/DATABASE), [상세사양](../spec/20261105/20261105_002_납품계획_연계_납품흐름_개편_상세사양서.md). 과거 변경 스크립트의 개별 적용 여부는 이번에 확인하지 않았다.
 
 ### tb_system_policy / tb_system_policy_history (2026-11-05, 미적용)
 
