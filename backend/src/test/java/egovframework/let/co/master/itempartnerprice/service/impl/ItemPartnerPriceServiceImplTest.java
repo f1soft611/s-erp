@@ -18,10 +18,12 @@ import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPric
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceVO;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceSearchCondition;
 import egovframework.let.co.master.itempartnerprice.domain.repository.ItemPartnerPriceDAO;
+import egovframework.let.system.policies.service.SystemPolicyService;
 
 class ItemPartnerPriceServiceImplTest {
     private final ItemPartnerPriceDAO dao = mock(ItemPartnerPriceDAO.class);
-    private final ItemPartnerPriceServiceImpl service = new ItemPartnerPriceServiceImpl(dao);
+    private final SystemPolicyService systemPolicyService = mock(SystemPolicyService.class);
+    private final ItemPartnerPriceServiceImpl service = new ItemPartnerPriceServiceImpl(dao, systemPolicyService);
 
     @Test
     void listRequiresTenantAndNormalizesFilters() throws Exception {
@@ -155,7 +157,7 @@ class ItemPartnerPriceServiceImplTest {
 
         verify(dao).insertItemPartnerPrice(argThat(params ->
                 params.get("unitPrice") == null
-                        && new BigDecimal("7.25").equals(params.get("foreignUnitPrice"))
+                        && new BigDecimal("7.250").equals(params.get("foreignUnitPrice"))
                         && "USD".equals(params.get("currency"))));
 
         ItemPartnerPriceSaveRequestVO none = validPayload(101L, 201L);
@@ -211,7 +213,7 @@ class ItemPartnerPriceServiceImplTest {
         verify(dao).insertItemPartnerPrice(argThat(params ->
                 "TAXABLE".equals(params.get("taxType"))
                         && "Y".equals(params.get("vatIncludedAt"))
-                        && new BigDecimal("9.50").equals(params.get("foreignUnitPrice"))
+                        && new BigDecimal("9.500").equals(params.get("foreignUnitPrice"))
                         && "USD".equals(params.get("currency"))));
     }
 
@@ -447,6 +449,72 @@ class ItemPartnerPriceServiceImplTest {
         result.setCustomerName("Mill");
         result.setExistingPriceId(null);
         return result;
+    }
+
+    @Test
+    void createRejectsPricesAndQuantitiesBeyondThePolicyPlaces() throws Exception {
+        ItemPartnerPriceSaveRequestVO price = validPayload(101L, 201L);
+        price.setUnitPrice(new BigDecimal("1.2345"));
+        assertThatThrownBy(() -> service.createPrice(9L, "00101", price))
+                .hasMessageContaining("소수 3자리");
+
+        ItemPartnerPriceSaveRequestVO moq = validPayload(101L, 201L);
+        moq.setMoq(new BigDecimal("1.5"));
+        assertThatThrownBy(() -> service.createPrice(9L, "00101", moq))
+                .hasMessageContaining("소수 0자리");
+
+        ItemPartnerPriceSaveRequestVO negative = validPayload(101L, 201L);
+        negative.setUnitPrice(new BigDecimal("-1"));
+        assertThatThrownBy(() -> service.createPrice(9L, "00101", negative))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("0 이상");
+    }
+
+    @Test
+    void createFollowsTheCommonModulePolicyOfTheTenant() throws Exception {
+        java.util.Map<String, Object> decimal = new java.util.HashMap<String, Object>();
+        decimal.put("places", 2);
+        decimal.put("rounding", "HALF_UP");
+        java.util.Map<String, Object> number = new java.util.HashMap<String, Object>();
+        number.put("places", 1);
+        number.put("rounding", "HALF_UP");
+        java.util.Map<String, Object> module = new java.util.HashMap<String, Object>();
+        module.put("decimal", decimal);
+        module.put("number", number);
+        when(systemPolicyService.getGridDecimals(9L)).thenReturn(Collections.singletonMap("COMMON", module));
+        stubCreate();
+
+        ItemPartnerPriceSaveRequestVO ok = validPayload(101L, 201L);
+        ok.setUnitPrice(new BigDecimal("12.34"));
+        ok.setMoq(new BigDecimal("2.5"));
+        service.createPrice(9L, "00101", ok);
+        verify(dao).insertItemPartnerPrice(argThat(params ->
+                new BigDecimal("12.34").equals(params.get("unitPrice"))
+                        && new BigDecimal("2.5").equals(params.get("moq"))));
+
+        ItemPartnerPriceSaveRequestVO tooPrecise = validPayload(101L, 201L);
+        tooPrecise.setUnitPrice(new BigDecimal("12.345"));
+        assertThatThrownBy(() -> service.createPrice(9L, "00101", tooPrecise))
+                .hasMessageContaining("소수 2자리");
+    }
+
+    @Test
+    void importValidationUsesThePolicyPlacesInTheMessage() throws Exception {
+        ItemPartnerPriceImportRowVO row = new ItemPartnerPriceImportRowVO();
+        row.setSourceRowNumber(2);
+        row.setTradeType("매입");
+        row.setMaterialCode("M1");
+        row.setCustomerCode("C1");
+        row.setUnitPrice("1.2345");
+        row.setMoq("1.5");
+        row.setStartDt("2026-10-01");
+
+        ItemPartnerPriceImportValidationVO result = service.validateImport(9L, java.util.Collections.singletonList(row));
+
+        assertThat(result.getRows().get(0).getErrors()).extracting("code")
+                .contains("INVALID_UNIT_PRICE", "INVALID_MOQ");
+        assertThat(result.getRows().get(0).getErrors()).extracting("message")
+                .anyMatch(message -> String.valueOf(message).contains("소수 3자리"))
+                .anyMatch(message -> String.valueOf(message).contains("소수 0자리"));
     }
 
     private ItemPartnerPriceSaveRequestVO validPayload(Long materialId, Long customerId) {

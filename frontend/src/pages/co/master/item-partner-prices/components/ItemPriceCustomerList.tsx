@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { F1Grid, type F1GridColumn } from '../../../../../shared/components/f1-grid';
+import { decimalColumnOptions, getDecimalColumnContract } from '../../../../../shared/services/decimalColumnContract';
 import type { ItemPriceCustomerRow } from '../types/itemPriceCustomer.types';
 
 function createColumns(): F1GridColumn<ItemPriceCustomerRow>[] {
@@ -8,7 +9,7 @@ function createColumns(): F1GridColumn<ItemPriceCustomerRow>[] {
     { field: 'customerCode', headerName: '거래처코드', width: 92, align: 'center', editable: false, highlightSearch: true, search: { hidden: true } },
     { field: 'customerName', headerName: '거래처명', width: 140, editable: false, highlightSearch: true, search: { hidden: true } },
     { field: 'businessNo', headerName: '사업자번호', width: 110, align: 'center', editable: false, highlightSearch: true, search: { hidden: true } },
-    { field: 'priceCount', headerName: '등록 건수', type: 'number', width: 78, align: 'right', editable: false, search: { hidden: true } },
+    { field: 'priceCount', headerName: '등록 건수', ...decimalColumnOptions(getDecimalColumnContract('co.itemPartnerPriceSummary'), 'priceCount'), width: 78, align: 'right', editable: false, search: { hidden: true } },
   ];
 }
 

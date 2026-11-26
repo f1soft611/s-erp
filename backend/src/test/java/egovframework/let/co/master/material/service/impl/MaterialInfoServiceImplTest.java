@@ -26,16 +26,43 @@ import egovframework.let.co.master.classification.domain.model.ClassificationKin
 import egovframework.let.co.master.classification.domain.model.ClassificationVO;
 import egovframework.let.co.master.classification.domain.repository.ClassificationDAO;
 import egovframework.let.co.master.classification.service.ClassificationSelectionValidator;
+import egovframework.let.system.policies.service.SystemPolicyService;
 
 @ExtendWith(MockitoExtension.class)
 class MaterialInfoServiceImplTest {
     @Mock MaterialInfoDAO dao;
     @Mock EgovIdGnrService generator;
     @Mock ClassificationDAO classificationDao;
+    @Mock SystemPolicyService systemPolicyService;
     MaterialInfoServiceImpl service;
 
     @BeforeEach void setup() {
-        service = new MaterialInfoServiceImpl(dao, generator, new ClassificationSelectionValidator(classificationDao));
+        service = new MaterialInfoServiceImpl(dao, generator, new ClassificationSelectionValidator(classificationDao),
+                systemPolicyService);
+    }
+
+    @Test void rejectsSafeStockBeyondTheCommonPolicyPlaces() throws Exception {
+        MaterialInfoSaveRequestVO p = payload("");
+        p.setSafeInvoice(12.5);
+        assertThatThrownBy(() -> service.createMaterial(9L, "101", p)).hasMessageContaining("소수 0자리");
+        verify(dao, never()).insertMaterial(anyMap());
+    }
+
+    @Test void acceptsSafeStockWhenTheCommonPolicyAllowsPlaces() throws Exception {
+        Map<String, Object> number = new HashMap<String, Object>();
+        number.put("places", 1);
+        number.put("rounding", "HALF_UP");
+        Map<String, Object> module = new HashMap<String, Object>();
+        module.put("number", number);
+        when(systemPolicyService.getGridDecimals(9L)).thenReturn(java.util.Collections.singletonMap("COMMON", module));
+        stubInsert();
+        when(generator.getNextStringId()).thenReturn("000001");
+        MaterialInfoSaveRequestVO p = payload("");
+        p.setSafeInvoice(12.5);
+        service.createMaterial(9L, "101", p);
+        ArgumentCaptor<Map<String, Object>> captured = ArgumentCaptor.forClass(Map.class);
+        verify(dao).insertMaterial(captured.capture());
+        assertThat(captured.getValue()).containsEntry("safeInvoice", 12.5);
     }
 
     private MaterialInfoSaveRequestVO payload(String code) {

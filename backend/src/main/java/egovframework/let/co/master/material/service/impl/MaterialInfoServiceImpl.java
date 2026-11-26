@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
+import egovframework.com.cmm.DecimalColumnContract;
 import egovframework.let.co.master.material.domain.model.MaterialInfoVO;
 import egovframework.let.co.master.material.domain.model.MaterialInfoOptionVO;
 import egovframework.let.co.master.material.domain.model.MaterialInfoSaveRequestVO;
@@ -23,6 +24,8 @@ import egovframework.let.co.master.material.domain.model.MaterialInfoSearchCondi
 import egovframework.let.co.master.material.domain.repository.MaterialInfoDAO;
 import egovframework.let.co.master.material.service.MaterialInfoService;
 import egovframework.let.co.master.classification.service.ClassificationSelectionValidator;
+import egovframework.let.sales.common.SalesDecimalPolicy;
+import egovframework.let.system.policies.service.SystemPolicyService;
 
 @Service("materialInfoService")
 public class MaterialInfoServiceImpl extends EgovAbstractServiceImpl implements MaterialInfoService {
@@ -31,10 +34,12 @@ public class MaterialInfoServiceImpl extends EgovAbstractServiceImpl implements 
     private final MaterialInfoDAO dao;
     private final EgovIdGnrService generator;
     private final ClassificationSelectionValidator classifications;
+    private final SystemPolicyService systemPolicyService;
 
     public MaterialInfoServiceImpl(MaterialInfoDAO dao,
             @Qualifier("materialCodeIdGnrService") EgovIdGnrService generator,
-            ClassificationSelectionValidator classifications) {
+            ClassificationSelectionValidator classifications, SystemPolicyService systemPolicyService) {
+        this.systemPolicyService = systemPolicyService;
         this.dao = dao;
         this.generator = generator;
         this.classifications = classifications;
@@ -163,7 +168,7 @@ public class MaterialInfoServiceImpl extends EgovAbstractServiceImpl implements 
         params.put(field, value);
     }
 
-    private Map<String, Object> saveParams(Long tenantId, String actor, MaterialInfoSaveRequestVO p) {
+    private Map<String, Object> saveParams(Long tenantId, String actor, MaterialInfoSaveRequestVO p) throws Exception {
         Map<String, Object> params = tenantParams(tenantId);
         if (p == null) throw new IllegalArgumentException("품목 저장 요청이 비어 있습니다.");
         putText(params, "materialName", "품목명", p.getMaterialName(), 200, true);
@@ -192,6 +197,8 @@ public class MaterialInfoServiceImpl extends EgovAbstractServiceImpl implements 
         putText(params, "kfdaReportNo", "품목보고번호", p.getKfdaReportNo(), 20, false);
         putText(params, "createdBy", "등록자", actor, 10, true);
         putText(params, "updatedBy", "수정자", actor, 10, true);
+        SalesDecimalPolicy decimalPolicy = SalesDecimalPolicy.forModule("COMMON",
+                systemPolicyService.getGridDecimals(tenantId), DecimalColumnContract.forDocument("co.material"));
         if (p.getSafeInvoice() != null && !Double.isFinite(p.getSafeInvoice())) {
             throw new IllegalArgumentException("안전재고는 유한한 숫자여야 합니다.");
         }
@@ -199,6 +206,10 @@ public class MaterialInfoServiceImpl extends EgovAbstractServiceImpl implements 
                 || p.getMaterialWeight() > 9007199254740991L)) {
             throw new IllegalArgumentException("중량은 안전한 정수 범위여야 합니다.");
         }
+        Double safeInvoice = p.getSafeInvoice() == null ? null : Double.valueOf(decimalPolicy
+                .input("safeInvoice", new java.math.BigDecimal(p.getSafeInvoice().toString()), "안전재고").doubleValue());
+        Long materialWeight = p.getMaterialWeight() == null ? null : Long.valueOf(decimalPolicy
+                .input("materialWeight", java.math.BigDecimal.valueOf(p.getMaterialWeight().longValue()), "중량").longValueExact());
         String expiryStatusValue = expiryStatus(p.getExpiryedStatus());
         Integer expiryCount = p.getExpiryedCount();
         if ("NONE".equals(expiryStatusValue) && expiryCount != null) {
@@ -208,9 +219,12 @@ public class MaterialInfoServiceImpl extends EgovAbstractServiceImpl implements 
                 && (expiryCount == null || expiryCount <= 0)) {
             throw new IllegalArgumentException("소비기한 숫자는 양의 정수여야 합니다.");
         }
-        params.put("materialWeight", p.getMaterialWeight());
-        params.put("safeInvoice", p.getSafeInvoice());
+        params.put("materialWeight", materialWeight);
+        params.put("safeInvoice", safeInvoice);
         params.put("expiryedStatus", expiryStatusValue);
+        if (expiryCount != null) {
+            decimalPolicy.input("expiryedCount", java.math.BigDecimal.valueOf(expiryCount.longValue()), "소비기한 숫자");
+        }
         params.put("expiryedCount", expiryCount);
         return params;
     }

@@ -23,6 +23,7 @@ import {
   normalizeBatchSaveResponse,
   saveCommonCodeBatch,
 } from '../services/commonCodeManagement.service';
+import { decimalColumnOptions, getDecimalColumnContract } from '../../../../../shared/services/decimalColumnContract';
 import Splitter from '../../../../../shared/components/Splitter';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
@@ -178,7 +179,7 @@ const itemColumns = (
     headerName: '정렬순서',
     editable: true,
     width: 100,
-    type: 'number',
+    ...decimalColumnOptions(getDecimalColumnContract('co.commonCode'), 'sortOrder'),
     align: 'right',
     headerAlign: 'center',
     min: 0,

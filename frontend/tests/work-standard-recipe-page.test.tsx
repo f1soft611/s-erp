@@ -14,6 +14,8 @@ import {
   toWorkStandardListRow,
 } from '../src/pages/co/work-standard/recipe/services/workStandard.service';
 import type { MenuPermission } from '../src/pages/dashboard/types/dashboard';
+import { GridDecimalModuleProvider } from '../src/shared/components/f1-grid/core/GridDecimalPolicy';
+import * as decimalPolicyService from '../src/shared/services/gridDecimalPolicy.service';
 
 vi.mock('../src/pages/co/master/materials/services/materialManagement.service', () => ({
   fetchMaterials: vi.fn(async () => []),
@@ -37,9 +39,20 @@ describe('work standard recipe filtering and formula calculation', () => {
     const [dark] = SAMPLE_WORK_STANDARDS;
     const totals = calculateFormulaTotals(dark.formula, dark.baseQty);
     expect(totals).toEqual({ inputQty: 35.46, ratio: 100, perPlateG: 886.5 });
-    expect(calculateRatio(18, totals.inputQty)).toBe(50.76);
+    expect(calculateRatio(18, totals.inputQty)).toBe(50.76142131979695);
     expect(calculatePerPlateGram(18, 40)).toBe(450);
     expect(calculatePerPlateGram(18, 0)).toBe(0);
+  });
+
+  it('rounds the calculated values only with the policy rule and never with fixed digits', () => {
+    const rule = { places: 3, rounding: 'HALF_UP' as const, trailingZeros: 'FIXED' as const };
+    const rules = { inputQty: rule, ratio: rule, perPlateG: rule };
+    const [dark] = SAMPLE_WORK_STANDARDS;
+    const totals = calculateFormulaTotals(dark.formula, dark.baseQty, rules);
+    expect(totals).toEqual({ inputQty: 35.46, ratio: 100, perPlateG: 886.5 });
+    expect(calculateRatio(18, totals.inputQty, rule)).toBe(50.761);
+    expect(calculatePerPlateGram(18, 40, { ...rule, places: 0 })).toBe(450);
+    expect(calculatePerPlateGram(1, 3, { ...rule, places: 1, rounding: 'DOWN' })).toBe(333.3);
   });
 });
 
@@ -58,9 +71,9 @@ describe('work standard recipe page', () => {
     expect(within(basicInfo).getByRole('button', { name: '버전 개정' })).toBeDisabled();
 
     const totals = screen.getByLabelText('배합비 합계');
-    expect(totals).toHaveTextContent('35.460');
-    expect(totals).toHaveTextContent('100.00');
-    expect(totals).toHaveTextContent('886.5');
+    await waitFor(() => expect(totals).toHaveTextContent('35.460'));
+    expect(totals).toHaveTextContent('100.000');
+    expect(totals).toHaveTextContent('886.500');
 
     const list = screen.getByRole('grid', { name: '작업표준서 목록' });
     fireEvent.click(within(list).getByText('(반)카카올라 밀크 생초콜릿 [판]'));
@@ -111,11 +124,18 @@ const permissions: MenuPermission = {
 } as MenuPermission;
 
 function renderPage() {
+  const rule = { trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const };
+  const rules = { COMMON: {
+    number: { ...rule, places: 0 }, decimal: { ...rule, places: 3 }, currency: { ...rule, places: 3 },
+  } };
+  vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue(rules);
+  vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
   const router = createMemoryRouter(
     [
       {
         path: '/',
         element: (
+          <GridDecimalModuleProvider moduleCode="common">
           <WorkStandardRecipePage
             selectedModule={{ id: 'co', name: '기준정보' } as never}
             currentMenuName="작업표준서 등록(레시피)"
@@ -123,6 +143,7 @@ function renderPage() {
             breadcrumbItems={['기준정보', '작업표준서 관리', '작업표준서 등록(레시피)']}
             selectedMenuPermissions={permissions}
           />
+          </GridDecimalModuleProvider>
         ),
       },
     ],

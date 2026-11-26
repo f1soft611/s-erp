@@ -1,4 +1,5 @@
 import type { F1GridColumn } from '../../../../../shared/components/f1-grid';
+import { decimalColumnOptions, getDecimalColumnContract } from '../../../../../shared/services/decimalColumnContract';
 import { renderBlankWhenEmpty } from './blankWhenEmptyCell';
 import type {
   ItemPartnerPriceRow,
@@ -53,8 +54,9 @@ function validateAmount(value: unknown, optional: boolean, label: string): strin
   if (value == null || value === '') return optional ? true : `${label}은 필수입니다.`;
   if (typeof value !== 'number' && typeof value !== 'string') return `${label} 숫자를 확인해 주세요.`;
   const raw = String(value);
-  if (!/^\d{1,13}(?:\.\d{1,2})?$/.test(raw)) {
-    return `${label}은 0 이상, 소수 둘째 자리까지 입력해 주세요.`;
+  // 소수 자릿수는 정책(계약)이 정하므로 여기서는 0 이상의 숫자 형식만 확인한다. 자릿수는 그리드와 서버가 검증한다.
+  if (!/^\d{1,13}(?:\.\d+)?$/.test(raw)) {
+    return `${label}은 0 이상의 숫자로 입력해 주세요.`;
   }
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? true : `${label} 숫자를 확인해 주세요.`;
@@ -263,10 +265,9 @@ export function createItemPartnerPriceColumns(
     {
       field: 'unitPrice',
       headerName: '원화단가',
-      type: 'decimal',
+      ...decimalColumnOptions(getDecimalColumnContract('co.itemPartnerPrice'), 'unitPrice'),
       width: 130,
       align: 'right',
-      decimalPlaces: 2,
       min: 0,
       requiredMark: markRequired,
       editable: canEdit,
@@ -312,10 +313,9 @@ export function createItemPartnerPriceColumns(
     {
       field: 'foreignUnitPrice',
       headerName: '외화단가',
-      type: 'decimal',
+      ...decimalColumnOptions(getDecimalColumnContract('co.itemPartnerPrice'), 'foreignUnitPrice'),
       width: 120,
       align: 'right',
-      decimalPlaces: 2,
       min: 0,
       requiredMark: markRequired,
       editable: canEdit,

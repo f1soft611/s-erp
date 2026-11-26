@@ -42,7 +42,8 @@ function cellAmount(value: unknown): string {
 
 function validAmount(value: string, optional: boolean): boolean {
   if (!value) return optional;
-  return /^[0-9]{1,13}(?:\.[0-9]{1,2})?$/.test(value);
+  // 소수 자릿수는 정책(계약)이 정하며 서버 검증이 확인한다. 여기서는 0 이상의 숫자 형식만 확인한다.
+  return /^[0-9]{1,13}(?:\.[0-9]+)?$/.test(value);
 }
 
 /** 엑셀에는 공통코드 이름(예: 과세) 또는 코드를 쓸 수 있다. 이름이면 코드로 바꾼다. */
@@ -73,7 +74,7 @@ function rowErrors(row: ItemPartnerPriceImportRow, screenTradeType?: '매입' | 
   if (!row.unitPrice && !row.foreignUnitPrice) {
     errors.push('원화단가 또는 외화단가를 입력해 주세요.');
   } else if (row.unitPrice && !validAmount(row.unitPrice, false)) {
-    errors.push('원화단가는 0 이상, 소수 둘째 자리까지 입력해 주세요.');
+    errors.push('원화단가는 0 이상의 숫자로 입력해 주세요.');
   }
   if (row.vatIncludedAt && row.vatIncludedAt !== 'Y' && row.vatIncludedAt !== 'N') {
     errors.push('부가세포함은 Y 또는 N이어야 합니다.');
@@ -81,7 +82,7 @@ function rowErrors(row: ItemPartnerPriceImportRow, screenTradeType?: '매입' | 
     errors.push('부가세 포함은 과세일 때만 선택할 수 있습니다.');
   }
   if (!validAmount(row.foreignUnitPrice, true)) {
-    errors.push('외화단가는 0 이상, 소수 둘째 자리까지 입력해 주세요.');
+    errors.push('외화단가는 0 이상의 숫자로 입력해 주세요.');
   } else if (row.foreignUnitPrice && !row.currency) {
     errors.push('외화단가를 입력하면 통화가 필요합니다.');
   }
@@ -94,7 +95,7 @@ function rowErrors(row: ItemPartnerPriceImportRow, screenTradeType?: '매입' | 
     errors.push('적용 종료일은 시작일 이후의 YYYY-MM-DD여야 합니다.');
   }
   if (!validAmount(row.moq ?? '', true)) {
-    errors.push('최소주문수량은 0 이상, 소수 둘째 자리까지 입력해 주세요.');
+    errors.push('최소주문수량은 0 이상의 숫자로 입력해 주세요.');
   }
   if (row.useAt !== 'Y' && row.useAt !== 'N') {
     errors.push('사용여부는 Y 또는 N이어야 합니다.');

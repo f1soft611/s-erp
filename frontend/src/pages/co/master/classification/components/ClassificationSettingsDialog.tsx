@@ -11,6 +11,7 @@ import { useUnsavedChangesBeforeUnload } from '../../../../../shared/hooks/useUn
 import {
   createClassification, fetchClassifications, updateClassification,
 } from '../services/classification.service';
+import { decimalColumnOptions, getDecimalColumnContract } from '../../../../../shared/services/decimalColumnContract';
 import type { Classification, ClassificationKind } from '../types/classification.types';
 
 type Props = {
@@ -84,7 +85,7 @@ function SettingsContent({ kind, canCreate, canUpdate, onClose }: Omit<Props, 'o
     !busy && !loadError && (row.id < 0 ? canCreate : canUpdate);
   const columns: F1GridColumn<Classification>[] = [
     { field: 'name', headerName: '분류명', width: 240, flex: 1, editable, required: true },
-    { field: 'sortSeq', headerName: '정렬순서', width: 100, type: 'number', editable },
+    { field: 'sortSeq', headerName: '정렬순서', width: 100, ...decimalColumnOptions(getDecimalColumnContract('co.classification'), 'sortSeq'), editable },
     {
       field: 'useAt', headerName: '사용여부', width: 90, type: 'checkbox', editable, align: 'center',
       getValue: (row) => row.useAt === 'Y',

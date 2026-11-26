@@ -3,6 +3,13 @@ import type {
   F1GridColumn,
 } from '../../../../../shared/components/f1-grid';
 import type { MasterPickerOption } from '../../../../../shared/components/master-picker/masterPicker.types';
+import { roundGridNumber } from '../../../../../shared/components/f1-grid/utils/grid.utils';
+import type { GridDecimalModuleRule, GridDecimalRule } from '../../../../../shared/services/gridDecimalPolicy.service';
+import {
+  decimalColumnOptions,
+  getDecimalColumnContract,
+  resolveDecimalColumn,
+} from '../../../../../shared/services/decimalColumnContract';
 import type {
   FormulaQuantityBasis,
   WorkStandardFormulaRow,
@@ -46,32 +53,49 @@ function numericValue(value: unknown): number {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
-export function roundTo(value: number, digits: number): number {
-  const factor = 10 ** digits;
-  return Math.round(value * factor) / factor;
+/** 작업표준 배합 컬럼의 정책 규칙. 계약 문서 co.workStandard의 각 필드를 정책(decimal)으로 푼다. */
+export type FormulaDecimalRules = {
+  inputQty: GridDecimalRule;
+  ratio: GridDecimalRule;
+  perPlateG: GridDecimalRule;
+};
+
+export function resolveFormulaDecimalRules(policy: GridDecimalModuleRule): FormulaDecimalRules {
+  const contract = getDecimalColumnContract('co.workStandard');
+  return {
+    inputQty: resolveDecimalColumn(contract.inputQty, policy),
+    ratio: resolveDecimalColumn(contract.ratio, policy),
+    perPlateG: resolveDecimalColumn(contract.perPlateG, policy),
+  };
 }
 
-export function calculateRatio(inputQty: number, totalQty: number): number {
-  return totalQty > 0 ? roundTo((numericValue(inputQty) / totalQty) * 100, 2) : 0;
+/** 정책 규칙이 있으면 그 규칙으로 반올림하고, 정책이 없으면 고정 자릿수 없이 원래 값을 쓴다. */
+function roundByRule(value: number, rule?: GridDecimalRule): number {
+  return rule ? roundGridNumber(value, rule.places, rule.rounding) : value;
+}
+
+export function calculateRatio(inputQty: number, totalQty: number, rule?: GridDecimalRule): number {
+  return totalQty > 0 ? roundByRule((numericValue(inputQty) / totalQty) * 100, rule) : 0;
 }
 
 /** 투입량(kg)을 기준 생산량으로 나눈 1판당 투입량(g) */
-export function calculatePerPlateGram(inputQty: number, baseQty: number): number {
-  return baseQty > 0 ? roundTo((numericValue(inputQty) * 1000) / baseQty, 1) : 0;
+export function calculatePerPlateGram(inputQty: number, baseQty: number, rule?: GridDecimalRule): number {
+  return baseQty > 0 ? roundByRule((numericValue(inputQty) * 1000) / baseQty, rule) : 0;
 }
 
 export function calculateFormulaTotals(
   rows: WorkStandardFormulaRow[],
   baseQty: number,
+  rules?: FormulaDecimalRules,
 ): FormulaTotals {
-  const inputQty = roundTo(
+  const inputQty = roundByRule(
     rows.reduce((sum, row) => sum + numericValue(row.inputQty), 0),
-    3,
+    rules?.inputQty,
   );
   return {
     inputQty,
     ratio: inputQty > 0 ? 100 : 0,
-    perPlateG: calculatePerPlateGram(inputQty, baseQty),
+    perPlateG: calculatePerPlateGram(inputQty, baseQty, rules?.perPlateG),
   };
 }
 
@@ -95,6 +119,8 @@ type FormulaColumnOptions = {
   basis: FormulaQuantityBasis;
   disabled: boolean;
   onOpenMaterialPicker: OpenFormulaMaterialPicker;
+  /** 정책에서 푼 규칙. 정책이 없으면 계산값을 반올림하지 않는다. */
+  rules?: FormulaDecimalRules;
 };
 
 export function createFormulaColumns({
@@ -103,7 +129,9 @@ export function createFormulaColumns({
   basis,
   disabled,
   onOpenMaterialPicker,
+  rules,
 }: FormulaColumnOptions): F1GridColumn<WorkStandardFormulaRow>[] {
+  const contract = getDecimalColumnContract('co.workStandard');
   const isBatchBasis = basis === 'batch';
   const baseLabel = baseQty > 0 ? `${baseQty}` : '-';
 
@@ -152,8 +180,7 @@ export function createFormulaColumns({
     {
       field: 'inputQty',
       headerName: isBatchBasis ? `투입량 (${baseLabel}판)` : '투입량 (1판)',
-      type: 'decimal',
-      decimalPlaces: 3,
+      ...decimalColumnOptions(contract, 'inputQty'),
       width: 130,
       align: 'right',
       editable: !disabled && isBatchBasis,
@@ -161,28 +188,26 @@ export function createFormulaColumns({
       min: 0,
       getValue: isBatchBasis
         ? undefined
-        : (row) => (baseQty > 0 ? roundTo(numericValue(row.inputQty) / baseQty, 3) : 0),
+        : (row) => (baseQty > 0 ? roundByRule(numericValue(row.inputQty) / baseQty, rules?.inputQty) : 0),
       validate: (value) => (Number(value) > 0 ? true : '투입량은 0보다 커야 합니다.'),
     },
     {
       field: 'ratio',
       headerName: '배합비(%)',
-      type: 'decimal',
-      decimalPlaces: 2,
+      ...decimalColumnOptions(contract, 'ratio'),
       width: 100,
       align: 'right',
       editable: false,
-      getValue: (row) => calculateRatio(row.inputQty, totalQty),
+      getValue: (row) => calculateRatio(row.inputQty, totalQty, rules?.ratio),
     },
     {
       field: 'perPlateG',
       headerName: '1판당(g)',
-      type: 'decimal',
-      decimalPlaces: 1,
+      ...decimalColumnOptions(contract, 'perPlateG'),
       width: 100,
       align: 'right',
       editable: false,
-      getValue: (row) => calculatePerPlateGram(row.inputQty, baseQty),
+      getValue: (row) => calculatePerPlateGram(row.inputQty, baseQty, rules?.perPlateG),
     },
     {
       field: 'lotInput',
