@@ -10,8 +10,103 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>iPlusMES</title>
+    <script>
+      try {
+        if (window.localStorage.getItem('erp-theme') === 'dark') {
+          document.documentElement.setAttribute('data-boot-theme', 'dark');
+        }
+      } catch (e) {}
+    </script>
+    <style>
+      #boot-splash{--bs-bg:#f4f7fb;--bs-pink:#ee1c6e;--bs-navy:#1f2a44;--bs-blue:#2a6df4;--bs-soft:#c9d8f6;--bs-muted:#6b7a99;--bs-track:#dde4f2;--bs-body:#1d3fa8;--bs-body2:#f2f5fb;--bs-tire:#20242f;--bs-rim:#aab4c8;
+        position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;overflow:hidden;background:var(--bs-bg);color:var(--bs-navy);
+        font-family:'Exo 2','Segoe UI','Noto Sans KR','Malgun Gothic',sans-serif;opacity:0;animation:boot-in .2s ease .3s both}
+      html[data-boot-theme="dark"] #boot-splash{--bs-bg:#0f172a;--bs-navy:#eef2fb;--bs-soft:#2b3a63;--bs-muted:#8c9bbd;--bs-track:#243052;--bs-body2:#e8edf8;--bs-rim:#8794b0}
+      #boot-splash.is-leaving{animation:boot-out .25s ease forwards}
+      #boot-splash .bs-wrap{width:min(480px,100%);padding:0 16px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:12px}
+      #boot-splash .bs-logo{display:flex;align-items:baseline;font-style:italic;font-weight:900;line-height:1;font-size:clamp(44px,10vw,64px);letter-spacing:-.02em;font-family:'Exo 2','Arial Black','Segoe UI',sans-serif}
+      #boot-splash .bs-f1{color:var(--bs-pink);margin-right:.06em}
+      #boot-splash .bs-sub{font-size:clamp(9px,2.2vw,11px);letter-spacing:.38em;padding-left:.38em;color:var(--bs-muted);text-align:center}
+      #boot-splash .bs-track{position:relative;width:100%;height:116px;margin-top:8px;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent);mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent)}
+      #boot-splash .bs-road{position:absolute;left:0;right:0;bottom:22px;height:3px;background:var(--bs-soft)}
+      #boot-splash .bs-dash{position:absolute;left:0;bottom:8px;height:3px;width:200%;background:repeating-linear-gradient(90deg,var(--bs-soft) 0 38px,transparent 38px 90px);animation:bs-scroll .45s linear infinite}
+      #boot-splash .bs-sl{position:absolute;height:3px;border-radius:2px;right:-30%;width:34%;opacity:.85;animation:bs-streak linear infinite}
+      #boot-splash .bs-sl.a{top:46px;background:var(--bs-blue);animation-duration:.55s}
+      #boot-splash .bs-sl.b{top:60px;background:var(--bs-pink);width:22%;animation-duration:.42s;animation-delay:-.2s}
+      #boot-splash .bs-sl.c{top:74px;background:var(--bs-blue);width:40%;animation-duration:.7s;animation-delay:-.35s;opacity:.5}
+      #boot-splash .bs-sl.d{top:88px;background:var(--bs-soft);width:30%;animation-duration:.6s;animation-delay:-.1s}
+      #boot-splash .bs-sl.e{top:32px;background:var(--bs-soft);width:26%;animation-duration:.8s;animation-delay:-.5s}
+      #boot-splash .bs-car{position:absolute;left:50%;bottom:20px;width:190px;margin-left:-95px;animation:bs-bob .32s ease-in-out infinite}
+      #boot-splash .bs-car svg{display:block;width:100%;height:auto;overflow:visible}
+      #boot-splash .bs-wheel{transform-box:fill-box;transform-origin:center;animation:bs-spin .28s linear infinite}
+      #boot-splash .bs-puff{position:absolute;bottom:20px;left:calc(50% - 112px);width:20px;height:20px;border-radius:50%;background:var(--bs-bg);border:2px solid var(--bs-soft);opacity:0;animation:bs-puff .7s ease-out infinite}
+      #boot-splash .bs-puff:nth-of-type(2){animation-delay:-.23s;width:16px;height:16px}
+      #boot-splash .bs-puff:nth-of-type(3){animation-delay:-.46s;width:12px;height:12px}
+      #boot-splash .bs-bar{width:min(320px,80%);height:8px;border-radius:99px;background:var(--bs-track);overflow:hidden;margin-top:6px}
+      #boot-splash .bs-bar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#2a6df4,#5b9bff);animation:bs-fill 3.2s cubic-bezier(.5,0,.3,1) infinite}
+      #boot-splash .bs-msg{font-size:clamp(13px,3.4vw,15px);opacity:.82}
+      #boot-splash .bs-powered{display:flex;align-items:center;gap:14px;margin-top:20px;font-size:11px;letter-spacing:.32em;color:var(--bs-muted)}
+      #boot-splash .bs-powered:before,#boot-splash .bs-powered:after{content:"";width:clamp(28px,10vw,90px);height:1px;background:var(--bs-soft)}
+      @keyframes boot-in{from{opacity:0}to{opacity:1}}
+      @keyframes boot-out{from{opacity:1}to{opacity:0}}
+      @keyframes bs-scroll{to{transform:translateX(-90px)}}
+      @keyframes bs-streak{from{transform:translateX(0)}to{transform:translateX(-340%)}}
+      @keyframes bs-spin{to{transform:rotate(360deg)}}
+      @keyframes bs-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+      @keyframes bs-puff{0%{opacity:.9;transform:translateX(0) scale(.5)}100%{opacity:0;transform:translateX(-90px) scale(1.6)}}
+      @keyframes bs-fill{0%{width:4%}70%{width:92%}100%{width:100%}}
+      @media (prefers-reduced-motion:reduce){
+        #boot-splash .bs-dash,#boot-splash .bs-sl,#boot-splash .bs-car,#boot-splash .bs-wheel,#boot-splash .bs-puff{animation:none}
+        #boot-splash .bs-puff{display:none}
+        #boot-splash .bs-bar i{animation:none;width:60%}
+      }
+    </style>
   </head>
   <body>
+    <div id="boot-splash" role="status" aria-label="시스템을 준비하고 있습니다">
+      <div class="bs-wrap">
+        <div class="bs-logo" aria-hidden="true"><span class="bs-f1">F1</span><span>SOFT</span></div>
+        <div class="bs-sub" aria-hidden="true">ENTERPRISE RESOURCE PLANNING</div>
+        <div class="bs-track" aria-hidden="true">
+          <span class="bs-sl a"></span><span class="bs-sl b"></span><span class="bs-sl c"></span><span class="bs-sl d"></span><span class="bs-sl e"></span>
+          <div class="bs-road"></div><div class="bs-dash"></div>
+          <span class="bs-puff"></span><span class="bs-puff"></span><span class="bs-puff"></span>
+          <div class="bs-car">
+            <svg viewBox="0 0 260 80">
+              <ellipse cx="130" cy="75" rx="108" ry="3.5" fill="#000" opacity=".12"/>
+              <path d="M20 14h26l-3 24H24z" fill="var(--bs-body)"/>
+              <path d="M16 12h34v5H16z" fill="var(--bs-navy)"/>
+              <text x="28" y="31" font-style="italic" font-weight="900" font-size="11" fill="#fff">F1</text>
+              <path d="M44 40 L96 30 L132 26 L158 32 L196 46 L246 60 L252 64 L252 66 L44 66 Z" fill="var(--bs-body2)"/>
+              <path d="M44 40 L96 30 L132 26 L148 30 L120 40 L70 48 L44 50Z" fill="var(--bs-body)"/>
+              <path d="M158 32 L196 46 L246 60 L252 64 L200 62 L150 46Z" fill="var(--bs-body)"/>
+              <path d="M70 52 L170 56 L240 64 L240 66 L70 66Z" fill="var(--bs-pink)" opacity=".9"/>
+              <path d="M52 66 L246 66 L246 69 L52 69Z" fill="var(--bs-navy)"/>
+              <path d="M112 26 L124 16 L134 16 L136 28Z" fill="var(--bs-body)"/>
+              <circle cx="146" cy="25" r="9" fill="#fff" stroke="var(--bs-navy)" stroke-width="1.5"/>
+              <path d="M142 23h12v6h-12z" fill="var(--bs-navy)" opacity=".85"/>
+              <path d="M141 21c3-5 11-5 14 0z" fill="var(--bs-blue)"/>
+              <text x="106" y="58" font-style="italic" font-weight="900" font-size="12" fill="var(--bs-pink)">F1<tspan fill="var(--bs-navy)">SOFT</tspan></text>
+              <path d="M226 64h30v4h-30z" fill="var(--bs-navy)"/>
+              <path d="M240 58h16l-2 6h-16z" fill="var(--bs-body)"/>
+              <g transform="translate(70 56)">
+                <circle r="19" fill="var(--bs-tire)"/>
+                <g class="bs-wheel"><circle r="10" fill="var(--bs-rim)"/><path d="M-10 0h20M0 -10v20M-7 -7l14 14M-7 7l14 -14" stroke="var(--bs-tire)" stroke-width="2.2"/></g>
+                <circle r="3" fill="var(--bs-navy)"/>
+              </g>
+              <g transform="translate(206 58)">
+                <circle r="16" fill="var(--bs-tire)"/>
+                <g class="bs-wheel"><circle r="8.5" fill="var(--bs-rim)"/><path d="M-8.5 0h17M0 -8.5v17M-6 -6l12 12M-6 6l12 -12" stroke="var(--bs-tire)" stroke-width="2"/></g>
+                <circle r="2.6" fill="var(--bs-navy)"/>
+              </g>
+            </svg>
+          </div>
+        </div>
+        <div class="bs-bar" aria-hidden="true"><i></i></div>
+        <div class="bs-msg">시스템을 준비하고 있습니다...</div>
+        <div class="bs-powered" aria-hidden="true">POWERED BY F1SOFT</div>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -7,6 +7,7 @@ import {
   subscribeAuthChange,
 } from '../shared/services/authService';
 import { PwaInstallPrompt } from '../shared/components/PwaInstallPrompt';
+import { BootSplashReady } from '../shared/components/BootSplashReady';
 
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const ForcePasswordChangePage = lazy(() => import('../pages/auth/ForcePasswordChangePage'));
@@ -202,6 +203,7 @@ function AppRouter() {
           />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        <BootSplashReady />
       </Suspense>
       <PwaInstallPrompt
         enabled={isAuthed && location.pathname === '/groupware/overview'}
