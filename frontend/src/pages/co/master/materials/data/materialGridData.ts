@@ -1,4 +1,5 @@
 import type { F1GridColumn } from '../../../../../shared/components/f1-grid';
+import { decimalColumnOptions, getDecimalColumnContract } from '../../../../../shared/services/decimalColumnContract';
 import {
   emptyMaterialPayload,
   expiryStatuses,
@@ -111,11 +112,12 @@ export function createMaterialColumns(
       expiryOptions.push({ value: row.expiryedStatus, label: row.expiryedStatus });
     }
   }
+  const contract = getDecimalColumnContract('co.material');
   columns.push(
     {
       field: 'materialWeight',
       headerName: '중량',
-      type: 'number',
+      ...decimalColumnOptions(contract, 'materialWeight'),
       hidden: true,
       editable: canEdit,
       form: { hidden: false, group: '규격·분류', order: 20 },
@@ -124,7 +126,7 @@ export function createMaterialColumns(
     {
       field: 'safeInvoice',
       headerName: '안전재고',
-      type: 'decimal',
+      ...decimalColumnOptions(contract, 'safeInvoice'),
       align: 'right',
       width: 110,
       editable: canEdit,
@@ -155,7 +157,7 @@ export function createMaterialColumns(
     {
       field: 'expiryedCount',
       headerName: '소비기한 숫자',
-      type: 'number',
+      ...decimalColumnOptions(contract, 'expiryedCount'),
       editable: canEdit,
       validate: (value, row) => {
         const count = value == null || value === '' ? null : Number(value);

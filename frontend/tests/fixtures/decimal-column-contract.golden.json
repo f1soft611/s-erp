@@ -35,5 +35,25 @@
   },
   "settings.role": {
     "menuCount": { "type": "number" }
+  },
+  "co.itemPartnerPrice": {
+    "unitPrice": { "type": "decimal" },
+    "foreignUnitPrice": { "type": "decimal" },
+    "moq": { "type": "number" }
+  },
+  "co.material": {
+    "materialWeight": { "type": "number" },
+    "safeInvoice": { "type": "number" },
+    "expiryedCount": { "type": "number" }
+  },
+  "co.itemPartnerPriceSummary": {
+    "priceCount": { "type": "number" },
+    "customerCount": { "type": "number" }
+  },
+  "co.classification": {
+    "sortSeq": { "type": "number" }
+  },
+  "co.commonCode": {
+    "sortOrder": { "type": "number" }
   }
 }

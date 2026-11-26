@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
+import egovframework.com.cmm.DecimalColumnContract;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceImportErrorVO;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceImportResolutionVO;
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceImportRowResultVO;
@@ -27,6 +28,8 @@ import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPric
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceVO;
 import egovframework.let.co.master.itempartnerprice.domain.repository.ItemPartnerPriceDAO;
 import egovframework.let.co.master.itempartnerprice.service.ItemPartnerPriceService;
+import egovframework.let.sales.common.SalesDecimalPolicy;
+import egovframework.let.system.policies.service.SystemPolicyService;
 
 @Service("itemPartnerPriceService")
 public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl implements ItemPartnerPriceService {
@@ -41,8 +44,10 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
     private static final String ORDER_TYPE_GROUP = "PURCHASE_ORDER_TYPE";
 
     private final ItemPartnerPriceDAO dao;
+    private final SystemPolicyService systemPolicyService;
 
-    public ItemPartnerPriceServiceImpl(ItemPartnerPriceDAO dao) {
+    public ItemPartnerPriceServiceImpl(ItemPartnerPriceDAO dao, SystemPolicyService systemPolicyService) {
+        this.systemPolicyService = systemPolicyService;
         this.dao = dao;
     }
 
@@ -90,6 +95,7 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
             throw new IllegalArgumentException("엑셀은 한 번에 1,000행까지 검증할 수 있습니다.");
         }
 
+        SalesDecimalPolicy decimalPolicy = decimalPolicy(tenantId);
         List<Map<String, Object>> requestRows = new ArrayList<Map<String, Object>>();
         List<ItemPartnerPriceImportRowResultVO> results = new ArrayList<ItemPartnerPriceImportRowResultVO>();
         Set<Integer> sourceNumbers = new HashSet<Integer>();
@@ -103,7 +109,7 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
             ItemPartnerPriceImportRowResultVO result = new ItemPartnerPriceImportRowResultVO();
             result.setSourceRowNumber(row.getSourceRowNumber());
             results.add(result);
-            validateImportValues(row, result);
+            validateImportValues(row, result, decimalPolicy);
             Map<String, Object> queryRow = new HashMap<String, Object>();
             queryRow.put("sourceRowNumber", row.getSourceRowNumber());
             queryRow.put("materialCode", safeText(row.getMaterialCode()));
@@ -241,7 +247,8 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
         return cached;
     }
 
-    private void validateImportValues(ItemPartnerPriceImportRowVO row, ItemPartnerPriceImportRowResultVO result) {
+    private void validateImportValues(ItemPartnerPriceImportRowVO row, ItemPartnerPriceImportRowResultVO result,
+            SalesDecimalPolicy decimalPolicy) {
         int sourceRow = row.getSourceRowNumber();
         String tradeType = safeText(row.getTradeType());
         if (!TRADE_TYPES.contains(tradeType)) {
@@ -257,16 +264,16 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
         boolean hasForeignPrice = !safeText(row.getForeignUnitPrice()).isEmpty();
         if (!hasUnitPrice && !hasForeignPrice) {
             addError(result, "INVALID_UNIT_PRICE", "엑셀 " + sourceRow + "행의 원화단가 또는 외화단가를 입력해 주세요.");
-        } else if (hasUnitPrice && !validAmount(row.getUnitPrice(), false)) {
-            addError(result, "INVALID_UNIT_PRICE", "엑셀 " + sourceRow + "행의 원화단가는 0 이상, 소수 둘째 자리까지 입력해 주세요.");
+        } else if (hasUnitPrice && !validAmount(row.getUnitPrice(), false, "unitPrice", decimalPolicy)) {
+            addError(result, "INVALID_UNIT_PRICE", "엑셀 " + sourceRow + "행의 원화단가는 0 이상, 소수 " + decimalPolicy.places("unitPrice") + "자리까지 입력해 주세요.");
         }
         String currency = safeText(row.getCurrency());
         if (currency.length() > 10) {
             addError(result, "INVALID_CURRENCY", "엑셀 " + sourceRow + "행의 통화는 10자 이하여야 합니다.");
         }
-        if (!validAmount(row.getForeignUnitPrice(), true)) {
+        if (!validAmount(row.getForeignUnitPrice(), true, "foreignUnitPrice", decimalPolicy)) {
             addError(result, "INVALID_FOREIGN_UNIT_PRICE",
-                    "엑셀 " + sourceRow + "행의 외화단가는 0 이상, 소수 둘째 자리까지 입력해 주세요.");
+                    "엑셀 " + sourceRow + "행의 외화단가는 0 이상, 소수 " + decimalPolicy.places("foreignUnitPrice") + "자리까지 입력해 주세요.");
         } else if (!safeText(row.getForeignUnitPrice()).isEmpty() && currency.isEmpty()) {
             addError(result, "INVALID_CURRENCY", "엑셀 " + sourceRow + "행의 외화단가에는 통화가 필요합니다.");
         }
@@ -285,8 +292,8 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
                 || validDate(safeText(row.getStartDt())) && dateBefore(endDt, row.getStartDt()))) {
             addError(result, "INVALID_END_DATE", "엑셀 " + sourceRow + "행의 적용 종료일은 시작일 이후의 YYYY-MM-DD여야 합니다.");
         }
-        if (!validAmount(row.getMoq(), true)) {
-            addError(result, "INVALID_MOQ", "엑셀 " + sourceRow + "행의 최소주문수량은 0 이상, 소수 둘째 자리까지 입력해 주세요.");
+        if (!validAmount(row.getMoq(), true, "moq", decimalPolicy)) {
+            addError(result, "INVALID_MOQ", "엑셀 " + sourceRow + "행의 최소주문수량은 0 이상, 소수 " + decimalPolicy.places("moq") + "자리까지 입력해 주세요.");
         }
         String importOrderType = safeText(row.getOrderType());
         if (importOrderType.length() > 50) {
@@ -308,15 +315,29 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
         }
     }
 
-    private boolean validAmount(String raw, boolean optional) {
+    /** 0 이상 숫자이며 정책의 컬럼 소수 자릿수와 허용 범위를 지키는지 확인한다. */
+    private boolean validAmount(String raw, boolean optional, String field, SalesDecimalPolicy decimalPolicy) {
         String value = safeText(raw);
         if (value.isEmpty()) return optional;
-        if (!value.matches("[0-9]{1,13}(\\.[0-9]{1,2})?")) return false;
+        if (!value.matches("[0-9]+(\\.[0-9]+)?")) return false;
         try {
-            return new BigDecimal(value).precision() <= 15;
-        } catch (NumberFormatException ex) {
+            decimalPolicy.input(field, new BigDecimal(value), field);
+            return true;
+        } catch (ResponseStatusException | NumberFormatException ex) {
             return false;
         }
+    }
+
+    private SalesDecimalPolicy decimalPolicy(Long tenantId) throws Exception {
+        return SalesDecimalPolicy.forModule("COMMON", systemPolicyService.getGridDecimals(tenantId),
+                DecimalColumnContract.forDocument("co.itemPartnerPrice"));
+    }
+
+    /** 0 이상 값을 정책 자릿수로 검증해 저장값으로 돌려준다. */
+    private BigDecimal policyAmount(SalesDecimalPolicy decimalPolicy, String field, String label, BigDecimal value) {
+        BigDecimal result = decimalPolicy.input(field, value, label);
+        if (result.signum() < 0) throw new IllegalArgumentException(label + "은 0 이상이어야 합니다.");
+        return result;
     }
 
     private boolean validCode(String raw) {
@@ -509,7 +530,8 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
         return row;
     }
 
-    private Map<String, Object> saveParams(Long tenantId, String actor, ItemPartnerPriceSaveRequestVO payload) {
+    private Map<String, Object> saveParams(Long tenantId, String actor, ItemPartnerPriceSaveRequestVO payload)
+            throws Exception {
         Map<String, Object> params = tenantParams(tenantId);
         if (payload == null) throw new IllegalArgumentException("단가 저장 요청이 비어 있습니다.");
         if (payload.getMaterialId() == null || payload.getMaterialId() <= 0) {
@@ -524,17 +546,13 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
         if (payload.getUnitPrice() == null && payload.getForeignUnitPrice() == null) {
             throw new IllegalArgumentException("원화단가 또는 외화단가를 입력해 주세요.");
         }
-        if (payload.getUnitPrice() != null && !validAmount(payload.getUnitPrice().toPlainString(), false)) {
-            throw new IllegalArgumentException("원화단가는 0 이상, 소수 둘째 자리까지 입력해 주세요.");
-        }
-        BigDecimal moq = payload.getMoq();
-        if (moq != null && !validAmount(moq.toPlainString(), false)) {
-            throw new IllegalArgumentException("최소주문수량은 0 이상, 소수 둘째 자리까지 입력해 주세요.");
-        }
-        BigDecimal foreignUnitPrice = payload.getForeignUnitPrice();
-        if (foreignUnitPrice != null && !validAmount(foreignUnitPrice.toPlainString(), false)) {
-            throw new IllegalArgumentException("외화단가는 0 이상, 소수 둘째 자리까지 입력해 주세요.");
-        }
+        SalesDecimalPolicy decimalPolicy = decimalPolicy(tenantId);
+        BigDecimal unitPrice = payload.getUnitPrice() == null ? null
+                : policyAmount(decimalPolicy, "unitPrice", "원화단가", payload.getUnitPrice());
+        BigDecimal moq = payload.getMoq() == null ? null
+                : policyAmount(decimalPolicy, "moq", "최소주문수량", payload.getMoq());
+        BigDecimal foreignUnitPrice = payload.getForeignUnitPrice() == null ? null
+                : policyAmount(decimalPolicy, "foreignUnitPrice", "외화단가", payload.getForeignUnitPrice());
         String currency = safeText(payload.getCurrency());
         if (currency.length() > 10) throw new IllegalArgumentException("통화는 10자 이하여야 합니다.");
         if (foreignUnitPrice != null && currency.isEmpty()) {
@@ -574,7 +592,7 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
         params.put("materialId", payload.getMaterialId());
         params.put("customerId", payload.getCustomerId());
         params.put("tradeType", payload.getTradeType().trim());
-        params.put("unitPrice", payload.getUnitPrice());
+        params.put("unitPrice", unitPrice);
         params.put("currency", storedCurrency);
         params.put("taxType", taxType);
         params.put("vatIncludedAt", vatIncludedAt);

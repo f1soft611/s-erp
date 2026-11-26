@@ -38,8 +38,10 @@ class DecimalColumnContractGuardTest {
      * 서버 사용 필드 대조에서 제외하며, 계약에서 사라진 문서는 이 목록에서도 제거해야 한다.
      */
     private static final Set<String> FRONTEND_ONLY_DOCUMENTS = new HashSet<String>(java.util.Arrays.asList(
-            "settings.module", "settings.menu", "settings.role"));
-    private static final Pattern SERVER_FIELD = Pattern.compile("\\.(?:input|amount)\\(\"(\\w+)\"");
+            "settings.module", "settings.menu", "settings.role",
+            "co.itemPartnerPriceSummary", "co.classification", "co.commonCode"));
+    private static final Pattern SERVER_FIELD = Pattern.compile(
+            "\\.(?:input|amount|places)\\(\"(\\w+)\"|policyAmount\\(\\s*\\w+,\\s*\"(\\w+)\"|validAmount\\([^\"]*\"(\\w+)\",\\s*decimalPolicy");
 
     private static Map<String, Map<String, Object>> contracts() throws IOException {
         try (InputStream input = DecimalColumnContractGuardTest.class.getResourceAsStream("/decimal-column-contract.json")) {
@@ -91,16 +93,22 @@ class DecimalColumnContractGuardTest {
     }
 
     private static Set<String> serverUsedFields() throws IOException {
-        Path root = Paths.get("src", "main", "java", "egovframework", "let", "sales");
-        List<Path> files;
-        try (Stream<Path> walk = Files.walk(root)) {
-            files = walk.filter(path -> path.toString().endsWith(".java")).collect(Collectors.toList());
+        List<Path> files = new java.util.ArrayList<Path>();
+        for (String module : new String[] { "sales", "co" }) {
+            Path root = Paths.get("src", "main", "java", "egovframework", "let", module);
+            try (Stream<Path> walk = Files.walk(root)) {
+                files.addAll(walk.filter(path -> path.toString().endsWith(".java")).collect(Collectors.toList()));
+            }
         }
         Set<String> used = new HashSet<String>();
         for (Path file : files) {
             String source = new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
             Matcher matcher = SERVER_FIELD.matcher(source);
-            while (matcher.find()) used.add(matcher.group(1));
+            while (matcher.find()) {
+                for (int group = 1; group <= matcher.groupCount(); group++) {
+                    if (matcher.group(group) != null) used.add(matcher.group(group));
+                }
+            }
         }
         return Collections.unmodifiableSet(used);
     }

@@ -19,6 +19,11 @@ const GUARD_SCOPE: Record<string, string[]> = {
   'settings.module': ['src/pages/settings/system/modules'],
   'settings.menu': ['src/pages/settings/system/menus'],
   'settings.role': ['src/pages/settings/system/roles'],
+  'co.itemPartnerPrice': ['src/pages/co/master/item-partner-prices'],
+  'co.itemPartnerPriceSummary': ['src/pages/co/master/item-partner-prices'],
+  'co.material': ['src/pages/co/master/materials'],
+  'co.classification': ['src/pages/co/master/classification'],
+  'co.commonCode': ['src/pages/co/master/common-code'],
 };
 
 /**

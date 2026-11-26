@@ -29,11 +29,22 @@ public final class SalesDecimalPolicy {
     }
 
     public static SalesDecimalPolicy from(Map<String, Map<String, Object>> policies, Map<String, Object> columns) {
-        Map<String, Object> module = policies == null ? null : policies.get("SALES");
+        return forModule("SALES", policies, columns);
+    }
+
+    /** 영업 외 모듈도 같은 정책 규칙을 쓸 수 있도록 모듈 코드(GRID_DECIMAL_{모듈코드})를 받는다. */
+    public static SalesDecimalPolicy forModule(String moduleCode, Map<String, Map<String, Object>> policies,
+            Map<String, Object> columns) {
+        Map<String, Object> module = policies == null ? null : policies.get(moduleCode);
         SalesDecimalPolicy policy = new SalesDecimalPolicy(resolve(module, "number", 0), resolve(module, "decimal", 3),
                 resolve(module, "currency", 3), columns == null ? Collections.<String, Object>emptyMap() : columns);
         for (String field : policy.columns.keySet()) policy.columnRule(field);
         return policy;
+    }
+
+    /** 컬럼 규칙의 소수 자릿수. 안내 메시지용이다. */
+    public int places(String field) {
+        return columnRule(field).places;
     }
 
     public BigDecimal input(String field, BigDecimal value, String label) {
