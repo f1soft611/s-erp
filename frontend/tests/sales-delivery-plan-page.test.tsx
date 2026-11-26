@@ -129,7 +129,7 @@ it('uses the planned quantity column override for input and saving', async () =>
   const strict = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue({ SALES: decimalPolicy });
   const standard = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue({ SALES: decimalPolicy });
   const columns = vi.spyOn(decimalColumns, 'getDecimalColumnContract').mockReturnValue({
-    plannedQty: { type: 'number', places: 1 },
+    plannedQty: { type: 'number', places: 1 }, orderQty: { type: 'number' }, deliveryQty: { type: 'number' },
   });
   try {
     render(<GridDecimalModuleProvider moduleCode="SALES"><SalesDeliveryPlanCreatePage {...props} deliveryPlanMode="AUTO" /></GridDecimalModuleProvider>);
@@ -149,7 +149,7 @@ it('uses the planned quantity column override for input and saving', async () =>
     fireEvent.keyDown(editor, { key: 'Enter' });
     fireEvent.click(screen.getByRole('button', { name: '수정 저장', exact: true }));
     await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledWith(9, expect.objectContaining({
-      decimalColumns: { plannedQty: { type: 'number', places: 1 } },
+      decimalColumns: { plannedQty: { type: 'number', places: 1 }, orderQty: { type: 'number' }, deliveryQty: { type: 'number' } },
       details: [expect.objectContaining({ plannedQty: '7.1' })],
     })));
   } finally { columns.mockRestore(); strict.mockRestore(); standard.mockRestore(); }
@@ -226,7 +226,7 @@ it('displays the planned quantity with its column override in status detail', as
     SALES: { number: rule, decimal: rule, currency: rule },
   });
   const columns = vi.spyOn(decimalColumns, 'getDecimalColumnContract').mockReturnValue({
-    plannedQty: { type: 'number', places: 2 },
+    plannedQty: { type: 'number', places: 2 }, orderQty: { type: 'number' }, deliveryQty: { type: 'number' },
   });
   vi.mocked(getDeliveryPlan).mockResolvedValue({
     ...plan, details: [{ ...plan.details[0], plannedQty: '1.25' }],

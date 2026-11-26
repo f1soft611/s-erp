@@ -9,7 +9,7 @@ import { PageMessageArea } from '../../../../../shared/components/PageMessageAre
 import { F1Grid, type F1GridColumn, type F1GridRef } from '../../../../../shared/components/f1-grid';
 import { usePolicyDecimalStatus } from '../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
 import type { GridDecimalModuleRule } from '../../../../../shared/services/gridDecimalPolicy.service';
-import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
+import { decimalColumnOptions, getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
 import { SalesDecimalPolicyError } from '../../../shared/SalesDecimalPolicyError';
 import { addExactSalesDecimals, addSalesOrderAmounts } from '../../../order/create/data/salesOrderAmounts';
 import { compareGridExactDecimals } from '../../../../../shared/components/f1-grid/utils/gridExactDecimal';
@@ -192,8 +192,8 @@ export function SalesDeliveryPlanCreatePage({
     { field: 'lineNo', headerName: '수주상세', width: 90, align: 'center' },
     { field: 'materialCode', headerName: '품목코드', width: 110, align: 'center' },
     { field: 'materialName', headerName: '품목명', width: 150, align: 'left' },
-    { field: 'orderQty', headerName: '수주수량', type: 'number', exactDecimal: true, width: 110, align: 'right' },
-    { field: 'remainingPlanQty', headerName: '계획잔량', type: 'number', exactDecimal: true, width: 110, align: 'right' },
+    { field: 'orderQty', headerName: '수주수량', ...decimalColumnOptions(getDecimalColumnContract('sales.order'), 'orderQty'), exactDecimal: true, width: 110, align: 'right' },
+    { field: 'remainingPlanQty', headerName: '계획잔량', ...decimalColumnOptions(getDecimalColumnContract('sales.deliveryPlan'), 'plannedQty'), exactDecimal: true, width: 110, align: 'right' },
   ];
 
   if (!canRead) return <Alert severity="warning">출하계획등록 조회 권한이 없습니다.</Alert>;

@@ -23,6 +23,15 @@ export function getDecimalColumnContract(document: string): Readonly<Record<stri
   return contract;
 }
 
+/** 계약 컬럼의 type과 예외(places/rounding/trailingZeros)를 F1-Grid 컬럼 옵션(type, decimal)으로 바꾼다. 계약에 없는 필드는 오류다. */
+export function decimalColumnOptions(contract: Readonly<Record<string, DecimalColumn>>, field: string): { type: DecimalColumn['type']; decimal: Partial<GridDecimalRule> } {
+  const column = contract[field];
+  if (!column) throw new Error(`Unknown decimal contract field: ${field}`);
+  validateColumn(column);
+  const { type, ...decimal } = column;
+  return { type, decimal };
+}
+
 export function resolveDecimalColumn(column: DecimalColumn, policy: GridDecimalModuleRule): GridDecimalRule {
   validateColumn(column);
   const base = 'places' in policy ? policy : policy[column.type];

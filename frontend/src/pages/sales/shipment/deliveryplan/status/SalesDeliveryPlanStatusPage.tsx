@@ -11,7 +11,7 @@ import { PostDetailPanel } from '../../../../../shared/components/feed/PostDetai
 import { PageAreaOverlay } from '../../../../../shared/components/view-mode/PageAreaOverlay';
 import { F1Grid, F1GridHighlightText, type F1GridColumn, type F1GridRef } from '../../../../../shared/components/f1-grid';
 import { usePolicyDecimalStatus } from '../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
-import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
+import { decimalColumnOptions, getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
 import { SalesDecimalPolicyError } from '../../../shared/SalesDecimalPolicyError';
 import { formatSalesOrderAmount, subtractExactSalesDecimals } from '../../../order/create/data/salesOrderAmounts';
 import { useCommonConfirmDialog } from '../../../../../shared/hooks/useCommonConfirmDialog';
@@ -169,12 +169,12 @@ export function SalesDeliveryPlanStatusPage({
     { field: 'planDt', headerName: '계획일', type: 'date', width: 100, align: 'center' },
     { field: 'materialCode', headerName: '품목코드', width: 120, align: 'center', highlightSearch: true },
     { field: 'materialName', headerName: '품목명', width: 180, align: 'left', highlightSearch: true },
-    { field: 'orderQty', headerName: '수주수량', type: 'number', exactDecimal: true, width: 110, align: 'right' },
+    { field: 'orderQty', headerName: '수주수량', ...decimalColumnOptions(getDecimalColumnContract('sales.order'), 'orderQty'), exactDecimal: true, width: 110, align: 'right' },
     { field: 'plannedQty', headerName: '계획수량', type: plannedColumn.type,
       decimal: { places: plannedColumn.places, rounding: plannedColumn.rounding, trailingZeros: plannedColumn.trailingZeros },
       exactDecimal: true, width: 110, align: 'right' },
-    { field: 'deliveredQty', headerName: '출하수량', type: 'number', exactDecimal: true, width: 110, align: 'right' },
-    { field: 'remainingQty', headerName: '출하잔량', type: 'number', exactDecimal: true, width: 110, align: 'right' },
+    { field: 'deliveredQty', headerName: '출하수량', ...decimalColumnOptions(getDecimalColumnContract('sales.delivery'), 'deliveryQty'), exactDecimal: true, width: 110, align: 'right' },
+    { field: 'remainingQty', headerName: '출하잔량', ...decimalColumnOptions(getDecimalColumnContract('sales.delivery'), 'deliveryQty'), exactDecimal: true, width: 110, align: 'right' },
   ], [open, plannedColumn]);
   if (!permissions?.read) return <Alert severity="warning">출하계획 현황 조회 권한이 없습니다.</Alert>;
 

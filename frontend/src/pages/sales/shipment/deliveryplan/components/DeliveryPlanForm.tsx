@@ -5,7 +5,7 @@ import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import SearchIcon from '@mui/icons-material/Search';
 import { F1Grid, type F1GridColumn, type F1GridRef } from '../../../../../shared/components/f1-grid';
 import { usePolicyDecimalRule } from '../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
-import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
+import { decimalColumnOptions, getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
 import { addExactSalesDecimals, formatSalesOrderAmount } from '../../../order/create/data/salesOrderAmounts';
 import { compareGridExactDecimals } from '../../../../../shared/components/f1-grid/utils/gridExactDecimal';
 import type { PlanRow } from '../types/salesDeliveryPlan.types';
@@ -41,7 +41,7 @@ export function DeliveryPlanForm({ storageKey, planNo, orderNo, orderDt, custome
     { field: 'rowId', headerName: 'No', type: 'rownumber', width: 56, align: 'center' },
     { field: 'materialCode', headerName: '품목코드', width: 130, align: 'center', mergeRows: true },
     { field: 'materialName', headerName: '품목명', width: 180, align: 'left', mergeRows: true },
-    { field: 'orderQty', headerName: '수주수량', type: 'number', exactDecimal: true, width: 110, align: 'right', mergeRows: true },
+    { field: 'orderQty', headerName: '수주수량', ...decimalColumnOptions(getDecimalColumnContract('sales.order'), 'orderQty'), exactDecimal: true, width: 110, align: 'right', mergeRows: true },
     { field: 'planDt', headerName: '계획일', type: 'date', mergeRows: true,
       editable: (row) => editable && !(Number(row.deliveredQty) > 0), width: 180, align: 'center',
       onValueChange: (_row, value) => ({ planDt: String(value || '') || null }) },
