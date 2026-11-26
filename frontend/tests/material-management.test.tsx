@@ -11,6 +11,10 @@ import { F1GridFormModal } from '../src/shared/components/f1-grid/form/F1GridFor
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
 import { buildGridFormSections } from '../src/shared/components/f1-grid/form/GridFormModel';
 import { toPageSearchFields } from '../src/shared/components/page-search/searchFields';
+import { preloadDashboardPages } from '../src/pages/dashboard/components/dashboardPages';
+
+// 대시보드 업무 화면은 지연 로딩된다. 기존 동기 렌더링 단언을 유지하도록 화면 모듈을 미리 불러온다.
+beforeAll(() => preloadDashboardPages(), 60_000);
 
 const api = vi.hoisted(() => ({ apiGet: vi.fn(), apiPost: vi.fn(), apiPut: vi.fn() }));
 vi.mock('../src/shared/services/apiClient', () => api);

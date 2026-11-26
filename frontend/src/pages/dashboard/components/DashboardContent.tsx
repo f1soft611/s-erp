@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import {
   Box,
   Card,
@@ -10,53 +11,6 @@ import {
   useTheme,
 } from '@mui/material';
 import FactCheckOutlined from '@mui/icons-material/FactCheckOutlined';
-import { OverviewPage } from '../../groupware/OverviewPage';
-import { CommunityNoticePage } from '../../groupware/community/notice/CommunityNoticePage';
-import { ArchiveBoardPage } from '../../groupware/community/archive/ArchiveBoardPage';
-import { DocumentWritePage } from '../../groupware/documents/write/DocumentWritePage';
-import { DocumentStatusPage } from '../../groupware/documents/status/DocumentStatusPage';
-import { MenuManagementPage } from '../../settings/system/menus/MenuManagementPage';
-import { ModuleManagementPage } from '../../settings/system/modules/ModuleManagementPage';
-import { AccountManagementPage } from '../../settings/system/accounts/AccountManagementPage';
-import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPage';
-import { SystemPolicyPage } from '../../settings/system/policies/SystemPolicyPage';
-import { CommonCodeManagementPage } from '../../co/master/common-code/CommonCodeManagementPage';
-import { CustomerManagementPage } from '../../co/master/customers/CustomerManagementPage';
-import { CompanyInfoPage } from '../../co/master/company/CompanyInfoPage';
-import { WarehouseManagementPage } from '../../co/master/warehouse/WarehouseManagementPage';
-import { MaterialManagementPage } from '../../co/master/materials/MaterialManagementPage';
-import { ItemPartnerPriceManagementPage } from '../../co/master/item-partner-prices/ItemPartnerPriceManagementPage';
-import { WorkStandardRecipePage } from '../../co/work-standard/recipe/WorkStandardRecipePage';
-import { ProcessManagementPage } from '../../pr/process/ProcessManagementPage';
-import { SalesOrderCreatePage } from '../../sales/order/create/SalesOrderCreatePage';
-import { SalesDestinationPage } from '../../sales/master/destination/SalesDestinationPage';
-import { SalesOrderStatusPage } from '../../sales/order/status/SalesOrderStatusPage';
-import { QuotationCreatePage } from '../../sales/quotation/create/QuotationCreatePage';
-import { QuotationStatusPage } from '../../sales/quotation/status/QuotationStatusPage';
-import { SalesDeliveryCreatePage } from '../../sales/shipment/delivery/create/SalesDeliveryCreatePage';
-import { SalesDeliveryStatusPage } from '../../sales/shipment/delivery/status/SalesDeliveryStatusPage';
-import { SalesDeliveryPlanCreatePage } from '../../sales/shipment/deliveryplan/create/SalesDeliveryPlanCreatePage';
-import { SalesDeliveryPlanStatusPage } from '../../sales/shipment/deliveryplan/status/SalesDeliveryPlanStatusPage';
-import { SalesStatementCreatePage } from '../../sales/shipment/statement/create/SalesStatementCreatePage';
-import { SalesStatementStatusPage } from '../../sales/shipment/statement/status/SalesStatementStatusPage';
-import { RevenueClosingPage } from '../../sales/revenue/closing/RevenueClosingPage';
-import { PurchaseRequestCreatePage } from '../../materials/request/create/PurchaseRequestCreatePage';
-import { PurchaseRequestStatusPage } from '../../materials/request/status/PurchaseRequestStatusPage';
-import { PurchaseOrderCreatePage } from '../../materials/order/create/PurchaseOrderCreatePage';
-import { PurchaseOrderStatusPage } from '../../materials/order/status/PurchaseOrderStatusPage';
-import { PurchaseArrivalCreatePage } from '../../materials/arrival/create/PurchaseArrivalCreatePage';
-import { PurchaseArrivalStatusPage } from '../../materials/arrival/status/PurchaseArrivalStatusPage';
-import { PurchaseReceiptClosingPage } from '../../materials/receipt/closing/PurchaseReceiptClosingPage';
-import { PurchaseReceiptCreatePage } from '../../materials/receipt/create/PurchaseReceiptCreatePage';
-import { QualityInspectionCreatePage } from '../../quality/inspect/create/QualityInspectionCreatePage';
-import { QualityInspectionStatusPage } from '../../quality/inspect/status/QualityInspectionStatusPage';
-import { PurchaseReceiptStatusPage } from '../../materials/receipt/status/PurchaseReceiptStatusPage';import { PurchaseRequestConfirmPage } from '../../materials/request/confirm/PurchaseRequestConfirmPage';
-import { DraftFormManagementPage } from '../../co/workflow/form/DraftFormManagementPage';
-import { DepartmentManagePage } from '../../hr/department/DepartmentManagePage';
-import { EmployeeManagePage } from '../../hr/employee/EmployeeManagePage';
-import { OrderManagePage } from '../../hr/order/OrderManagePage';
-import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
-import { F1GridDocsPage } from '../../f1-grid-docs/F1GridDocsPage';
 import { PageHeader } from '../../../shared/components/PageHeader';
 import { pageContentMap } from '../services/dashboardData';
 import type {
@@ -64,6 +18,56 @@ import type {
   ModuleItem,
   PageContent,
 } from '../types/dashboard';
+import {
+  OverviewPage,
+  CommunityNoticePage,
+  ArchiveBoardPage,
+  DocumentWritePage,
+  DocumentStatusPage,
+  MenuManagementPage,
+  ModuleManagementPage,
+  AccountManagementPage,
+  RoleManagementPage,
+  SystemPolicyPage,
+  CommonCodeManagementPage,
+  CustomerManagementPage,
+  CompanyInfoPage,
+  WarehouseManagementPage,
+  MaterialManagementPage,
+  ItemPartnerPriceManagementPage,
+  WorkStandardRecipePage,
+  ProcessManagementPage,
+  SalesOrderCreatePage,
+  SalesDestinationPage,
+  SalesOrderStatusPage,
+  QuotationCreatePage,
+  QuotationStatusPage,
+  SalesDeliveryCreatePage,
+  SalesDeliveryStatusPage,
+  SalesDeliveryPlanCreatePage,
+  SalesDeliveryPlanStatusPage,
+  SalesStatementCreatePage,
+  SalesStatementStatusPage,
+  RevenueClosingPage,
+  PurchaseRequestCreatePage,
+  PurchaseRequestStatusPage,
+  PurchaseOrderCreatePage,
+  PurchaseOrderStatusPage,
+  PurchaseArrivalCreatePage,
+  PurchaseArrivalStatusPage,
+  PurchaseReceiptClosingPage,
+  PurchaseReceiptCreatePage,
+  QualityInspectionCreatePage,
+  QualityInspectionStatusPage,
+  PurchaseReceiptStatusPage,
+  PurchaseRequestConfirmPage,
+  DraftFormManagementPage,
+  DepartmentManagePage,
+  EmployeeManagePage,
+  OrderManagePage,
+  F1GridTestPage,
+  F1GridDocsPage,
+} from './dashboardPages';
 import type { DocumentApprovalScope } from '../../groupware/documents/write/types/documentWrite.types';
 
 type DashboardContentProps = {
@@ -176,7 +180,7 @@ function TrendIcon() {
   );
 }
 
-export function DashboardContent({
+function DashboardContentView({
   selectedModule,
   currentMenuName,
   currentPageKey,
@@ -798,5 +802,13 @@ export function DashboardContent({
         </Box>
       </Container>
     </Box>
+  );
+}
+
+export function DashboardContent(props: DashboardContentProps) {
+  return (
+    <Suspense fallback={null}>
+      <DashboardContentView {...props} />
+    </Suspense>
   );
 }
