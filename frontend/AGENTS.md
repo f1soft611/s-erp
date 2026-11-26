@@ -190,3 +190,9 @@ npm run test
 - 문서 없이 화면 동작을 임의로 추가하지 않습니다.
 - 인접 기능과 무관한 수정이나 대규모 리팩터링을 하지 않습니다.
 - 결과 문서와 스크린샷 없이 작업을 완료로 간주하지 않습니다.
+
+## 소수점 계약 규칙 (서버 계산 문서)
+
+- 소수점은 `src/shared/config/decimal-column-contract.json`에서만 정합니다. 계약 대상 문서의 컬럼에 `decimalPlaces`, `rounding`, `trailingZeros`, `decimal`이나 고정 `places`를 직접 쓰지 않습니다.
+- 정책이 기본이고, 계약 컬럼에 `places`/`rounding`/`trailingZeros`가 있으면 그 항목만 정책보다 우선합니다.
+- 예외 컬럼 설정 방법과 JSON 예시, 신규 모듈 적용 절차는 [공통 소수점 계약 가드레일 사양](../docs/spec/20261126/20261126_001_공통_소수점_계약_가드레일_상세사양서.md)을 따릅니다.
