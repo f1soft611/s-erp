@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isApiNetworkError } from '../../../../shared/services/apiErrors';
 import ClearIcon from '@mui/icons-material/Clear';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import SearchIcon from '@mui/icons-material/Search';
 import { Alert, Box, IconButton, TextField } from '@mui/material';
 import { PageHeader } from '../../../../shared/components/PageHeader';
+import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
+import { useInitialLoadState } from '../../../../shared/hooks/useInitialLoadState';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { useCommonConfirmDialog } from '../../../../shared/hooks/useCommonConfirmDialog';
 import { getSystemDate } from '../../../../shared/services/systemDateService';
@@ -97,6 +100,7 @@ export function RevenueClosingPage(props: Props) {
     keyword: '',
   }));
   const [draftCustomers, setDraftCustomers] = useState<MasterPickerOption[]>([]);
+  const { start: startLoad, succeed: succeedLoad, fail: failLoad, ...initialLoad } = useInitialLoadState({ networkOnly: true });
   const [appliedCustomers, setAppliedCustomers] = useState<MasterPickerOption[]>([]);
   const [selectedSummaryCustomerId, setSelectedSummaryCustomerId] = useState<number | null>(null);
   const [sourceTarget, setSourceTarget] = useState<RevenueClosingSourceTarget | null>(null);
@@ -164,6 +168,7 @@ export function RevenueClosingPage(props: Props) {
   useEffect(() => {
     if (!canRead) return undefined;
     const requestId = ++searchRequestIdRef.current;
+    startLoad();
     void searchRevenueClosings({
       deliveryDtFrom: appliedSearch.deliveryDtFrom,
       deliveryDtTo: appliedSearch.deliveryDtTo,
@@ -173,18 +178,25 @@ export function RevenueClosingPage(props: Props) {
       if (requestId !== searchRequestIdRef.current) return;
       setDetails(result.details);
       setCustomerSummaries(result.customerSummaries);
+      succeedLoad();
     }).catch((searchError: unknown) => {
       if (requestId !== searchRequestIdRef.current) return;
+      failLoad(searchError);
       setDetails(emptyDetails);
       setCustomerSummaries(emptyCustomerSummaries);
-      setError(searchError instanceof Error ? searchError.message : '매출마감 조회에 실패했습니다.');
+      if (!isApiNetworkError(searchError)) setError(searchError instanceof Error ? searchError.message : '매출마감 조회에 실패했습니다.');
     }).finally(() => {
       if (requestId === searchRequestIdRef.current) setLoading(false);
     });
     return () => {
       searchRequestIdRef.current += 1;
     };
-  }, [appliedCustomers, appliedSearch, canRead]);
+  }, [appliedCustomers, appliedSearch, canRead, startLoad, succeedLoad, failLoad]);
+
+  const retryLoad = () => {
+    setLoading(true);
+    setAppliedSearch((current) => ({ ...current }));
+  };
 
   const applyDetailSearch = (values: Record<string, PageSearchFieldValue>) => {
     const range = dateRangeOf(values);
@@ -313,6 +325,7 @@ export function RevenueClosingPage(props: Props) {
           },
         ]}
       />
+      <PageLoadBoundary {...initialLoad} label="매출마감" onRetry={retryLoad}>
       <PageSearchArea
         detailFields={detailFields}
         detailValues={detailValues}
@@ -424,6 +437,7 @@ export function RevenueClosingPage(props: Props) {
           />
         </Box>
       </Box>
+      </PageLoadBoundary>
       <RevenueClosingSourcePanels target={sourceTarget} onClose={closeSource} page={props} />
       {dialog}
     </Box>

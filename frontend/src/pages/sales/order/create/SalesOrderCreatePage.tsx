@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isApiNetworkError } from '../../../../shared/services/apiErrors';
 import { useBlocker } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined';
@@ -18,6 +19,9 @@ import {
   Typography,
 } from '@mui/material';
 import { PageHeader } from '../../../../shared/components/PageHeader';
+import { resetGridDecimalPolicyCache } from '../../../../shared/services/gridDecimalPolicy.service';
+import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
+import { useInitialLoadState } from '../../../../shared/hooks/useInitialLoadState';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useCommonConfirmDialog } from '../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
@@ -249,6 +253,8 @@ export function SalesOrderCreatePage({
   const hasUnsavedChanges =
     !isLocked && (hasHeaderChanges || hasDetailChanges);
   useUnsavedChangesBeforeUnload(hasUnsavedChanges);
+  const { start: startLoad, succeed: succeedLoad, fail: failLoad, ...initialLoad } = useInitialLoadState({ networkOnly: true });
+  const [loadRetry, setLoadRetry] = useState(0);
 
   useEffect(() => {
     onDirtyChange?.(hasUnsavedChanges);
@@ -328,8 +334,10 @@ export function SalesOrderCreatePage({
   useEffect(() => {
     if (salesOrderId != null || mode !== 'create') return;
     let active = true;
+    startLoad();
     void getSystemDate()
       .then((date) => {
+        if (active) succeedLoad();
         if (!active || orderDateTouchedRef.current) return;
         setOrderDate(date);
         orderDateTouchedRef.current = true;
@@ -337,25 +345,28 @@ export function SalesOrderCreatePage({
       })
       .catch((cause: unknown) => {
         if (!active) return;
-        setError(cause instanceof Error
+        failLoad(cause);
+        if (!isApiNetworkError(cause)) setError(cause instanceof Error
           ? `서버 기준일을 불러오지 못했습니다. ${cause.message}`
           : '서버 기준일을 불러오지 못했습니다.');
       });
     return () => { active = false; };
-  }, [mode, salesOrderId]);
+  }, [mode, salesOrderId, loadRetry, startLoad, succeedLoad, failLoad]);
 
   useEffect(() => {
     if (salesOrderId == null) return;
     let active = true;
     setIsLoadingOrder(true);
+    startLoad();
     getSalesOrder(salesOrderId)
       .then((order) => {
-        if (active) applyLoadedOrder(order);
+        if (active) { applyLoadedOrder(order); succeedLoad(); }
       })
       .catch((loadError: unknown) => {
         if (!active) return;
+        failLoad(loadError);
         setIsLocked(true);
-        setError(
+        if (!isApiNetworkError(loadError)) setError(
           loadError instanceof Error
             ? loadError.message
             : '수주를 불러오지 못했습니다.',
@@ -367,7 +378,7 @@ export function SalesOrderCreatePage({
     return () => {
       active = false;
     };
-  }, [applyLoadedOrder, salesOrderId]);
+  }, [applyLoadedOrder, salesOrderId, loadRetry, startLoad, succeedLoad, failLoad]);
 
   const handleChangesChange = useCallback(
     (changes: F1GridChanges<SalesOrderDetailRow>) => {
@@ -725,6 +736,8 @@ export function SalesOrderCreatePage({
           actionGroups={actions}
         />
       )}
+      <PageLoadBoundary {...initialLoad} error={initialLoad.error ?? (policyState.network ? 'network' : null)} label="수주등록"
+        onRetry={() => { if (policyState.network) resetGridDecimalPolicyCache(); setLoadRetry((value) => value + 1); }}>
       <Box
         role="region"
         aria-label="수주 입력 내용"
@@ -753,7 +766,7 @@ export function SalesOrderCreatePage({
           </Alert>
         )}
         {notice && <Alert severity="success">{notice}</Alert>}
-        <SalesDecimalPolicyError status={policyState.status} />
+        <SalesDecimalPolicyError status={policyState.status} network={policyState.network} />
         {commonCodesError || missingCommonCodes ? (
           <Alert
             severity="error"
@@ -1079,6 +1092,7 @@ export function SalesOrderCreatePage({
           clearValidationErrors();
         }}
       />
+      </PageLoadBoundary>
       {embedded ? null : (
         <SalesOrderRouteLeaveGuard when={hasUnsavedChanges} />
       )}

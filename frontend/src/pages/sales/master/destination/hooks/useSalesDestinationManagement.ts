@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { isApiNetworkError } from '../../../../../shared/services/apiErrors';
 import type { F1GridChanges } from '../../../../../shared/components/f1-grid';
+import { useInitialLoadState } from '../../../../../shared/hooks/useInitialLoadState';
 import {
   deleteSalesDestination, fetchDestinationCustomers, fetchSalesDestinations, saveDestinationBatch,
 } from '../services/salesDestination.service';
@@ -19,6 +21,7 @@ export function useSalesDestinationManagement() {
   const [gridKey, setGridKey] = useState(0);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
+  const { start, succeed, fail, ...initialLoad } = useInitialLoadState({ networkOnly: true });
   const quietCustomerRefreshRevision = useRef<number | null>(null);
   const quietDestinationRefreshRevision = useRef<number | null>(null);
 
@@ -27,12 +30,17 @@ export function useSalesDestinationManagement() {
     const quiet = quietCustomerRefreshRevision.current === revision;
     if (quiet) quietCustomerRefreshRevision.current = null;
     if (!quiet) setLoading(true);
+    start();
     fetchDestinationCustomers(keyword)
-      .then((list) => { if (active) setCustomers(list); })
-      .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : '거래처 조회에 실패했습니다.'); })
+      .then((list) => { if (active) { setCustomers(list); succeed(); } })
+      .catch((cause: unknown) => {
+        if (!active) return;
+        fail(cause);
+        if (!isApiNetworkError(cause)) setError(cause instanceof Error ? cause.message : '거래처 조회에 실패했습니다.');
+      })
       .finally(() => { if (active && !quiet) setLoading(false); });
     return () => { active = false; };
-  }, [keyword, revision]);
+  }, [keyword, revision, start, succeed, fail]);
 
   useEffect(() => {
     let active = true;
@@ -94,7 +102,7 @@ export function useSalesDestinationManagement() {
     setGridKey((value) => value + 1);
   }, []);
 
-  return { customers, customerId, setCustomerId, rows, selectedId, setSelectedId,
+  return { initialLoad, customers, customerId, setCustomerId, rows, selectedId, setSelectedId,
     setKeyword, loading, rowsLoading, saving, error, setError, save, remove,
     hasChanges, setHasChanges, gridKey, discardChanges, refresh: () => setRevision((value) => value + 1) };
 }
