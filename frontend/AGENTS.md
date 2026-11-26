@@ -48,6 +48,14 @@
 - 기준일이 기간 검색이면 시작일과 종료일을 모두 필수로 검증하고, 필수 조건은 상세검색 적용 칩에서 해제할 수 없게 합니다.
 - 검색 기본값 유무와 관계없이 제출 검증을 유지하고, 이전 세션 복원에도 유효한 기준일을 보장합니다.
 
+### 서버 연결 실패 화면 (모든 페이지 공통)
+
+- 페이지가 열릴 때 서버에서 읽는 초기 데이터(목록, 기준일, 공통코드, 상세, 소수점 정책 등)의 조회가 서버에 연결하지 못해(`ApiNetworkError`) 실패하면 `shared/components/PageLoadBoundary.tsx`를 사용해 해당 페이지 본문 영역에만 "서버에 연결하지 못했습니다…" 문구와 다시 시도 아이콘을 표시합니다. 헤더와 사이드 메뉴는 유지하고, 전체 앱 화면으로 대체하지 않습니다.
+- 상태는 `shared/hooks/useInitialLoadState.ts`로 관리합니다. 조회 시작 `start()`, 성공 `succeed()`, 실패 `fail(cause)`를 호출하고, 기존 화면 내 오류 메시지를 유지해야 하는 화면은 `useInitialLoadState({ networkOnly: true })`로 서버 연결 실패만 페이지 오류 화면으로 처리합니다. 오류 종류는 `toPageLoadError(cause)`로 구분하며, 모든 실패를 `'server'`로 고정하지 않습니다.
+- 소수점 정책을 쓰는 화면은 `usePolicyDecimalStatus()`의 `network`를 `PageLoadBoundary`의 `error`(`'network'`)에 연결하고, 다시 시도에서 `resetGridDecimalPolicyCache()`를 호출합니다. `SalesDecimalPolicyError`에는 `network`를 넘겨 중복 표시를 막습니다.
+- 페이지 오류 화면이 표시될 때는 다른 메시지(오류·성공 알림, 검색 결과 건수, 입력 검증 메시지)가 함께 보이면 안 됩니다. `PageMessageArea`, `Alert`, `SearchResultMessage` 등 모든 메시지 영역을 `PageLoadBoundary` 내부에 두고, 서버 연결 실패는 `isApiNetworkError(cause)`일 때 `setError`를 호출하지 않습니다(`shared/services/apiErrors.ts`).
+- 등록·현황·관리·마감 등 새 페이지를 만들 때는 초기 조회가 하나도 없는 화면이 아니라면 이 규칙을 적용하고, 다시 시도는 실패한 조회를 다시 실행하도록 연결합니다. 영업관리의 모든 화면(견적·수주·출하계획·출하·거래명세서·매출마감·납품처관리)에 적용되어 있습니다.
+
 ## 반응형 브라우저 대응 규칙
 
 - 화면 구현 전 모바일, 태블릿, 데스크톱 레이아웃을 함께 고려합니다.

@@ -5,6 +5,7 @@ import {
   subscribeGridDecimalPolicy,
   type GridDecimalModuleRule,
 } from '../../../services/gridDecimalPolicy.service';
+import { isApiNetworkError } from '../../../services/apiErrors';
 
 export const GridDecimalModuleContext = createContext<string | null>(null);
 
@@ -52,10 +53,12 @@ export function usePolicyDecimalRule(): GridDecimalModuleRule | undefined {
 export function usePolicyDecimalStatus(): {
   status: 'unmanaged' | 'loading' | 'ready' | 'error';
   rule?: GridDecimalModuleRule;
+  /** 정책 조회 실패 원인이 서버 연결 불가일 때 true (페이지 오류 화면 표시용) */
+  network?: boolean;
 } {
   const moduleCode = useContext(GridDecimalModuleContext);
   const [snapshot, setSnapshot] = useState<{
-    moduleCode: string; status: 'loading' | 'ready' | 'error'; rule?: GridDecimalModuleRule;
+    moduleCode: string; status: 'loading' | 'ready' | 'error'; rule?: GridDecimalModuleRule; network?: boolean;
   }>();
   useEffect(() => {
     if (!moduleCode) return undefined;
@@ -69,8 +72,10 @@ export function usePolicyDecimalStatus(): {
           setSnapshot({ moduleCode, status: 'ready',
             rule: policy[moduleCode] ?? (moduleCode === 'SALES' ? SALES_DEFAULT : undefined) });
         }
-      }, () => {
-        if (active && current === requestId) setSnapshot({ moduleCode, status: 'error' });
+      }, (cause: unknown) => {
+        if (active && current === requestId) {
+          setSnapshot({ moduleCode, status: 'error', network: isApiNetworkError(cause) });
+        }
       });
     };
     const unsubscribe = subscribeGridDecimalPolicy(refresh);
