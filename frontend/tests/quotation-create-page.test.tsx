@@ -337,7 +337,9 @@ describe('quotation create page', () => {
     }
   });
 
-  it('supports direct snapshots and master snapshots while calculating rounded line amounts', () => {
-    expect(calculateQuotationLineAmount(1, 1.005)).toBe(1.01);
+  it('calculates line amounts only with an explicit policy rule instead of a fixed two places', () => {
+    expect(calculateQuotationLineAmount(1, 1.005, { places: 2, rounding: 'HALF_UP' })).toBe(1.01);
+    expect(calculateQuotationLineAmount(1, 1.005, { places: 3, rounding: 'DOWN' })).toBe(1.005);
+    expect(() => calculateQuotationLineAmount(1, 1.005)).toThrow('소수점 정책을 불러오지 못했습니다.');
   });
 });

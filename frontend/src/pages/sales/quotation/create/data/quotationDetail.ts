@@ -26,16 +26,14 @@ export type OpenMaterialPicker = (
   applyPatch: (changes: Partial<QuotationDetailRow>) => void,
 ) => void;
 
-export function roundQuotationAmount(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
-
+/** 소수점 규칙이 없으면 고정 자릿수로 계산하지 않고 오류로 처리한다. */
 export function calculateQuotationLineAmount(quantity: number, unitPrice: number, rule?: SalesAmountRule): number {
-  if (rule) return multiplySalesOrderAmount(quantity, unitPrice, rule, '견적금액');
-  return roundQuotationAmount(quantity * unitPrice);
+  if (!rule) throw new Error('소수점 정책을 불러오지 못했습니다.');
+  return multiplySalesOrderAmount(quantity, unitPrice, rule, '견적금액');
 }
 
 export function calculateQuotationTotals(rows: Array<Pick<QuotationDetailRow, 'lineAmt'>>, rule?: SalesAmountRule, policy?: GridDecimalModuleRule) {
+  if (!rule) return { supplyAmt: 0, vatAmt: 0, totalAmt: 0 };
   const contract = getDecimalColumnContract('sales.quotation');
   const source = policy ?? (rule && { ...rule, trailingZeros: rule.trailingZeros ?? 'FIXED' as const });
   const supplyRule = source && resolveDecimalColumn(contract.supplyAmt, source);
@@ -45,20 +43,13 @@ export function calculateQuotationTotals(rows: Array<Pick<QuotationDetailRow, 'l
     item && (item.places !== rule.places || item.rounding !== rule.rounding));
   if (rows.some((row) => typeof row.lineAmt === 'string'
       || (supplyRule && !isExactSalesPolicyNumber(String(row.lineAmt), supplyRule.places))) || hasDistinctRules) {
-    const effectiveRule = rule ?? { places: 2, rounding: 'HALF_UP' as const };
-    const supplyAmt = sumExactSalesDecimals(rows.map((row) => String(row.lineAmt)), supplyRule ?? effectiveRule);
-    const vatAmt = multiplyExactSalesDecimals(supplyAmt, '0.1', vatRule ?? effectiveRule);
-    return { supplyAmt, vatAmt, totalAmt: addExactSalesDecimals(supplyAmt, vatAmt, totalRule ?? effectiveRule) };
+    const supplyAmt = sumExactSalesDecimals(rows.map((row) => String(row.lineAmt)), supplyRule ?? rule);
+    const vatAmt = multiplyExactSalesDecimals(supplyAmt, '0.1', vatRule ?? rule);
+    return { supplyAmt, vatAmt, totalAmt: addExactSalesDecimals(supplyAmt, vatAmt, totalRule ?? rule) };
   }
-  if (rule) {
-    const supplyAmt = rows.reduce((total, row) => addSalesOrderAmounts(total, Number(row.lineAmt) || 0, rule, '공급가'), 0);
-    const vatAmt = multiplySalesOrderAmount(supplyAmt, 0.1, rule, '부가세');
-    return { supplyAmt, vatAmt, totalAmt: addSalesOrderAmounts(supplyAmt, vatAmt, rule, '총액') };
-  }
-  const supply = rows.reduce((total, row) => total + Number(row.lineAmt || 0), 0);
-  const supplyAmt = roundQuotationAmount(supply);
-  const vatAmt = roundQuotationAmount(supplyAmt * 0.1);
-  return { supplyAmt, vatAmt, totalAmt: supplyAmt + vatAmt };
+  const supplyAmt = rows.reduce((total, row) => addSalesOrderAmounts(total, Number(row.lineAmt) || 0, rule, '공급가'), 0);
+  const vatAmt = multiplySalesOrderAmount(supplyAmt, 0.1, rule, '부가세');
+  return { supplyAmt, vatAmt, totalAmt: addSalesOrderAmounts(supplyAmt, vatAmt, rule, '총액') };
 }
 
 export function createQuotationDetailRow(): QuotationDetailRow {

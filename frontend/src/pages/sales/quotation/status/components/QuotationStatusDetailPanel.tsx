@@ -33,12 +33,7 @@ type Props = {
 
 function formatAmount(value: number | string | null | undefined, rule?: SalesAmountRule) {
   if (value == null) return '-';
-  if (rule) return formatSalesOrderAmount(value, rule);
-  if (typeof value === 'string') return formatSalesOrderAmount(value, { places: 2, rounding: 'HALF_UP', trailingZeros: 'AUTO' });
-  return Number(value).toLocaleString('ko-KR', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
+  return formatSalesOrderAmount(value, rule);
 }
 
 function InfoItem({ label, children, wide = false }: { label: string; children: ReactNode; wide?: boolean }) {
