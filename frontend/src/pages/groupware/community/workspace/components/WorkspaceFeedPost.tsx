@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Alert, Chip, Stack } from '@mui/material';
+import MoreVert from '@mui/icons-material/MoreVert';
+import { Alert, Chip, IconButton, Menu, MenuItem, Stack } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { AttachmentList } from '../../../../../shared/components/feed/AttachmentList';
 import { CommentThread } from '../../../../../shared/components/feed/CommentThread';
@@ -24,6 +25,8 @@ type WorkspaceFeedPostProps = {
   onEditComment: (postId: string, commentId: string, html: string, files: File[]) => Promise<void> | void;
   onDeleteComment: (postId: string, commentId: string) => Promise<void> | void;
   onDownloadAttachment: (attachment: WorkspaceAttachment) => void;
+  /** 작성자 본인의 글에만 수정 버튼을 보여준다. */
+  onEditPost?: (post: WorkspacePost) => void;
   commentError?: string;
 };
 
@@ -45,6 +48,7 @@ export function WorkspaceFeedPost({
   onEditComment,
   onDeleteComment,
   onDownloadAttachment,
+  onEditPost,
   commentError,
 }: WorkspaceFeedPostProps) {
   const theme = useTheme();
@@ -53,6 +57,7 @@ export function WorkspaceFeedPost({
   const [isBodyExpanded, setIsBodyExpanded] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [selectedImage, setSelectedImage] = useState<{ src: string; alt: string } | null>(null);
 
   const bodyView = useMemo(() => buildBodyView(post.body), [post.body]);
@@ -144,6 +149,25 @@ export function WorkspaceFeedPost({
       author={author}
       meta={date}
       badges={statusChip}
+      actions={
+        onEditPost && canWrite && post.authorId === currentUserId ? (
+          <>
+            <IconButton aria-label="글 더보기" size="small" onClick={(event) => setMenuAnchor(event.currentTarget)}>
+              <MoreVert fontSize="small" />
+            </IconButton>
+            <Menu anchorEl={menuAnchor} open={menuAnchor !== null} onClose={() => setMenuAnchor(null)}>
+              <MenuItem
+                onClick={() => {
+                  setMenuAnchor(null);
+                  onEditPost(post);
+                }}
+              >
+                글 수정
+              </MenuItem>
+            </Menu>
+          </>
+        ) : undefined
+      }
       title={post.title}
       isDark={isDark}
       testId="workspace-feed-card"

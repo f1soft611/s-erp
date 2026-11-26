@@ -14,6 +14,8 @@ type KanbanColumnProps = {
   canWrite: boolean;
   onMovePost: (postId: string, columnId: string) => void;
   onOpenPost: (postId: string) => void;
+  currentUserId?: string;
+  onEditPost?: (postId: string) => void;
   onToggleCollapse?: (columnId: string) => void;
   /** 좁은 화면의 탭 보기에서 한 컬럼을 화면 폭 전체로 보여준다. */
   fullWidth?: boolean;
@@ -27,6 +29,8 @@ export function KanbanColumn({
   canWrite,
   onMovePost,
   onOpenPost,
+  currentUserId,
+  onEditPost,
   onToggleCollapse,
   fullWidth = false,
 }: KanbanColumnProps) {
@@ -118,6 +122,7 @@ export function KanbanColumn({
                 canWrite={canWrite}
                 moveTargets={otherColumns}
                 onOpen={onOpenPost}
+                onEdit={currentUserId && onEditPost && post.authorId === currentUserId ? () => onEditPost(post.id) : undefined}
                 onMove={(columnId) => onMovePost(post.id, columnId)}
               />
             ))

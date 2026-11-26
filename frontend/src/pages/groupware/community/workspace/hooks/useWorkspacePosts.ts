@@ -6,6 +6,7 @@ import {
   listPosts,
   movePost as movePostRequest,
   updateComment as updateCommentRequest,
+  updatePost as updatePostRequest,
 } from '../services/workspace.service';
 import type { WorkspaceAttachment, WorkspacePost } from '../types/workspace.types';
 
@@ -64,6 +65,14 @@ export function useWorkspacePosts(roomId: string | null, userId: string) {
     [roomId, userId],
   );
 
+  const updatePost = useCallback(
+    async (postId: string, input: NewPostInput) => {
+      await updatePostRequest(postId, input, userId);
+      await reloadRef.current();
+    },
+    [userId],
+  );
+
   const movePost = useCallback(
     async (postId: string, columnId: string | null) => {
       await movePostRequest(postId, columnId, userId);
@@ -96,5 +105,5 @@ export function useWorkspacePosts(roomId: string | null, userId: string) {
     [userId],
   );
 
-  return { posts, loading, error, reload, createPost, movePost, addComment, updateComment, deleteComment };
+  return { posts, loading, error, reload, createPost, updatePost, movePost, addComment, updateComment, deleteComment };
 }

@@ -48,15 +48,28 @@ describe('KanbanBoard', () => {
   it('gives a read-only user neither drag handles nor the move menu', () => {
     renderBoard({ canWrite: false });
     expect(document.querySelector('[draggable="true"]')).toBeNull();
-    expect(screen.queryByRole('button', { name: '카드 이동' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '카드 더보기' })).toBeNull();
   });
 
   it('moves a card to another column from the move menu', () => {
     const { onMovePost } = renderBoard();
     const card = screen.getByText('견적 문의 - A사').closest('[data-post-id]') as HTMLElement;
-    fireEvent.click(within(card).getByRole('button', { name: '카드 이동' }));
+    fireEvent.click(within(card).getByRole('button', { name: '카드 더보기' }));
     fireEvent.click(screen.getByRole('menuitem', { name: '진행중' }));
     expect(onMovePost).toHaveBeenCalledWith('post-1', 'col-doing');
+  });
+
+  it('offers edit in the more menu only on a card the user wrote', () => {
+    const onEditPost = vi.fn();
+    renderBoard({ currentUserId: 'u2', onEditPost });
+    const mine = screen.getByText('견적 문의 - A사').closest('[data-post-id]') as HTMLElement;
+    fireEvent.click(within(mine).getByRole('button', { name: '카드 더보기' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '글 수정' }));
+    expect(onEditPost).toHaveBeenCalledWith('post-1');
+    const authors = Object.fromEntries(salesPosts.map((post) => [post.id, post.authorId]));
+    const others = salesPosts.filter((post) => post.authorId !== 'u2');
+    expect(others.length).toBeGreaterThan(0);
+    expect(authors['post-1']).toBe('u2');
   });
 
   it('moves a card when it is dropped on a column', () => {
@@ -212,7 +225,7 @@ describe('KanbanBoard with many columns', () => {
       prefs: { ...defaultPrefs(salesRoom.columns), hiddenColumnIds: ['col-done'] },
     });
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['요청 1', '진행중 1']);
-    fireEvent.click(screen.getByRole('button', { name: '카드 이동' }));
+    fireEvent.click(screen.getByRole('button', { name: '카드 더보기' }));
     expect(screen.queryByRole('menuitem', { name: '완료' })).toBeNull();
     fireEvent.click(screen.getByRole('menuitem', { name: '진행중' }));
     expect(onMovePost).toHaveBeenCalledWith('post-1', 'col-doing');

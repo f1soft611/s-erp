@@ -2,7 +2,7 @@ import { useState, type DragEvent, type MouseEvent } from 'react';
 import AttachFileOutlined from '@mui/icons-material/AttachFileOutlined';
 import ChatBubbleOutlineRounded from '@mui/icons-material/ChatBubbleOutlineRounded';
 import MoreVertRounded from '@mui/icons-material/MoreVertRounded';
-import { Box, ButtonBase, IconButton, Menu, MenuItem, Paper, Stack, Typography } from '@mui/material';
+import { Box, ButtonBase, IconButton, Divider, ListSubheader, Menu, MenuItem, Paper, Stack, Typography } from '@mui/material';
 import { formatInboxDateTime } from '../../../shared/utils/formatInboxDateTime';
 import { countComments } from '../data/workspaceFeedAdapter';
 import { getUserName } from '../data/workspaceSamples';
@@ -15,9 +15,11 @@ type PostCardProps = {
   moveTargets: WorkspaceColumn[];
   onOpen: (postId: string) => void;
   onMove: (columnId: string) => void;
+  /** 있으면 더보기 메뉴에 수정을 보여준다(작성자 본인 카드). */
+  onEdit?: () => void;
 };
 
-export function PostCard({ post, canWrite, moveTargets, onOpen, onMove }: PostCardProps) {
+export function PostCard({ post, canWrite, moveTargets, onOpen, onMove, onEdit }: PostCardProps) {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const commentCount = countComments(post.comments);
 
@@ -69,9 +71,9 @@ export function PostCard({ post, canWrite, moveTargets, onOpen, onMove }: PostCa
             {post.title}
           </Typography>
         </ButtonBase>
-        {canWrite && moveTargets.length > 0 ? (
+        {canWrite && (onEdit || moveTargets.length > 0) ? (
           <>
-            <IconButton size="small" aria-label="카드 이동" onClick={openMenu} sx={{ mt: -0.5, mr: -0.75 }}>
+            <IconButton size="small" aria-label="카드 더보기" onClick={openMenu} sx={{ mt: -0.5, mr: -0.75 }}>
               <MoreVertRounded fontSize="small" />
             </IconButton>
             <Menu
@@ -80,6 +82,18 @@ export function PostCard({ post, canWrite, moveTargets, onOpen, onMove }: PostCa
               onClose={() => setMenuAnchor(null)}
               onClick={(event) => event.stopPropagation()}
             >
+              {onEdit ? (
+                <MenuItem
+                  onClick={() => {
+                    setMenuAnchor(null);
+                    onEdit();
+                  }}
+                >
+                  글 수정
+                </MenuItem>
+              ) : null}
+              {onEdit && moveTargets.length > 0 ? <Divider /> : null}
+              {onEdit && moveTargets.length > 0 ? <ListSubheader sx={{ lineHeight: '28px' }}>다음으로 이동</ListSubheader> : null}
               {moveTargets.map((column) => (
                 <MenuItem
                   key={column.id}
