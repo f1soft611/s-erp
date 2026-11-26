@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { describe, expect, it, vi } from 'vitest';
 import { WorkStandardFormulaTab } from '../src/pages/co/work-standard/recipe/components/WorkStandardFormulaTab';
 import { SAMPLE_WORK_STANDARDS } from '../src/pages/co/work-standard/recipe/data/workStandard.data';
+import { GridDecimalModuleProvider } from '../src/shared/components/f1-grid/core/GridDecimalPolicy';
+import * as decimalPolicyService from '../src/shared/services/gridDecimalPolicy.service';
 
 vi.mock('../src/pages/co/work-standard/recipe/services/workStandard.service', () => ({
   searchWorkStandardMaterials: vi.fn(async () => [{
@@ -17,6 +19,25 @@ vi.mock('../src/pages/co/work-standard/recipe/services/workStandard.service', ()
 
 const rows = SAMPLE_WORK_STANDARDS[0].formula.slice(0, 2);
 
+function renderFormulaTab() {
+  const rule = { trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const };
+  const rules = {
+    COMMON: {
+      number: { ...rule, places: 0 },
+      decimal: { ...rule, places: 3 },
+      currency: { ...rule, places: 3 },
+    },
+  };
+  decimalPolicyService.resetGridDecimalPolicyCache();
+  vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue(rules);
+  vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+  return render(
+    <GridDecimalModuleProvider moduleCode="COMMON">
+      <WorkStandardFormulaTab rows={rows} baseQty={40} />
+    </GridDecimalModuleProvider>,
+  );
+}
+
 async function chooseMaterial() {
   const dialog = await screen.findByRole('dialog', { name: '품목 선택' });
   fireEvent.click(within(dialog).getByRole('button', { name: '검색' }));
@@ -28,7 +49,7 @@ async function chooseMaterial() {
 
 describe('work standard formula picker targets', () => {
   it('applies the cell code picker patch without changing quantity or totals', async () => {
-    render(<WorkStandardFormulaTab rows={rows} baseQty={40} />);
+    renderFormulaTab();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     fireEvent.doubleClick(screen.getByRole('gridcell', { name: '000112' }));
     fireEvent.click(screen.getByRole('button', { name: '코드 선택' }));
