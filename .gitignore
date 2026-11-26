@@ -42,3 +42,7 @@ mvn-test-output.txt
 backend/cp.txt
 node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json
 .superpowers/brainstorm/document-approval-layout/state/server-info
+# Superpowers 미리보기 서버 임시 파일(접속 키·프로세스 번호). 목업 HTML은 추적한다.
+.superpowers/brainstorm/.last-port
+.superpowers/brainstorm/.last-token
+.superpowers/brainstorm/**/state/
