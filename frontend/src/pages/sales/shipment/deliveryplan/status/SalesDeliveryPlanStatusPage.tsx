@@ -205,14 +205,13 @@ export function SalesDeliveryPlanStatusPage({
   const selectedCustomerCodes = customerCodes || (selected && 'customerCode' in selected ? selected.customerCode : '');
   const selectedPlanDates = planDates;
   const formatQuantity = (value: number | string, rule = quantityRule) => {
-    try { return rule ? formatSalesOrderAmount(value, rule)
-      : typeof value === 'string' ? formatSalesOrderAmount(value, { places: 2, rounding: 'HALF_UP', trailingZeros: 'AUTO' }) : value.toLocaleString(); }
+    try { return formatSalesOrderAmount(value, rule); }
     catch { return '표현 불가'; }
   };
   const formatDifference = (left: number | string, right: number | string) => {
+    if (!quantityRule) return '-';
     try {
-      return formatQuantity(subtractExactSalesDecimals(String(left), String(right),
-        quantityRule ?? { places: 2, rounding: 'HALF_UP' }));
+      return formatQuantity(subtractExactSalesDecimals(String(left), String(right), quantityRule));
     } catch { return '표현 불가'; }
   };
   const detailTable = <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflowX: 'auto' }}>

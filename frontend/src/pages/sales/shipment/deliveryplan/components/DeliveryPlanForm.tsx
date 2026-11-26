@@ -64,7 +64,7 @@ export function DeliveryPlanForm({ storageKey, planNo, orderNo, orderDt, custome
         const capacity = row.remainingPlanQty ?? row.orderQty;
         return <Box sx={{ color: total === undefined || (compareGridExactDecimals(total, capacity) ?? 1) > 0 ? 'error.main' : 'text.primary' }}>
           {total === undefined ? '계산 범위 초과'
-            : formatSalesOrderAmount(total, quantityRule ?? { places: 2, rounding: 'HALF_UP', trailingZeros: 'AUTO' })}
+            : formatSalesOrderAmount(total, quantityRule)}
         </Box>;
       } },
     { field: 'salesDeliveryPlanDetailId', headerName: '분할', width: 160, align: 'center',

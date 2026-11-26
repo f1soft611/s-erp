@@ -59,6 +59,7 @@ type PlanCapacitySource = Pick<PlanSourceOrderRow, 'salesOrderId' | 'salesOrderD
 
 export function validateDeliveryPlan(request: DeliveryPlanRequest, sourceRows: PlanCapacitySource[], quantityRule?: SalesAmountRule) {
   if (!request.details.length) return '계획 상세를 1건 이상 입력해 주세요.';
+  if (!quantityRule) return '소수점 정책을 불러오지 못했습니다.';
   const validLines = new Map(sourceRows.map((row) => [
     `${row.salesOrderId}:${row.salesOrderDetailId}`, row,
   ]));
@@ -66,13 +67,13 @@ export function validateDeliveryPlan(request: DeliveryPlanRequest, sourceRows: P
   for (const detail of request.details) {
     const sourceKey = `${detail.salesOrderId}:${detail.salesOrderDetailId}`;
     if (!validLines.has(sourceKey)) return '수주에 포함되지 않은 상세 항목입니다.';
-    if (!isExactSalesPolicyNumber(String(detail.plannedQty), quantityRule?.places ?? 2) || Number(detail.plannedQty) <= 0) {
+    if (!isExactSalesPolicyNumber(String(detail.plannedQty), quantityRule.places) || Number(detail.plannedQty) <= 0) {
       return '계획수량의 자릿수와 범위를 확인해 주세요.';
     }
     if (detail.planDt !== null && !validDate(detail.planDt)) return '계획일자를 확인해 주세요.';
     try {
       totals.set(sourceKey, addExactSalesDecimals(totals.get(sourceKey) ?? '0', String(detail.plannedQty),
-        quantityRule ?? { places: 2, rounding: 'HALF_UP' }));
+        quantityRule));
     } catch {
       return '계획수량 합계의 범위 또는 정밀도를 확인해 주세요.';
     }

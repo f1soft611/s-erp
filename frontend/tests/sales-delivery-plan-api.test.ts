@@ -31,18 +31,22 @@ describe('sales delivery plan contract', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('accepts split plans within the source order quantity and rejects over-planning', () => {
-    expect(validateDeliveryPlan(request, [source])).toBe('');
+    expect(validateDeliveryPlan(request, [source], { places: 6, rounding: 'HALF_UP' })).toBe('');
     expect(validateDeliveryPlan({
       ...request, details: [...request.details, { ...request.details[0], plannedQty: 1 }],
-    }, [source])).toContain('초과');
+    }, [source], { places: 6, rounding: 'HALF_UP' })).toContain('초과');
     expect(validateDeliveryPlan({
       ...request, details: [{ ...request.details[0], plannedQty: 0 }],
-    }, [source])).toContain('수량');
+    }, [source], { places: 6, rounding: 'HALF_UP' })).toContain('수량');
+  });
+
+  it('does not validate plan quantities with a fixed two places when no policy rule exists', () => {
+    expect(validateDeliveryPlan(request, [source])).toBe('소수점 정책을 불러오지 못했습니다.');
   });
 
   it('validates split capacity using the remaining source quantity', () => {
     const partiallyPlanned = { ...source, remainingPlanQty: 8 };
-    expect(validateDeliveryPlan(request, [partiallyPlanned])).toContain('초과');
+    expect(validateDeliveryPlan(request, [partiallyPlanned], { places: 6, rounding: 'HALF_UP' })).toContain('초과');
   });
 
   it('uses the quantity policy and compares split quantities without floating-point drift', () => {
@@ -74,7 +78,7 @@ describe('sales delivery plan contract', () => {
         { ...request.details[1], salesOrderId: 8, plannedQty: 4 },
       ],
     };
-    expect(validateDeliveryPlan(multiOrderRequest, [source, otherOrder])).toBe('');
+    expect(validateDeliveryPlan(multiOrderRequest, [source, otherOrder], { places: 6, rounding: 'HALF_UP' })).toBe('');
   });
 
   it('requires a valid period and initializes status filters to the current month', () => {
