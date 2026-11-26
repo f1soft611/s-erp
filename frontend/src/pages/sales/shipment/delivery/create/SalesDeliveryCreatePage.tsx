@@ -18,7 +18,7 @@ import { getSystemDate } from '../../../../../shared/services/systemDateService'
 import { CustomerPicker, MaterialPickerDialog } from '../../../../../shared/components/master-picker/MasterPickers';
 import type { F1GridChanges, F1GridRef } from '../../../../../shared/components/f1-grid';
 import { searchOrderCustomers, searchOrderMaterials } from '../../../order/create/services/salesOrderMaster.service';
-import { formatSalesOrderAmount, sumExactSalesAmounts, sumSalesOrderAmounts } from '../../../order/create/data/salesOrderAmounts';
+import { formatSalesOrderAmount, sumExactSalesAmounts } from '../../../order/create/data/salesOrderAmounts';
 import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
 import { usePolicyDecimalStatus } from '../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
 import { SalesDecimalPolicyError } from '../../../shared/SalesDecimalPolicyError';
@@ -224,7 +224,7 @@ export function SalesDeliveryCreatePage({
       { label: '삭제', icon: DeleteForeverOutlinedIcon, visible: Boolean(permissions?.delete) && mode !== 'view', disabled: !canDelete || deleteDisabled, onClick: requestDelete },
     ] },
   ];
-  let totals: ReturnType<typeof sumSalesOrderAmounts> | ReturnType<typeof sumExactSalesAmounts> | null;
+  let totals: ReturnType<typeof sumExactSalesAmounts> | null;
   const contract = getDecimalColumnContract('sales.delivery');
   const summaryRules = policy && {
     supplyAmount: resolveDecimalColumn(contract.supplyAmt, policy),
@@ -235,11 +235,7 @@ export function SalesDeliveryCreatePage({
     const lines = form.details.map((row) => ({
       supplyAmount: row.supplyAmt, vatAmount: row.vatAmt, totalAmount: row.totalAmt,
     }));
-    totals = policy || lines.some((row) => typeof row.supplyAmount === 'string')
-      ? sumExactSalesAmounts(lines, amountRule ?? { places: 2, rounding: 'HALF_UP' }, summaryRules)
-      : sumSalesOrderAmounts(lines.map((row) => ({
-        supplyAmount: Number(row.supplyAmount), vatAmount: Number(row.vatAmount), totalAmount: Number(row.totalAmount),
-      })), amountRule);
+    totals = amountRule ? sumExactSalesAmounts(lines, amountRule, summaryRules) : null;
   } catch {
     totals = null;
   }
@@ -332,7 +328,7 @@ export function SalesDeliveryCreatePage({
           {([['공급가 합계', totals?.supplyAmount, summaryRules?.supplyAmount], ['부가세 합계', totals?.vatAmount, summaryRules?.vatAmount], ['총 합계', totals?.totalAmount, summaryRules?.totalAmount]] as const).map(([label, amount, displayRule]) => (
             <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1, px: 1.5, py: 1 }}>
               <Typography variant="body2" color="text.secondary">{label}</Typography>
-              <Typography variant="body1" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{amount === undefined ? '계산 범위 초과' : formatSalesOrderAmount(amount, displayRule ?? amountRule)}</Typography>
+              <Typography variant="body1" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{amount === undefined ? (amountRule ? '계산 범위 초과' : '-') : formatSalesOrderAmount(amount, displayRule ?? amountRule)}</Typography>
             </Box>
           ))}
         </Box>

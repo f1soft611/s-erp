@@ -247,15 +247,28 @@ it('preserves edits on failed save and permits update without writer ownership',
 }, 15000);
 it('prevents duplicate save and reloads authoritative server amounts', async () => {
   let resolve!: (value: Awaited<ReturnType<typeof updateDelivery>>) => void;
-  vi.mocked(updateDelivery).mockImplementation(() => new Promise((done) => { resolve = done; }));
-  mount(<SalesDeliveryCreatePage {...props} salesDeliveryId={1} />);
-  await screen.findByDisplayValue('SD-1');
-  const save = screen.getByRole('button', { name: '저장', exact: true });
-  fireEvent.click(save); fireEvent.click(save);
-  expect(updateDelivery).toHaveBeenCalledTimes(1);
-  resolve(item as Awaited<ReturnType<typeof updateDelivery>>);
-  await waitFor(() => expect(getDelivery).toHaveBeenCalledTimes(2));
-  expect(screen.getByLabelText('출하 금액 합계')).toHaveTextContent('220.00');
+  const rules = { SALES: {
+    number: { places: 1, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const },
+    decimal: { places: 2, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const },
+    currency: { places: 2, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const },
+  } };
+  const strict = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue(rules);
+  const standard = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+  try {
+    vi.mocked(updateDelivery).mockImplementation(() => new Promise((done) => { resolve = done; }));
+    mount(<GridDecimalModuleProvider moduleCode="SALES"><SalesDeliveryCreatePage {...props} salesDeliveryId={1} /></GridDecimalModuleProvider>);
+    await screen.findByDisplayValue('SD-1');
+    const save = await waitFor(() => {
+      const button = screen.getByRole('button', { name: '저장', exact: true });
+      expect(button).toBeEnabled();
+      return button;
+    });
+    fireEvent.click(save); fireEvent.click(save);
+    expect(updateDelivery).toHaveBeenCalledTimes(1);
+    resolve(item as Awaited<ReturnType<typeof updateDelivery>>);
+    await waitFor(() => expect(getDelivery).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByLabelText('출하 금액 합계')).toHaveTextContent('220.00'));
+  } finally { strict.mockRestore(); standard.mockRestore(); }
 });
 it('preserves input when overdelivery confirmation is cancelled and requests fresh confirmation on the next save', async () => {
   vi.mocked(updateDelivery).mockRejectedValue(new OverDeliveryConfirmationRequired('수주수량 100 / 누적출하 105 / 초과 5'));
