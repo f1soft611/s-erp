@@ -54,6 +54,7 @@ import type {
   RichTextEditorToolbarProps,
 } from './richTextEditor.types';
 import { calculateImageResize, type ImageResizeDirection } from './imageResize';
+import { TEXT_COLOR_SWATCHES } from './textColorSwatches';
 
 const RichTextImage = Image.extend({
   addAttributes() {
@@ -147,20 +148,7 @@ const RichTextTableHeader = TableHeader.extend({
   },
 });
 
-const textColorSwatches = [
-  '#ef4444',
-  '#f97316',
-  '#eab308',
-  '#84cc16',
-  '#22c55e',
-  '#14b8a6',
-  '#3b82f6',
-  '#6366f1',
-  '#8b5cf6',
-  '#ec4899',
-  '#6b7280',
-  '#111827',
-];
+const textColorSwatches = TEXT_COLOR_SWATCHES;
 
 const toolbarIconButtonSx = (active: boolean) => ({
   width: 32,

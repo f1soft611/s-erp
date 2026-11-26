@@ -19,8 +19,7 @@ import { CommentThread } from '../../../../../shared/components/feed/CommentThre
 import type { FeedCommentItem } from '../../../../../shared/components/feed/CommentThread';
 import { FeedBodyContent } from '../../../../../shared/components/feed/FeedBodyContent';
 import type { FeedBodyImage } from '../../../../../shared/components/feed/FeedBodyContent';
-import { FeedCommentsSection } from '../../../../../shared/components/feed/FeedCommentsSection';
-import { FeedReactionBar } from '../../../../../shared/components/feed/FeedReactionBar';
+import { FEED_COMMENT_LIST_SX, FeedEngagementSection } from '../../../../../shared/components/feed/FeedEngagementSection';
 import { FeedCard } from '../../../../../shared/components/feed/FeedCard';
 import { ProfileAvatar } from '../../../../../shared/components/ProfileAvatar';
 import { PostDetailPanel } from '../../../../../shared/components/feed/PostDetailPanel';
@@ -29,6 +28,7 @@ import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { useNotification } from '../../../../../shared/context/notification';
 import { DocumentActionsMenu } from './DocumentActionsMenu';
 import { DocumentReferenceAddDialog } from './DocumentReferenceAddDialog';
+import { DocumentReferenceParticipants } from './DocumentReferenceParticipants';
 import { DocumentLinkPreviews } from './DocumentLinkPreviews';
 import { buildDocumentShareLink, parseDocumentShareLink, resolveDocumentShareReference } from '../data/documentShareLink';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -1939,87 +1939,9 @@ export function DocumentApprovalDetailFeed(
                               >
                                 참조
                               </Typography>
-                              <Box
-                                data-testid="approval-line-reference-participants"
-                                sx={{
-                                  display: 'flex',
-                                  flexWrap: 'wrap',
-                                  gap: 1,
-                                  minWidth: 0,
-                                }}
-                              >
-                                {approvalLineGroups.reference.map((line) => {
-                                  const departmentName =
-                                    line.participantDepartmentName ?? '';
-                                  const hasDepartmentName = Boolean(
-                                    departmentName.trim(),
-                                  );
-                                  const departmentLabel = hasDepartmentName
-                                    ? departmentName
-                                    : '부서없음';
-                                  return (
-                                    <Box
-                                      key={line.electronicApprovalLineId}
-                                      data-testid={`approval-line-reference-participant-${line.electronicApprovalLineId}`}
-                                      sx={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 1,
-                                        flex: '1 1 240px',
-                                        minWidth: 'min(100%, 190px)',
-                                        maxWidth: '100%',
-                                        height: 56,
-                                        boxSizing: 'border-box',
-                                        px: 1,
-                                        py: 0.75,
-                                        border: '1px solid',
-                                        borderColor: 'divider',
-                                        borderRadius: '4px',
-                                        bgcolor: 'background.paper',
-                                      }}
-                                    >
-                                      <ProfileAvatar
-                                        data-testid={`approval-line-reference-avatar-${line.electronicApprovalLineId}`}
-                                        name={line.participantName}
-                                        imageUrl={line.participantProfileImage}
-                                        fallback={line.participantName.slice(0, 1)}
-                                        sx={{
-                                          width: 32,
-                                          height: 32,
-                                          flexShrink: 0,
-                                        }}
-                                      />
-                                      <Box sx={{ minWidth: 0, flex: 1 }}>
-                                        <Typography
-                                          variant="body1"
-                                          title={line.participantName}
-                                          noWrap
-                                          sx={{
-                                            display: 'block',
-                                            fontSize: 14,
-                                            lineHeight: '18px',
-                                          }}
-                                        >
-                                          {line.participantName}
-                                        </Typography>
-                                        <Typography
-                                          data-testid={`approval-line-reference-department-${line.electronicApprovalLineId}`}
-                                          variant="body1"
-                                          title={departmentLabel}
-                                          noWrap
-                                          color="text.secondary"
-                                          sx={{
-                                            fontSize: 14,
-                                            lineHeight: '18px',
-                                          }}
-                                        >
-                                          {departmentLabel}
-                                        </Typography>
-                                      </Box>
-                                    </Box>
-                                  );
-                                })}
-                              </Box>
+                              <DocumentReferenceParticipants
+                                lines={approvalLineGroups.reference}
+                              />
                             </Box>
                           )}
                         </Stack>
@@ -2088,31 +2010,33 @@ export function DocumentApprovalDetailFeed(
                 }}
               />
             </Box>
-            <Divider sx={{ my: 1.5 }} />
-            <FeedReactionBar
-              liked={isLiked}
-              likeCount={0}
-              bookmarked={isBookmarked}
-              commentCount={commentCount}
-              onToggleLike={() => setIsLiked((value) => !value)}
-              onToggleBookmark={() => setIsBookmarked((value) => !value)}
-            />
-            <FeedCommentsSection
-              showPrevious={hasPreviousComments}
-              isLoadingPrevious={isLoadingComments}
-              remainingPreviousCount={
-                Number.isFinite(commentCount)
-                  ? Math.max(
-                      0,
-                      commentCount -
-                        commentRecords.filter(
-                          (comment) => comment.parentCommentId == null,
-                        ).length -
-                        commentSystemEvents.length,
-                    )
-                  : undefined
-              }
-              onLoadPrevious={() => void handleLoadPreviousComments()}
+            <FeedEngagementSection
+              // 피드 카드와 문서 상세 패널의 카드는 안쪽 여백이 달라, 구분선이 튀어나오지 않게 각각에 맞춘다.
+              bleed={isFeedPresentation ? undefined : { xs: 1.5, sm: 2 }}
+              reaction={{
+                liked: isLiked,
+                likeCount: 0,
+                bookmarked: isBookmarked,
+                commentCount,
+                onToggleLike: () => setIsLiked((value) => !value),
+                onToggleBookmark: () => setIsBookmarked((value) => !value),
+              }}
+              comments={{
+                showPrevious: hasPreviousComments,
+                isLoadingPrevious: isLoadingComments,
+                remainingPreviousCount:
+                  Number.isFinite(commentCount)
+                    ? Math.max(
+                        0,
+                        commentCount -
+                          commentRecords.filter(
+                            (comment) => comment.parentCommentId == null,
+                          ).length -
+                          commentSystemEvents.length,
+                      )
+                    : undefined,
+                onLoadPrevious: () => void handleLoadPreviousComments(),
+              }}
             >
               <>
                 {commentError && (
@@ -2143,6 +2067,7 @@ export function DocumentApprovalDetailFeed(
                   </Box>
                 ) : null}
                 <CommentThread
+                  commentListSx={FEED_COMMENT_LIST_SX}
                   renderContentPreview={(html) => (
                     <DocumentLinkPreviews html={html} onOpenDocument={onOpenDocument} />
                   )}
@@ -2167,7 +2092,7 @@ export function DocumentApprovalDetailFeed(
                   onOpenAttachmentImage={setSelectedBodyImage}
                 />
               </>
-            </FeedCommentsSection>
+            </FeedEngagementSection>
           </Box>
           {!isFeedPresentation && canProcess && (
             <>

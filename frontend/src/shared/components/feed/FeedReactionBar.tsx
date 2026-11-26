@@ -7,7 +7,7 @@ import {
 import FavoriteBorderOutlinedIcon from '@mui/icons-material/FavoriteBorderOutlined';
 import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
 
-type FeedReactionBarProps = {
+export type FeedReactionBarProps = {
   liked: boolean;
   likeCount: number;
   bookmarked: boolean;

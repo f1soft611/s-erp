@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Box, Button } from '@mui/material';
 
-type FeedCommentsSectionProps = {
+export type FeedCommentsSectionProps = {
   children: ReactNode;
   showPrevious?: boolean;
   isLoadingPrevious?: boolean;

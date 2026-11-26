@@ -22,6 +22,7 @@ import {
   OverviewPage,
   CommunityNoticePage,
   ArchiveBoardPage,
+  WorkspacePage,
   DocumentWritePage,
   DocumentStatusPage,
   MenuManagementPage,
@@ -456,6 +457,17 @@ function DashboardContentView({
         content={content}
         selectedMenuPermissions={selectedMenuPermissions}
         isTenantAdmin={isTenantAdmin}
+      />
+    );
+  }
+
+  if (selectedModule.id === 'groupware' && currentPageKey === 'workspace') {
+    return (
+      <WorkspacePage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+        selectedMenuPermissions={selectedMenuPermissions}
       />
     );
   }

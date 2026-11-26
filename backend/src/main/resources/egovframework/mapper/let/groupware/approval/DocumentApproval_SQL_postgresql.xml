@@ -1245,7 +1245,8 @@
     <select id="selectApprovalLines" parameterType="map" resultMap="approvalLine">
         SELECT line.electronic_approval_line_id, line.stage_order, line.participant_order,
                line.participant_type, line.participant_user_id, line.participant_name,
-               line.participant_department_name, la.profile_image AS participant_profile_image,
+               COALESCE(NULLIF(TRIM(dept.department_nm), ''), NULLIF(TRIM(line.participant_department_name), '')) AS participant_department_name,
+               la.profile_image AS participant_profile_image,
                CASE
                    WHEN line.participant_type = 'APPROVAL'
                     AND line.action_status IN ('APPROVED', 'REJECTED', 'RETURNED')
@@ -1260,6 +1261,9 @@
         LEFT JOIN public.tb_login_account la
           ON la.tenant_id = u.tenant_id
          AND la.login_id = u.login_id
+        LEFT JOIN public.tb_department dept
+          ON dept.tenant_id = u.tenant_id
+         AND dept.department_id = u.department_id
         WHERE line.tenant_id = #{tenantId}
           AND line.electronic_approval_id = #{electronicApprovalId}
         ORDER BY line.stage_order, line.participant_order
@@ -1269,7 +1273,8 @@
         SELECT line.electronic_approval_id, line.electronic_approval_line_id,
                line.stage_order, line.participant_order,
                line.participant_type, line.participant_user_id, line.participant_name,
-               line.participant_department_name, la.profile_image AS participant_profile_image,
+               COALESCE(NULLIF(TRIM(dept.department_nm), ''), NULLIF(TRIM(line.participant_department_name), '')) AS participant_department_name,
+               la.profile_image AS participant_profile_image,
                CASE
                    WHEN line.participant_type = 'APPROVAL'
                     AND line.action_status IN ('APPROVED', 'REJECTED', 'RETURNED')
@@ -1284,6 +1289,9 @@
         LEFT JOIN public.tb_login_account la
           ON la.tenant_id = u.tenant_id
          AND la.login_id = u.login_id
+        LEFT JOIN public.tb_department dept
+          ON dept.tenant_id = u.tenant_id
+         AND dept.department_id = u.department_id
         WHERE line.tenant_id = #{tenantId}
           AND line.electronic_approval_id IN
           <foreach collection="ownerIds" item="ownerId" open="(" separator="," close=")">

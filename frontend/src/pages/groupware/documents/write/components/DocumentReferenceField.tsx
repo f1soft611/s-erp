@@ -1,6 +1,10 @@
+import { useMemo, useState } from 'react';
 import { Box, Button, Typography } from '@mui/material';
 import { UserSelectEditor, type F1GridUserValue } from '../../../../../shared/components/f1-grid/editing/UserSelectEditor';
 import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/types/grid.types';
+import { DocumentReferenceListDialog } from './DocumentReferenceListDialog';
+
+const MAX_VISIBLE_CHIPS = 3;
 
 type DocumentReferenceFieldProps = {
   userOptions: F1GridUserOption[];
@@ -17,6 +21,17 @@ export function DocumentReferenceField({
   onOpenSettings,
   settingsDisabled = false,
 }: DocumentReferenceFieldProps) {
+  const [isListOpen, setIsListOpen] = useState(false);
+  const selectedUsers = useMemo(
+    () =>
+      referenceUserIds.flatMap((id) => {
+        const user = userOptions.find((option) => String(option.value) === String(id));
+        return user ? [user] : [];
+      }),
+    [referenceUserIds, userOptions],
+  );
+  const removeUser = (userId: string) =>
+    onChange(referenceUserIds.filter((id) => String(id) !== userId));
   return (
     <Box
       data-testid="document-reference-row"
@@ -57,8 +72,21 @@ export function DocumentReferenceField({
             onChange={onChange}
             hideSelectedOptions
             preserveSelectionOrder
+            maxVisibleChips={MAX_VISIBLE_CHIPS}
+            onOverflowClick={() => setIsListOpen(true)}
           />
         </Box>
+        {selectedUsers.length > 0 && (
+          <Button
+            size="small"
+            variant="outlined"
+            data-testid="document-reference-list-button"
+            onClick={() => setIsListOpen(true)}
+            sx={{ boxSizing: 'border-box', flexShrink: 0, height: 40, minHeight: 40 }}
+          >
+            참조 {selectedUsers.length}명 보기
+          </Button>
+        )}
         {onOpenSettings && (
           <Button
             size="small"
@@ -76,6 +104,13 @@ export function DocumentReferenceField({
           </Button>
         )}
       </Box>
+      <DocumentReferenceListDialog
+        open={isListOpen}
+        users={selectedUsers}
+        onRemove={removeUser}
+        onClear={() => onChange([])}
+        onClose={() => setIsListOpen(false)}
+      />
     </Box>
   );
 }

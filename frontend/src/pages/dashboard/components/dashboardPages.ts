@@ -41,6 +41,7 @@ export function preloadDashboardPages(): Promise<void> {
 export const OverviewPage = lazyPage(() => import('../../groupware/OverviewPage'), 'OverviewPage');
 export const CommunityNoticePage = lazyPage(() => import('../../groupware/community/notice/CommunityNoticePage'), 'CommunityNoticePage');
 export const ArchiveBoardPage = lazyPage(() => import('../../groupware/community/archive/ArchiveBoardPage'), 'ArchiveBoardPage');
+export const WorkspacePage = lazyPage(() => import('../../groupware/community/workspace/WorkspacePage'), 'WorkspacePage');
 export const DocumentWritePage = lazyPage(() => import('../../groupware/documents/write/DocumentWritePage'), 'DocumentWritePage');
 export const DocumentStatusPage = lazyPage(() => import('../../groupware/documents/status/DocumentStatusPage'), 'DocumentStatusPage');
 export const MenuManagementPage = lazyPage(() => import('../../settings/system/menus/MenuManagementPage'), 'MenuManagementPage');

@@ -14,7 +14,7 @@ import {
   Typography,
 } from '@mui/material';
 import type { ChipProps } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
+import { useTheme, type SxProps, type Theme } from '@mui/material/styles';
 import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
@@ -128,6 +128,8 @@ export type CommentThreadProps = {
   renderContentPreview?: (html: string) => ReactNode;
   mentionOptions?: CommentMentionOption[];
   enableMentions?: boolean;
+  /** 댓글 목록 영역의 기본 위 여백·구분선·안쪽 여백을 덮어쓴다. 기본 모양은 그대로다. */
+  commentListSx?: SxProps<Theme>;
 };
 
 function hasCommentText(html: string): boolean {
@@ -1024,6 +1026,7 @@ export function TiptapCommentThread({
   renderContentPreview,
   mentionOptions,
   enableMentions,
+  commentListSx,
 }: CommentThreadProps) {
   const theme = useTheme();
   const isDark = isDarkProp ?? theme.palette.mode === 'dark';
@@ -1057,12 +1060,15 @@ export function TiptapCommentThread({
     <Box sx={{ minWidth: 0 }}>
       {comments.length > 0 && (
         <Box
-          sx={{
-            mt: 2,
-            borderTop: '1px solid',
-            borderColor: 'divider',
-            pt: 1.5,
-          }}
+          sx={[
+            {
+              mt: 2,
+              borderTop: '1px solid',
+              borderColor: 'divider',
+              pt: 1.5,
+            },
+            ...(Array.isArray(commentListSx) ? commentListSx : [commentListSx]),
+          ]}
         >
           {comments.map((comment) => (
             <CommentItem

@@ -11,6 +11,7 @@ type PinnedViewToolbarProps = {
   modeLabel?: string;
   filterAction?: ReactNode;
   enableFileView?: boolean;
+  enableKanbanView?: boolean;
 };
 
 export function PinnedViewToolbar({
@@ -21,6 +22,7 @@ export function PinnedViewToolbar({
   modeLabel = '보기 방식',
   filterAction,
   enableFileView = false,
+  enableKanbanView = false,
 }: PinnedViewToolbarProps) {
   return (
     <Box
@@ -39,7 +41,7 @@ export function PinnedViewToolbar({
         </Typography>}
         {filterAction}
       </Box>
-      <ViewModeToggle mode={mode} onChange={onChange} ariaLabel={modeLabel} enableFileView={enableFileView} />
+      <ViewModeToggle mode={mode} onChange={onChange} ariaLabel={modeLabel} enableFileView={enableFileView} enableKanbanView={enableKanbanView} />
     </Box>
   );
 }
