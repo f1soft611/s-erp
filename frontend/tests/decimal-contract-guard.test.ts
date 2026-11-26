@@ -16,6 +16,9 @@ const GUARD_SCOPE: Record<string, string[]> = {
   'sales.quotation': ['src/pages/sales/quotation'],
   'sales.delivery': ['src/pages/sales/shipment/delivery', 'src/pages/sales/shipment/statement', 'src/pages/sales/revenue/closing'],
   'sales.deliveryPlan': ['src/pages/sales/shipment/deliveryplan'],
+  'settings.module': ['src/pages/settings/system/modules'],
+  'settings.menu': ['src/pages/settings/system/menus'],
+  'settings.role': ['src/pages/settings/system/roles'],
 };
 
 /**

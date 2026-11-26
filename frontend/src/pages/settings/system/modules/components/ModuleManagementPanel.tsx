@@ -29,6 +29,7 @@ import {
   type F1GridColumn,
   type F1GridRef,
 } from '../../../../../shared/components/f1-grid';
+import { decimalColumnOptions, getDecimalColumnContract } from '../../../../../shared/services/decimalColumnContract';
 import type {
   ModuleManagementRow,
   ModuleSavePayload,
@@ -191,7 +192,7 @@ export const ModuleManagementPanel = forwardRef<
         field: 'sortOrder',
         headerName: '정렬 순서',
         flex: 0.8,
-        type: 'number',
+        ...decimalColumnOptions(getDecimalColumnContract('settings.module'), 'sortOrder'),
         editable: !saving,
         required: true,
         align: 'center',
@@ -201,7 +202,7 @@ export const ModuleManagementPanel = forwardRef<
         field: 'menuCount',
         headerName: '메뉴 수',
         flex: 0.7,
-        type: 'number',
+        ...decimalColumnOptions(getDecimalColumnContract('settings.module'), 'menuCount'),
         editable: false,
         align: 'center',
         headerAlign: 'center',

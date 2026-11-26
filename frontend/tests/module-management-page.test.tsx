@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModuleManagementPage } from '../src/pages/settings/system/modules/ModuleManagementPage';
 import {
@@ -10,6 +10,8 @@ import {
   updateModule,
 } from '../src/pages/settings/system/modules/services/moduleManagement.service';
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
+import { GridDecimalModuleProvider } from '../src/shared/components/f1-grid/core/GridDecimalPolicy';
+import * as decimalPolicyService from '../src/shared/services/gridDecimalPolicy.service';
 
 const apiMocks = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -65,6 +67,35 @@ beforeEach(() => {
 });
 
 describe('ModuleManagementPage', () => {
+  it('follows the settings integer policy and does not accept a decimal sort order', async () => {
+    const rule = { trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const };
+    const rules = { SETTINGS: {
+      number: { ...rule, places: 0 }, decimal: { ...rule, places: 2 }, currency: { ...rule, places: 2 },
+    } };
+    const strict = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue(rules);
+    const standard = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+    try {
+      apiMocks.apiGet.mockResolvedValue(moduleList());
+      render(
+        <NotificationProvider>
+          <GridDecimalModuleProvider moduleCode="settings">
+            <ModuleManagementPage selectedModule={settingsModule} currentMenuName="모듈관리"
+              content={content} selectedMenuPermissions={{ read: true, create: true, update: true, delete: true }} />
+          </GridDecimalModuleProvider>
+        </NotificationProvider>,
+      );
+      const row = (await screen.findByRole('gridcell', { name: '그룹웨어' })).closest('[role="row"]') as HTMLElement;
+      const sortCell = within(row).getAllByRole('gridcell').filter((cell) => cell.textContent === '1').at(-1)!;
+      fireEvent.doubleClick(sortCell);
+      const editor = await screen.findByRole('spinbutton');
+      for (const key of ['.', ',']) {
+        const separator = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+        fireEvent(editor, separator);
+        expect(separator.defaultPrevented, key).toBe(true);
+      }
+    } finally { strict.mockRestore(); standard.mockRestore(); }
+  });
+
   it('replaces only the initial failed body and restores a normal empty result on retry', async () => {
     apiMocks.apiGet.mockRejectedValueOnce(new Error('initial failure'));
     render(

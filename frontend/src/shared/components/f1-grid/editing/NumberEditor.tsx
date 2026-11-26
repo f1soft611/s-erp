@@ -49,7 +49,7 @@ export function NumberEditor({
       }}
       onBlur={clearDraft}
       onKeyDown={(event) => {
-        if (exactDecimal && decimalPlaces === 0 && (event.key === '.' || event.key === ',')) {
+        if (decimalPlaces === 0 && (event.key === '.' || event.key === ',')) {
           event.preventDefault();
           return;
         }
@@ -57,7 +57,7 @@ export function NumberEditor({
       }}
       onBeforeInput={(event) => {
         const inserted = (event.nativeEvent as InputEvent).data;
-        if (exactDecimal && decimalPlaces === 0 && inserted && /[.,]/.test(inserted)) {
+        if (decimalPlaces === 0 && inserted && /[.,]/.test(inserted)) {
           event.preventDefault();
         }
       }}

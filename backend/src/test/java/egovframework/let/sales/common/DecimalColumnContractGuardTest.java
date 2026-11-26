@@ -33,6 +33,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * 계약 JSON을 바꾸면 이 테스트로 문서 전체의 유효성과 서버 사용 필드와의 일치를 확인한다.
  */
 class DecimalColumnContractGuardTest {
+    /**
+     * 서버가 소수점 규칙으로 계산·저장하지 않고 화면에서 정수 표시·입력 규칙만 쓰는 문서.
+     * 서버 사용 필드 대조에서 제외하며, 계약에서 사라진 문서는 이 목록에서도 제거해야 한다.
+     */
+    private static final Set<String> FRONTEND_ONLY_DOCUMENTS = new HashSet<String>(java.util.Arrays.asList(
+            "settings.module", "settings.menu", "settings.role"));
     private static final Pattern SERVER_FIELD = Pattern.compile("\\.(?:input|amount)\\(\"(\\w+)\"");
 
     private static Map<String, Map<String, Object>> contracts() throws IOException {
@@ -55,7 +61,9 @@ class DecimalColumnContractGuardTest {
     @Test
     void serverUsesOnlyFieldsThatTheContractDeclaresAndDeclaresNoUnusedField() throws IOException {
         Set<String> declared = new HashSet<String>();
-        for (Map<String, Object> fields : contracts().values()) declared.addAll(fields.keySet());
+        for (Map.Entry<String, Map<String, Object>> document : contracts().entrySet()) {
+            if (!FRONTEND_ONLY_DOCUMENTS.contains(document.getKey())) declared.addAll(document.getValue().keySet());
+        }
         Set<String> used = serverUsedFields();
         assertFalse(used.isEmpty(), "서버 소스에서 컬럼 규칙 사용을 찾지 못했습니다.");
         Set<String> missing = new HashSet<String>(used);
@@ -64,6 +72,13 @@ class DecimalColumnContractGuardTest {
         Set<String> unused = new HashSet<String>(declared);
         unused.removeAll(used);
         assertTrue(unused.isEmpty(), "서버가 사용하지 않는 계약 필드가 있습니다: " + unused);
+    }
+
+    @Test
+    void frontendOnlyDocumentsExistInTheContract() throws IOException {
+        Set<String> missing = new HashSet<String>(FRONTEND_ONLY_DOCUMENTS);
+        missing.removeAll(contracts().keySet());
+        assertTrue(missing.isEmpty(), "계약에 없는 화면 전용 문서가 허용 목록에 있습니다: " + missing);
     }
 
     @Test

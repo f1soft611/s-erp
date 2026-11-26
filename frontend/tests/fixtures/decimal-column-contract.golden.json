@@ -25,5 +25,15 @@
   },
   "sales.deliveryPlan": {
     "plannedQty": { "type": "number" }
+  },
+  "settings.module": {
+    "sortOrder": { "type": "number" },
+    "menuCount": { "type": "number" }
+  },
+  "settings.menu": {
+    "order": { "type": "number" }
+  },
+  "settings.role": {
+    "menuCount": { "type": "number" }
   }
 }

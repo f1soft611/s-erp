@@ -3431,6 +3431,34 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
     expect(ref.current?.getActiveRows()[0].qty).toBe('1');
   });
 
+  it('blocks decimal separators in a zero-place number editor without exactDecimal', () => {
+    type Line = { id: string; qty: number };
+    const ref = createRef<F1GridRef<Line>>();
+    render(<F1Grid ref={ref} rowKey="id" rows={[{ id: 'a', qty: 3 }]}
+      columns={[{ field: 'qty', headerName: '수량', type: 'number', editable: true, decimalPlaces: 0 }]} />);
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '3' }));
+    const editor = document.querySelector('input.MuiInputBase-input') as HTMLInputElement;
+    for (const key of ['.', ',']) {
+      const separator = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      fireEvent(editor, separator);
+      expect(separator.defaultPrevented, key).toBe(true);
+    }
+    fireEvent.change(editor, { target: { value: '7' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    expect(ref.current?.getActiveRows()[0].qty).toBe(7);
+  });
+
+  it('keeps allowing a decimal separator when the number editor has decimal places', () => {
+    type Line = { id: string; qty: number };
+    render(<F1Grid rowKey="id" rows={[{ id: 'a', qty: 3 }]}
+      columns={[{ field: 'qty', headerName: '수량', type: 'number', editable: true, decimalPlaces: 2 }]} />);
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: /^3/ }));
+    const editor = document.querySelector('input.MuiInputBase-input') as HTMLInputElement;
+    const separator = new KeyboardEvent('keydown', { key: '.', bubbles: true, cancelable: true });
+    fireEvent(editor, separator);
+    expect(separator.defaultPrevented).toBe(false);
+  });
+
   it('rejects excess exact decimal digits without changing the existing value', () => {
     type Line = { id: string; price: string };
     const ref = createRef<F1GridRef<Line>>();
