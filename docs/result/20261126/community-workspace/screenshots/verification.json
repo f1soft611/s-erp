@@ -1,0 +1,507 @@
+[
+  {
+    "name": "1280px header has 새 글 button",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px four view toggles",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px kanban: no page horizontal scroll",
+    "ok": true,
+    "detail": "overflow=0"
+  },
+  {
+    "name": "1280px kanban layout is board",
+    "ok": true,
+    "detail": "layout=board"
+  },
+  {
+    "name": "1280px right panel keeps at least 320px",
+    "ok": true,
+    "detail": "width=320"
+  },
+  {
+    "name": "1280px kanban board fills down to the bottom of the screen",
+    "ok": true,
+    "detail": "gap=16"
+  },
+  {
+    "name": "1280px right panel order: user switch, then rooms, then create",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px no room summary panel",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px toolbar: count, filter icon and column settings sit together on the left",
+    "ok": true,
+    "detail": "filter=67.640625 column=101.640625-199.5625 toggle=779"
+  },
+  {
+    "name": "1280px filter options hidden until the icon is clicked",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px active filter shows a removable chip",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px room settings colors reach the kanban columns",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px personal color overrides the room color for this user",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px another user still sees the room color",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px personal color is kept for the user after switching back",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px feed status badge uses the column color",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px drag card to another column",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px kanban fits three columns without inner scrolling",
+    "ok": true,
+    "detail": "inner overflow=0"
+  },
+  {
+    "name": "1280px kanban card opens right detail panel",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px detail panel uses the same feed card as the feed list",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px detail panel is docked to the right edge",
+    "ok": true,
+    "detail": "x=358.40625 w=921.59375"
+  },
+  {
+    "name": "1280px detail panel: no page horizontal scroll",
+    "ok": true,
+    "detail": "overflow=0"
+  },
+  {
+    "name": "1280px comment posted through the shared comment editor",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px list rows",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px list: no page horizontal scroll",
+    "ok": true,
+    "detail": "overflow=0"
+  },
+  {
+    "name": "1280px exactly one divider in the card",
+    "ok": true,
+    "detail": "count=1"
+  },
+  {
+    "name": "1280px divider spans the card edge to edge",
+    "ok": true,
+    "detail": "card=24-920 divider=25-919"
+  },
+  {
+    "name": "1280px divider sits right below the reaction row",
+    "ok": true,
+    "detail": "gap=8"
+  },
+  {
+    "name": "1280px space above and below the reaction row match",
+    "ok": true,
+    "detail": "above=8 below=8"
+  },
+  {
+    "name": "1280px space above and below the divider match visually",
+    "ok": true,
+    "detail": "above=12 below=10"
+  },
+  {
+    "name": "1280px comment area starts right below the divider",
+    "ok": true,
+    "detail": "below=10"
+  },
+  {
+    "name": "1280px feed: no page horizontal scroll",
+    "ok": true,
+    "detail": "overflow=0"
+  },
+  {
+    "name": "1280px file: no page horizontal scroll",
+    "ok": true,
+    "detail": "overflow=0"
+  },
+  {
+    "name": "1280px body image preview strip is shown when collapsed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px image attachment preview is shown",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px image viewer opens from body image",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px pasted image is inserted into the editor",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px new post shows image preview strip and attachment",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px expanding shows the image inside the body",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px seven columns scroll inside the board only",
+    "ok": true,
+    "detail": "scrollable=926"
+  },
+  {
+    "name": "1280px many columns: no page horizontal scroll",
+    "ok": true,
+    "detail": "overflow=0"
+  },
+  {
+    "name": "1280px right edge fade is shown, left is not",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px board height is bounded by the viewport",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px after scrolling both edges show a fade",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1280px columns snap into place",
+    "ok": true,
+    "detail": "x"
+  },
+  {
+    "name": "1280px dragging near the right edge auto-scrolls the board",
+    "ok": true,
+    "detail": "scrollLeft=926"
+  },
+  {
+    "name": "1280px no console errors",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768px header has 새 글 button",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768px four view toggles",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768px kanban: no page horizontal scroll",
+    "ok": true,
+    "detail": "overflow=0"
+  },
+  {
+    "name": "768px kanban layout is board",
+    "ok": true,
+    "detail": "layout=board"
+  },
+  {
+    "name": "768px right panel order: user switch, then rooms, then create",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768px no room summary panel",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768px toolbar: count, filter icon and column settings sit together on the left",
+    "ok": true,
+    "detail": "filter=67.640625 column=101.640625-199.5625 toggle=603"
+  },
+  {
+    "name": "768px filter options hidden until the icon is clicked",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768px active filter shows a removable chip",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768px kanban card opens right detail panel",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768px detail panel uses the same feed card as the feed list",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768px detail panel is docked to the right edge",
+    "ok": true,
+    "detail": "x=215.046875 w=552.953125"
+  },
+  {
+    "name": "768px detail panel: no page horizontal scroll",
+    "ok": true,
+    "detail": "overflow=0"
+  },
+  {
+    "name": "768px list rows",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "768px list: no page horizontal scroll",
+    "ok": true,
+    "detail": "overflow=0"
+  },
+  {
+    "name": "768px exactly one divider in the card",
+    "ok": true,
+    "detail": "count=1"
+  },
+  {
+    "name": "768px divider spans the card edge to edge",
+    "ok": true,
+    "detail": "card=24-744 divider=25-743"
+  },
+  {
+    "name": "768px divider sits right below the reaction row",
+    "ok": true,
+    "detail": "gap=8"
+  },
+  {
+    "name": "768px space above and below the reaction row match",
+    "ok": true,
+    "detail": "above=8 below=8"
+  },
+  {
+    "name": "768px space above and below the divider match visually",
+    "ok": true,
+    "detail": "above=12 below=10"
+  },
+  {
+    "name": "768px comment area starts right below the divider",
+    "ok": true,
+    "detail": "below=10"
+  },
+  {
+    "name": "768px feed: no page horizontal scroll",
+    "ok": true,
+    "detail": "overflow=0"
+  },
+  {
+    "name": "768px file: no page horizontal scroll",
+    "ok": true,
+    "detail": "overflow=0"
+  },
+  {
+    "name": "768px no console errors",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "375px header has 새 글 button",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "375px four view toggles",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "375px kanban: no page horizontal scroll",
+    "ok": true,
+    "detail": "overflow=0"
+  },
+  {
+    "name": "375px kanban layout is tabs",
+    "ok": true,
+    "detail": "layout=tabs"
+  },
+  {
+    "name": "375px kanban tabs show names with counts",
+    "ok": true,
+    "detail": "요청 1|진행중 1|완료 1"
+  },
+  {
+    "name": "375px switching the tab shows that column",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "375px right panel order: user switch, then rooms, then create",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "375px no room summary panel",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "375px toolbar: count, filter icon and column settings sit together on the left",
+    "ok": true,
+    "detail": "filter=59.640625 column=93.640625-191.5625 toggle=218"
+  },
+  {
+    "name": "375px filter options hidden until the icon is clicked",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "375px active filter shows a removable chip",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "375px kanban card opens right detail panel",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "375px detail panel uses the same feed card as the feed list",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "375px detail panel is docked to the right edge",
+    "ok": true,
+    "detail": "x=0 w=375"
+  },
+  {
+    "name": "375px detail panel: no page horizontal scroll",
+    "ok": true,
+    "detail": "overflow=0"
+  },
+  {
+    "name": "375px list rows",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "375px list: no page horizontal scroll",
+    "ok": true,
+    "detail": "overflow=0"
+  },
+  {
+    "name": "375px exactly one divider in the card",
+    "ok": true,
+    "detail": "count=1"
+  },
+  {
+    "name": "375px divider spans the card edge to edge",
+    "ok": true,
+    "detail": "card=16-359 divider=17-358"
+  },
+  {
+    "name": "375px divider sits right below the reaction row",
+    "ok": true,
+    "detail": "gap=8"
+  },
+  {
+    "name": "375px space above and below the reaction row match",
+    "ok": true,
+    "detail": "above=8 below=8"
+  },
+  {
+    "name": "375px space above and below the divider match visually",
+    "ok": true,
+    "detail": "above=12 below=10"
+  },
+  {
+    "name": "375px comment area starts right below the divider",
+    "ok": true,
+    "detail": "below=10"
+  },
+  {
+    "name": "375px feed: no page horizontal scroll",
+    "ok": true,
+    "detail": "overflow=0"
+  },
+  {
+    "name": "375px file: no page horizontal scroll",
+    "ok": true,
+    "detail": "overflow=0"
+  },
+  {
+    "name": "375px no console errors",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "1920px left column stops at the four-column width (1036px)",
+    "ok": true,
+    "detail": "left=1036"
+  },
+  {
+    "name": "1920px right panel takes the remaining width and is wider than 400px",
+    "ok": true,
+    "detail": "right=436"
+  },
+  {
+    "name": "1920px four columns fit without horizontal scrolling",
+    "ok": true,
+    "detail": "overflow=0"
+  },
+  {
+    "name": "1920px board fills down to the bottom of the screen",
+    "ok": true,
+    "detail": "bottom=1064"
+  }
+]
