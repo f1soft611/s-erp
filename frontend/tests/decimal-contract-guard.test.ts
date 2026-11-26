@@ -14,7 +14,7 @@ import { getDecimalColumnContract } from '../src/shared/services/decimalColumnCo
 const GUARD_SCOPE: Record<string, string[]> = {
   'sales.order': ['src/pages/sales/order'],
   'sales.quotation': ['src/pages/sales/quotation'],
-  'sales.delivery': ['src/pages/sales/shipment/delivery', 'src/pages/sales/shipment/statement'],
+  'sales.delivery': ['src/pages/sales/shipment/delivery', 'src/pages/sales/shipment/statement', 'src/pages/sales/revenue/closing'],
   'sales.deliveryPlan': ['src/pages/sales/shipment/deliveryplan'],
 };
 
