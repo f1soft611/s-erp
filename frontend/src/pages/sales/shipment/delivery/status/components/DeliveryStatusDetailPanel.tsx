@@ -24,11 +24,7 @@ function InfoGroup({ title, children }: { title: string; children: ReactNode }) 
     <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1.5 }}>{children}</Box>
   </Box>;
 }
-const amount = (value: number | string, rule?: SalesAmountRule) => rule
-  ? formatSalesOrderAmount(value, rule)
-  : typeof value === 'string'
-    ? formatSalesOrderAmount(value, { places: 2, rounding: 'HALF_UP', trailingZeros: 'AUTO' })
-    : value.toLocaleString('ko-KR', { maximumFractionDigits: 2 });
+const amount = (value: number | string, rule?: SalesAmountRule) => formatSalesOrderAmount(value, rule);
 
 export function DeliveryStatusDetailPanel({ item, loading, error, canEdit, onClose, onView, onEdit }: {
   item: DeliveryItem | null; loading: boolean; error: string; canEdit: boolean;

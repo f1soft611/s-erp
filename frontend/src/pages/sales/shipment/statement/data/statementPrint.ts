@@ -3,11 +3,7 @@ import { addExactSalesDecimals, addSalesOrderAmounts, formatSalesOrderAmount, ty
 
 export const ROWS_PER_PAGE = 12;
 export const text = (value: string | null | undefined) => value || '-';
-export const amount = (value: number | string, rule?: SalesAmountRule) => rule
-  ? formatSalesOrderAmount(value, rule)
-  : typeof value === 'string'
-    ? formatSalesOrderAmount(value, { places: 2, rounding: 'HALF_UP', trailingZeros: 'AUTO' })
-    : value.toLocaleString('ko-KR', { maximumFractionDigits: 2 });
+export const amount = (value: number | string, rule?: SalesAmountRule) => formatSalesOrderAmount(value, rule);
 export function printSum(values: (number | string)[], rule?: SalesAmountRule): number | string | undefined {
   try {
     if (values.some((value) => typeof value === 'string')) {

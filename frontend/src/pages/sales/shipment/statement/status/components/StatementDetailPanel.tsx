@@ -10,11 +10,7 @@ import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../.
 import { formatSalesOrderAmount, type SalesAmountRule } from '../../../../order/create/data/salesOrderAmounts';
 import type { StatementItem } from '../../types/salesStatement.types';
 
-const amount = (value: number | string, rule?: SalesAmountRule) => rule
-  ? formatSalesOrderAmount(value, rule)
-  : typeof value === 'string'
-    ? formatSalesOrderAmount(value, { places: 2, rounding: 'HALF_UP', trailingZeros: 'AUTO' })
-    : value.toLocaleString('ko-KR', { maximumFractionDigits: 2 });
+const amount = (value: number | string, rule?: SalesAmountRule) => formatSalesOrderAmount(value, rule);
 export function StatementDetailPanel({ item, loading, error, canEdit, onClose, onView, onEdit, onPrint }: {
   item: StatementItem | null; loading: boolean; error: string; canEdit: boolean;
   onClose: () => void; onView: () => void; onEdit: () => void; onPrint: () => void;
@@ -24,7 +20,7 @@ export function StatementDetailPanel({ item, loading, error, canEdit, onClose, o
   const quantityRule = policy && resolveDecimalColumn(contract.deliveryQty, policy);
   const priceRule = policy && resolveDecimalColumn(contract.unitPrice, policy);
   const lineRule = policy && resolveDecimalColumn(contract.totalAmt, policy);
-  const amountRule = policy && ('places' in policy ? policy : policy.currency);
+  const amountRule = policy && resolveDecimalColumn(contract.deliveryTotal, policy);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const writer = item?.createdByName || item?.createdBy || '-';
   return <PageAreaOverlay onClose={onClose}>
