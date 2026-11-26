@@ -334,7 +334,7 @@ it('loads status with mandatory current-month period and renders required chip',
   expect(screen.getByRole('grid', { name: '출하현황 목록' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /출하일.*삭제/ })).not.toBeInTheDocument();
 });
-it('aligns delivery status codes and names centrally and numeric values to the right', async () => {
+it('aligns delivery status codes and numeric values and preserves name text alignment', async () => {
   vi.mocked(getDeliveryStatus).mockResolvedValue(
     [{ ...item, ...item.details[0] }] as Awaited<ReturnType<typeof getDeliveryStatus>>,
   );
@@ -342,7 +342,7 @@ it('aligns delivery status codes and names centrally and numeric values to the r
   const grid = await screen.findByRole('grid', { name: '출하현황 목록' });
 
   expect(within(grid).getByRole('gridcell', { name: 'C10' })).toHaveStyle({ justifyContent: 'center' });
-  expect(within(grid).getByRole('gridcell', { name: '거래처' })).toHaveStyle({ justifyContent: 'center' });
+  expect(within(grid).getByRole('gridcell', { name: '거래처' })).toHaveStyle({ justifyContent: 'flex-start' });
   expect(within(grid).getByRole('gridcell', { name: 'SD-1' })).toHaveStyle({ justifyContent: 'center' });
   expect(within(grid).getByRole('gridcell', { name: '원래 장소' })).toHaveStyle({ justifyContent: 'flex-start' });
 });
@@ -459,7 +459,7 @@ it('selects one order, populates remaining lines and prevents source identity ed
   const deliveryGrid = screen.getByRole('grid', { name: '출하 상세 목록' });
   const deliveryCells = within(deliveryGrid).getAllByRole('gridcell');
   expect(within(deliveryGrid).getByRole('gridcell', { name: 'M20' })).toHaveStyle({ justifyContent: 'center' });
-  expect(within(deliveryGrid).getByRole('gridcell', { name: '품목' })).toHaveStyle({ justifyContent: 'center' });
+  expect(within(deliveryGrid).getByRole('gridcell', { name: '품목' })).toHaveStyle({ justifyContent: 'flex-start' });
   expect(deliveryCells[4]).toHaveStyle({ justifyContent: 'flex-end' });
   expect(screen.getByLabelText('출하장소')).toHaveValue('창고');
   expect(screen.getByRole('button', { name: '거래처 선택' })).toBeDisabled();

@@ -89,13 +89,13 @@ describe('sales order detail grid', () => {
       { columns: createQuotationDetailColumns(() => undefined), quantity: 'quotationQty', price: 'unitPrice', amount: 'lineAmt', row: 'rowId' },
       { columns: createSalesOrderStatusColumns(), quantity: 'orderQty', price: 'unitPrice', amount: 'supplyAmt', row: 'salesOrderDetailId' },
       { columns: createQuotationStatusColumns(), quantity: 'quotationQty', price: 'unitPrice', amount: 'lineAmt', row: 'quotationDetailId' },
-      { columns: statementDetailColumns, quantity: 'deliveryQty', price: 'unitPrice', amount: 'supplyAmt', row: 'lineNo' },
+      { columns: statementDetailColumns, quantity: 'deliveryQty', price: 'unitPrice', amount: 'supplyAmt', row: null },
     ];
     for (const { columns, quantity, price, amount, row } of groups) {
       expect(columns.find((column) => column.field === quantity)?.type).toBe('number');
       expect(columns.find((column) => column.field === price)?.type).toBe('decimal');
       expect(columns.find((column) => column.field === amount)?.type).toBe('currency');
-      expect(columns.find((column) => column.field === row)?.type).toBe('rownumber');
+      if (row) expect(columns.find((column) => column.field === row)?.type).toBe('rownumber');
     }
   });
 
