@@ -1,5 +1,6 @@
 import SearchIcon from '@mui/icons-material/Search';
 import { Alert, Box, TextField } from '@mui/material';
+import { PageLoadBoundary } from '../../../../../shared/components/PageLoadBoundary';
 import { PageHeader } from '../../../../../shared/components/PageHeader';
 import { PageSearchArea } from '../../../../../shared/components/PageSearchArea';
 import { PageMessageArea } from '../../../../../shared/components/PageMessageArea';
@@ -17,7 +18,7 @@ import { useSalesStatementStatus } from './hooks/useSalesStatementStatus';
 
 export function SalesStatementStatusPage(props: StatementPageProps) {
   const {
-    defaults, values, setValues, applied, keyword, setKeyword, appliedKeyword, rows, loading, error, setError,
+    initialLoad, retry, defaults, values, setValues, applied, keyword, setKeyword, appliedKeyword, rows, loading, error, setError,
     loaded, selectedId, detail, detailError, detailLoading, editor, setEditor, printing, setPrinting,
     canRead, detailPermissions, search, columns, resetSearch, closeDetail, saved, deleted,
     deliveryId, delivery, deliveryError, deliveryLoading, deliveryEditor, setDeliveryEditor, closeDelivery,
@@ -29,6 +30,7 @@ export function SalesStatementStatusPage(props: StatementPageProps) {
       description={props.content.description} actionGroups={[{ key: 'read', actions: [
         { label: '조회', icon: SearchIcon, visible: canRead, disabled: loading, onClick: () => search(applied) },
       ] }]} />
+    <PageLoadBoundary {...initialLoad} label="거래명세서현황" onRetry={retry}>
     <PageSearchArea detailFields={statementStatusSearchFields} detailValues={values} appliedDetailValues={applied}
       defaultValues={defaults} onDetailValuesChange={setValues} onDetailSearch={search}
       onDetailReset={resetSearch}
@@ -59,6 +61,7 @@ export function SalesStatementStatusPage(props: StatementPageProps) {
           canExportExcel={Boolean(props.selectedMenuPermissions?.excel)} />
       </Box>
     </Box>
+    </PageLoadBoundary>
     {selectedId !== null ? <StatementDetailPanel item={detail} loading={detailLoading} error={detailError}
       canEdit={Boolean(detail && (detailPermissions.update || detailPermissions.delete))}
       onClose={closeDetail}

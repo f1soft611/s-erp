@@ -7,6 +7,8 @@ import { Alert, Box, IconButton, InputAdornment, Paper, TextField, Typography } 
 import { usePolicyDecimalStatus } from '../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
 import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
 import { formatSalesOrderAmount, sumExactSalesAmounts } from '../../../order/create/data/salesOrderAmounts';
+import { PageLoadBoundary } from '../../../../../shared/components/PageLoadBoundary';
+import { resetGridDecimalPolicyCache } from '../../../../../shared/services/gridDecimalPolicy.service';
 import { PageHeader } from '../../../../../shared/components/PageHeader';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import { DateEditor } from '../../../../../shared/components/f1-grid/editing/DateEditor';
@@ -21,9 +23,10 @@ export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
   const {
     id, item, source, rows, selectedRowIds, setSelectedRowIds, date, changeDate, commitDate, dateError, remark, setRemark, picker, setPicker, printing, setPrinting,
     pending, error, setError, notice, canRead, canSave, canDelete, editable, dirty, blocker, dialog,
-    choose, save, remove, handleNew, print,
+    choose, save, remove, handleNew, print, initialLoad, retryLoad,
   } = useSalesStatementCreate(props);
-  const policy = usePolicyDecimalStatus().rule;
+  const policyState = usePolicyDecimalStatus();
+  const policy = policyState.rule;
   const amountRule = policy && ('places' in policy ? policy : policy.currency);
   const contract = getDecimalColumnContract('sales.delivery');
   const summaryRules = policy && {
@@ -54,6 +57,8 @@ export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
         { key: 'print', actions: [{ label: '출력', icon: PrintIcon, visible: Boolean(item),
           disabled: pending || dirty, onClick: print }] },
       ]} /> : null}
+    <PageLoadBoundary {...initialLoad} error={initialLoad.error ?? (policyState.network ? 'network' : null)} label="거래명세서등록"
+      onRetry={() => { if (policyState.network) resetGridDecimalPolicyCache(); retryLoad(); }}>
     <Box role="region" aria-label="거래명세서 입력 내용" aria-busy={pending}
       sx={{ px: embedded ? 0 : 2, pt: embedded ? 0 : 2, pb: embedded ? 0 : 2,
         display: 'flex', flexDirection: 'column',
@@ -104,6 +109,7 @@ export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
         </Box>
       </Paper>
     </Box>
+    </PageLoadBoundary>
     <StatementSourcePicker open={picker} onClose={() => setPicker(false)} onSelect={(value) => void choose(value)} />
     {printing && item ? <StatementPrint item={item} onClose={() => setPrinting(false)} /> : null}
     <UnsavedChangesConfirmDialog open={blocker.state === 'blocked'} disableContinue={pending}

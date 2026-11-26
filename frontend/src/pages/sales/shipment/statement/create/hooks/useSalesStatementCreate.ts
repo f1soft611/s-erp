@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isApiNetworkError } from '../../../../../../shared/services/apiErrors';
 import { useBlocker } from 'react-router-dom';
 import { useCommonConfirmDialog } from '../../../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../../../shared/hooks/useUnsavedChangesBeforeUnload';
@@ -6,6 +7,7 @@ import { normalizeDateInput } from '../../../../../../shared/components/f1-grid/
 import { getSystemDate } from '../../../../../../shared/services/systemDateService';
 import type { F1GridRowId } from '../../../../../../shared/components/f1-grid';
 import { calculateGridSummary } from '../../../../../../shared/components/f1-grid/utils/gridSummary';
+import { useInitialLoadState } from '../../../../../../shared/hooks/useInitialLoadState';
 import { getDelivery } from '../../../delivery/create/services/salesDelivery.service';
 import { MAX_STATEMENT_DETAIL_COUNT } from '../../../../shared/statementDetailLimit';
 import { createStatement, deleteStatement, getStatement, updateStatement } from '../../services/salesStatement.service';
@@ -58,14 +60,19 @@ export function useSalesStatementCreate({
     selectedIds,
   ]) !== baseline;
   useUnsavedChangesBeforeUnload(dirty);
+  const { start: startLoad, succeed: succeedLoad, fail: failLoad, ...initialLoad } = useInitialLoadState({ networkOnly: true });
+  const [loadRetry, setLoadRetry] = useState(0);
+  const retryLoad = useCallback(() => setLoadRetry((value) => value + 1), []);
   const blocker = useBlocker(!embedded && (dirty || pending));
   useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
   useEffect(() => onPendingChange?.(pending), [pending, onPendingChange]);
   useEffect(() => {
     if (statementId != null) return;
     let active = true;
+    startLoad();
     void getSystemDate()
       .then((today) => {
+        if (active) succeedLoad();
         if (!active || dateTouchedRef.current) return;
         dateTouchedRef.current = true;
         setDate(today);
@@ -76,12 +83,14 @@ export function useSalesStatementCreate({
         });
       })
       .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error
+        if (!active) return;
+        failLoad(cause);
+        if (!isApiNetworkError(cause)) setError(cause instanceof Error
           ? `서버 기준일을 불러오지 못했습니다. ${cause.message}`
           : '서버 기준일을 불러오지 못했습니다.');
       });
     return () => { active = false; };
-  }, [statementId]);
+  }, [statementId, loadRetry, startLoad, succeedLoad, failLoad]);
   const apply = useCallback((value: StatementItem) => {
     setItem(value); setId(value.salesStatementId);
     const detailIds = value.details
@@ -107,11 +116,16 @@ export function useSalesStatementCreate({
     if (!statementId || !canRead) return;
     let active = true;
     setPending(true);
-    getStatement(statementId).then((value) => { if (active) apply(value); })
-      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : '명세서 조회에 실패했습니다.'); })
+    startLoad();
+    getStatement(statementId).then((value) => { if (active) { apply(value); succeedLoad(); } })
+      .catch((cause) => {
+        if (!active) return;
+        failLoad(cause);
+        if (!isApiNetworkError(cause)) setError(cause instanceof Error ? cause.message : '명세서 조회에 실패했습니다.');
+      })
       .finally(() => { if (active) setPending(false); });
     return () => { active = false; };
-  }, [statementId, canRead, apply]);
+  }, [statementId, canRead, apply, loadRetry, startLoad, succeedLoad, failLoad]);
   const choose = useCallback(async (values: StatementSource[]) => {
     setPicker(false); setPending(true); setError('');
     try {
@@ -212,6 +226,6 @@ export function useSalesStatementCreate({
   return {
     id, item, source, rows, selectedRowIds, setSelectedRowIds, date, changeDate, commitDate, dateError, remark, setRemark, picker, setPicker, printing, setPrinting,
     pending, error, setError, notice, canRead, canSave, canDelete, editable, dirty, blocker, dialog,
-    choose, save, remove, handleNew, print,
+    choose, save, remove, handleNew, print, initialLoad, retryLoad,
   };
 }

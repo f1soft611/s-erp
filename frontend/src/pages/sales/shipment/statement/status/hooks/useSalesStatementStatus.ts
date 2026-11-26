@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isApiNetworkError } from '../../../../../../shared/services/apiErrors';
+import { useInitialLoadState } from '../../../../../../shared/hooks/useInitialLoadState';
 import type { PageSearchFieldValue } from '../../../../../../shared/components/page-search/searchFields';
 import type { MenuPermission, MenuTreeNode } from '../../../../../dashboard/types/dashboard';
 import { localDate } from '../../../delivery/create/services/salesDelivery.service';
@@ -47,6 +49,7 @@ export function useSalesStatementStatus(props: StatementPageProps) {
   const [refresh, setRefresh] = useState(0);
   const [detailRefresh, setDetailRefresh] = useState(0);
   const request = useRef(0);
+  const { start, succeed, fail, ...initialLoad } = useInitialLoadState({ networkOnly: true });
   const canRead = Boolean(props.selectedMenuPermissions?.read);
   const [previousListRequest, setPreviousListRequest] = useState<{
     canRead: boolean; applied: Values; appliedKeyword: string; refresh: number;
@@ -72,6 +75,7 @@ export function useSalesStatementStatus(props: StatementPageProps) {
     if (canRead && typeof period === 'object' && period) {
       setLoading(true);
       setError('');
+      start();
     }
   }
   if (previousDetailRequest.id !== selectedId || previousDetailRequest.refresh !== detailRefresh) {
@@ -87,11 +91,15 @@ export function useSalesStatementStatus(props: StatementPageProps) {
     if (typeof period !== 'object' || !period) return;
     const token = ++request.current;
     getStatementStatus(period.from ?? '', period.to ?? '', appliedKeyword)
-      .then((items) => { if (token === request.current) { setRows(items); setLoaded(true); } })
-      .catch((cause) => { if (token === request.current) setError(cause instanceof Error ? cause.message : '현황 조회에 실패했습니다.'); })
+      .then((items) => { if (token === request.current) { setRows(items); setLoaded(true); succeed(); } })
+      .catch((cause) => {
+        if (token !== request.current) return;
+        fail(cause);
+        if (!isApiNetworkError(cause)) setError(cause instanceof Error ? cause.message : '현황 조회에 실패했습니다.');
+      })
       .finally(() => { if (token === request.current) setLoading(false); });
     return () => { request.current += 1; };
-  }, [canRead, applied, appliedKeyword, refresh]);
+  }, [canRead, applied, appliedKeyword, refresh, succeed, fail]);
   useEffect(() => {
     if (!deliveryId) return;
     let active = true;
@@ -134,8 +142,10 @@ export function useSalesStatementStatus(props: StatementPageProps) {
     setEditor(null); setSelectedId(null); setDetail(null); setRefresh((value) => value + 1);
   };
 
+  const retry = () => setRefresh((value) => value + 1);
+
   return {
-    defaults, values, setValues, applied, keyword, setKeyword, appliedKeyword, rows, loading, error, setError,
+    initialLoad, retry, defaults, values, setValues, applied, keyword, setKeyword, appliedKeyword, rows, loading, error, setError,
     loaded, selectedId, detail, detailError, detailLoading, editor, setEditor, printing, setPrinting,
     canRead, detailPermissions, search, columns, resetSearch, closeDetail, saved, deleted,
     deliveryId, delivery, deliveryError, deliveryLoading, deliveryEditor, setDeliveryEditor, closeDelivery,

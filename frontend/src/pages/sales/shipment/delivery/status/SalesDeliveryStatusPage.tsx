@@ -3,6 +3,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import { Alert, Box, IconButton, Link, TextField } from '@mui/material';
 import { PageHeader } from '../../../../../shared/components/PageHeader';
+import { toPageLoadError, type PageLoadError } from '../../../../../shared/hooks/useInitialLoadState';
+import { isApiNetworkError } from '../../../../../shared/services/apiErrors';
 import { PageLoadBoundary } from '../../../../../shared/components/PageLoadBoundary';
 import { PageMessageArea } from '../../../../../shared/components/PageMessageArea';
 import { PageSearchArea } from '../../../../../shared/components/PageSearchArea';
@@ -62,7 +64,7 @@ export function SalesDeliveryStatusPage(props: DeliveryPageProps) {
   const [rows, setRows] = useState<DeliveryStatusRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [initialError, setInitialError] = useState(false);
+  const [initialError, setInitialError] = useState<PageLoadError | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<DeliveryItem | null>(null);
@@ -91,13 +93,13 @@ export function SalesDeliveryStatusPage(props: DeliveryPageProps) {
     if (!canRead) return;
     const token = ++request.current;
     let active = true;
-    setLoading(!quietRefresh.current); quietRefresh.current = false; setError(''); setInitialError(false);
+    setLoading(!quietRefresh.current); quietRefresh.current = false; setError(''); setInitialError(null);
     getDeliveryStatus(filters).then((items) => {
       if (active && token === request.current) { setRows(items); setHasLoaded(true); }
     }).catch((cause) => {
       if (active && token === request.current) {
-        setError(cause instanceof Error ? cause.message : '출하현황 조회에 실패했습니다.');
-        setInitialError(true);
+        setInitialError(toPageLoadError(cause));
+        if (!isApiNetworkError(cause)) setError(cause instanceof Error ? cause.message : '출하현황 조회에 실패했습니다.');
       }
     }).finally(() => { if (active && token === request.current) setLoading(false); });
     return () => { active = false; };
@@ -161,7 +163,7 @@ export function SalesDeliveryStatusPage(props: DeliveryPageProps) {
   return <Box sx={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
     <PageHeader breadcrumbItems={props.breadcrumbItems.length ? props.breadcrumbItems : [props.currentMenuName]} description={props.content.description}
       actionGroups={[{ key: 'read', actions: [{ label: '조회', icon: SearchIcon, visible: canRead, disabled: loading, onClick: () => search(appliedValues) }] }]} />
-    <PageLoadBoundary loading={loading} error={initialError && !hasLoaded ? 'server' : null} label="출하현황" onRetry={() => setRefresh((value) => value + 1)}>
+    <PageLoadBoundary loading={loading} error={initialError && !hasLoaded ? initialError : null} label="출하현황" onRetry={() => setRefresh((value) => value + 1)}>
       <PageSearchArea detailFields={fields} detailValues={detailValues} appliedDetailValues={appliedValues}
         defaultValues={defaultValues} onDetailValuesChange={setDetailValues} onDetailSearch={search}
         onDetailReset={() => {
