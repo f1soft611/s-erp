@@ -241,6 +241,9 @@ export const isAuthenticated = (): boolean => {
   return true;
 };
 
+const SERVER_UNAVAILABLE_MESSAGE =
+  '서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.';
+
 interface LoginJwtResponse {
   resultCode: string;
   resultMessage: string;
@@ -256,17 +259,28 @@ export const login = async (
     throw new Error('필수 값이 누락되었습니다.');
   }
 
-  const response = await fetch(`${API_BASE_URL}/auth/login-jwt`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      tenantCode: credentials.tenantCode,
-      id: credentials.userId,
-      password: credentials.password,
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/auth/login-jwt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenantCode: credentials.tenantCode,
+        id: credentials.userId,
+        password: credentials.password,
+      }),
+    });
+  } catch {
+    throw new Error(SERVER_UNAVAILABLE_MESSAGE);
+  }
 
-  const body = (await response.json()) as LoginJwtResponse;
+  // 서버가 내려가 있으면 프록시/게이트웨이가 JSON이 아닌 HTML 오류 페이지를 돌려줄 수 있다.
+  let body: LoginJwtResponse;
+  try {
+    body = (await response.json()) as LoginJwtResponse;
+  } catch {
+    throw new Error(SERVER_UNAVAILABLE_MESSAGE);
+  }
 
   if (!response.ok || body.resultCode !== '200' || !body.jToken) {
     throw new Error(body.resultMessage || '로그인에 실패했습니다.');
