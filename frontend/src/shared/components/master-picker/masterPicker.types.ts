@@ -3,6 +3,8 @@ export type MasterPickerOption = {
   code: string;
   name: string;
   details?: { label: string; value: string }[];
+  /** 항목 아래 새 줄에 `라벨 done/total` 로 표시한다. done은 녹색, 미완료가 남으면 합계는 주황색. */
+  progress?: { label: string; done: number; total: number };
 };
 
 export type MasterPickerSearch = (

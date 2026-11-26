@@ -171,9 +171,6 @@ export function MasterPickerDialog({
       actions={
         isMultiple ? (
           <>
-            <Button type="button" onClick={close}>
-              취소
-            </Button>
             <Button
               type="button"
               variant="contained"
@@ -181,6 +178,9 @@ export function MasterPickerDialog({
               onClick={handleApply}
             >
               적용
+            </Button>
+            <Button type="button" onClick={close}>
+              취소
             </Button>
           </>
         ) : undefined
@@ -243,13 +243,24 @@ export function MasterPickerDialog({
           {!loading && !error && results.length > 0 && (
             <List disablePadding>
               {results.map((option) => {
-                const itemDetails =
+                const detailText =
                   option.details
-                    ?.map(
-                      ({ label: detailLabel, value }) =>
-                        `${detailLabel}: ${value}`,
-                    )
-                    .join(' · ') || undefined;
+                    ?.map(({ label: detailLabel, value }) => `${detailLabel}: ${value}`)
+                    .join(' · ') || '';
+                const progress = option.progress;
+                const itemDetails = detailText || progress ? (
+                  <>
+                    {detailText}
+                    {progress ? (
+                      <Box component="span" data-testid="picker-progress" sx={{ display: 'block', fontWeight: 600 }}>
+                        {`${progress.label} `}
+                        <Box component="span" sx={{ color: 'success.main' }}>{progress.done}</Box>
+                        {'/'}
+                        <Box component="span" sx={{ color: progress.done < progress.total ? 'warning.main' : 'success.main' }}>{progress.total}</Box>
+                      </Box>
+                    ) : null}
+                  </>
+                ) : undefined;
                 const checkboxLabel = `${option.code} ${option.name} 선택`;
                 const itemText = (
                   <>

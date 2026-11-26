@@ -1,12 +1,14 @@
 import { apiGetWithExactDecimals, apiPost } from '../../../../../shared/services/apiClient';
 import { compareGridExactDecimals } from '../../../../../shared/components/f1-grid/utils/gridExactDecimal';
 import { MAX_STATEMENT_DETAIL_COUNT } from '../../../shared/statementDetailLimit';
+import type { MasterPickerOption } from '../../../../../shared/components/master-picker/masterPicker.types';
 import type {
   RevenueClosingCustomerSummaryRow,
   RevenueClosingDetailRow,
 } from '../types/revenueClosing.types';
 
 const PATH = '/api/v1/sales/revenue-closings/search';
+const CUSTOMERS_PATH = '/api/v1/sales/revenue-closings/customers';
 const CLOSE_PATH = '/api/v1/sales/revenue-closings/close';
 
 export type RevenueClosingSearch = {
@@ -42,6 +44,24 @@ export async function searchRevenueClosings(
     throw new Error('매출마감 조회 응답을 확인해 주세요.');
   }
   return response;
+}
+
+/** 기간 내 출하등록이 있는 거래처만 마감/미마감 건수와 함께 도움창 옵션으로 반환한다. */
+export async function searchRevenueClosingCustomers(
+  deliveryDtFrom: string,
+  deliveryDtTo: string,
+  keyword: string,
+): Promise<MasterPickerOption[]> {
+  const params = new URLSearchParams({ deliveryDtFrom, deliveryDtTo, keyword: keyword.trim() });
+  const response = await apiGetWithExactDecimals<unknown>(`${CUSTOMERS_PATH}?${params.toString()}`, []);
+  const customers = (response as { customers?: unknown } | null)?.customers;
+  if (!Array.isArray(customers) || !customers.every(isCustomerSummaryRow)) {
+    throw new Error('거래처 조회 응답을 확인해 주세요.');
+  }
+  return customers.map((row) => ({
+    id: row.customerId, code: row.customerCode, name: row.customerName,
+    progress: { label: '마감', done: row.closedCount, total: row.totalCount },
+  }));
 }
 
 export async function closeRevenueClosings(

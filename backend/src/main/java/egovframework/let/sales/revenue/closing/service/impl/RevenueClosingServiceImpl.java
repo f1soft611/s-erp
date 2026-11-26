@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
+import egovframework.let.sales.revenue.closing.domain.model.RevenueClosingCustomerSummaryVO;
 import egovframework.let.sales.revenue.closing.domain.model.RevenueClosingResponseVO;
 import egovframework.let.sales.revenue.closing.domain.model.RevenueClosingCloseRequestVO;
 import egovframework.let.sales.revenue.closing.domain.model.RevenueClosingCloseResponseVO;
@@ -60,6 +61,26 @@ public class RevenueClosingServiceImpl implements RevenueClosingService {
         result.setDetails(dao.selectDetails(params));
         result.setCustomerSummaries(dao.selectCustomerSummaries(params));
         return result;
+    }
+
+    @Override
+    public List<RevenueClosingCustomerSummaryVO> searchCustomers(Long tenantId, String userId,
+            RevenueClosingSearchVO search) throws Exception {
+        validatePrincipal(tenantId, userId);
+        if (search == null) {
+            throw badRequest("검색 조건을 확인해 주세요.");
+        }
+        LocalDate from = parseDate(search.getDeliveryDtFrom());
+        LocalDate to = parseDate(search.getDeliveryDtTo());
+        if (from.isAfter(to)) {
+            throw badRequest("출하일 기간을 확인해 주세요.");
+        }
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("tenantId", tenantId);
+        params.put("deliveryDtFrom", from);
+        params.put("deliveryDtTo", to);
+        params.put("keyword", search.getKeyword() == null ? "" : search.getKeyword().trim());
+        return dao.selectCustomerOptions(params);
     }
 
     @Override

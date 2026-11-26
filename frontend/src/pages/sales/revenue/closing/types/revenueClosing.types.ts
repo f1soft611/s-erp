@@ -5,6 +5,7 @@ export type RevenueClosingDetailRow = {
   salesDeliveryId: number;
   deliveryNo: string;
   deliveryDt: string;
+  salesOrderId?: number | null;
   orderNo: string;
   customerId: number;
   customerCode: string;

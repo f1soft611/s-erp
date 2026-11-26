@@ -7,6 +7,7 @@ import { RevenueClosingDetailGrid } from '../src/pages/sales/revenue/closing/com
 import { filterRevenueClosingDetails } from '../src/pages/sales/revenue/closing/data/revenueClosingFilters';
 import {
   closeRevenueClosings,
+  searchRevenueClosingCustomers,
   searchRevenueClosings,
 } from '../src/pages/sales/revenue/closing/services/revenueClosing.service';
 import { getSystemDate } from '../src/shared/services/systemDateService';
@@ -16,16 +17,28 @@ import type {
 } from '../src/pages/sales/revenue/closing/types/revenueClosing.types';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
 import { searchOrderCustomers } from '../src/pages/sales/order/create/services/salesOrderMaster.service';
+import { getDelivery } from '../src/pages/sales/shipment/delivery/create/services/salesDelivery.service';
+import { getSalesOrder } from '../src/pages/sales/order/create/services/salesOrder.service';
 
 vi.mock('../src/pages/sales/order/create/services/salesOrderMaster.service', () => ({
   searchOrderCustomers: vi.fn(async () => [
-    { id: 11, code: 'C11', name: '가나다상사' },
+    { id: 11, code: 'C11', name: '가나다상사', details: [{ label: '사업자번호', value: '123-45-67890' }] },
     { id: 22, code: 'C22', name: '라마바산업' },
   ]),
+}));
+vi.mock('../src/pages/sales/shipment/delivery/create/services/salesDelivery.service', async (original) => ({
+  ...await original<object>(), getDelivery: vi.fn(),
+}));
+vi.mock('../src/pages/sales/order/create/services/salesOrder.service', async (original) => ({
+  ...await original<object>(), getSalesOrder: vi.fn(),
 }));
 
 vi.mock('../src/pages/sales/revenue/closing/services/revenueClosing.service', () => ({
   searchRevenueClosings: vi.fn(async () => ({ details: [], customerSummaries: [] })),
+  searchRevenueClosingCustomers: vi.fn(async () => [
+    { id: 11, code: 'C11', name: '가나다상사', progress: { label: '마감', done: 1, total: 3 } },
+    { id: 22, code: 'C22', name: '라마바산업', progress: { label: '마감', done: 0, total: 3 } },
+  ]),
   closeRevenueClosings: vi.fn(async () => ({ closedCount: 0, items: [] })),
 }));
 
@@ -439,6 +452,8 @@ it('applies customer drafts only on detail submit and reset clears selections an
   const picker = screen.getByRole('dialog', { name: '거래처 선택' });
   fireEvent.click(within(picker).getByRole('button', { name: '검색' }));
   const firstOption = await screen.findByRole('checkbox', { name: /C11 가나다상사 선택/ });
+  expect(within(picker).getByText('사업자번호: 123-45-67890')).toBeInTheDocument();
+  expect(within(picker).getAllByTestId('picker-progress')[0]).toHaveTextContent('마감 1/3');
   fireEvent.click(firstOption);
   fireEvent.click(within(picker).getByRole('button', { name: '적용' }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: '거래처 선택' })).not.toBeInTheDocument());
@@ -472,5 +487,27 @@ it('applies customer drafts only on detail submit and reset clears selections an
   expect(within(restoredSearch).getByLabelText('출하일 시작일')).toHaveValue(firstDay);
   expect(within(restoredSearch).getByLabelText('출하일 종료일')).toHaveValue(lastDay);
   expect(searchOrderCustomers).toHaveBeenCalled();
+  expect(searchRevenueClosingCustomers).toHaveBeenCalledWith(firstDay, lastDay, expect.any(String));
   await waitForSearch(3);
 });
+
+it('opens delivery and order detail panels from the closing grid links', async () => {
+  vi.mocked(searchRevenueClosings).mockResolvedValue({
+    details: [{ ...detailRows[0], salesOrderId: 7 }], customerSummaries: summaryRows,
+  });
+  vi.mocked(getDelivery).mockResolvedValue({ salesDeliveryId: 100, deliveryNo: 'D-001', deliveryDt: '2026-11-03',
+    deliveryType: 'ORDER', customerId: 11, customerCode: 'C11', customerName: '가나다상사', salesOrderId: 7, orderNo: 'O-001',
+    deliveryPlace: null, deliveryMethod: null, remark: null, totalAmt: 110, details: [] } as Awaited<ReturnType<typeof getDelivery>>);
+  vi.mocked(getSalesOrder).mockResolvedValue({ salesOrderId: 7, orderNo: 'O-001', orderDt: '2026-11-01', customerId: 11,
+    customerCode: 'C11', customerName: '가나다상사', salesDestinationId: null, destinationCode: null, destinationName: null,
+    billingCustomerId: null, billingCustomerCode: null, billingCustomerName: null, quotNo: null, deliveryDt: null,
+    deliveryPlace: null, deliveryMethod: null, status: '수주등록', totalAmt: 0, remark: null, details: [] });
+  render(<RevenueClosingPage {...props} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'D-001 출하 상세 보기' }));
+  const deliveryPanel = await screen.findByRole('region', { name: '출하 상세' });
+  expect(await within(deliveryPanel).findByText('출하번호: D-001')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'O-001 수주 상세 보기' }));
+  const orderPanel = await screen.findByRole('region', { name: '수주 상세' });
+  expect(await within(orderPanel).findByText('수주번호: O-001')).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: '출하 상세' })).not.toBeInTheDocument();
+}, 15000);
