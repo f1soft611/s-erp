@@ -32,6 +32,7 @@ describe('workspace service', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('lists only rooms the user can read', async () => {
@@ -46,6 +47,8 @@ describe('workspace service', () => {
   });
 
   it('creates a post and puts it first in the list', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-27T00:00:00Z'));
     const created = await createPost(newPost(), 'u2');
     const posts = await listPosts('room-sales');
     expect(posts[0].id).toBe(created.id);
