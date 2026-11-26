@@ -204,7 +204,7 @@ class SalesDeliveryServiceImplTest {
         when(statementDao.lockDelivery(anyMap())).thenReturn(501L);
         when(statementDao.selectAvailableDetailIdsByDelivery(anyMap())).thenReturn(ids);
         when(systemPolicyService.getStatementIssueMode(71L)).thenReturn("AUTO");
-        SalesStatementServiceImpl realStatements = new SalesStatementServiceImpl(statementDao, sequenceService);
+        SalesStatementServiceImpl realStatements = new SalesStatementServiceImpl(statementDao, sequenceService, systemPolicyService);
         SalesDeliveryServiceImpl target = new SalesDeliveryServiceImpl(dao, sequenceService, planService,
                 systemPolicyService, realStatements);
         PlatformTransactionManager transactions = org.mockito.Mockito.mock(PlatformTransactionManager.class);

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,18 +31,21 @@ import org.springframework.web.server.ResponseStatusException;
 import egovframework.let.common.idsequence.service.IdSequenceService;
 import egovframework.let.sales.shipment.statement.domain.repository.SalesStatementDAO;
 import egovframework.let.sales.shipment.statement.service.impl.SalesStatementServiceImpl;
+import egovframework.let.system.policies.service.SystemPolicyService;
 
 class SalesStatementServiceTest {
     @Mock
     private SalesStatementDAO dao;
     @Mock
     private IdSequenceService sequence;
+    @Mock
+    private SystemPolicyService policies;
     private SalesStatementServiceImpl service;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new SalesStatementServiceImpl(dao, sequence);
+        service = new SalesStatementServiceImpl(dao, sequence, policies);
     }
 
     @Test
@@ -68,6 +72,42 @@ class SalesStatementServiceTest {
         assertThat(header.getValue()).containsEntry("customerId", 31L)
                 .containsEntry("salesDeliveryId", 15L)
                 .containsEntry("salesDeliveryDetailIds", Arrays.asList(21L, 22L));
+    }
+
+    @Test
+    void storesTheHeaderTotalRoundedByTheDeliveryTotalRuleInsteadOfTheRawSum() throws Exception {
+        Map<String, Object> currency = new HashMap<String, Object>();
+        currency.put("places", 1);
+        currency.put("rounding", "DOWN");
+        Map<String, Object> module = new HashMap<String, Object>();
+        module.put("currency", currency);
+        when(policies.getGridDecimals(71L)).thenReturn(Collections.singletonMap("SALES", module));
+        when(dao.lockDeliveryDetails(anyMap())).thenReturn(Arrays.asList(
+                line(21L, 15L, 31L, false, false, new BigDecimal("1.29")),
+                line(22L, 16L, 31L, false, false, new BigDecimal("1.29"))));
+        when(sequence.nextValue("SALES_STATEMENT_NO", "71", "20261109")).thenReturn(1L);
+        when(dao.insertHeader(anyMap())).thenReturn(100L);
+        when(dao.insertDetails(anyMap())).thenReturn(2);
+        when(dao.selectHeader(anyMap())).thenReturn(statement());
+        when(dao.selectDetails(anyMap())).thenReturn(Collections.<Map<String, Object>>emptyList());
+
+        service.createBatch(71L, "user01", Arrays.asList(21L, 22L), "2026-11-09");
+
+        ArgumentCaptor<Map<String, Object>> header = ArgumentCaptor.forClass(Map.class);
+        verify(dao).insertHeader(header.capture());
+        assertThat(header.getValue().get("totalAmt")).isEqualTo(new BigDecimal("2.5"));
+    }
+
+    @Test
+    void doesNotCreateAStatementWhenTheDecimalPolicyCannotBeRead() throws Exception {
+        when(policies.getGridDecimals(71L)).thenThrow(new IllegalStateException("policy"));
+        when(dao.lockDeliveryDetails(anyMap())).thenReturn(Collections.singletonList(
+                line(21L, 15L, 31L, false, false)));
+        when(sequence.nextValue("SALES_STATEMENT_NO", "71", "20261109")).thenReturn(1L);
+
+        assertThatThrownBy(() -> service.createBatch(71L, "user01", Collections.singletonList(21L), "2026-11-09"))
+                .isInstanceOf(IllegalStateException.class);
+        verify(dao, never()).insertHeader(anyMap());
     }
 
     @Test
@@ -200,7 +240,13 @@ class SalesStatementServiceTest {
 
     private Map<String, Object> line(Long detailId, Long deliveryId, Long customerId,
             boolean issued, boolean closed) {
+        return line(detailId, deliveryId, customerId, issued, closed, new BigDecimal("10.00"));
+    }
+
+    private Map<String, Object> line(Long detailId, Long deliveryId, Long customerId,
+            boolean issued, boolean closed, BigDecimal total) {
         Map<String, Object> result = new HashMap<String, Object>();
+        result.put("totalAmt", total);
         result.put("salesDeliveryDetailId", detailId);
         result.put("salesDeliveryId", deliveryId);
         result.put("customerId", customerId);

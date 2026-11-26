@@ -1,5 +1,6 @@
 package egovframework.let.sales.shipment.statement.service.impl;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -19,17 +20,23 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
+import egovframework.com.cmm.DecimalColumnContract;
 import egovframework.let.common.idsequence.service.IdSequenceService;
+import egovframework.let.sales.common.SalesDecimalPolicy;
 import egovframework.let.sales.shipment.statement.domain.repository.SalesStatementDAO;
+import egovframework.let.system.policies.service.SystemPolicyService;
 
 @Service
 public class SalesStatementServiceImpl {
     private final SalesStatementDAO dao;
     private final IdSequenceService sequence;
+    private final SystemPolicyService systemPolicyService;
 
-    public SalesStatementServiceImpl(SalesStatementDAO dao, IdSequenceService sequence) {
+    public SalesStatementServiceImpl(SalesStatementDAO dao, IdSequenceService sequence,
+            SystemPolicyService systemPolicyService) {
         this.dao = dao;
         this.sequence = sequence;
+        this.systemPolicyService = systemPolicyService;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -205,13 +212,17 @@ public class SalesStatementServiceImpl {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "거래처가 같은 출하 상세만 선택할 수 있습니다.");
         }
 
+        SalesDecimalPolicy decimalPolicy = SalesDecimalPolicy.from(systemPolicyService.getGridDecimals(tenantId),
+                DecimalColumnContract.forDocument("sales.delivery"));
         List<Map<String, Object>> created = new ArrayList<Map<String, Object>>();
         String scope = date.format(DateTimeFormatter.BASIC_ISO_DATE);
         for (Map.Entry<Long, List<Map<String, Object>>> entry : groups.entrySet()) {
             List<Map<String, Object>> group = entry.getValue();
             List<Long> groupIds = new ArrayList<Long>();
+            BigDecimal total = BigDecimal.ZERO;
             for (Map<String, Object> target : group) {
                 groupIds.add(numberValue(target.get("salesDeliveryDetailId")));
+                total = total.add(amountValue(target.get("totalAmt")));
             }
             Long number = sequence.nextValue("SALES_STATEMENT_NO", String.valueOf(tenantId), scope);
             if (number == null || number < 1) {
@@ -224,6 +235,7 @@ public class SalesStatementServiceImpl {
             params.put("statementNo", String.format(Locale.ROOT, "TS-%s-%04d", scope, number));
             params.put("statementDt", date);
             params.put("remark", remark);
+            params.put("totalAmt", decimalPolicy.amount("deliveryTotal", total, "명세서 합계"));
             Long id = dao.insertHeader(params);
             if (id == null || id < 1) {
                 throw new IllegalStateException("거래명세서 저장에 실패했습니다.");
@@ -235,6 +247,16 @@ public class SalesStatementServiceImpl {
             created.add(get(tenantId, userId, id));
         }
         return created;
+    }
+
+    private BigDecimal amountValue(Object value) {
+        if (value instanceof BigDecimal) {
+            return (BigDecimal) value;
+        }
+        if (value instanceof Number) {
+            return new BigDecimal(value.toString());
+        }
+        throw new IllegalStateException("출하 상세 금액을 확인해 주세요.");
     }
 
     private Long numberValue(Object value) {

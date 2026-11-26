@@ -17,6 +17,7 @@
                h.delivery_type AS "deliveryType",
                d.line_no AS "sourceLineNo",
                d.revenue_closed_at AS "revenueClosedAt",
+               d.total_amt AS "totalAmt",
                EXISTS (
                    SELECT 1
                    FROM tb_sales_statement_dt sd
@@ -126,13 +127,7 @@
                t.business_type, t.business_category, t.post_code, t.address, t.telephone_no, t.facsimile_no, t.stamp_image,
                c.customer_code, c.customer_name, c.business_no, c.president_name,
                c.business_item_1, c.business_status_1, c.post_code, c.address, c.telephone_no, c.facsimile_no,
-               (SELECT COALESCE(SUM(d.total_amt), 0)
-                  FROM tb_sales_delivery_dt d
-                 WHERE d.tenant_id = #{tenantId, jdbcType=BIGINT}
-                   AND d.sales_delivery_detail_id IN
-                   <foreach collection="salesDeliveryDetailIds" item="detailId" open="(" separator="," close=")">
-                       #{detailId, jdbcType=BIGINT}
-                   </foreach>) AS total_amt,
+               #{totalAmt, jdbcType=NUMERIC},
                #{remark, jdbcType=VARCHAR}, #{userId, jdbcType=VARCHAR}
         FROM tb_sales_delivery_hd h
         JOIN tb_tenant t ON t.tenant_id = h.tenant_id
