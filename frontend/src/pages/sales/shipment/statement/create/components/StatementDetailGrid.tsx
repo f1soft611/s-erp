@@ -11,7 +11,7 @@ export function StatementDetailGrid({ rows, selectable = false, selectedRowIds, 
 }) {
   return (
     <F1Grid storageKey="sales-statement-create-details-v1" ariaLabel="거래명세서 상세 목록"
-      rows={rows} columns={statementDetailColumns} rowKey="salesStatementDetailId"
+      rows={rows} columns={statementDetailColumns} features={[{ ftype: 'summary', dock: 'bottom' }]} rowKey="salesStatementDetailId"
       showCheckbox={selectable} selectionMode="row" multiSelect={selectable}
       initialSelectedRowIds={selectedRowIds}
       onSelectionChange={selectable ? onSelectionChange : undefined}

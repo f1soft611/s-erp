@@ -4,6 +4,9 @@ import NoteAddOutlinedIcon from '@mui/icons-material/NoteAddOutlined';
 import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined';
 import PrintIcon from '@mui/icons-material/Print';
 import { Alert, Box, IconButton, InputAdornment, Paper, TextField, Typography } from '@mui/material';
+import { usePolicyDecimalStatus } from '../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
+import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
+import { formatSalesOrderAmount, sumExactSalesAmounts } from '../../../order/create/data/salesOrderAmounts';
 import { PageHeader } from '../../../../../shared/components/PageHeader';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import { DateEditor } from '../../../../../shared/components/f1-grid/editing/DateEditor';
@@ -20,6 +23,23 @@ export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
     pending, error, setError, notice, canRead, canSave, canDelete, editable, dirty, blocker, dialog,
     choose, save, remove, handleNew, print,
   } = useSalesStatementCreate(props);
+  const policy = usePolicyDecimalStatus().rule;
+  const amountRule = policy && ('places' in policy ? policy : policy.currency);
+  const contract = getDecimalColumnContract('sales.delivery');
+  const summaryRules = policy && {
+    supplyAmount: resolveDecimalColumn(contract.supplyAmt, policy),
+    vatAmount: resolveDecimalColumn(contract.vatAmt, policy),
+    totalAmount: resolveDecimalColumn(contract.deliveryTotal, policy),
+  };
+  let totals: ReturnType<typeof sumExactSalesAmounts> | null;
+  try {
+    const summed = id ? rows : rows.filter((row) => selectedRowIds.includes(row.salesStatementDetailId));
+    totals = amountRule ? sumExactSalesAmounts(summed.map((row) => ({
+      supplyAmount: row.supplyAmt, vatAmount: row.vatAmt, totalAmount: row.totalAmt,
+    })), amountRule, summaryRules) : null;
+  } catch {
+    totals = null;
+  }
   if (!canRead) return <Alert severity="warning">거래명세서 조회 권한이 없습니다.</Alert>;
   return <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
     {!embedded ? <PageHeader breadcrumbItems={breadcrumbItems.length ? breadcrumbItems : [currentMenuName]}
@@ -73,6 +93,14 @@ export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
             selectedRowIds={selectedRowIds}
             onSelectionChange={setSelectedRowIds}
           />
+        </Box>
+        <Box aria-label="거래명세서 금액 합계" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 1, p: 2 }}>
+          {([['공급가 합계', totals?.supplyAmount, summaryRules?.supplyAmount], ['부가세 합계', totals?.vatAmount, summaryRules?.vatAmount], ['총 합계', totals?.totalAmount, summaryRules?.totalAmount]] as const).map(([label, value, displayRule]) => (
+            <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1, px: 1.5, py: 1 }}>
+              <Typography variant="body2" color="text.secondary">{label}</Typography>
+              <Typography variant="body1" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{value === undefined ? (amountRule ? '계산 범위 초과' : '-') : formatSalesOrderAmount(value, displayRule ?? amountRule)}</Typography>
+            </Box>
+          ))}
         </Box>
       </Paper>
     </Box>

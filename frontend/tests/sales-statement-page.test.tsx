@@ -209,7 +209,7 @@ it('groups selected detail lines from multiple same-customer deliveries into one
   });
   fireEvent.click(screen.getByRole('button', { name: '출하 선택' }));
   const picker = screen.getByRole('dialog', { name: '출하 선택' });
-  fireEvent.click(within(picker).getByRole('button', { name: '검색' }));
+  fireEvent.keyDown(within(picker).getByRole('textbox', { name: '출하번호·거래처 검색' }), { key: 'Enter', code: 'Enter' });
   await within(picker).findByText('SD-1');
   fireEvent.click(within(picker).getByLabelText('1 행 선택'));
   fireEvent.click(within(picker).getByLabelText('4 행 선택'));
@@ -234,7 +234,7 @@ it('prevents grouping deliveries from different customers', async () => {
   mount(<SalesStatementCreatePage {...props} />);
   fireEvent.click(screen.getByRole('button', { name: '출하 선택' }));
   const picker = screen.getByRole('dialog', { name: '출하 선택' });
-  fireEvent.click(within(picker).getByRole('button', { name: '검색' }));
+  fireEvent.keyDown(within(picker).getByRole('textbox', { name: '출하번호·거래처 검색' }), { key: 'Enter', code: 'Enter' });
   await within(picker).findByText('SD-1');
   fireEvent.click(within(picker).getByLabelText('1 행 선택'));
 
@@ -250,7 +250,7 @@ it('requires at least one selected detail before creating a statement', async ()
   mount(<SalesStatementCreatePage {...props} />);
   fireEvent.click(screen.getByRole('button', { name: '출하 선택' }));
   const picker = screen.getByRole('dialog', { name: '출하 선택' });
-  fireEvent.click(within(picker).getByRole('button', { name: '검색' }));
+  fireEvent.keyDown(within(picker).getByRole('textbox', { name: '출하번호·거래처 검색' }), { key: 'Enter', code: 'Enter' });
   await within(picker).findByText('SD-1');
   fireEvent.click(within(picker).getByLabelText('1 행 선택'));
   fireEvent.click(within(picker).getByRole('button', { name: '선택 완료' }));
@@ -272,7 +272,7 @@ it('shows the 100-detail limit before submitting a statement', async () => {
   mount(<SalesStatementCreatePage {...props} />);
   fireEvent.click(screen.getByRole('button', { name: '출하 선택' }));
   const picker = screen.getByRole('dialog', { name: '출하 선택' });
-  fireEvent.click(within(picker).getByRole('button', { name: '검색' }));
+  fireEvent.keyDown(within(picker).getByRole('textbox', { name: '출하번호·거래처 검색' }), { key: 'Enter', code: 'Enter' });
   await within(picker).findByText('SD-1');
   fireEvent.click(within(picker).getByLabelText('1 행 선택'));
   fireEvent.click(within(picker).getByRole('button', { name: '선택 완료' }));
@@ -317,3 +317,23 @@ it('opens the same registration form from status detail and prints its stored sn
   }
   await waitFor(() => expect(getStatement).toHaveBeenCalledWith(3));
 });
+it('opens the source delivery detail panel from the status delivery number', async () => {
+  vi.mocked(getStatementStatus).mockResolvedValue([{ ...detail, salesStatementId: 3, statementNo: 'TS-1',
+    statementDt: '2026-11-09', deliveryNo: 'SD-1', sourceDeliveryId: 1, sourceDeliveryNo: 'SD-1',
+    customerCode: 'C1', customerName: '거래처', lineTotalAmt: 220 }]);
+  vi.mocked(getDelivery).mockResolvedValue({ salesDeliveryId: 1, deliveryNo: 'SD-1', deliveryDt: '2026-11-09',
+    deliveryType: 'DIRECT', customerId: 5, customerCode: 'C1', customerName: '거래처', salesOrderId: null, orderNo: null,
+    deliveryPlace: null, deliveryMethod: null, remark: null, totalAmt: 220, details: [] } as Awaited<ReturnType<typeof getDelivery>>);
+  mount(<SalesStatementStatusPage {...props} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'SD-1 출하 상세 보기' }));
+  const panel = await screen.findByRole('region', { name: '출하 상세' });
+  expect(await within(panel).findByText('출하번호: SD-1')).toBeInTheDocument();
+  expect(getDelivery).toHaveBeenCalledWith(1);
+}, 15000);
+it('shows amount totals under the statement detail grid without a row-number column', async () => {
+  mount(<SalesStatementCreatePage {...props} statementId={3} />);
+  const totals = await screen.findByLabelText('거래명세서 금액 합계');
+  expect(within(totals).getByText('공급가 합계')).toBeInTheDocument();
+  expect(within(totals).getByText('총 합계')).toBeInTheDocument();
+  expect(screen.queryByRole('columnheader', { name: 'No' })).not.toBeInTheDocument();
+}, 15000);

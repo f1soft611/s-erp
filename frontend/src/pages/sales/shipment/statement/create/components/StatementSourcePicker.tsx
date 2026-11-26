@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import SearchIcon from '@mui/icons-material/Search';
-import { Box, Button, TextField } from '@mui/material';
+import ClearIcon from '@mui/icons-material/Clear';
+import { Box, Button, IconButton, TextField } from '@mui/material';
 import { CommonDialog } from '../../../../../../shared/components/CommonDialog';
+import { PageSearchArea } from '../../../../../../shared/components/PageSearchArea';
 import { PageMessageArea } from '../../../../../../shared/components/PageMessageArea';
 import { F1Grid } from '../../../../../../shared/components/f1-grid';
 import { searchStatementSources } from '../../services/salesStatement.service';
@@ -44,13 +45,15 @@ export function StatementSourcePicker({ open, onClose, onSelect }: {
       <Button variant="contained" disabled={selectedSources.length === 0}
         onClick={completeSelection}>선택 완료</Button>
     </>}>
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 1.5 }}>
-      <Box component="form" onSubmit={(event) => { event.preventDefault(); void search(); }}
-        sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-        <TextField fullWidth size="small" label="출하번호·거래처 검색" value={keyword}
-          onChange={(event) => setKeyword(event.target.value)} sx={{ '& .MuiOutlinedInput-root': { height: 40 } }} />
-        <Button type="submit" variant="contained" disabled={loading} startIcon={<SearchIcon />}
-          sx={{ flexShrink: 0, minWidth: 88, height: 40 }}>검색</Button>
+    <Box sx={{ position: 'relative', display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, minWidth: 0, gap: 1.5 }}>
+      <Box role="group" aria-label="출하 선택 검색" sx={{ minWidth: 0, flexShrink: 0 }}>
+        <PageSearchArea mode="dialog" detailLoading={loading} onDefaultSearch={() => void search()}
+          searchField={<TextField fullWidth size="small" margin="none" placeholder="출하번호·거래처 검색" value={keyword}
+            disabled={loading} onChange={(event) => setKeyword(event.target.value)}
+            slotProps={{ htmlInput: { 'aria-label': '출하번호·거래처 검색' }, input: { endAdornment: keyword ? (
+              <IconButton type="button" size="small" edge="end" aria-label="출하 선택 검색어 초기화" onClick={() => setKeyword('')} sx={{ p: 0.25 }}>
+                <ClearIcon fontSize="small" /></IconButton>) : null } }}
+            sx={(theme) => ({ width: '100%', height: 40, '& .MuiOutlinedInput-root': { height: 40, backgroundColor: theme.palette.background.paper } })} />} />
       </Box>
       <PageMessageArea message={error} />
       <Box sx={{ flex: 1, minHeight: 240, minWidth: 0, overflow: 'hidden' }}>

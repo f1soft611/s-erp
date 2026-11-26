@@ -212,8 +212,9 @@
                to_char(h.statement_dt, 'YYYY-MM-DD') AS "statementDt", h.delivery_no AS "deliveryNo",
                h.customer_code AS "customerCode", h.customer_name AS "customerName", h.total_amt AS "totalAmt",
                d.sales_statement_detail_id AS "salesStatementDetailId", d.line_no AS "lineNo",
-               h.delivery_no AS "sourceDeliveryNo",
-               to_char(h.delivery_dt, 'YYYY-MM-DD') AS "sourceDeliveryDt",
+               sh.sales_delivery_id AS "sourceDeliveryId",
+               COALESCE(sh.delivery_no, h.delivery_no) AS "sourceDeliveryNo",
+               to_char(COALESCE(sh.delivery_dt, h.delivery_dt), 'YYYY-MM-DD') AS "sourceDeliveryDt",
                d.material_code AS "materialCode", d.material_name AS "materialName", d.material_spec AS "materialSpec",
                d.unit, d.delivery_qty AS "deliveryQty", d.unit_price AS "unitPrice",
                d.supply_amt AS "supplyAmt", d.vat_amt AS "vatAmt", d.total_amt AS "lineTotalAmt"

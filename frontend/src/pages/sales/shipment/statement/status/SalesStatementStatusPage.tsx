@@ -7,6 +7,9 @@ import { SearchResultMessage } from '../../../../../shared/components/SearchResu
 import { F1Grid } from '../../../../../shared/components/f1-grid';
 import { StatementDetailPanel } from './components/StatementDetailPanel';
 import { StatementEditorDialog } from './components/StatementEditorDialog';
+import { DeliveryStatusDetailPanel } from '../../delivery/status/components/DeliveryStatusDetailPanel';
+import { DeliveryEditorDialog } from '../../delivery/status/components/DeliveryEditorDialog';
+import { useSalesOrderCommonCodes } from '../../../order/hooks/useSalesOrderCommonCodes';
 import { StatementPrint } from '../components/StatementPrint';
 import type { StatementPageProps } from '../types/salesStatement.types';
 import { statementStatusSearchFields } from './data/statementStatusSearch';
@@ -17,7 +20,9 @@ export function SalesStatementStatusPage(props: StatementPageProps) {
     defaults, values, setValues, applied, keyword, setKeyword, appliedKeyword, rows, loading, error, setError,
     loaded, selectedId, detail, detailError, detailLoading, editor, setEditor, printing, setPrinting,
     canRead, detailPermissions, search, columns, resetSearch, closeDetail, saved, deleted,
+    deliveryId, delivery, deliveryError, deliveryLoading, deliveryEditor, setDeliveryEditor, closeDelivery,
   } = useSalesStatementStatus(props);
+  const { codes: commonCodes } = useSalesOrderCommonCodes();
   if (!canRead) return <Alert severity="warning">거래명세서현황 조회 권한이 없습니다.</Alert>;
   return <Box sx={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
     <PageHeader breadcrumbItems={props.breadcrumbItems.length ? props.breadcrumbItems : [props.currentMenuName]}
@@ -48,7 +53,7 @@ export function SalesStatementStatusPage(props: StatementPageProps) {
     <Box data-testid="sales-status-content" sx={{ px: 2, pt: 2, pb: 2, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 360, flex: 1 }}>
       <Box sx={{ flex: 1, minHeight: 320, minWidth: 0, overflow: 'hidden' }}>
         <F1Grid ariaLabel="거래명세서현황 목록" rows={rows} columns={columns} rowKey="salesStatementDetailId" highlightKeyword={appliedKeyword}
-          storageKey="sales-statement-status-grid-v1" loading={loading} showCheckbox={false} height="100%"
+          storageKey="sales-statement-status-grid-v1" features={[{ ftype: 'summary', dock: 'bottom' }]} loading={loading} showCheckbox={false} height="100%"
           minHeight={320} selectionMode="row" selectRowOnContextMenu={false} allowAddRowInContextMenu={false}
           allowDuplicateRowInContextMenu={false} allowDeleteRowInContextMenu={false}
           canExportExcel={Boolean(props.selectedMenuPermissions?.excel)} />
@@ -61,6 +66,12 @@ export function SalesStatementStatusPage(props: StatementPageProps) {
     {selectedId !== null && editor ? <StatementEditorDialog id={selectedId} mode={editor} page={props}
       permissions={detailPermissions} onClose={() => setEditor(null)}
       onSaved={saved} onDeleted={deleted} /> : null}
+    {deliveryId !== null ? <DeliveryStatusDetailPanel item={delivery} loading={deliveryLoading} error={deliveryError}
+      canEdit={false} deliveryMethodOptions={commonCodes.deliveryMethodOptions}
+      onClose={closeDelivery} onView={() => setDeliveryEditor('view')} onEdit={() => undefined} /> : null}
+    {deliveryId !== null && deliveryEditor ? <DeliveryEditorDialog id={deliveryId} mode="view" page={props}
+      permissions={{ read: canRead, create: false, update: false, delete: false, excel: false }}
+      onClose={() => setDeliveryEditor(null)} onSaved={() => setDeliveryEditor(null)} onDeleted={() => setDeliveryEditor(null)} /> : null}
     {printing && detail ? <StatementPrint item={detail} onClose={() => setPrinting(false)} /> : null}
   </Box>;
 }
