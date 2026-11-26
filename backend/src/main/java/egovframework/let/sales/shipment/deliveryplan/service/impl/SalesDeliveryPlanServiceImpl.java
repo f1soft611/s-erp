@@ -33,7 +33,7 @@ import egovframework.let.sales.shipment.deliveryplan.domain.model.SalesDeliveryP
 import egovframework.let.sales.shipment.deliveryplan.domain.repository.SalesDeliveryPlanDAO;
 import egovframework.let.sales.shipment.deliveryplan.service.SalesDeliveryPlanService;
 import egovframework.let.system.policies.service.SystemPolicyService;
-import egovframework.let.sales.common.SalesDecimalPolicy;
+import egovframework.com.cmm.DecimalPolicy;
 import egovframework.com.cmm.DecimalColumnContract;
 
 @Service("salesDeliveryPlanService")
@@ -423,7 +423,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
     private Map<SourceKey, BigDecimal> validateAndSumDetails(Long tenantId, SalesDeliveryPlanRequestVO request,
             Map<SourceKey, SalesDeliveryPlanDetailVO> linesBySource,
             Map<Long, SalesDeliveryPlanDetailVO> currentById) throws Exception {
-        SalesDecimalPolicy decimalPolicy = SalesDecimalPolicy.from(policy.getGridDecimals(tenantId),
+        DecimalPolicy decimalPolicy = DecimalPolicy.forModule("SALES", policy.getGridDecimals(tenantId),
                 DecimalColumnContract.forDocument("sales.deliveryPlan"));
         decimalPolicy.verifySnapshot(request.getDecimalPolicy());
         decimalPolicy.verifyColumnContract(request.getDecimalColumns());
@@ -601,7 +601,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         }
     }
 
-    private BigDecimal validateQuantity(BigDecimal quantity, SalesDecimalPolicy decimalPolicy) {
+    private BigDecimal validateQuantity(BigDecimal quantity, DecimalPolicy decimalPolicy) {
         if (quantity == null || quantity.signum() <= 0) throw badRequest("계획수량은 양수로 입력해 주세요.");
         return decimalPolicy.input("plannedQty", quantity, "계획수량");
     }

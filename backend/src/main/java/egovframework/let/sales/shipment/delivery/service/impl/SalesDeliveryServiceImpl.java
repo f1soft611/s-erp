@@ -35,7 +35,7 @@ import egovframework.let.sales.shipment.delivery.service.SalesDeliveryService;
 import egovframework.let.sales.shipment.deliveryplan.service.SalesDeliveryPlanService;
 import egovframework.let.sales.shipment.statement.service.impl.SalesStatementServiceImpl;
 import egovframework.let.system.policies.service.SystemPolicyService;
-import egovframework.let.sales.common.SalesDecimalPolicy;
+import egovframework.com.cmm.DecimalPolicy;
 import egovframework.com.cmm.DecimalColumnContract;
 
 @Service("salesDeliveryService")
@@ -72,7 +72,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         Map<Long, SalesDeliverySourceOrderHeaderVO> sourceOrders =
                 lockAndValidateOrders(tenantId, payload, Collections.<SalesDeliveryDetailVO>emptyList());
         validateCustomer(tenantId, payload.getCustomerId());
-        SalesDecimalPolicy decimalPolicy = SalesDecimalPolicy.from(systemPolicyService.getGridDecimals(tenantId),
+        DecimalPolicy decimalPolicy = DecimalPolicy.forModule("SALES", systemPolicyService.getGridDecimals(tenantId),
                 DecimalColumnContract.forDocument("sales.delivery"));
         decimalPolicy.verifySnapshot(payload.getDecimalPolicy());
         decimalPolicy.verifyColumnContract(payload.getDecimalColumns());
@@ -151,7 +151,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         if (oldDetails == null) {
             oldDetails = new ArrayList<SalesDeliveryDetailVO>();
         }
-        SalesDecimalPolicy decimalPolicy = SalesDecimalPolicy.from(systemPolicyService.getGridDecimals(tenantId),
+        DecimalPolicy decimalPolicy = DecimalPolicy.forModule("SALES", systemPolicyService.getGridDecimals(tenantId),
                 DecimalColumnContract.forDocument("sales.delivery"));
         decimalPolicy.verifySnapshot(payload.getDecimalPolicy());
         decimalPolicy.verifyColumnContract(payload.getDecimalColumns());
@@ -353,7 +353,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
 
     private List<PreparedDetail> prepareDetails(Long tenantId, SalesDeliveryRequestVO payload,
             Map<Long, SalesDeliverySourceOrderHeaderVO> sourceOrderHeaders, Map<Long, BigDecimal> oldPlanQuantities,
-            Map<Long, BigDecimal> oldOrderQuantities, SalesDecimalPolicy decimalPolicy)
+            Map<Long, BigDecimal> oldOrderQuantities, DecimalPolicy decimalPolicy)
             throws Exception {
         List<PreparedDetail> prepared = new ArrayList<PreparedDetail>();
         Map<Long, SalesDeliverySourceOrderVO> sourcePlans = new LinkedHashMap<Long, SalesDeliverySourceOrderVO>();
@@ -412,7 +412,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         return quantities == null ? ZERO : valueOrZero(quantities.get(detailId));
     }
 
-    private void validateCumulativeQuantity(BigDecimal quantity, String label, SalesDecimalPolicy decimalPolicy) {
+    private void validateCumulativeQuantity(BigDecimal quantity, String label, DecimalPolicy decimalPolicy) {
         if (quantity.signum() < 0) {
             throw conflict(label + "이 유효하지 않습니다. 다시 조회해 주세요.");
         }
@@ -455,7 +455,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         return line;
     }
 
-    private PreparedDetail prepareDetail(SalesDeliveryDetailRequestVO request, SalesDeliveryRequestVO payload, SalesDecimalPolicy decimalPolicy) {
+    private PreparedDetail prepareDetail(SalesDeliveryDetailRequestVO request, SalesDeliveryRequestVO payload, DecimalPolicy decimalPolicy) {
         if (request.getDeliveryQty() == null || request.getDeliveryQty().signum() <= 0) {
             throw badRequest("출하수량은 0보다 커야 합니다.");
         }
@@ -616,7 +616,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         quantities.put(key, valueOrZero(quantities.get(key)).add(valueOrZero(value)));
     }
 
-    private BigDecimal sumTotals(List<PreparedDetail> details, SalesDecimalPolicy decimalPolicy) {
+    private BigDecimal sumTotals(List<PreparedDetail> details, DecimalPolicy decimalPolicy) {
         BigDecimal total = ZERO;
         for (PreparedDetail detail : details) {
             total = total.add(detail.totalAmt);

@@ -28,7 +28,7 @@ import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPric
 import egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceVO;
 import egovframework.let.co.master.itempartnerprice.domain.repository.ItemPartnerPriceDAO;
 import egovframework.let.co.master.itempartnerprice.service.ItemPartnerPriceService;
-import egovframework.let.sales.common.SalesDecimalPolicy;
+import egovframework.com.cmm.DecimalPolicy;
 import egovframework.let.system.policies.service.SystemPolicyService;
 
 @Service("itemPartnerPriceService")
@@ -95,7 +95,7 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
             throw new IllegalArgumentException("엑셀은 한 번에 1,000행까지 검증할 수 있습니다.");
         }
 
-        SalesDecimalPolicy decimalPolicy = decimalPolicy(tenantId);
+        DecimalPolicy decimalPolicy = decimalPolicy(tenantId);
         List<Map<String, Object>> requestRows = new ArrayList<Map<String, Object>>();
         List<ItemPartnerPriceImportRowResultVO> results = new ArrayList<ItemPartnerPriceImportRowResultVO>();
         Set<Integer> sourceNumbers = new HashSet<Integer>();
@@ -248,7 +248,7 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
     }
 
     private void validateImportValues(ItemPartnerPriceImportRowVO row, ItemPartnerPriceImportRowResultVO result,
-            SalesDecimalPolicy decimalPolicy) {
+            DecimalPolicy decimalPolicy) {
         int sourceRow = row.getSourceRowNumber();
         String tradeType = safeText(row.getTradeType());
         if (!TRADE_TYPES.contains(tradeType)) {
@@ -316,7 +316,7 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
     }
 
     /** 0 이상 숫자이며 정책의 컬럼 소수 자릿수와 허용 범위를 지키는지 확인한다. */
-    private boolean validAmount(String raw, boolean optional, String field, SalesDecimalPolicy decimalPolicy) {
+    private boolean validAmount(String raw, boolean optional, String field, DecimalPolicy decimalPolicy) {
         String value = safeText(raw);
         if (value.isEmpty()) return optional;
         if (!value.matches("[0-9]+(\\.[0-9]+)?")) return false;
@@ -328,13 +328,13 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
         }
     }
 
-    private SalesDecimalPolicy decimalPolicy(Long tenantId) throws Exception {
-        return SalesDecimalPolicy.forModule("COMMON", systemPolicyService.getGridDecimals(tenantId),
+    private DecimalPolicy decimalPolicy(Long tenantId) throws Exception {
+        return DecimalPolicy.forModule("COMMON", systemPolicyService.getGridDecimals(tenantId),
                 DecimalColumnContract.forDocument("co.itemPartnerPrice"));
     }
 
     /** 0 이상 값을 정책 자릿수로 검증해 저장값으로 돌려준다. */
-    private BigDecimal policyAmount(SalesDecimalPolicy decimalPolicy, String field, String label, BigDecimal value) {
+    private BigDecimal policyAmount(DecimalPolicy decimalPolicy, String field, String label, BigDecimal value) {
         BigDecimal result = decimalPolicy.input(field, value, label);
         if (result.signum() < 0) throw new IllegalArgumentException(label + "은 0 이상이어야 합니다.");
         return result;
@@ -546,7 +546,7 @@ public class ItemPartnerPriceServiceImpl extends EgovAbstractServiceImpl impleme
         if (payload.getUnitPrice() == null && payload.getForeignUnitPrice() == null) {
             throw new IllegalArgumentException("원화단가 또는 외화단가를 입력해 주세요.");
         }
-        SalesDecimalPolicy decimalPolicy = decimalPolicy(tenantId);
+        DecimalPolicy decimalPolicy = decimalPolicy(tenantId);
         BigDecimal unitPrice = payload.getUnitPrice() == null ? null
                 : policyAmount(decimalPolicy, "unitPrice", "원화단가", payload.getUnitPrice());
         BigDecimal moq = payload.getMoq() == null ? null

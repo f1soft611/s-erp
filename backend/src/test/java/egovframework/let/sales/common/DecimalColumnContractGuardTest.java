@@ -1,5 +1,6 @@
 package egovframework.let.sales.common;
 
+import egovframework.com.cmm.DecimalPolicy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -55,8 +56,8 @@ class DecimalColumnContractGuardTest {
     void everyDocumentAndColumnIsValidForTheServer() throws IOException {
         Map<String, Map<String, Object>> sales = new HashMap<String, Map<String, Object>>();
         for (Map.Entry<String, Map<String, Object>> document : contracts().entrySet()) {
-            // SalesDecimalPolicy.from은 문서의 모든 컬럼을 검증하고, 잘못되면 IllegalStateException을 던진다.
-            SalesDecimalPolicy.from(sales, document.getValue());
+            // DecimalPolicy.from은 문서의 모든 컬럼을 검증하고, 잘못되면 IllegalStateException을 던진다.
+            DecimalPolicy.forModule("SALES", sales, document.getValue());
         }
         assertFalse(contracts().isEmpty());
     }

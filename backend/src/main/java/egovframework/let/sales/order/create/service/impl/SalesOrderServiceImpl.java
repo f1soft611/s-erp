@@ -26,7 +26,7 @@ import egovframework.let.sales.shipment.deliveryplan.domain.model.SalesDeliveryP
 import egovframework.let.sales.shipment.deliveryplan.domain.model.SalesDeliveryPlanRequestVO;
 import egovframework.let.sales.shipment.deliveryplan.service.SalesDeliveryPlanService;
 import egovframework.let.system.policies.service.SystemPolicyService;
-import egovframework.let.sales.common.SalesDecimalPolicy;
+import egovframework.com.cmm.DecimalPolicy;
 import egovframework.com.cmm.DecimalColumnContract;
 
 /**
@@ -76,7 +76,7 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         validateDestinationAndBilling(tenantId, payload);
         String deliveryPlanMode = salesDeliveryPlanService.lockModeForPlanCreation(tenantId);
 
-        SalesDecimalPolicy decimalPolicy = SalesDecimalPolicy.from(systemPolicyService.getGridDecimals(tenantId),
+        DecimalPolicy decimalPolicy = DecimalPolicy.forModule("SALES", systemPolicyService.getGridDecimals(tenantId),
                 DecimalColumnContract.forDocument("sales.order"));
         decimalPolicy.verifySnapshot(payload.getDecimalPolicy());
         decimalPolicy.verifyColumnContract(payload.getDecimalColumns());
@@ -187,7 +187,7 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         validateCustomer(tenantId, payload.getCustomerId());
         validateDestinationAndBilling(tenantId, payload);
 
-        SalesDecimalPolicy decimalPolicy = SalesDecimalPolicy.from(systemPolicyService.getGridDecimals(tenantId),
+        DecimalPolicy decimalPolicy = DecimalPolicy.forModule("SALES", systemPolicyService.getGridDecimals(tenantId),
                 DecimalColumnContract.forDocument("sales.order"));
         decimalPolicy.verifySnapshot(payload.getDecimalPolicy());
         decimalPolicy.verifyColumnContract(payload.getDecimalColumns());
@@ -387,7 +387,7 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         }
     }
 
-    private List<PreparedDetail> prepareDetails(Long tenantId, SalesOrderCreateRequestVO payload, SalesDecimalPolicy decimalPolicy)
+    private List<PreparedDetail> prepareDetails(Long tenantId, SalesOrderCreateRequestVO payload, DecimalPolicy decimalPolicy)
             throws Exception {
         List<PreparedDetail> preparedDetails = new ArrayList<>();
         for (SalesOrderDetailCreateRequestVO detail : payload.getDetails()) {
@@ -396,7 +396,7 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         return preparedDetails;
     }
 
-    private BigDecimal sumTotals(List<PreparedDetail> preparedDetails, SalesDecimalPolicy decimalPolicy) {
+    private BigDecimal sumTotals(List<PreparedDetail> preparedDetails, DecimalPolicy decimalPolicy) {
         BigDecimal total = ZERO;
         for (PreparedDetail prepared : preparedDetails) {
             total = total.add(prepared.totalAmt);
@@ -450,7 +450,7 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         }
     }
 
-    private PreparedDetail prepareDetail(Long tenantId, SalesOrderDetailCreateRequestVO detail, SalesDecimalPolicy decimalPolicy)
+    private PreparedDetail prepareDetail(Long tenantId, SalesOrderDetailCreateRequestVO detail, DecimalPolicy decimalPolicy)
             throws Exception {
         if (detail == null || detail.getMaterialId() == null || detail.getMaterialId() < 1L) {
             throw badRequest("상세 품목을 선택해 주세요.");

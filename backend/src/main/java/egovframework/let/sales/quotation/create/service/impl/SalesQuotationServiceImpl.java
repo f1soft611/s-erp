@@ -16,7 +16,7 @@ import egovframework.let.sales.quotation.create.domain.model.*;
 import egovframework.let.sales.quotation.create.domain.repository.SalesQuotationDAO;
 import egovframework.let.sales.quotation.create.service.SalesQuotationService;
 import egovframework.let.system.policies.service.SystemPolicyService;
-import egovframework.let.sales.common.SalesDecimalPolicy;
+import egovframework.com.cmm.DecimalPolicy;
 import egovframework.com.cmm.DecimalColumnContract;
 
 @Service
@@ -113,7 +113,7 @@ public class SalesQuotationServiceImpl implements SalesQuotationService {
         validateText(request.getCustomerReference(), 100); validateText(request.getIncoterms(), 50);
         validateText(request.getPaymentTerm(), 100); validateText(request.getValidTerm(), 100);
         validateText(request.getCurrencyCode(), 10); validateText(request.getRemark(), 500);
-        SalesDecimalPolicy decimalPolicy = SalesDecimalPolicy.from(policy.getGridDecimals(tenantId),
+        DecimalPolicy decimalPolicy = DecimalPolicy.forModule("SALES", policy.getGridDecimals(tenantId),
                 DecimalColumnContract.forDocument("sales.quotation"));
         decimalPolicy.verifySnapshot(request.getDecimalPolicy());
         decimalPolicy.verifyColumnContract(request.getDecimalColumns());

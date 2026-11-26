@@ -22,7 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import egovframework.com.cmm.DecimalColumnContract;
 import egovframework.let.common.idsequence.service.IdSequenceService;
-import egovframework.let.sales.common.SalesDecimalPolicy;
+import egovframework.com.cmm.DecimalPolicy;
 import egovframework.let.sales.shipment.statement.domain.repository.SalesStatementDAO;
 import egovframework.let.system.policies.service.SystemPolicyService;
 
@@ -212,7 +212,7 @@ public class SalesStatementServiceImpl {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "거래처가 같은 출하 상세만 선택할 수 있습니다.");
         }
 
-        SalesDecimalPolicy decimalPolicy = SalesDecimalPolicy.from(systemPolicyService.getGridDecimals(tenantId),
+        DecimalPolicy decimalPolicy = DecimalPolicy.forModule("SALES", systemPolicyService.getGridDecimals(tenantId),
                 DecimalColumnContract.forDocument("sales.delivery"));
         List<Map<String, Object>> created = new ArrayList<Map<String, Object>>();
         String scope = date.format(DateTimeFormatter.BASIC_ISO_DATE);
