@@ -1,17 +1,8 @@
 import { useMemo, useState } from 'react';
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { Box, Button, IconButton, TextField, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/types/grid.types';
+import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { groupByDepartment } from '../data/documentReferenceGroups';
 
 type DocumentReferenceListDialogProps = {
@@ -43,9 +34,21 @@ export function DocumentReferenceListDialog({
   }, [query, users]);
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs" data-testid="document-reference-list-dialog">
-      <DialogTitle>참조자 {users.length}명</DialogTitle>
-      <DialogContent dividers sx={{ p: 0 }}>
+    <CommonDialog
+      open={open}
+      onClose={onClose}
+      title={`참조자 ${users.length}명`}
+      size="xs"
+      dialogProps={{ 'data-testid': 'document-reference-list-dialog' }}
+      actions={
+        <>
+          <Button color="inherit" onClick={onClear} disabled={users.length === 0}>
+            전체 삭제
+          </Button>
+          <Button onClick={onClose}>닫기</Button>
+        </>
+      }
+    >
         <Box sx={{ p: 1.5 }}>
           <TextField
             size="small"
@@ -88,13 +91,6 @@ export function DocumentReferenceListDialog({
             </Box>
           ))}
         </Box>
-      </DialogContent>
-      <DialogActions>
-        <Button color="inherit" onClick={onClear} disabled={users.length === 0}>
-          전체 삭제
-        </Button>
-        <Button onClick={onClose}>닫기</Button>
-      </DialogActions>
-    </Dialog>
+    </CommonDialog>
   );
 }
