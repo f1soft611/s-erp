@@ -201,6 +201,12 @@ export const pageContentMap: Record<string, PageContent> = {
     cards: [],
     items: [],
   },
+  workspace: {
+    title: '협업공간',
+    description: '협업방을 만들어 글과 댓글로 소통하고, 칸반이나 피드로 업무와 자료를 함께 관리합니다.',
+    cards: [],
+    items: [],
+  },
   roles: {
     title: '권한관리',
     description: '역할별 메뉴 접근 권한과 기능 권한을 설정합니다.',
