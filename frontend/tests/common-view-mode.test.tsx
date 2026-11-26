@@ -7,6 +7,7 @@ import { ListViewSkeleton } from '../src/shared/components/view-mode/ListViewSke
 import { PinnedItemsPanel } from '../src/shared/components/view-mode/PinnedItemsPanel';
 import { ContentSplitLayout } from '../src/shared/components/view-mode/ContentSplitLayout';
 import { SummaryPanelSkeleton } from '../src/shared/components/view-mode/SummaryPanelSkeleton';
+import { PinnedViewToolbar } from '../src/shared/components/view-mode/PinnedViewToolbar';
 import { ViewModeToggle } from '../src/shared/components/view-mode/ViewModeToggle';
 import type { CommonViewItem } from '../src/shared/components/view-mode/commonViewTypes';
 
@@ -151,6 +152,27 @@ describe('common notice view mode components', () => {
     fireEvent.click(screen.getByRole('button', { name: '리스트형 보기' }));
 
     expect(onChange).toHaveBeenCalledWith('list');
+  });
+
+  it('adds a kanban mode only when it is opted in, leaving existing screens unchanged', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<ViewModeToggle mode="feed" onChange={onChange} />);
+    expect(screen.queryByRole('button', { name: '칸반형 보기' })).toBeNull();
+    rerender(<ViewModeToggle mode="feed" onChange={onChange} enableKanbanView />);
+    fireEvent.click(screen.getByRole('button', { name: '칸반형 보기' }));
+    expect(onChange).toHaveBeenCalledWith('kanban');
+  });
+
+  it('keeps the default layout and offers opt-in left max width, right min width and fill height', () => {
+    const { rerender } = render(<ContentSplitLayout left={<div>왼쪽</div>} right={<div>오른쪽</div>} />);
+    const layout = screen.getByTestId('view-mode-split-layout');
+    expect(layout.hasAttribute('data-fill-height')).toBe(false);
+    rerender(
+      <ContentSplitLayout left={<div>왼쪽</div>} right={<div>오른쪽</div>} leftMaxWidth={1036} rightMinWidth={320} fillHeight />,
+    );
+    expect(screen.getByTestId('view-mode-split-layout').getAttribute('data-fill-height')).toBe('true');
+    expect(screen.getByText('오른쪽')).toBeTruthy();
+    expect(screen.getByText('왼쪽')).toBeTruthy();
   });
 
   it('renders pinned items and hides the panel when empty', () => {

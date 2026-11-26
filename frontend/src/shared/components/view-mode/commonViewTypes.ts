@@ -1,4 +1,4 @@
-export type CommonViewMode = 'feed' | 'list' | 'file';
+export type CommonViewMode = 'kanban' | 'feed' | 'list' | 'file';
 
 export type CommonFileViewItem = {
   id: string | number;
