@@ -21,6 +21,11 @@ it('formats order totals with the policy precision instead of always using two p
   expect(formatSalesOrderAmount(1.2, { places: 3, rounding: 'DOWN', trailingZeros: 'AUTO' })).toBe('1.2');
 });
 
+it('does not format with a hard-coded two places when no policy rule is available', () => {
+  expect(formatSalesOrderAmount('1.2345', undefined)).toBe('-');
+  expect(formatSalesOrderAmount(1.2345, undefined)).toBe('-');
+});
+
 describe('sales order amount calculations', () => {
   it('rounds supply and 10 percent VAT to two decimal places', () => {
     expect(calculateSalesOrderAmounts(3, 10.25)).toEqual({

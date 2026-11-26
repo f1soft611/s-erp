@@ -16,14 +16,13 @@ export type SalesAmountColumnRules = {
   totalAmount: SalesAmountRule;
 };
 
+/** 정책·계약 규칙이 없으면 고정 자릿수로 표시하지 않고 '-'를 돌려준다. */
 export function formatSalesOrderAmount(value: number | string, rule?: SalesAmountRule): string {
-  if (typeof value === 'string') {
-    return formatExactSalesDecimal(value, rule ?? { places: 2, rounding: 'HALF_UP' });
-  }
-  const places = rule?.places ?? 2;
-  return (rule ? roundSalesOrderAmount(value, '금액', rule) : value).toLocaleString('ko-KR', {
-    minimumFractionDigits: rule?.trailingZeros === 'AUTO' ? 0 : places,
-    maximumFractionDigits: places,
+  if (!rule) return '-';
+  if (typeof value === 'string') return formatExactSalesDecimal(value, rule);
+  return roundSalesOrderAmount(value, '금액', rule).toLocaleString('ko-KR', {
+    minimumFractionDigits: rule.trailingZeros === 'AUTO' ? 0 : rule.places,
+    maximumFractionDigits: rule.places,
   });
 }
 

@@ -284,7 +284,7 @@ export function SalesOrderCreatePage({
         billingCustomerId: nextBillingCustomer?.id ?? null });
       setGridRows(rows);
       setGridKey((key) => key + 1);
-      setAmounts(rows.length > 0 ? sumExactSalesAmounts(rows, amountRuleRef.current ?? { places: 2, rounding: 'HALF_UP' }, summaryRulesRef.current) : EMPTY_AMOUNTS);
+      setAmounts(rows.length > 0 && amountRuleRef.current ? sumExactSalesAmounts(rows, amountRuleRef.current, summaryRulesRef.current) : EMPTY_AMOUNTS);
       setHasDetailChanges(false);
       setSelectedRowIds([]);
       setValidationErrors(null);
@@ -372,8 +372,9 @@ export function SalesOrderCreatePage({
   const handleChangesChange = useCallback(
     (changes: F1GridChanges<SalesOrderDetailRow>) => {
       try {
-        setAmounts(sumExactSalesAmounts(resolveActiveSalesOrderRows(gridRows, changes),
-          amountRule ?? { places: 2, rounding: 'HALF_UP' }, summaryRules));
+        if (amountRule) {
+          setAmounts(sumExactSalesAmounts(resolveActiveSalesOrderRows(gridRows, changes), amountRule, summaryRules));
+        }
         setError('');
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : '합계를 계산할 수 없습니다.');

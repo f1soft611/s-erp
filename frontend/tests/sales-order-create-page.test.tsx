@@ -588,8 +588,19 @@ describe('sales order entry page', () => {
     });
   }, 15000);
 
-  it('recalculates line and order totals when grid amounts are edited', () => {
-    renderSalesOrderPage();
+  it('recalculates line and order totals when grid amounts are edited', async () => {
+    const rules = { SALES: {
+      number: { places: 6, trailingZeros: 'AUTO' as const, rounding: 'HALF_UP' as const },
+      decimal: { places: 6, trailingZeros: 'AUTO' as const, rounding: 'HALF_UP' as const },
+      currency: { places: 2, trailingZeros: 'AUTO' as const, rounding: 'HALF_UP' as const },
+    } };
+    vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue(rules);
+    vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+    const router = createMemoryRouter([{ path: '/', element: <GridDecimalModuleProvider moduleCode="SALES">
+      <SalesOrderCreatePage {...salesOrderPageProps} selectedMenuPermissions={{ read: true, create: true, update: true, delete: true }} />
+    </GridDecimalModuleProvider> }]);
+    render(<RouterProvider router={router} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: '상세 행 추가' })).toBeEnabled());
 
     fireEvent.click(screen.getByRole('button', { name: '상세 행 추가' }));
 
@@ -613,16 +624,16 @@ describe('sales order entry page', () => {
     expect(within(summary).getByRole('gridcell', { name: '주문수량 집계' })).toHaveTextContent('2');
     expect(within(summary).getByRole('gridcell', { name: '공급가 집계' })).toHaveTextContent('200');
     expect(within(summary).getByRole('gridcell', { name: '라인합계 집계' })).toHaveTextContent('220');
-    expect(screen.getByLabelText('수주 금액 합계')).toHaveTextContent(
-      /공급가 합계\s*200\.00\s*부가세 합계\s*20\.00\s*총 합계\s*220\.00/,
-    );
+    await waitFor(() => expect(screen.getByLabelText('수주 금액 합계')).toHaveTextContent(
+      /공급가 합계\s*200\s*부가세 합계\s*20\s*총 합계\s*220/,
+    ));
 
     editCell(6, '30');
     expect(within(summary).getByRole('gridcell', { name: '부가세 집계' })).toHaveTextContent('30');
     expect(within(summary).getByRole('gridcell', { name: '라인합계 집계' })).toHaveTextContent('230');
-    expect(screen.getByLabelText('수주 금액 합계')).toHaveTextContent(
-      /공급가 합계\s*200\.00\s*부가세 합계\s*30\.00\s*총 합계\s*230\.00/,
-    );
+    await waitFor(() => expect(screen.getByLabelText('수주 금액 합계')).toHaveTextContent(
+      /공급가 합계\s*200\s*부가세 합계\s*30\s*총 합계\s*230/,
+    ));
   });
 
   it('marks required header fields and detail grid columns', () => {
