@@ -19,8 +19,7 @@ import { CommentThread } from '../../../../../shared/components/feed/CommentThre
 import type { FeedCommentItem } from '../../../../../shared/components/feed/CommentThread';
 import { FeedBodyContent } from '../../../../../shared/components/feed/FeedBodyContent';
 import type { FeedBodyImage } from '../../../../../shared/components/feed/FeedBodyContent';
-import { FeedCommentsSection } from '../../../../../shared/components/feed/FeedCommentsSection';
-import { FeedReactionBar } from '../../../../../shared/components/feed/FeedReactionBar';
+import { FEED_COMMENT_LIST_SX, FeedEngagementSection } from '../../../../../shared/components/feed/FeedEngagementSection';
 import { FeedCard } from '../../../../../shared/components/feed/FeedCard';
 import { ProfileAvatar } from '../../../../../shared/components/ProfileAvatar';
 import { PostDetailPanel } from '../../../../../shared/components/feed/PostDetailPanel';
@@ -2088,31 +2087,33 @@ export function DocumentApprovalDetailFeed(
                 }}
               />
             </Box>
-            <Divider sx={{ my: 1.5 }} />
-            <FeedReactionBar
-              liked={isLiked}
-              likeCount={0}
-              bookmarked={isBookmarked}
-              commentCount={commentCount}
-              onToggleLike={() => setIsLiked((value) => !value)}
-              onToggleBookmark={() => setIsBookmarked((value) => !value)}
-            />
-            <FeedCommentsSection
-              showPrevious={hasPreviousComments}
-              isLoadingPrevious={isLoadingComments}
-              remainingPreviousCount={
-                Number.isFinite(commentCount)
-                  ? Math.max(
-                      0,
-                      commentCount -
-                        commentRecords.filter(
-                          (comment) => comment.parentCommentId == null,
-                        ).length -
-                        commentSystemEvents.length,
-                    )
-                  : undefined
-              }
-              onLoadPrevious={() => void handleLoadPreviousComments()}
+            <FeedEngagementSection
+              // 피드 카드와 문서 상세 패널의 카드는 안쪽 여백이 달라, 구분선이 튀어나오지 않게 각각에 맞춘다.
+              bleed={isFeedPresentation ? undefined : { xs: 1.5, sm: 2 }}
+              reaction={{
+                liked: isLiked,
+                likeCount: 0,
+                bookmarked: isBookmarked,
+                commentCount,
+                onToggleLike: () => setIsLiked((value) => !value),
+                onToggleBookmark: () => setIsBookmarked((value) => !value),
+              }}
+              comments={{
+                showPrevious: hasPreviousComments,
+                isLoadingPrevious: isLoadingComments,
+                remainingPreviousCount:
+                  Number.isFinite(commentCount)
+                    ? Math.max(
+                        0,
+                        commentCount -
+                          commentRecords.filter(
+                            (comment) => comment.parentCommentId == null,
+                          ).length -
+                          commentSystemEvents.length,
+                      )
+                    : undefined,
+                onLoadPrevious: () => void handleLoadPreviousComments(),
+              }}
             >
               <>
                 {commentError && (
@@ -2143,6 +2144,7 @@ export function DocumentApprovalDetailFeed(
                   </Box>
                 ) : null}
                 <CommentThread
+                  commentListSx={FEED_COMMENT_LIST_SX}
                   renderContentPreview={(html) => (
                     <DocumentLinkPreviews html={html} onOpenDocument={onOpenDocument} />
                   )}
@@ -2167,7 +2169,7 @@ export function DocumentApprovalDetailFeed(
                   onOpenAttachmentImage={setSelectedBodyImage}
                 />
               </>
-            </FeedCommentsSection>
+            </FeedEngagementSection>
           </Box>
           {!isFeedPresentation && canProcess && (
             <>

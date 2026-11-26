@@ -327,10 +327,14 @@ describe('Community notice page', () => {
     expect(noticeCard).toBeInTheDocument();
     expect(screen.getByTestId('feed-reaction-bar')).toBeInTheDocument();
     expect(screen.getByTestId('feed-comments-section')).toBeInTheDocument();
+    // 구분선은 반응 줄 아래 하나뿐이다(첨부와 반응 줄 사이에는 두지 않는다).
     expect(
       within(noticeCard).getAllByRole('separator'),
     ).toHaveLength(1);
     expect(screen.getByTestId('feed-reaction-bar').nextElementSibling).toBe(
+      screen.getByTestId('feed-engagement-divider'),
+    );
+    expect(screen.getByTestId('feed-engagement-divider').nextElementSibling).toBe(
       screen.getByTestId('feed-comments-section'),
     );
 
@@ -338,7 +342,7 @@ describe('Community notice page', () => {
     expect(commentInput).toHaveAttribute('contenteditable', 'true');
   });
 
-  it('removes direct body and previous-comments separators on notice feed cards', () => {
+  it('keeps one divider below the reaction bar and none between the body and the comments on notice feed cards', () => {
     const item = {
       ...noticeFeed[0],
       body: '짧은 공지',
@@ -354,12 +358,15 @@ describe('Community notice page', () => {
       .querySelector<HTMLElement>('[data-feed-card="true"]');
     expect(noticeCard).toBeInTheDocument();
     expect(
-      within(noticeCard).queryAllByRole('separator'),
-    ).toHaveLength(0);
+      within(noticeCard).getAllByRole('separator'),
+    ).toHaveLength(1);
     expect(
       screen.getByTestId(`notice-preview-${item.id}`),
     ).toHaveAttribute('data-expanded', 'false');
     expect(screen.getByTestId('feed-reaction-bar').nextElementSibling).toBe(
+      screen.getByTestId('feed-engagement-divider'),
+    );
+    expect(screen.getByTestId('feed-engagement-divider').nextElementSibling).toBe(
       screen.getByTestId('feed-comments-section'),
     );
   });

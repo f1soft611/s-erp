@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
-  Divider,
   IconButton,
   Menu,
   MenuItem,
@@ -16,9 +15,8 @@ import { CommentThread } from '../../../../../shared/components/feed/CommentThre
 import type { FeedCommentItem } from '../../../../../shared/components/feed/CommentThread';
 import { FeedCard } from '../../../../../shared/components/feed/FeedCard';
 import { FeedBodyContent } from '../../../../../shared/components/feed/FeedBodyContent';
-import { FeedCommentsSection } from '../../../../../shared/components/feed/FeedCommentsSection';
+import { FEED_COMMENT_LIST_SX, FeedEngagementSection } from '../../../../../shared/components/feed/FeedEngagementSection';
 import { FeedLinkPreviews, type InternalContentPreview } from '../../../../../shared/components/feed/FeedLinkPreviews';
-import { FeedReactionBar } from '../../../../../shared/components/feed/FeedReactionBar';
 import { FeedView } from '../../../../../shared/components/view-mode/FeedView';
 import { ImageViewerDialog } from '../../../../../shared/components/ImageViewerDialog';
 import type {
@@ -1327,93 +1325,92 @@ export function NoticeFeedList({
                 </Box>
               )}
 
-              {attachmentFiles.length > 0 && <Divider sx={{ my: 1.5 }} />}
-              <FeedReactionBar
-                liked={Boolean(item.liked)}
-                likeCount={item.likeCount ?? 0}
-                bookmarked={Boolean(item.bookmarked)}
-                commentCount={item.commentCount}
-                onToggleLike={() => onToggleLike?.(item.id)}
-                onToggleBookmark={() => onToggleBookmark?.(item.id)}
-                isDark={isDark}
-              />
+              <FeedEngagementSection
+                reaction={{
+                  liked: Boolean(item.liked),
+                  likeCount: item.likeCount ?? 0,
+                  bookmarked: Boolean(item.bookmarked),
+                  commentCount: item.commentCount,
+                  onToggleLike: () => onToggleLike?.(item.id),
+                  onToggleBookmark: () => onToggleBookmark?.(item.id),
+                  isDark,
+                }}
+                comments={{
+                  showPrevious: canLoadPrevious,
+                  isLoadingPrevious: Boolean(loadingPreviousByNoticeId[item.id]),
+                  remainingPreviousCount:
+                    Number.isFinite(item.commentCount)
+                      ? Math.max(
+                          0,
+                          item.commentCount - countLoadedComments(itemComments),
+                        )
+                      : undefined,
+                  onLoadPrevious: async () => {
+                    if (loadingPreviousByNoticeId[item.id]) return;
+                    const hasInitializedCursor =
+                      Object.prototype.hasOwnProperty.call(
+                        previousCursorByNoticeId,
+                        item.id,
+                      );
+                    const cursor =
+                      (hasInitializedCursor
+                        ? previousCursorByNoticeId[item.id]
+                        : item.nextBeforeCommentId) ?? visibleComments[0]?.id;
+                    if (!cursor || !onLoadPreviousComments) return;
 
-              <FeedCommentsSection
-                showPrevious={canLoadPrevious}
-                isLoadingPrevious={Boolean(loadingPreviousByNoticeId[item.id])}
-                remainingPreviousCount={
-                  Number.isFinite(item.commentCount)
-                    ? Math.max(
-                        0,
-                        item.commentCount - countLoadedComments(itemComments),
-                      )
-                    : undefined
-                }
-                onLoadPrevious={async () => {
-                  if (loadingPreviousByNoticeId[item.id]) return;
-                  const hasInitializedCursor =
-                    Object.prototype.hasOwnProperty.call(
-                      previousCursorByNoticeId,
-                      item.id,
-                    );
-                  const cursor =
-                    (hasInitializedCursor
-                      ? previousCursorByNoticeId[item.id]
-                      : item.nextBeforeCommentId) ?? visibleComments[0]?.id;
-                  if (!cursor || !onLoadPreviousComments) return;
-
-                  setLoadingPreviousByNoticeId((current) => ({
-                    ...current,
-                    [item.id]: true,
-                  }));
-                  try {
-                    const previousResult = await onLoadPreviousComments(
-                      item.id,
-                      cursor,
-                    );
-                    const previous = previousResult.comments;
-                    const currentComments =
-                      localCommentsByNoticeId[item.id] ?? itemComments;
-                    const merged = mergeCommentTrees(currentComments, previous);
-                    const nextCursor = previousResult.nextBeforeCommentId;
-                    const hasNewComments =
-                      countComments(merged) > countComments(currentComments);
-                    const previousIds = collectCommentIds(previous);
-                    previousCommentIdsByNoticeId.current[item.id] = new Set([
-                      ...(previousCommentIdsByNoticeId.current[item.id] ?? []),
-                      ...previousIds,
-                    ]);
-                    setLocalCommentsByNoticeId((current) => ({
-                      ...current,
-                      [item.id]: merged,
-                    }));
-                    setPreviousCursorByNoticeId((cursors) => ({
-                      ...cursors,
-                      [item.id]: nextCursor ?? undefined,
-                    }));
-                    setLoadedPreviousByNoticeId((loaded) => ({
-                      ...loaded,
-                      [item.id]: true,
-                    }));
-                    if (
-                      !previousResult.hasPrevious ||
-                      !hasNewComments ||
-                      nextCursor == null ||
-                      String(nextCursor) === String(cursor)
-                    ) {
-                      setExhaustedPreviousByNoticeId((exhausted) => ({
-                        ...exhausted,
-                        [item.id]: true,
-                      }));
-                    }
-                  } catch (error) {
-                    onLoadPreviousCommentsError?.(error);
-                  } finally {
                     setLoadingPreviousByNoticeId((current) => ({
                       ...current,
-                      [item.id]: false,
+                      [item.id]: true,
                     }));
-                  }
+                    try {
+                      const previousResult = await onLoadPreviousComments(
+                        item.id,
+                        cursor,
+                      );
+                      const previous = previousResult.comments;
+                      const currentComments =
+                        localCommentsByNoticeId[item.id] ?? itemComments;
+                      const merged = mergeCommentTrees(currentComments, previous);
+                      const nextCursor = previousResult.nextBeforeCommentId;
+                      const hasNewComments =
+                        countComments(merged) > countComments(currentComments);
+                      const previousIds = collectCommentIds(previous);
+                      previousCommentIdsByNoticeId.current[item.id] = new Set([
+                        ...(previousCommentIdsByNoticeId.current[item.id] ?? []),
+                        ...previousIds,
+                      ]);
+                      setLocalCommentsByNoticeId((current) => ({
+                        ...current,
+                        [item.id]: merged,
+                      }));
+                      setPreviousCursorByNoticeId((cursors) => ({
+                        ...cursors,
+                        [item.id]: nextCursor ?? undefined,
+                      }));
+                      setLoadedPreviousByNoticeId((loaded) => ({
+                        ...loaded,
+                        [item.id]: true,
+                      }));
+                      if (
+                        !previousResult.hasPrevious ||
+                        !hasNewComments ||
+                        nextCursor == null ||
+                        String(nextCursor) === String(cursor)
+                      ) {
+                        setExhaustedPreviousByNoticeId((exhausted) => ({
+                          ...exhausted,
+                          [item.id]: true,
+                        }));
+                      }
+                    } catch (error) {
+                      onLoadPreviousCommentsError?.(error);
+                    } finally {
+                      setLoadingPreviousByNoticeId((current) => ({
+                        ...current,
+                        [item.id]: false,
+                      }));
+                    }
+                  },
                 }}
               >
                 <Box
@@ -1424,6 +1421,7 @@ export function NoticeFeedList({
                   }}
                 >
                   <CommentThread
+                    commentListSx={FEED_COMMENT_LIST_SX}
                     comments={normalizeCommentTree(
                       visibleComments,
                       item.id,
@@ -1493,7 +1491,7 @@ export function NoticeFeedList({
                     submitLabel="등록"
                   />
                 </Box>
-              </FeedCommentsSection>
+              </FeedEngagementSection>
             </FeedCard>
           );
         }}

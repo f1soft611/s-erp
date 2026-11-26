@@ -1491,13 +1491,16 @@ describe('Document write page', () => {
     const footer = screen.getByTestId('approval-feed-footer');
     const reactionBar = screen.getByTestId('feed-reaction-bar');
     const commentsSection = screen.getByTestId('feed-comments-section');
-    expect(reactionBar.parentElement).toBe(footer);
-    expect(commentsSection.parentElement).toBe(footer);
+    // 반응 줄 → 구분선(좌우 끝까지) → 댓글 순서의 공통 섹션이 푸터 안에 있다.
+    const engagement = screen.getByTestId('feed-engagement-section');
+    const engagementDivider = screen.getByTestId('feed-engagement-divider');
+    expect(engagement.parentElement).toBe(footer);
+    expect(reactionBar.parentElement).toBe(engagement);
+    expect(commentsSection.parentElement).toBe(engagement);
     expect(parseFloat(getComputedStyle(reactionBar).marginTop)).toBe(0);
     expect(parseFloat(getComputedStyle(commentsSection).marginTop)).toBe(0);
-    expect(
-      reactionBar.nextElementSibling,
-    ).toBe(commentsSection);
+    expect(reactionBar.nextElementSibling).toBe(engagementDivider);
+    expect(engagementDivider.nextElementSibling).toBe(commentsSection);
     expect(screen.queryByText('첨부파일', { exact: true })).not.toBeInTheDocument();
     expect(composerApi.listApprovalComments).toHaveBeenCalledWith(1, {
       limit: 3,
