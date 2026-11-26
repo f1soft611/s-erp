@@ -45,7 +45,7 @@ export function deliveryAmounts(qty: number | string, price: number | string, va
 }
 export function newDeliveryRow(): DeliveryRow {
   return { rowId: `delivery-${crypto.randomUUID()}`, materialId: null, materialCode: '', materialName: '', unit: '',
-    salesOrderId: null, salesOrderDetailId: null, salesDeliveryPlanDetailId: null,
+    salesOrderId: null, orderNo: '', salesOrderDetailId: null, salesDeliveryPlanDetailId: null,
     deliveryQty: 0, unitPrice: 0, ...deliveryAmounts(0, 0) };
 }
 export function sourceOrderForm(rows: SourceOrderRow[], deliveryDt: string, rule?: SalesAmountRule, policy?: GridDecimalModuleRule): DeliveryForm {
@@ -59,7 +59,7 @@ export function sourceOrderForm(rows: SourceOrderRow[], deliveryDt: string, rule
       const quantity = Number(row.remainingQty) > 0 ? row.remainingQty : typeof row.remainingQty === 'string' ? '0' : 0;
       return ({
       ...newDeliveryRow(), materialId: row.materialId, materialCode: row.materialCode, materialName: row.materialName,
-      unit: row.unit, salesOrderId: row.salesOrderId, salesOrderDetailId: row.salesOrderDetailId,
+      unit: row.unit, salesOrderId: row.salesOrderId, orderNo: row.orderNo, salesOrderDetailId: row.salesOrderDetailId,
       salesDeliveryPlanDetailId: row.salesDeliveryPlanDetailId, deliveryQty: quantity,
       unitPrice: row.unitPrice, ...deliveryAmounts(quantity, row.unitPrice, undefined, rule, policy),
     }); }) };

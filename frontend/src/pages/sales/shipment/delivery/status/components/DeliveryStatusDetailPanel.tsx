@@ -10,6 +10,7 @@ import { PageAreaOverlay } from '../../../../../../shared/components/view-mode/P
 import { usePolicyDecimalRule } from '../../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
 import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../../shared/services/decimalColumnContract';
 import { formatSalesOrderAmount, type SalesAmountRule } from '../../../../order/create/data/salesOrderAmounts';
+import { getSalesOrderCodeLabel, type SalesOrderCodeOption } from '../../../../order/services/salesOrderCommonCode.service';
 import type { DeliveryItem } from '../../create/types/salesDelivery.types';
 
 function InfoItem({ label, children }: { label: string; children: ReactNode }) {
@@ -26,8 +27,8 @@ function InfoGroup({ title, children }: { title: string; children: ReactNode }) 
 }
 const amount = (value: number | string, rule?: SalesAmountRule) => formatSalesOrderAmount(value, rule);
 
-export function DeliveryStatusDetailPanel({ item, loading, error, canEdit, onClose, onView, onEdit }: {
-  item: DeliveryItem | null; loading: boolean; error: string; canEdit: boolean;
+export function DeliveryStatusDetailPanel({ item, loading, error, canEdit, deliveryMethodOptions = [], onClose, onView, onEdit }: {
+  item: DeliveryItem | null; loading: boolean; error: string; canEdit: boolean; deliveryMethodOptions?: SalesOrderCodeOption[];
   onClose: () => void; onView: () => void; onEdit: () => void;
 }) {
   const policy = usePolicyDecimalRule();
@@ -79,7 +80,7 @@ export function DeliveryStatusDetailPanel({ item, loading, error, canEdit, onClo
           </Box>
         </Box>
         <Box aria-label="출하 기본정보" sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))' }, gap: 1.5 }}>
-          <InfoGroup title="출하 정보"><InfoItem label="출하장소">{item.deliveryPlace}</InfoItem><InfoItem label="배송방법">{item.deliveryMethod}</InfoItem></InfoGroup>
+          <InfoGroup title="출하 정보"><InfoItem label="출하장소">{item.deliveryPlace}</InfoItem><InfoItem label="배송방법">{getSalesOrderCodeLabel(deliveryMethodOptions, item.deliveryMethod)}</InfoItem></InfoGroup>
           <InfoGroup title="추가 정보"><InfoItem label="거래처코드">{item.customerCode}</InfoItem><InfoItem label="비고">{item.remark}</InfoItem></InfoGroup>
         </Box>
         <Box sx={{ minWidth: 0 }}>

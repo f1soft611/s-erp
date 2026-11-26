@@ -23,6 +23,18 @@ vi.mock('../src/pages/sales/order/create/services/salesOrderMaster.service', () 
   searchOrderCustomers: vi.fn(async () => [{ id: 10, code: 'C10', name: '거래처' }]),
   searchOrderMaterials: vi.fn(async () => [{ id: 20, code: 'M20', name: '품목' }]),
 }));
+vi.mock('../src/pages/sales/order/services/salesOrderCommonCode.service', async (original) => ({
+  ...await original<object>(),
+  fetchSalesOrderCommonCodes: vi.fn(async () => ({ orderStatusOptions: [], progressStatusOptions: [],
+    deliveryMethodOptions: [{ value: 'PARCEL', label: '택배' }, { value: 'DIRECT', label: '직배송' }] })),
+}));
+vi.mock('../src/pages/sales/order/create/services/salesOrder.service', async (original) => ({
+  ...await original<object>(),
+  getSalesOrder: vi.fn(async () => ({ salesOrderId: 7, orderNo: 'SO-7', orderDt: '2026-11-01', customerId: 10, customerCode: 'C10',
+    customerName: '거래처', salesDestinationId: null, destinationCode: null, destinationName: null, billingCustomerId: null,
+    billingCustomerCode: null, billingCustomerName: null, quotNo: null, deliveryDt: null, deliveryPlace: null, deliveryMethod: null,
+    status: '수주등록', totalAmt: 0, remark: null, details: [] })),
+}));
 const item = {
   salesDeliveryId: 1, deliveryNo: 'SD-1', deliveryDt: '2026-11-04', deliveryType: 'DIRECT',
   customerId: 10, customerCode: 'C10', customerName: '거래처', salesOrderId: null, orderNo: null,
@@ -430,7 +442,7 @@ it('selects one order, populates remaining lines and prevents source identity ed
   }]);
   vi.mocked(createDelivery).mockResolvedValue({ ...item, deliveryType: 'ORDER' } as Awaited<ReturnType<typeof createDelivery>>);
   mount(<SalesDeliveryCreatePage {...props} />);
-  fireEvent.mouseDown(screen.getByRole('combobox'));
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: '출하구분' }));
   fireEvent.click(screen.getByRole('option', { name: '수주출하' }));
   fireEvent.click(screen.getByRole('button', { name: '수주 선택', exact: true }));
   await searchSourceOrderByEnter();
@@ -443,7 +455,7 @@ it('selects one order, populates remaining lines and prevents source identity ed
   expect(screen.getByRole('dialog', { name: '수주 선택' })).toBeInTheDocument();
   fireEvent.click(within(sourceRow as HTMLElement).getByRole('checkbox'));
   fireEvent.click(screen.getByRole('button', { name: '선택', exact: true }));
-  expect(screen.getByLabelText('연결 수주번호')).toHaveValue('SO-7');
+  expect(screen.getByRole('textbox', { name: '연결 수주번호' })).toHaveValue('SO-7');
   const deliveryGrid = screen.getByRole('grid', { name: '출하 상세 목록' });
   const deliveryCells = within(deliveryGrid).getAllByRole('gridcell');
   expect(within(deliveryGrid).getByRole('gridcell', { name: 'M20' })).toHaveStyle({ justifyContent: 'center' });
@@ -462,7 +474,7 @@ it('selects one order, populates remaining lines and prevents source identity ed
 it('uses a full-width status-style keyword search without a submit button', async () => {
   vi.mocked(searchSourceOrders).mockResolvedValue([]);
   mount(<SalesDeliveryCreatePage {...props} />);
-  fireEvent.mouseDown(screen.getByRole('combobox'));
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: '출하구분' }));
   fireEvent.click(screen.getByRole('option', { name: '수주출하' }));
   fireEvent.click(screen.getByRole('button', { name: '수주 선택', exact: true }));
   const searchGroup = await screen.findByRole('group', { name: '수주 선택 검색' });
@@ -684,7 +696,7 @@ it('combines multiple same-customer orders into one delivery with per-line sourc
   fireEvent.click(within(firstRow as HTMLElement).getByRole('checkbox'));
   fireEvent.click(within(secondRow as HTMLElement).getByRole('checkbox'));
   fireEvent.click(screen.getByRole('button', { name: '선택', exact: true }));
-  expect(screen.getByLabelText('연결 수주번호')).toHaveValue('SO-7, SO-8');
+  expect(screen.getByRole('textbox', { name: '연결 수주번호' })).toHaveValue('SO-7, SO-8');
   fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
   await waitFor(() => expect(createDelivery).toHaveBeenCalledWith(expect.objectContaining({
     salesOrderId: 7,
@@ -742,3 +754,18 @@ it('matches order status quick search behavior and result message', async () => 
     paddingTop: '16px', paddingLeft: '16px', paddingRight: '16px', paddingBottom: '16px',
   });
 });
+
+it('renders the delivery method as a common-code select', async () => {
+  mount(<SalesDeliveryCreatePage {...props} salesDeliveryId={1} />);
+  await screen.findByDisplayValue('SD-1');
+  fireEvent.mouseDown(await screen.findByRole('combobox', { name: '배송방법' }));
+  expect(await screen.findByRole('option', { name: '택배' })).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: '직배송' })).toBeInTheDocument();
+});
+it('opens the linked sales order detail panel from the status order number', async () => {
+  vi.mocked(getDeliveryStatus).mockResolvedValue([{ ...item, ...item.details[0], salesOrderId: 7, orderNo: 'SO-7' }] as Awaited<ReturnType<typeof getDeliveryStatus>>);
+  mount(<SalesDeliveryStatusPage {...props} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'SO-7 수주 상세 보기' }));
+  const panel = await screen.findByRole('region', { name: '수주 상세' });
+  expect(await within(panel).findByText('수주번호: SO-7')).toBeInTheDocument();
+}, 15000);

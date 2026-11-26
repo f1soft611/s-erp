@@ -270,6 +270,7 @@
                m.material_spec AS materialSpec,
                m.unit AS unit,
                d.sales_order_id AS salesOrderId,
+               o.order_no AS orderNo,
                d.sales_order_detail_id AS salesOrderDetailId,
                d.sales_delivery_plan_detail_id AS salesDeliveryPlanDetailId,
                d.delivery_qty AS deliveryQty,
@@ -281,6 +282,9 @@
         LEFT JOIN tb_material_info m
           ON m.material_id = d.material_id
          AND m.tenant_id = d.tenant_id
+        LEFT JOIN tb_sales_order_hd o
+          ON o.sales_order_id = d.sales_order_id
+         AND o.tenant_id = d.tenant_id
         WHERE d.sales_delivery_id = #{salesDeliveryId, jdbcType=BIGINT}
           AND d.tenant_id = #{tenantId, jdbcType=BIGINT}
         ORDER BY d.line_no

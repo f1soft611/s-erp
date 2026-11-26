@@ -21,6 +21,7 @@ import { searchOrderCustomers, searchOrderMaterials } from '../../../order/creat
 import { formatSalesOrderAmount, sumExactSalesAmounts } from '../../../order/create/data/salesOrderAmounts';
 import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
 import { usePolicyDecimalStatus } from '../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
+import { useSalesOrderCommonCodes } from '../../../order/hooks/useSalesOrderCommonCodes';
 import { SalesDecimalPolicyError } from '../../../shared/SalesDecimalPolicyError';
 import { DeliveryDetailGrid } from './components/DeliveryDetailGrid';
 import { activeDeliveryRows } from './data/deliveryDetailRows';
@@ -49,6 +50,7 @@ export function SalesDeliveryCreatePage({
   currentMenuName, content, breadcrumbItems, selectedMenuPermissions: permissions, salesDeliveryId,
   embedded = false, mode = 'edit', onSaved, onDeleted, onDirtyChange, onPendingChange, onEmbeddedActionsChange,
 }: Props) {
+  const { codes: commonCodes, loading: commonCodesLoading, error: commonCodesError } = useSalesOrderCommonCodes();
   const policyState = usePolicyDecimalStatus();
   const policy = policyState.rule;
   const amountRule = policy && ('places' in policy ? policy : policy.currency);
@@ -294,7 +296,15 @@ export function SalesDeliveryCreatePage({
                   onClick={() => setSourceOpen(true)}><SearchIcon fontSize="small" /></IconButton></span></Tooltip>
               </InputAdornment> : null } }} />
             <TextField size="small" label="출하장소" value={form.deliveryPlace} disabled={!editable} onChange={(event) => change('deliveryPlace', event.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />
-            <TextField size="small" label="배송방법" value={form.deliveryMethod} disabled={!editable} onChange={(event) => change('deliveryMethod', event.target.value)} slotProps={{ htmlInput: { maxLength: 50 } }} />
+            <TextField select size="small" label="배송방법" value={form.deliveryMethod}
+              error={Boolean(commonCodesError)} helperText={commonCodesError || undefined}
+              disabled={!editable || commonCodesLoading || Boolean(commonCodesError)}
+              onChange={(event) => change('deliveryMethod', event.target.value)}>
+              <MenuItem value="">선택 안 함</MenuItem>
+              {form.deliveryMethod && !commonCodes.deliveryMethodOptions.some(({ value }) => value === form.deliveryMethod)
+                ? <MenuItem value={form.deliveryMethod}>{form.deliveryMethod}</MenuItem> : null}
+              {commonCodes.deliveryMethodOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}
+            </TextField>
             <TextField size="small" label="비고" multiline minRows={2} sx={{ gridColumn: '1 / -1' }} value={form.remark} disabled={!editable} onChange={(event) => change('remark', event.target.value)} slotProps={{ htmlInput: { maxLength: 500 } }} />
           </Box>
         </Paper>

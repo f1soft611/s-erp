@@ -13,6 +13,10 @@ import { usePageSessionState } from '../../../../../shared/hooks/usePageSessionS
 import type { MenuPermission, MenuTreeNode } from '../../../../dashboard/types/dashboard';
 import { defaultDeliveryFilters, getDelivery, getDeliveryStatus, restoreDeliveryFilters, validDeliveryPeriod } from '../create/services/salesDelivery.service';
 import type { DeliveryFilters, DeliveryItem, DeliveryPageProps, DeliveryStatusRow } from '../create/types/salesDelivery.types';
+import { SalesOrderStatusDetailPanel } from '../../../order/status/components/SalesOrderStatusDetailPanel';
+import { SalesOrderEditorDialog } from '../../../order/status/components/SalesOrderEditorDialog';
+import { useSalesOrderStatusDetail } from '../../../order/status/hooks/useSalesOrderStatusDetail';
+import { useSalesOrderCommonCodes } from '../../../order/hooks/useSalesOrderCommonCodes';
 import { DeliveryEditorDialog } from './components/DeliveryEditorDialog';
 import { DeliveryStatusDetailPanel } from './components/DeliveryStatusDetailPanel';
 import { getDecimalColumnContract } from '../../../../../shared/services/decimalColumnContract';
@@ -67,6 +71,9 @@ export function SalesDeliveryStatusPage(props: DeliveryPageProps) {
   const [editorMode, setEditorMode] = useState<'view' | 'edit' | null>(null);
   const [detailRefresh, setDetailRefresh] = useState(0);
   const [refresh, setRefresh] = useState(0);
+  const orderDetail = useSalesOrderStatusDetail();
+  const { openDetail: openOrderDetail, closeDetail: closeOrderDetail, closeEditor: closeOrderEditor } = orderDetail;
+  const { codes: commonCodes } = useSalesOrderCommonCodes();
   const quietRefresh = useRef(false);
   const request = useRef(0);
   const canRead = Boolean(permissions?.read);
@@ -122,28 +129,34 @@ export function SalesDeliveryStatusPage(props: DeliveryPageProps) {
     { field: 'salesDeliveryDetailId', headerName: 'No', type: 'rownumber', width: 56, align: 'center', pinned: 'left', search: { hidden: true }, form: { hidden: true } },
     { field: 'deliveryNo', headerName: '출하번호', width: 140, align: 'center', mergeRows: true, highlightSearch: true, renderCell: ({ row, highlightKeyword }) => (
       <Link component="button" type="button" underline="hover" disabled={!canRead} onClick={(event) => {
-        event.stopPropagation(); if (canRead) { setDetail(null); setSelectedId(row.salesDeliveryId); }
+        event.stopPropagation(); if (canRead) { closeOrderDetail(); setDetail(null); setSelectedId(row.salesDeliveryId); }
       }} aria-label={`${row.deliveryNo} 상세 보기`} sx={{ position: 'relative', zIndex: 1, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600, fontSize: 'inherit', verticalAlign: 'baseline' }}>
         {highlightKeyword ? <F1GridHighlightText text={row.deliveryNo} keyword={highlightKeyword} /> : row.deliveryNo}</Link>
     ) },
     { field: 'deliveryDt', headerName: '출하일자', type: 'date', width: 80, align: 'center', mergeRows: true },
     { field: 'customerCode', headerName: '거래처코드', width: 80, align: 'center', mergeRows: true, highlightSearch: true },
-    { field: 'customerName', headerName: '거래처명', width: 160, align: 'center', mergeRows: true, highlightSearch: true },
-    { field: 'orderNo', headerName: '연결 수주번호', width: 140, align: 'center', mergeRows: true },
+    { field: 'customerName', headerName: '거래처명', width: 160, align: 'left', mergeRows: true, highlightSearch: true },
+    { field: 'orderNo', headerName: '연결 수주번호', width: 140, align: 'center', renderCell: ({ row }) => row.salesOrderId && row.orderNo ? (
+      <Link component="button" type="button" underline="hover" disabled={!canRead} onClick={(event) => {
+        event.stopPropagation(); if (canRead && row.salesOrderId) { setSelectedId(null); setDetail(null); openOrderDetail(row.salesOrderId); }
+      }} aria-label={`${row.orderNo} 수주 상세 보기`} sx={{ position: 'relative', zIndex: 1, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600, fontSize: 'inherit', verticalAlign: 'baseline' }}>
+        {row.orderNo}</Link>
+    ) : row.orderNo ?? '' },
     { field: 'deliveryType', headerName: '출하구분', width: 80, align: 'center', mergeRows: true, renderCell: ({ row }) => row.deliveryType === 'ORDER' ? '수주출하' : '직출하' },
     { field: 'deliveryPlace', headerName: '출하장소', width: 150, align: 'left', mergeRows: true },
     { field: 'deliveryMethod', headerName: '배송방법', width: 110, align: 'left', mergeRows: true },
     { field: 'lineNo', headerName: '행', type: 'number', width: 56, align: 'center' },
     { field: 'materialCode', headerName: '품목코드', width: 120, align: 'center', highlightSearch: true },
-    { field: 'materialName', headerName: '품목명', width: 180, align: 'center', highlightSearch: true },
+    { field: 'materialName', headerName: '품목명', width: 180, align: 'left', highlightSearch: true },
     { field: 'unit', headerName: '단위', width: 80, align: 'center' },
     ...(['deliveryQty', 'unitPrice', 'supplyAmt', 'vatAmt', 'totalAmt'] as const).map((field, index) => {
       const { type, ...decimal } = getDecimalColumnContract('sales.delivery')[field];
       return { field, headerName: ['출하수량', '단가', '공급가', 'VAT', '합계'][index],
+        ...(field === 'unitPrice' ? {} : { summaryType: 'sum' as const }),
         type, decimal, exactDecimal: true, width: 130, align: 'right' as const };
     }),
     { field: 'remark', headerName: '비고', width: 200, align: 'left', mergeRows: true },
-  ], [canRead]);
+  ], [canRead, openOrderDetail, closeOrderDetail]);
   if (!canRead) return <Alert severity="warning">출하현황 조회 권한이 없습니다.</Alert>;
   return <Box sx={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
     <PageHeader breadcrumbItems={props.breadcrumbItems.length ? props.breadcrumbItems : [props.currentMenuName]} description={props.content.description}
@@ -176,7 +189,7 @@ export function SalesDeliveryStatusPage(props: DeliveryPageProps) {
       <Box data-testid="sales-status-content" sx={{ px: 2, pt: 2, pb: 2, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 360, flex: 1 }}>
         <Box sx={{ flex: 1, minHeight: 320, minWidth: 0, overflow: 'hidden' }}>
         <F1Grid ariaLabel="출하현황 목록" rows={rows} columns={columns} rowKey="salesDeliveryDetailId" highlightKeyword={filters.keyword}
-          storageKey="sales-delivery-status-grid-v1" loading={loading} showCheckbox={false} height="100%" minHeight={320}
+          storageKey="sales-delivery-status-grid-v1" features={[{ ftype: 'summary', dock: 'bottom' }]} loading={loading} showCheckbox={false} height="100%" minHeight={320}
           selectionMode="row" selectRowOnContextMenu={false}
           allowAddRowInContextMenu={false} allowDuplicateRowInContextMenu={false} allowDeleteRowInContextMenu={false}
           canExportExcel={Boolean(permissions?.excel)} />
@@ -185,9 +198,18 @@ export function SalesDeliveryStatusPage(props: DeliveryPageProps) {
     </PageLoadBoundary>
     {selectedId !== null ? <DeliveryStatusDetailPanel item={detail} loading={detailLoading} error={detailError}
       canEdit={Boolean(detail && (detailPermissions.update || detailPermissions.delete))}
+      deliveryMethodOptions={commonCodes.deliveryMethodOptions}
       onClose={() => { if (!editorMode) { setSelectedId(null); setDetail(null); } }}
       onView={() => setEditorMode('view')} onEdit={() => setEditorMode('edit')} /> : null}
     {selectedId !== null && editorMode ? <DeliveryEditorDialog id={selectedId} mode={editorMode} page={props} permissions={detailPermissions}
       onClose={closeEditor} onSaved={handleSaved} onDeleted={handleDeleted} /> : null}
+    {orderDetail.selectedOrderId !== null ? <SalesOrderStatusDetailPanel order={orderDetail.order} loading={orderDetail.loading}
+      error={orderDetail.error} canEdit={false} orderStatusOptions={commonCodes.orderStatusOptions}
+      progressStatusOptions={commonCodes.progressStatusOptions} deliveryMethodOptions={commonCodes.deliveryMethodOptions}
+      onClose={() => { if (orderDetail.editorMode === null) closeOrderDetail(); }}
+      onView={() => orderDetail.openEditor('view')} onEdit={() => undefined} /> : null}
+    <SalesOrderEditorDialog mode={orderDetail.editorMode} salesOrderId={orderDetail.selectedOrderId} selectedModule={props.selectedModule}
+      permissions={{ read: canRead, create: false, update: false, delete: false, excel: false }}
+      onClose={closeOrderEditor} onSaved={closeOrderEditor} onDeleted={closeOrderEditor} />
   </Box>;
 }
