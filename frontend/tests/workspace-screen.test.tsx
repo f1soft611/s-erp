@@ -235,7 +235,7 @@ describe('Workspace page', () => {
     renderWorkspace();
     await openRoom();
     const card = screen.getByText('견적 문의 - A사').closest('[data-post-id]') as HTMLElement;
-    fireEvent.click(within(card).getByRole('button', { name: '카드 이동' }));
+    fireEvent.click(within(card).getByRole('button', { name: '카드 더보기' }));
     fireEvent.click(screen.getByRole('menuitem', { name: '진행중' }));
     await waitFor(() => expect(within(columnOf(/진행중/)).getByText('견적 문의 - A사')).toBeTruthy());
     switchUser('u4');
@@ -248,7 +248,7 @@ describe('Workspace page', () => {
     expect(screen.getByRole('button', { name: '방 설정' })).toBeTruthy();
     switchUser('u4');
     await waitFor(() => expect(screen.queryByRole('button', { name: '새 글' })).toBeNull());
-    expect(screen.queryByRole('button', { name: '카드 이동' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '카드 더보기' })).toBeNull();
     expect(screen.queryByRole('button', { name: '방 설정' })).toBeNull();
   });
 
@@ -301,7 +301,7 @@ describe('Workspace page', () => {
     renderWorkspace({ read: true, create: false, update: false, delete: false, excel: false });
     await openRoom();
     expect(screen.queryByRole('button', { name: '새 글' })).toBeNull();
-    expect(screen.queryByRole('button', { name: '카드 이동' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '카드 더보기' })).toBeNull();
     expect(screen.queryByRole('button', { name: '방 설정' })).toBeNull();
   });
 

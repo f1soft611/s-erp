@@ -7,6 +7,7 @@
                h.sales_delivery_id AS "salesDeliveryId",
                h.delivery_no AS "deliveryNo",
                to_char(h.delivery_dt, 'YYYY-MM-DD') AS "deliveryDt",
+               d.sales_order_id AS "salesOrderId",
                COALESCE(o.order_no, '') AS "orderNo",
                h.customer_id AS "customerId",
                c.customer_code AS "customerCode",
@@ -92,6 +93,33 @@
                 m.material_code ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
                 OR m.material_name ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
             )
+          )
+        GROUP BY h.customer_id, c.customer_code, c.customer_name
+        ORDER BY c.customer_name ASC NULLS LAST, c.customer_code ASC, h.customer_id
+    </select>
+
+    <select id="selectCustomerOptions" parameterType="map"
+            resultType="egovframework.let.sales.revenue.closing.domain.model.RevenueClosingCustomerSummaryVO">
+        SELECT h.customer_id AS "customerId",
+               c.customer_code AS "customerCode",
+               COALESCE(c.customer_name, c.customer_code) AS "customerName",
+               COUNT(*) AS "totalCount",
+               COUNT(*) FILTER (WHERE d.revenue_closed_at IS NOT NULL) AS "closedCount",
+               COUNT(*) FILTER (WHERE d.revenue_closed_at IS NULL) AS "openCount"
+        FROM tb_sales_delivery_hd h
+        JOIN tb_sales_delivery_dt d
+          ON d.sales_delivery_id = h.sales_delivery_id
+         AND d.tenant_id = h.tenant_id
+        JOIN tb_customer_info c
+          ON c.customer_id = h.customer_id
+         AND c.tenant_id = h.tenant_id
+        WHERE h.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+          AND h.delivery_dt BETWEEN #{deliveryDtFrom, jdbcType=DATE} AND #{deliveryDtTo, jdbcType=DATE}
+          AND (
+            #{keyword, jdbcType=VARCHAR} = ''
+            OR c.customer_code ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
+            OR c.customer_name ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
           )
         GROUP BY h.customer_id, c.customer_code, c.customer_name
         ORDER BY c.customer_name ASC NULLS LAST, c.customer_code ASC, h.customer_id

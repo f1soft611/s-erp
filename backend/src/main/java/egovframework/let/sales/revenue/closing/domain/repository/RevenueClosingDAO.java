@@ -20,6 +20,11 @@ public class RevenueClosingDAO extends EgovAbstractMapper {
         return selectList("RevenueClosingDAO.selectCustomerSummaries", params);
     }
 
+    public List<RevenueClosingCustomerSummaryVO> selectCustomerOptions(Map<String, Object> params)
+            throws Exception {
+        return selectList("RevenueClosingDAO.selectCustomerOptions", params);
+    }
+
     public List<Map<String, Object>> lockDetailsForClosing(Map<String, Object> params) throws Exception {
         return selectList("RevenueClosingDAO.lockDetailsForClosing", params);
     }

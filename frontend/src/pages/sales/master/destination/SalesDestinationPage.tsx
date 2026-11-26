@@ -4,6 +4,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
 import { Box, Card, CardContent, TextField, Typography } from '@mui/material';
+import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
@@ -98,13 +99,14 @@ export function SalesDestinationPage({ content, breadcrumbItems, selectedMenuPer
   return (
     <Box sx={{ display: 'flex', flex: 1, flexDirection: 'column', minHeight: 0, minWidth: 0, height: '100%' }}>
       <PageHeader breadcrumbItems={breadcrumbItems} description={content.description} actionGroups={actions} />
+      <PageLoadBoundary {...state.initialLoad} label="납품처관리" onRetry={state.refresh}>
+      <PageMessageArea message={state.error} onClose={() => state.setError('')} salesSpacing="outer" />
       <PageSearchArea searchField={<TextField size="small" margin="none"
         placeholder="거래처 코드·명 검색" value={keyword} onChange={(event) => setKeyword(event.target.value)}
         slotProps={{ htmlInput: { 'aria-label': '거래처 검색' } }}
         sx={(theme) => ({ width: '100%', height: 40, '& .MuiOutlinedInput-root': {
           height: '100%', borderRadius: '0 4px 4px 0', backgroundColor: theme.palette.background.paper,
         } })} />} onDefaultSearch={() => { void search(); }} />
-      <PageMessageArea message={state.error} onClose={() => state.setError('')} salesSpacing="outer" />
       <Box sx={{ display: 'flex', flex: 1, minHeight: 280, minWidth: 0, p: 2 }}>
         <Splitter direction="horizontal" mobileMode="stacked" mobileBreakpoint={768}
           minSize={400} maxSize={1000} initialSize={430} ariaLabel="거래처와 납품처 영역 분리기">
@@ -160,6 +162,7 @@ export function SalesDestinationPage({ content, breadcrumbItems, selectedMenuPer
         </Card>
         </Splitter>
       </Box>
+      </PageLoadBoundary>
       {dialog}
     </Box>
   );

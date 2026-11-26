@@ -3,7 +3,15 @@ import { ApiNetworkError, ApiResponseError, isRequestAborted } from '../services
 
 export type PageLoadError = 'network' | 'authentication' | 'forbidden' | 'server';
 
-export function useInitialLoadState() {
+export function toPageLoadError(cause: unknown): PageLoadError {
+  return cause instanceof ApiNetworkError ? 'network'
+    : cause instanceof ApiResponseError && cause.status === 401 ? 'authentication'
+      : cause instanceof ApiResponseError && cause.status === 403 ? 'forbidden'
+        : 'server';
+}
+
+/** networkOnly: 서버 연결 실패(network)일 때만 페이지 오류 화면을 표시하고, 그 외 오류는 기존 화면 내 메시지에 맡긴다. */
+export function useInitialLoadState({ networkOnly = false }: { networkOnly?: boolean } = {}) {
   const hasSucceeded = useRef(false);
   const [error, setError] = useState<PageLoadError | null>(null);
   const [loading, setLoading] = useState(false);
@@ -18,13 +26,10 @@ export function useInitialLoadState() {
     setLoading(false);
     if (hasSucceeded.current) return;
     if (isRequestAborted(cause)) return;
-    setError(
-      cause instanceof ApiNetworkError ? 'network'
-        : cause instanceof ApiResponseError && cause.status === 401 ? 'authentication'
-          : cause instanceof ApiResponseError && cause.status === 403 ? 'forbidden'
-            : 'server',
-    );
-  }, []);
+    const kind = toPageLoadError(cause);
+    if (networkOnly && kind !== 'network') return;
+    setError(kind);
+  }, [networkOnly]);
 
   return useMemo(
     () => ({ error, loading, start, succeed, fail }),

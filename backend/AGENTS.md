@@ -133,5 +133,5 @@ mvn spring-boot:run
 
 ## 소수점 계약 규칙 (서버 계산 문서)
 
-- 소수점 계산·저장은 `DecimalColumnContract`와 모듈 정책 진입점(예: `SalesDecimalPolicy`)을 거칩니다. 컬럼별 자릿수·반올림을 서버 코드에 직접 쓰지 않습니다.
+- 소수점 계산·저장은 `DecimalColumnContract`와 모듈 정책 진입점(예: `DecimalPolicy`, 영업은 `DecimalPolicy.forModule("SALES", …)`)을 거칩니다. 컬럼별 자릿수·반올림을 서버 코드에 직접 쓰지 않습니다.
 - 계약 JSON은 프론트 `src/shared/config/decimal-column-contract.json` 한 파일을 Maven이 복사해 사용합니다. 예외 컬럼 설정 방법과 JSON 예시, 신규 모듈 적용 절차는 [공통 소수점 계약 가드레일 사양](../docs/spec/20261126/20261126_001_공통_소수점_계약_가드레일_상세사양서.md)을 따릅니다.

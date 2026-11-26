@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isApiNetworkError } from '../../../../../../shared/services/apiErrors';
+import { useInitialLoadState } from '../../../../../../shared/hooks/useInitialLoadState';
 import type { PageSearchFieldValue } from '../../../../../../shared/components/page-search/searchFields';
 import type { MenuPermission, MenuTreeNode } from '../../../../../dashboard/types/dashboard';
 import { localDate } from '../../../delivery/create/services/salesDelivery.service';
+import { getDelivery } from '../../../delivery/create/services/salesDelivery.service';
+import type { DeliveryItem } from '../../../delivery/create/types/salesDelivery.types';
 import { getStatement, getStatementStatus } from '../../services/salesStatement.service';
 import type { StatementItem, StatementPageProps, StatementStatusRow } from '../../types/salesStatement.types';
 import { createStatementStatusColumns } from '../data/statementStatusColumns';
@@ -37,9 +41,15 @@ export function useSalesStatementStatus(props: StatementPageProps) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [editor, setEditor] = useState<'view' | 'edit' | null>(null);
   const [printing, setPrinting] = useState(false);
+  const [deliveryId, setDeliveryId] = useState<number | null>(null);
+  const [delivery, setDelivery] = useState<DeliveryItem | null>(null);
+  const [deliveryError, setDeliveryError] = useState('');
+  const [deliveryLoading, setDeliveryLoading] = useState(false);
+  const [deliveryEditor, setDeliveryEditor] = useState<'view' | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [detailRefresh, setDetailRefresh] = useState(0);
   const request = useRef(0);
+  const { start, succeed, fail, ...initialLoad } = useInitialLoadState({ networkOnly: true });
   const canRead = Boolean(props.selectedMenuPermissions?.read);
   const [previousListRequest, setPreviousListRequest] = useState<{
     canRead: boolean; applied: Values; appliedKeyword: string; refresh: number;
@@ -65,6 +75,7 @@ export function useSalesStatementStatus(props: StatementPageProps) {
     if (canRead && typeof period === 'object' && period) {
       setLoading(true);
       setError('');
+      start();
     }
   }
   if (previousDetailRequest.id !== selectedId || previousDetailRequest.refresh !== detailRefresh) {
@@ -80,11 +91,23 @@ export function useSalesStatementStatus(props: StatementPageProps) {
     if (typeof period !== 'object' || !period) return;
     const token = ++request.current;
     getStatementStatus(period.from ?? '', period.to ?? '', appliedKeyword)
-      .then((items) => { if (token === request.current) { setRows(items); setLoaded(true); } })
-      .catch((cause) => { if (token === request.current) setError(cause instanceof Error ? cause.message : '현황 조회에 실패했습니다.'); })
+      .then((items) => { if (token === request.current) { setRows(items); setLoaded(true); succeed(); } })
+      .catch((cause) => {
+        if (token !== request.current) return;
+        fail(cause);
+        if (!isApiNetworkError(cause)) setError(cause instanceof Error ? cause.message : '현황 조회에 실패했습니다.');
+      })
       .finally(() => { if (token === request.current) setLoading(false); });
     return () => { request.current += 1; };
-  }, [canRead, applied, appliedKeyword, refresh]);
+  }, [canRead, applied, appliedKeyword, refresh, succeed, fail]);
+  useEffect(() => {
+    if (!deliveryId) return;
+    let active = true;
+    getDelivery(deliveryId).then((value) => { if (active) setDelivery(value); })
+      .catch((cause) => { if (active) setDeliveryError(cause instanceof Error ? cause.message : '출하 조회에 실패했습니다.'); })
+      .finally(() => { if (active) setDeliveryLoading(false); });
+    return () => { active = false; };
+  }, [deliveryId]);
   useEffect(() => {
     if (!selectedId) return;
     let active = true;
@@ -94,9 +117,18 @@ export function useSalesStatementStatus(props: StatementPageProps) {
     return () => { active = false; };
   }, [selectedId, detailRefresh]);
   const columns = useMemo(() => createStatementStatusColumns((row) => {
+    setDeliveryId(null); setDelivery(null); setDeliveryError('');
     setDetail(null);
     setSelectedId(row.salesStatementId);
+  }, (row) => {
+    if (!row.sourceDeliveryId) return;
+    setSelectedId(null); setDetail(null);
+    setDelivery(null); setDeliveryError(''); setDeliveryLoading(true);
+    setDeliveryId(row.sourceDeliveryId);
   }), []);
+  const closeDelivery = () => {
+    if (!deliveryEditor) { setDeliveryId(null); setDelivery(null); setDeliveryError(''); }
+  };
   const resetSearch = () => {
     setKeyword(''); setAppliedKeyword(''); setValues(defaults); setApplied(defaults);
   };
@@ -110,9 +142,12 @@ export function useSalesStatementStatus(props: StatementPageProps) {
     setEditor(null); setSelectedId(null); setDetail(null); setRefresh((value) => value + 1);
   };
 
+  const retry = () => setRefresh((value) => value + 1);
+
   return {
-    defaults, values, setValues, applied, keyword, setKeyword, appliedKeyword, rows, loading, error, setError,
+    initialLoad, retry, defaults, values, setValues, applied, keyword, setKeyword, appliedKeyword, rows, loading, error, setError,
     loaded, selectedId, detail, detailError, detailLoading, editor, setEditor, printing, setPrinting,
     canRead, detailPermissions, search, columns, resetSearch, closeDetail, saved, deleted,
+    deliveryId, delivery, deliveryError, deliveryLoading, deliveryEditor, setDeliveryEditor, closeDelivery,
   };
 }

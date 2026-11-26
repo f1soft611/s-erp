@@ -30,7 +30,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.web.server.ResponseStatusException;
 
-import egovframework.let.sales.common.SalesDecimalPolicy;
+import egovframework.com.cmm.DecimalPolicy;
 import egovframework.let.system.policies.domain.model.SystemPolicyHistoryVO;
 import egovframework.let.system.policies.domain.model.SystemPolicySaveRequestVO;
 import egovframework.let.system.policies.domain.model.SystemPolicyVO;
@@ -128,7 +128,7 @@ class SystemPolicyGridDecimalPostgresIntegrationTest {
         assertThat(((Map<?, ?>) stored.get("currency")).get("trailingZeros")).isEqualTo("FIXED");
 
         // 저장된 정책이 영업 서버 계산에 그대로 반영된다.
-        SalesDecimalPolicy sales = SalesDecimalPolicy.from(service.getGridDecimals(TENANT));
+        DecimalPolicy sales = DecimalPolicy.forModule("SALES", service.getGridDecimals(TENANT), java.util.Collections.<String, Object>emptyMap());
         assertEquals(new BigDecimal("1.24"), sales.amount(new BigDecimal("1.239"), "금액"));
         assertEquals(new BigDecimal("2"), sales.inputQuantity(new BigDecimal("2.0"), "수량"));
 
@@ -139,7 +139,7 @@ class SystemPolicyGridDecimalPostgresIntegrationTest {
         Map<String, Object> reloaded = service.getGridDecimals(TENANT).get("SALES");
         assertThat(((Map<?, ?>) reloaded.get("currency")).get("places")).isEqualTo(4);
         assertThat(((Map<?, ?>) reloaded.get("currency")).get("rounding")).isEqualTo("UP");
-        assertEquals(new BigDecimal("1.2301"), SalesDecimalPolicy.from(service.getGridDecimals(TENANT))
+        assertEquals(new BigDecimal("1.2301"), DecimalPolicy.forModule("SALES", service.getGridDecimals(TENANT), java.util.Collections.<String, Object>emptyMap())
                 .amount(new BigDecimal("1.23001"), "금액"));
         List<SystemPolicyHistoryVO> history = service.listHistory(TENANT, created.getPolicyId());
         assertThat(history).hasSize(2);

@@ -732,7 +732,7 @@ const columns: F1GridColumn<Item>[] = [
 
 1. 저장 필드와 계산 결과·헤더 합계의 의미를 구분해 계약에 등록한다. 그리드는 `getDecimalColumnContract`의 필드에서 `type`과 나머지 `decimal` 옵션을 가져오고, 정확한 입력이 필요하면 `exactDecimal`을 지정한다.
 2. 업무 계산과 저장 전 검증은 `resolveDecimalColumn(필드, 모듈정책)`으로 각 입력·결과 필드의 실효 규칙을 사용한다. 결과별 반올림과 합계 순서는 해당 업무의 서버와 일치시킨다. 단순히 그리드 컬럼만 설정하면 계산이나 서버 검증이 자동 변경되지는 않는다.
-3. 저장 요청에 실제 조회한 `decimalPolicy`와 해당 업무의 전체 `decimalColumns`를 전송한다. 영업 서버는 `DecimalColumnContract.forDocument`로 배포된 계약을 읽고 `SalesDecimalPolicy`의 `verifySnapshot`, `verifyColumnContract`, 필드별 `input`/`amount`를 사용한다. 클라이언트가 보낸 설정을 서버의 기준으로 사용하지 않는다.
+3. 저장 요청에 실제 조회한 `decimalPolicy`와 해당 업무의 전체 `decimalColumns`를 전송한다. 영업 서버는 `DecimalColumnContract.forDocument`로 배포된 계약을 읽고 `DecimalPolicy`(`egovframework.com.cmm`)의 `verifySnapshot`, `verifyColumnContract`, 필드별 `input`/`amount`를 사용한다. 클라이언트가 보낸 설정을 서버의 기준으로 사용하지 않는다.
 4. 계약 변경은 프론트와 서버를 함께 빌드·배포한다. 불일치 시 저장은 HTTP 409로 거부되며 사용자는 화면을 새로고침해 값을 확인해야 한다. 계약 스냅샷을 보내지 않는 구버전 API 호출은 컬럼별 예외가 없는 경우에만 허용되므로, 타입 자체를 바꾸는 배포에서도 구버전 호출자의 호환성을 별도로 확인해야 한다.
 5. 백엔드 Maven 빌드는 프론트 소스의 위 JSON을 서버 classpath로 복사한다. 백엔드만 별도로 빌드하는 환경은 동일 버전의 프론트 계약 파일을 지정된 상대 경로에 포함해야 한다. 깨끗한 빌드 산출물에 `decimal-column-contract.json`이 들어 있는지 확인한다. 파일이 없으면 해당 서버 기능의 계약 로딩이 실패하며, Maven 자체가 반드시 누락을 감지하는 것은 아니다.
 

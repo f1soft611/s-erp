@@ -70,6 +70,7 @@ export type StatementSource = {
 };
 
 export type StatementStatusRow = StatementDetail & {
+  sourceDeliveryId?: number | null;
   salesStatementId: number;
   statementNo: string;
   statementDt: string;

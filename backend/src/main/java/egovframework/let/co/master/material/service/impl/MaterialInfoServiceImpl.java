@@ -24,7 +24,7 @@ import egovframework.let.co.master.material.domain.model.MaterialInfoSearchCondi
 import egovframework.let.co.master.material.domain.repository.MaterialInfoDAO;
 import egovframework.let.co.master.material.service.MaterialInfoService;
 import egovframework.let.co.master.classification.service.ClassificationSelectionValidator;
-import egovframework.let.sales.common.SalesDecimalPolicy;
+import egovframework.com.cmm.DecimalPolicy;
 import egovframework.let.system.policies.service.SystemPolicyService;
 
 @Service("materialInfoService")
@@ -197,7 +197,7 @@ public class MaterialInfoServiceImpl extends EgovAbstractServiceImpl implements 
         putText(params, "kfdaReportNo", "품목보고번호", p.getKfdaReportNo(), 20, false);
         putText(params, "createdBy", "등록자", actor, 10, true);
         putText(params, "updatedBy", "수정자", actor, 10, true);
-        SalesDecimalPolicy decimalPolicy = SalesDecimalPolicy.forModule("COMMON",
+        DecimalPolicy decimalPolicy = DecimalPolicy.forModule("COMMON",
                 systemPolicyService.getGridDecimals(tenantId), DecimalColumnContract.forDocument("co.material"));
         if (p.getSafeInvoice() != null && !Double.isFinite(p.getSafeInvoice())) {
             throw new IllegalArgumentException("안전재고는 유한한 숫자여야 합니다.");

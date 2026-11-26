@@ -55,6 +55,15 @@ public class RevenueClosingApiController {
         return results.buildFromMap(values, ResponseCode.SUCCESS);
     }
 
+    @GetMapping("/customers")
+    public ResultVO customers(@ModelAttribute RevenueClosingSearchVO search,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        requireRead(user);
+        Map<String, Object> values = new HashMap<String, Object>();
+        values.put("customers", service.searchCustomers(user.getTenantId(), user.getId(), search));
+        return results.buildFromMap(values, ResponseCode.SUCCESS);
+    }
+
     @PostMapping("/close")
     public ResultVO close(@RequestBody RevenueClosingCloseRequestVO request,
             @AuthenticationPrincipal LoginVO user) throws Exception {

@@ -1,4 +1,4 @@
-package egovframework.let.sales.common;
+package egovframework.com.cmm;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -8,35 +8,26 @@ import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
-import egovframework.com.cmm.DecimalColumnRule;
 
-public final class SalesDecimalPolicy {
+public final class DecimalPolicy {
     private static final BigDecimal MAX_INTEGER = new BigDecimal("10000000000000");
     private final Rule quantity;
     private final Rule price;
     private final Rule amount;
     private final Map<String, Object> columns;
 
-    private SalesDecimalPolicy(Rule quantity, Rule price, Rule amount, Map<String, Object> columns) {
+    private DecimalPolicy(Rule quantity, Rule price, Rule amount, Map<String, Object> columns) {
         this.quantity = quantity;
         this.price = price;
         this.amount = amount;
         this.columns = columns;
     }
 
-    public static SalesDecimalPolicy from(Map<String, Map<String, Object>> policies) {
-        return from(policies, Collections.<String, Object>emptyMap());
-    }
-
-    public static SalesDecimalPolicy from(Map<String, Map<String, Object>> policies, Map<String, Object> columns) {
-        return forModule("SALES", policies, columns);
-    }
-
-    /** 영업 외 모듈도 같은 정책 규칙을 쓸 수 있도록 모듈 코드(GRID_DECIMAL_{모듈코드})를 받는다. */
-    public static SalesDecimalPolicy forModule(String moduleCode, Map<String, Map<String, Object>> policies,
+    /** 모듈 코드(GRID_DECIMAL_{모듈코드})별 정책과 컬럼 계약으로 소수점 규칙을 만든다. */
+    public static DecimalPolicy forModule(String moduleCode, Map<String, Map<String, Object>> policies,
             Map<String, Object> columns) {
         Map<String, Object> module = policies == null ? null : policies.get(moduleCode);
-        SalesDecimalPolicy policy = new SalesDecimalPolicy(resolve(module, "number", 0), resolve(module, "decimal", 3),
+        DecimalPolicy policy = new DecimalPolicy(resolve(module, "number", 0), resolve(module, "decimal", 3),
                 resolve(module, "currency", 3), columns == null ? Collections.<String, Object>emptyMap() : columns);
         for (String field : policy.columns.keySet()) policy.columnRule(field);
         return policy;

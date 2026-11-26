@@ -166,6 +166,30 @@ export async function createPost(
   return post;
 }
 
+export type PostUpdateInput = Pick<WorkspacePost, 'title' | 'body' | 'columnId' | 'attachments'>;
+
+/** 작성자 본인만 글을 수정할 수 있다. 댓글·작성자·작성일은 유지한다. */
+export async function updatePost(postId: string, input: PostUpdateInput, actorId: string): Promise<WorkspacePost> {
+  const store = readStore();
+  const post = store.posts.find((item) => item.id === postId);
+  if (!post) throw new Error('글을 찾을 수 없습니다.');
+  if (post.authorId !== actorId) throw new Error('수정 권한이 없습니다.');
+  const room = requireRoom(store, post.roomId);
+  requireLevel(room, actorId, 'write', NO_WRITE);
+  if (!input.title.trim()) throw new Error('제목을 입력하세요.');
+  const columnValid = room.columns.some((column) => column.id === input.columnId);
+  const columnId = room.columns.length === 0 ? null : columnValid ? input.columnId : (post.columnId ?? room.columns[0].id);
+  const updated: WorkspacePost = {
+    ...post,
+    title: input.title.trim(),
+    body: input.body,
+    columnId,
+    attachments: input.attachments,
+  };
+  savePost(store, updated);
+  return updated;
+}
+
 export async function movePost(
   postId: string,
   columnId: string | null,

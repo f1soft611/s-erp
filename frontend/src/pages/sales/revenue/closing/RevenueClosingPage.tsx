@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isApiNetworkError } from '../../../../shared/services/apiErrors';
 import ClearIcon from '@mui/icons-material/Clear';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import SearchIcon from '@mui/icons-material/Search';
 import { Alert, Box, IconButton, TextField } from '@mui/material';
 import { PageHeader } from '../../../../shared/components/PageHeader';
+import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
+import { useInitialLoadState } from '../../../../shared/hooks/useInitialLoadState';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { useCommonConfirmDialog } from '../../../../shared/hooks/useCommonConfirmDialog';
 import { getSystemDate } from '../../../../shared/services/systemDateService';
@@ -18,10 +21,11 @@ import type {
 } from '../../../dashboard/types/dashboard';
 import { searchOrderCustomers } from '../../order/create/services/salesOrderMaster.service';
 import { MAX_STATEMENT_DETAIL_COUNT } from '../../shared/statementDetailLimit';
+import { RevenueClosingSourcePanels, type RevenueClosingSourceTarget } from './components/RevenueClosingSourcePanels';
 import { CustomerClosingSummary } from './components/CustomerClosingSummary';
 import { RevenueClosingDetailGrid } from './components/RevenueClosingDetailGrid';
 import { filterRevenueClosingDetails } from './data/revenueClosingFilters';
-import { closeRevenueClosings, searchRevenueClosings } from './services/revenueClosing.service';
+import { closeRevenueClosings, searchRevenueClosingCustomers, searchRevenueClosings } from './services/revenueClosing.service';
 import type {
   RevenueClosingCustomerSummaryRow,
   RevenueClosingDetailRow,
@@ -83,12 +87,8 @@ function validPeriod(from: string, to: string) {
   return validDate(from) && validDate(to) && from <= to;
 }
 
-export function RevenueClosingPage({
-  currentMenuName,
-  content,
-  breadcrumbItems,
-  selectedMenuPermissions,
-}: Props) {
+export function RevenueClosingPage(props: Props) {
+  const { currentMenuName, content, breadcrumbItems, selectedMenuPermissions } = props;
   const canRead = Boolean(selectedMenuPermissions?.read);
   const defaults = useMemo(() => currentMonthRange(), []);
   const [detailValues, setDetailValues] = useState<Record<string, PageSearchFieldValue>>(
@@ -100,8 +100,15 @@ export function RevenueClosingPage({
     keyword: '',
   }));
   const [draftCustomers, setDraftCustomers] = useState<MasterPickerOption[]>([]);
+  const { start: startLoad, succeed: succeedLoad, fail: failLoad, ...initialLoad } = useInitialLoadState({ networkOnly: true });
   const [appliedCustomers, setAppliedCustomers] = useState<MasterPickerOption[]>([]);
   const [selectedSummaryCustomerId, setSelectedSummaryCustomerId] = useState<number | null>(null);
+  const [sourceTarget, setSourceTarget] = useState<RevenueClosingSourceTarget | null>(null);
+  const openDelivery = useCallback((row: RevenueClosingDetailRow) => setSourceTarget({ type: 'delivery', id: row.salesDeliveryId }), []);
+  const openOrder = useCallback((row: RevenueClosingDetailRow) => {
+    if (row.salesOrderId) setSourceTarget({ type: 'order', id: row.salesOrderId });
+  }, []);
+  const closeSource = useCallback(() => setSourceTarget(null), []);
   const [selectedRowIds, setSelectedRowIds] = useState<F1GridRowId[]>([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -136,6 +143,23 @@ export function RevenueClosingPage({
   }, [details, selectedRowIds]);
   const canCreate = Boolean(selectedMenuPermissions?.create);
 
+  const searchCustomers = (customerKeyword: string) => {
+    const range = dateRangeOf(detailValues);
+    if (!validPeriod(range.from, range.to)) {
+      return Promise.reject(new Error('출하일 기간의 시작일과 종료일을 확인해 주세요.'));
+    }
+    // 출하등록 거래처(마감/미마감 건수)에 거래처 마스터의 추가정보(사업자번호·대표자명)를 앞에 붙여 보여 준다.
+    return Promise.all([
+      searchRevenueClosingCustomers(range.from, range.to, customerKeyword),
+      searchOrderCustomers(customerKeyword).catch(() => [] as MasterPickerOption[]),
+    ]).then(([closing, masters]) => {
+      const extra = new Map(masters.map((master) => [master.id, master.details ?? []]));
+      return closing.map((option) => ({
+        ...option, details: [...(extra.get(option.id) ?? []), ...(option.details ?? [])],
+      }));
+    });
+  };
+
   const clearGridSelection = () => {
     gridRef.current?.clearSelection();
     setSelectedRowIds([]);
@@ -144,6 +168,7 @@ export function RevenueClosingPage({
   useEffect(() => {
     if (!canRead) return undefined;
     const requestId = ++searchRequestIdRef.current;
+    startLoad();
     void searchRevenueClosings({
       deliveryDtFrom: appliedSearch.deliveryDtFrom,
       deliveryDtTo: appliedSearch.deliveryDtTo,
@@ -153,18 +178,25 @@ export function RevenueClosingPage({
       if (requestId !== searchRequestIdRef.current) return;
       setDetails(result.details);
       setCustomerSummaries(result.customerSummaries);
+      succeedLoad();
     }).catch((searchError: unknown) => {
       if (requestId !== searchRequestIdRef.current) return;
+      failLoad(searchError);
       setDetails(emptyDetails);
       setCustomerSummaries(emptyCustomerSummaries);
-      setError(searchError instanceof Error ? searchError.message : '매출마감 조회에 실패했습니다.');
+      if (!isApiNetworkError(searchError)) setError(searchError instanceof Error ? searchError.message : '매출마감 조회에 실패했습니다.');
     }).finally(() => {
       if (requestId === searchRequestIdRef.current) setLoading(false);
     });
     return () => {
       searchRequestIdRef.current += 1;
     };
-  }, [appliedCustomers, appliedSearch, canRead]);
+  }, [appliedCustomers, appliedSearch, canRead, startLoad, succeedLoad, failLoad]);
+
+  const retryLoad = () => {
+    setLoading(true);
+    setAppliedSearch((current) => ({ ...current }));
+  };
 
   const applyDetailSearch = (values: Record<string, PageSearchFieldValue>) => {
     const range = dateRangeOf(values);
@@ -293,6 +325,7 @@ export function RevenueClosingPage({
           },
         ]}
       />
+      <PageLoadBoundary {...initialLoad} label="매출마감" onRetry={retryLoad}>
       <PageSearchArea
         detailFields={detailFields}
         detailValues={detailValues}
@@ -309,7 +342,7 @@ export function RevenueClosingPage({
         detailExtraContent={
           <CustomerMultiPicker
             selectedValues={draftCustomers}
-            search={searchOrderCustomers}
+            search={searchCustomers}
             onApply={setDraftCustomers}
           />
         }
@@ -399,9 +432,13 @@ export function RevenueClosingPage({
             loading={loading}
             gridRef={gridRef}
             onSelectionChange={setSelectedRowIds}
+            onOpenDelivery={openDelivery}
+            onOpenOrder={openOrder}
           />
         </Box>
       </Box>
+      </PageLoadBoundary>
+      <RevenueClosingSourcePanels target={sourceTarget} onClose={closeSource} page={props} />
       {dialog}
     </Box>
   );

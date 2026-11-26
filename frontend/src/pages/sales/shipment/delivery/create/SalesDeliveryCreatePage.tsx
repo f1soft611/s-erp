@@ -8,6 +8,9 @@ import NoteAddOutlinedIcon from '@mui/icons-material/NoteAddOutlined';
 import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined';
 import type { PermissionActionGroupDefinition } from '../../../../../shared/components/PermissionGroup';
 import { PageHeader } from '../../../../../shared/components/PageHeader';
+import { toPageLoadError, type PageLoadError } from '../../../../../shared/hooks/useInitialLoadState';
+import { isApiNetworkError } from '../../../../../shared/services/apiErrors';
+import { resetGridDecimalPolicyCache } from '../../../../../shared/services/gridDecimalPolicy.service';
 import { PageLoadBoundary } from '../../../../../shared/components/PageLoadBoundary';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useCommonConfirmDialog } from '../../../../../shared/hooks/useCommonConfirmDialog';
@@ -21,6 +24,7 @@ import { searchOrderCustomers, searchOrderMaterials } from '../../../order/creat
 import { formatSalesOrderAmount, sumExactSalesAmounts } from '../../../order/create/data/salesOrderAmounts';
 import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
 import { usePolicyDecimalStatus } from '../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
+import { useSalesOrderCommonCodes } from '../../../order/hooks/useSalesOrderCommonCodes';
 import { SalesDecimalPolicyError } from '../../../shared/SalesDecimalPolicyError';
 import { DeliveryDetailGrid } from './components/DeliveryDetailGrid';
 import { activeDeliveryRows } from './data/deliveryDetailRows';
@@ -49,6 +53,7 @@ export function SalesDeliveryCreatePage({
   currentMenuName, content, breadcrumbItems, selectedMenuPermissions: permissions, salesDeliveryId,
   embedded = false, mode = 'edit', onSaved, onDeleted, onDirtyChange, onPendingChange, onEmbeddedActionsChange,
 }: Props) {
+  const { codes: commonCodes, loading: commonCodesLoading, error: commonCodesError } = useSalesOrderCommonCodes();
   const policyState = usePolicyDecimalStatus();
   const policy = policyState.rule;
   const amountRule = policy && ('places' in policy ? policy : policy.currency);
@@ -59,7 +64,8 @@ export function SalesDeliveryCreatePage({
   const [item, setItem] = useState<DeliveryItem | null>(null);
   const [savedId, setSavedId] = useState<number | undefined>(salesDeliveryId);
   const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState(false);
+  const [loadError, setLoadError] = useState<PageLoadError | null>(null);
+  const [dateRetry, setDateRetry] = useState(0);
   const [pending, setPending] = useState(false);
   const [locked, setLocked] = useState(false);
   const [error, setError] = useState('');
@@ -94,10 +100,10 @@ export function SalesDeliveryCreatePage({
     setItem(next); setSavedId(next.salesDeliveryId); setLocked(false); applyForm(deliveryForm(next));
   }, [applyForm]);
   const load = useCallback(async (id: number) => {
-    setLoading(true); setLoadError(false); setError('');
+    setLoading(true); setLoadError(null); setError('');
     try { applyItem(await getDelivery(id)); }
     catch (cause) {
-      setLoadError(true); setError(cause instanceof Error ? cause.message : '출하 조회에 실패했습니다.');
+      setLoadError(toPageLoadError(cause));
     } finally { setLoading(false); }
   }, [applyItem]);
   useEffect(() => {
@@ -105,6 +111,7 @@ export function SalesDeliveryCreatePage({
     let active = true;
     void getSystemDate()
       .then((date) => {
+        if (active) setLoadError(null);
         if (!active || deliveryDateTouchedRef.current) return;
         deliveryDateTouchedRef.current = true;
         setForm((current) => ({ ...current, deliveryDt: date }));
@@ -114,12 +121,14 @@ export function SalesDeliveryCreatePage({
         }));
       })
       .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error
+        if (!active) return;
+        if (isApiNetworkError(cause)) { setLoadError('network'); return; }
+        setError(cause instanceof Error
           ? `서버 기준일을 불러오지 못했습니다. ${cause.message}`
           : '서버 기준일을 불러오지 못했습니다.');
       });
     return () => { active = false; };
-  }, [salesDeliveryId]);
+  }, [salesDeliveryId, dateRetry]);
   useEffect(() => {
     if (salesDeliveryId != null && canRead) void load(salesDeliveryId);
   }, [salesDeliveryId, canRead, load]);
@@ -135,7 +144,7 @@ export function SalesDeliveryCreatePage({
     materialPatch.current = patch; setMaterialOpen(true);
   }, []);
   const reset = async () => {
-    setItem(null); setSavedId(undefined); setLocked(false); setLoadError(false);
+    setItem(null); setSavedId(undefined); setLocked(false); setLoadError(null);
     setError(''); setNotice(''); setConfirm(null); setOverDelivery(null);
     setPending(true);
     deliveryDateTouchedRef.current = false;
@@ -245,13 +254,13 @@ export function SalesDeliveryCreatePage({
     <Box role="region" aria-label="출하 입력 내용" aria-busy={pending || loading}
       sx={{ px: embedded ? 0 : 2, pt: embedded ? 0 : 2, pb: embedded ? 0 : 2,
         display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
+      <PageLoadBoundary loading={loading} error={loadError ?? (policyState.network ? 'network' : null)} label="출하등록"
+        onRetry={() => { if (policyState.network) resetGridDecimalPolicyCache(); if (savedId) void load(savedId); else setDateRetry((value) => value + 1); }}>
       {notice ? <Alert severity="success">{notice}</Alert> : null}
-      <SalesDecimalPolicyError status={policyState.status} />
+      <SalesDecimalPolicyError status={policyState.status} network={policyState.network} />
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
       {locked && savedId ? <Button startIcon={<SearchIcon />} disabled={pending || loading} onClick={() => void load(savedId)}>재조회</Button> : null}
       {loading ? <Typography role="status">출하를 불러오는 중입니다.</Typography> : null}
-      <PageLoadBoundary loading={loading} error={loadError ? 'server' : null} label="출하등록"
-        onRetry={() => savedId && void load(savedId)}>
         <Paper variant="outlined" sx={{ p: 2, minWidth: 0, borderRadius: 1 }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>출하 기본정보</Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' }, columnGap: 2, rowGap: 1,
@@ -294,7 +303,15 @@ export function SalesDeliveryCreatePage({
                   onClick={() => setSourceOpen(true)}><SearchIcon fontSize="small" /></IconButton></span></Tooltip>
               </InputAdornment> : null } }} />
             <TextField size="small" label="출하장소" value={form.deliveryPlace} disabled={!editable} onChange={(event) => change('deliveryPlace', event.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />
-            <TextField size="small" label="배송방법" value={form.deliveryMethod} disabled={!editable} onChange={(event) => change('deliveryMethod', event.target.value)} slotProps={{ htmlInput: { maxLength: 50 } }} />
+            <TextField select size="small" label="배송방법" value={form.deliveryMethod}
+              error={Boolean(commonCodesError)} helperText={commonCodesError || undefined}
+              disabled={!editable || commonCodesLoading || Boolean(commonCodesError)}
+              onChange={(event) => change('deliveryMethod', event.target.value)}>
+              <MenuItem value="">선택 안 함</MenuItem>
+              {form.deliveryMethod && !commonCodes.deliveryMethodOptions.some(({ value }) => value === form.deliveryMethod)
+                ? <MenuItem value={form.deliveryMethod}>{form.deliveryMethod}</MenuItem> : null}
+              {commonCodes.deliveryMethodOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}
+            </TextField>
             <TextField size="small" label="비고" multiline minRows={2} sx={{ gridColumn: '1 / -1' }} value={form.remark} disabled={!editable} onChange={(event) => change('remark', event.target.value)} slotProps={{ htmlInput: { maxLength: 500 } }} />
           </Box>
         </Paper>

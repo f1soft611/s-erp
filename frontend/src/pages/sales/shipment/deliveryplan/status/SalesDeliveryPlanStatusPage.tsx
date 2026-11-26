@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { isApiNetworkError } from '../../../../../shared/services/apiErrors';
 import { Alert, Box, Button, Chip, Divider, IconButton, Link, Menu, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { ProfileAvatar } from '../../../../../shared/components/ProfileAvatar';
+import { resetGridDecimalPolicyCache } from '../../../../../shared/services/gridDecimalPolicy.service';
+import { PageLoadBoundary } from '../../../../../shared/components/PageLoadBoundary';
+import { useInitialLoadState } from '../../../../../shared/hooks/useInitialLoadState';
 import { PageHeader } from '../../../../../shared/components/PageHeader';
 import { PageMessageArea } from '../../../../../shared/components/PageMessageArea';
 import { PageSearchArea } from '../../../../../shared/components/PageSearchArea';
@@ -61,6 +65,7 @@ export function SalesDeliveryPlanStatusPage({
   const plannedRule = policy && resolveDecimalColumn(plannedColumn, policy);
   const { confirm, dialog } = useCommonConfirmDialog();
   const [filters, setFilters] = useState<DeliveryPlanFilters>(() => defaultDeliveryPlanFilters());
+  const { start: startLoad, succeed: succeedLoad, fail: failLoad, ...initialLoad } = useInitialLoadState({ networkOnly: true });
   const [rows, setRows] = useState<DeliveryPlanStatusRow[]>([]);
   const [appliedKeyword, setAppliedKeyword] = useState('');
   const [selected, setSelected] = useState<DeliveryPlanItem | DeliveryPlanStatusRow | null>(null);
@@ -85,22 +90,26 @@ export function SalesDeliveryPlanStatusPage({
     if (!validDeliveryPlanPeriod(next)) { setError('계획일 기간의 시작일과 종료일을 확인해 주세요.'); return; }
     setLoading(true);
     setError('');
-    try { setRows(await getDeliveryPlanStatus(next)); setAppliedKeyword(next.keyword.trim()); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : '출하계획 현황 조회에 실패했습니다.'); }
+    startLoad();
+    try { setRows(await getDeliveryPlanStatus(next)); setAppliedKeyword(next.keyword.trim()); succeedLoad(); }
+    catch (cause) { failLoad(cause); if (!isApiNetworkError(cause)) setError(cause instanceof Error ? cause.message : '출하계획 현황 조회에 실패했습니다.'); }
     finally { setLoading(false); }
-  }, []);
+  }, [startLoad, succeedLoad, failLoad]);
 
   const search = () => runSearch(filters);
   useEffect(() => {
     let active = true;
+    startLoad();
     getDeliveryPlanStatus(defaultDeliveryPlanFilters())
-      .then((result) => { if (active) setRows(result); })
+      .then((result) => { if (active) { setRows(result); succeedLoad(); } })
       .catch((cause) => {
-        if (active) setError(cause instanceof Error ? cause.message : '출하계획 현황 조회에 실패했습니다.');
+        if (!active) return;
+        failLoad(cause);
+        if (!isApiNetworkError(cause)) setError(cause instanceof Error ? cause.message : '출하계획 현황 조회에 실패했습니다.');
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [startLoad, succeedLoad, failLoad]);
 
   const open = useCallback(async (row: DeliveryPlanStatusRow) => {
     setSelected(row);
@@ -235,6 +244,8 @@ export function SalesDeliveryPlanStatusPage({
   return <Box sx={{ position: 'relative', display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
     <PageHeader breadcrumbItems={breadcrumbItems.length ? breadcrumbItems : [currentMenuName]}
       description={content.description} actionGroups={actions} />
+    <PageLoadBoundary {...initialLoad} error={initialLoad.error ?? (policyState.network ? 'network' : null)} label="출하계획현황"
+      onRetry={() => { if (policyState.network) resetGridDecimalPolicyCache(); void runSearch(filters); }}>
     <PageSearchArea detailFields={fields} detailValues={detailValues} appliedDetailValues={appliedValues}
       onDetailValuesChange={setDetailValues} onDetailSearch={(values) => {
         const period = values.planDt;
@@ -273,6 +284,7 @@ export function SalesDeliveryPlanStatusPage({
           canExportExcel={Boolean(permissions?.excel)} />
       </Box>
     </Box>
+    </PageLoadBoundary>
       {selected ? <PageAreaOverlay onClose={() => setSelected(null)}>
       <PostDetailPanel title="출하계획 상세" subtitle={`계획번호: ${selected.planNo}`}
         onClose={() => setSelected(null)} isLoading={detailLoading} loadingLabel="출하계획 상세를 불러오는 중입니다.">
@@ -325,7 +337,7 @@ export function SalesDeliveryPlanStatusPage({
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <Box sx={{ p: 0, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
         <PageMessageArea message={error} onClose={() => setError('')} />
-        <SalesDecimalPolicyError status={policyState.status} />
+        <SalesDecimalPolicyError status={policyState.status} network={policyState.network} />
         <DeliveryPlanForm gridRef={editGridRef} storageKey="sales-delivery-plan-status-details-v1" planNo={selected.planNo} orderNo={selectedOrderNumbers} orderDt={selectedOrderDates}
           customerName={selectedCustomerNames} rows={editRows} setRows={setEditRows} editable={dialogMode === 'edit' && !loading && policyReady}
           canSelectOrder={false} onSelectOrder={() => undefined} />

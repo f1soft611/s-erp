@@ -4,6 +4,8 @@ import NoteAddOutlinedIcon from '@mui/icons-material/NoteAddOutlined';
 import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
+import { resetGridDecimalPolicyCache } from '../../../../../shared/services/gridDecimalPolicy.service';
+import { PageLoadBoundary } from '../../../../../shared/components/PageLoadBoundary';
 import { PageHeader } from '../../../../../shared/components/PageHeader';
 import { PageMessageArea } from '../../../../../shared/components/PageMessageArea';
 import { F1Grid, type F1GridColumn, type F1GridRef } from '../../../../../shared/components/f1-grid';
@@ -201,16 +203,18 @@ export function SalesDeliveryPlanCreatePage({
   return <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
     <PageHeader breadcrumbItems={breadcrumbItems.length ? breadcrumbItems : [currentMenuName]}
       description={content.description} actionGroups={actions} />
+    <PageLoadBoundary loading={policyState.status === 'loading'} error={policyState.network ? 'network' : null} label="출하계획등록" onRetry={resetGridDecimalPolicyCache}>
     <Box role="region" aria-label="출하계획 입력 내용"
       sx={{ px: 2, pt: 2, pb: 2,
         display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
       {notice ? <Alert severity="success">{notice}</Alert> : null}
-      <SalesDecimalPolicyError status={policyState.status} />
+      <SalesDecimalPolicyError status={policyState.status} network={policyState.network} />
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
       <DeliveryPlanForm key={formVersion} gridRef={gridRef} storageKey="sales-delivery-plan-create-details-v1" planNo={planNo} orderNo={selectedOrderNo} orderDt={selectedOrderDates}
         customerName={selectedCustomers} rows={rows} setRows={setRows} editable={canWrite}
         canSelectOrder={canSelectOrder && planId === null} onSelectOrder={openSourcePicker} />
     </Box>
+    </PageLoadBoundary>
     <CommonDialog open={sourceOpen} onClose={() => setSourceOpen(false)} title="계획대상 수주 품목 선택"
       size="lg" fullScreenOnMobile bodyMode="fill" paperHeight="min(900px, 85vh)"
       actions={<>

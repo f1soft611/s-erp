@@ -12,6 +12,9 @@ type KanbanBoardProps = {
   canWrite: boolean;
   onMovePost: (postId: string, columnId: string) => void;
   onOpenPost: (postId: string) => void;
+  /** 작성자 본인 카드의 더보기 메뉴에 수정을 보여준다. */
+  currentUserId?: string;
+  onEditPost?: (postId: string) => void;
   onToggleCollapse?: (columnId: string) => void;
   /** board: 가로 스크롤 보드, tabs: 좁은 화면에서 컬럼 탭으로 한 컬럼씩 보기 */
   layout?: 'board' | 'tabs';
@@ -36,6 +39,8 @@ export function KanbanBoard({
   canWrite,
   onMovePost,
   onOpenPost,
+  currentUserId,
+  onEditPost,
   onToggleCollapse,
   layout = 'board',
   fillHeight = false,
@@ -108,6 +113,8 @@ export function KanbanBoard({
             canWrite={canWrite}
             onMovePost={onMovePost}
             onOpenPost={onOpenPost}
+            currentUserId={currentUserId}
+            onEditPost={onEditPost}
           />
         ) : null}
       </Box>
@@ -149,6 +156,8 @@ export function KanbanBoard({
           canWrite={canWrite}
           onMovePost={onMovePost}
           onOpenPost={onOpenPost}
+            currentUserId={currentUserId}
+            onEditPost={onEditPost}
           onToggleCollapse={onToggleCollapse}
         />
       ))}

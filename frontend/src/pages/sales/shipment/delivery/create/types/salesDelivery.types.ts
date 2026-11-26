@@ -12,6 +12,7 @@ export type DeliveryDetail = {
   materialSpec?: string | null;
   unit: string | null;
   salesOrderId: number | null;
+  orderNo?: string | null;
   salesOrderDetailId: number | null;
   salesDeliveryPlanDetailId: number | null;
   deliveryQty: number;

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isApiNetworkError } from '../../../../shared/services/apiErrors';
 import { useBlocker } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined';
@@ -14,6 +15,9 @@ import {
   Typography,
 } from '@mui/material';
 import { PageHeader } from '../../../../shared/components/PageHeader';
+import { resetGridDecimalPolicyCache } from '../../../../shared/services/gridDecimalPolicy.service';
+import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
+import { useInitialLoadState } from '../../../../shared/hooks/useInitialLoadState';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useCommonConfirmDialog } from '../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
@@ -182,6 +186,9 @@ export function QuotationCreatePage({
   const [codesLoading, setCodesLoading] = useState(true);
   const [codesError, setCodesError] = useState('');
   const [codesRetry, setCodesRetry] = useState(0);
+  const [loadRetry, setLoadRetry] = useState(0);
+  const { start: startCodes, succeed: succeedCodes, fail: failCodes, ...codesInitialLoad } = useInitialLoadState({ networkOnly: true });
+  const { start: startLoad, succeed: succeedLoad, fail: failLoad, ...quotationInitialLoad } = useInitialLoadState({ networkOnly: true });
   const [baseline, setBaseline] = useState<HeaderSnapshot>(() => emptyHeader());
   const [customer, setCustomer] = useState<MasterPickerOption | null>(null);
   const [quotationDt, setQuotationDt] = useState('');
@@ -236,16 +243,19 @@ export function QuotationCreatePage({
 
   useEffect(() => {
     let active = true;
+    startCodes();
     void fetchQuotationCommonCodes()
-      .then((codes) => { if (active) setCommonCodes(codes); })
+      .then((codes) => { if (active) { setCommonCodes(codes); succeedCodes(); } })
       .catch((loadError: unknown) => {
-        if (active) setCodesError(
+        if (!active) return;
+        failCodes(loadError);
+        if (!isApiNetworkError(loadError)) setCodesError(
           loadError instanceof Error ? loadError.message : '견적 공통코드를 불러오지 못했습니다.',
         );
       })
       .finally(() => { if (active) setCodesLoading(false); });
     return () => { active = false; };
-  }, [codesRetry]);
+  }, [codesRetry, startCodes, succeedCodes, failCodes]);
   const codesDisabled = !isEditable || codesLoading || Boolean(codesError);
   const missingCodes = (Object.keys(QUOTATION_CODE_GROUPS) as QuotationCodeGroup[])
     .filter((code) => commonCodes[code].length === 0)
@@ -336,16 +346,18 @@ export function QuotationCreatePage({
     let active = true;
     setIsLoadingQuotation(true);
     setError('');
+    startLoad();
     getQuotation(quotationId)
-      .then((quotation) => { if (active) applyLoadedQuotation(quotation); })
+      .then((quotation) => { if (active) { applyLoadedQuotation(quotation); succeedLoad(); } })
       .catch((loadError: unknown) => {
         if (!active) return;
+        failLoad(loadError);
         setIsLocked(true);
-        setError(loadError instanceof Error ? loadError.message : '견적을 불러오지 못했습니다.');
+        if (!isApiNetworkError(loadError)) setError(loadError instanceof Error ? loadError.message : '견적을 불러오지 못했습니다.');
       })
       .finally(() => { if (active) setIsLoadingQuotation(false); });
     return () => { active = false; };
-  }, [applyLoadedQuotation, quotationId]);
+  }, [applyLoadedQuotation, quotationId, loadRetry, startLoad, succeedLoad, failLoad]);
 
   const clearValidationErrors = useCallback(() => setValidationErrors(null), []);
 
@@ -575,6 +587,9 @@ export function QuotationCreatePage({
           actionGroups={actions}
         />
       ) : null}
+      <PageLoadBoundary {...codesInitialLoad} label="견적등록 공통코드" onRetry={() => setCodesRetry((value) => value + 1)}>
+      <PageLoadBoundary {...quotationInitialLoad} error={quotationInitialLoad.error ?? (policyState.network ? 'network' : null)} label="견적등록"
+        onRetry={() => { if (policyState.network) resetGridDecimalPolicyCache(); setLoadRetry((value) => value + 1); }}>
       <Box
         role="region"
         aria-label="견적 입력 내용"
@@ -607,7 +622,7 @@ export function QuotationCreatePage({
           </Alert>
         ) : null}
         {notice ? <Alert severity="success">{notice}</Alert> : null}
-        <SalesDecimalPolicyError status={policyState.status} />
+        <SalesDecimalPolicyError status={policyState.status} network={policyState.network} />
         {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
         <Paper variant="outlined" sx={{ p: 2, minWidth: 0, borderRadius: 1 }}>
           <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 700 }}>견적 기본정보</Typography>
@@ -738,6 +753,8 @@ export function QuotationCreatePage({
         onClose={() => { setPickerOpen(false); setMaterialPickerApply(null); }}
         onChange={selectMaterial}
       />
+      </PageLoadBoundary>
+      </PageLoadBoundary>
       {embedded ? null : <QuotationRouteLeaveGuard when={hasUnsavedChanges} />}
       <UnsavedChangesConfirmDialog
         open={deleteConfirmOpen}

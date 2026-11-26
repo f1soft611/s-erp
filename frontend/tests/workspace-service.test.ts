@@ -11,6 +11,7 @@ import {
   savePrefs,
   saveRoom,
   updateComment,
+  updatePost,
 } from '../src/pages/groupware/community/workspace/services/workspace.service';
 
 // u1: 영업 admin, u2/u3: 영업 write, u4: 영업 read (workspaceSamples 기준)
@@ -58,6 +59,18 @@ describe('workspace service', () => {
   it('falls back to the first column when the column is missing in a room with columns', async () => {
     const created = await createPost(newPost({ columnId: null }), 'u2');
     expect(created.columnId).toBe('col-request');
+  });
+
+  it('lets only the author update a post and keeps comments and author', async () => {
+    const created = await createPost(newPost(), 'u2');
+    const input = { title: ' 수정 제목 ', body: '<p>수정</p>', columnId: 'col-done', attachments: [] };
+    await expect(updatePost(created.id, input, 'u3')).rejects.toThrow('수정 권한이 없습니다.');
+    await expect(updatePost(created.id, { ...input, title: ' ' }, 'u2')).rejects.toThrow('제목을 입력하세요.');
+    const updated = await updatePost(created.id, input, 'u2');
+    expect(updated).toMatchObject({ title: '수정 제목', body: '<p>수정</p>', columnId: 'col-done', authorId: 'u2' });
+    expect(updated.createdAt).toBe(created.createdAt);
+    const stored = (await listPosts('room-sales')).find((post) => post.id === created.id);
+    expect(stored?.title).toBe('수정 제목');
   });
 
   it('moves a post and every user sees the same column', async () => {

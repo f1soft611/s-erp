@@ -14,6 +14,7 @@ public class RevenueClosingDetailVO implements Serializable {
     private Long salesDeliveryId;
     private String deliveryNo;
     private String deliveryDt;
+    private Long salesOrderId;
     private String orderNo;
     private Long customerId;
     private String customerCode;

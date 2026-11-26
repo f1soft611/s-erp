@@ -1,4 +1,4 @@
-package egovframework.let.sales.common;
+package egovframework.com.cmm;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
-class SalesDecimalColumnPolicyTest {
+class DecimalPolicyTest {
     @Test
     void appliesColumnOverridesIndependentlyAndChecksContract() {
         Map<String, Object> currency = new HashMap<String, Object>();
@@ -32,7 +32,7 @@ class SalesDecimalColumnPolicyTest {
         contract.put("supplyAmount", supply);
         contract.put("totalAmount", total);
 
-        SalesDecimalPolicy policy = SalesDecimalPolicy.from(policies, contract);
+        DecimalPolicy policy = DecimalPolicy.forModule("SALES", policies, contract);
         assertEquals(new BigDecimal("1.24"), policy.amount("supplyAmount", new BigDecimal("1.235"), "공급가"));
         assertEquals(new BigDecimal("1.235"), policy.amount("totalAmount", new BigDecimal("1.2359"), "합계"));
         policy.verifyColumnContract(contract);
@@ -45,7 +45,7 @@ class SalesDecimalColumnPolicyTest {
     @Test
     void permitsLegacyClientsWhenThereAreNoColumnOverrides() {
         Map<String, Object> quantity = Collections.<String, Object>singletonMap("type", "number");
-        SalesDecimalPolicy policy = SalesDecimalPolicy.from(null, Collections.singletonMap("quantity", (Object) quantity));
+        DecimalPolicy policy = DecimalPolicy.forModule("SALES", null, Collections.singletonMap("quantity", (Object) quantity));
         policy.verifyColumnContract(null);
         assertEquals(new BigDecimal("2"), policy.input("quantity", new BigDecimal("2.0"), "수량"));
     }
@@ -54,7 +54,7 @@ class SalesDecimalColumnPolicyTest {
     void rejectsOldClientsWhoseColumnTypeChangedEvenWithoutOverrides() {
         Map<String, Object> quantity = Collections.<String, Object>singletonMap("type", "number");
         Map<String, Object> server = Collections.singletonMap("quantity", (Object) quantity);
-        SalesDecimalPolicy policy = SalesDecimalPolicy.from(null, server);
+        DecimalPolicy policy = DecimalPolicy.forModule("SALES", null, server);
         Map<String, Object> retyped = Collections.singletonMap("quantity",
                 (Object) Collections.<String, Object>singletonMap("type", "decimal"));
         Map<String, Object> missingField = Collections.<String, Object>emptyMap();
@@ -83,7 +83,7 @@ class SalesDecimalColumnPolicyTest {
         module.put("number", number);
         module.put("decimal", decimal);
         module.put("currency", currency);
-        SalesDecimalPolicy policy = SalesDecimalPolicy.from(Collections.singletonMap("SALES", module));
+        DecimalPolicy policy = DecimalPolicy.forModule("SALES", Collections.singletonMap("SALES", module), Collections.<String, Object>emptyMap());
         policy.verifySnapshot(null);
         policy.verifySnapshot(module);
         Map<String, Object> changed = new HashMap<String, Object>(module);
@@ -111,7 +111,7 @@ class SalesDecimalColumnPolicyTest {
             column.put((String) entry[0], entry[1]);
             Map<String, Object> contract = Collections.singletonMap("quantity", (Object) column);
             assertThrows(IllegalStateException.class, () -> {
-                SalesDecimalPolicy policy = SalesDecimalPolicy.from(null, contract);
+                DecimalPolicy policy = DecimalPolicy.forModule("SALES", null, contract);
                 policy.verifyColumnContract(contract);
             }, entry[0].toString());
         }

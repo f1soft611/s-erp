@@ -64,6 +64,7 @@ export function WorkspacePage({ selectedModule, currentMenuName, content, select
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [viewByRoom, setViewByRoom] = useState<Record<string, CommonViewMode>>({});
   const [composerOpen, setComposerOpen] = useState(false);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [settingsTarget, setSettingsTarget] = useState<'edit' | 'new' | null>(null);
   const [detailPostId, setDetailPostId] = useState<string | null>(null);
 
@@ -124,6 +125,9 @@ export function WorkspacePage({ selectedModule, currentMenuName, content, select
   const handleCreatePost = (input: NewPostInput) =>
     guarded(() => postsState.createPost(input), '글을 등록했습니다.', '글을 등록하지 못했습니다.');
 
+  const handleUpdatePost = (postId: string, input: NewPostInput) =>
+    guarded(() => postsState.updatePost(postId, input), '글을 수정했습니다.', '글을 수정하지 못했습니다.');
+
   const handleAddComment = (postId: string, parentId: string | null, html: string, files: File[]) =>
     guarded(
       async () => postsState.addComment(postId, parentId, html, await toAttachments(files)),
@@ -157,6 +161,7 @@ export function WorkspacePage({ selectedModule, currentMenuName, content, select
     showSuccess('방 설정을 저장했습니다.');
   };
 
+  const editingPost = postsState.posts.find((post) => post.id === editingPostId) ?? null;
   const detailPost = postsState.posts.find((post) => post.id === detailPostId) ?? null;
   const closeDetail = () => setDetailPostId(null);
 
@@ -209,6 +214,8 @@ export function WorkspacePage({ selectedModule, currentMenuName, content, select
           fillHeight={fillKanban}
           onMovePost={handleMovePost}
           onOpenPost={setDetailPostId}
+          currentUserId={userId}
+          onEditPost={setEditingPostId}
           onToggleCollapse={(columnId) =>
             updatePrefs({
               collapsedColumnIds: prefs.collapsedColumnIds.includes(columnId)
@@ -259,6 +266,7 @@ export function WorkspacePage({ selectedModule, currentMenuName, content, select
             onEditComment={handleEditComment}
             onDeleteComment={handleDeleteComment}
             onDownloadAttachment={handleDownload}
+            onEditPost={(target) => setEditingPostId(target.id)}
           />
         )}
       />
@@ -404,6 +412,15 @@ export function WorkspacePage({ selectedModule, currentMenuName, content, select
       {room ? (
         <PostComposerDialog open={composerOpen} room={room} onClose={() => setComposerOpen(false)} onSubmit={handleCreatePost} />
       ) : null}
+      {room && editingPost ? (
+        <PostComposerDialog
+          open
+          room={room}
+          post={editingPost}
+          onClose={() => setEditingPostId(null)}
+          onSubmit={(input) => handleUpdatePost(editingPost.id, input)}
+        />
+      ) : null}
       {room && detailPost ? (
         <PageAreaOverlay onClose={closeDetail}>
           <PostDetailPanel title="글 상세" onClose={closeDetail}>
@@ -416,6 +433,7 @@ export function WorkspacePage({ selectedModule, currentMenuName, content, select
               onEditComment={handleEditComment}
               onDeleteComment={handleDeleteComment}
               onDownloadAttachment={handleDownload}
+              onEditPost={(target) => setEditingPostId(target.id)}
             />
           </PostDetailPanel>
         </PageAreaOverlay>
