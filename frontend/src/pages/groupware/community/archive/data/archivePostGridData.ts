@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { Button } from '@mui/material';
 import type { F1GridColumn } from '../../../../../shared/components/f1-grid';
+import { decimalColumnOptions, getDecimalColumnContract } from '../../../../../shared/services/decimalColumnContract';
 import type { ArchiveCategory, ArchivePost } from '../types/archive.types';
 
 function formatDate(value?: string | Date | null) {
@@ -79,10 +80,11 @@ export function createArchivePostColumns(
     {
       field: 'attachmentCount',
       headerName: '첨부 수',
+      ...decimalColumnOptions(getDecimalColumnContract('groupware.archivePost'), 'attachmentCount'),
       align: 'center',
       editable: false,
       search: { hidden: true },
-      renderCell: ({ row }) => row.attachmentCount ?? 0,
+      getValue: (row) => row.attachmentCount ?? 0,
     },
   ];
 }

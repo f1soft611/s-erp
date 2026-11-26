@@ -14,12 +14,15 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material';
+import type { GridDecimalRule } from '../../../../../shared/services/gridDecimalPolicy.service';
 import { getAttachmentIconMeta } from '../../../../../shared/components/feed/attachmentIconMeta';
 import {
   F1GridHighlightText,
   F1Tree,
   type F1GridColumn,
 } from '../../../../../shared/components/f1-grid';
+import { usePolicyDecimalRule } from '../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
+import { formatFileSize, resolveFileSizeRule } from '../../../shared/utils/formatFileSize';
 import type { ArchiveBrowserRow, ArchiveFileRow } from '../types/archive.types';
 
 type ArchiveFileGridProps = {
@@ -35,12 +38,10 @@ type ArchiveFileGridProps = {
   onDelete: (row: ArchiveFileRow) => void;
 };
 
-function formatSize(value?: number | string | null) {
+function formatSize(value: number | string | null | undefined, rule: GridDecimalRule | undefined) {
   const size = Number(value ?? 0);
   if (!Number.isFinite(size) || size <= 0) return '—';
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  return formatFileSize(size, rule);
 }
 
 function formatDate(value?: string | Date | null) {
@@ -65,6 +66,8 @@ export function ArchiveFileGrid({
 }: ArchiveFileGridProps) {
   const theme = useTheme();
   const isNarrow = useMediaQuery(theme.breakpoints.down('sm'));
+  const policy = usePolicyDecimalRule();
+  const sizeRule = useMemo(() => resolveFileSizeRule(policy), [policy]);
   const columns = useMemo<F1GridColumn<ArchiveBrowserRow>[]>(() => {
     const result: F1GridColumn<ArchiveBrowserRow>[] = [
       {
@@ -168,7 +171,7 @@ export function ArchiveFileGrid({
                   <Typography variant="caption" color="text.secondary">
                     {row.file.writerName ?? '—'} ·{' '}
                     {formatDate(row.file.uploadedAt)} ·{' '}
-                    {formatSize(row.file.fileSize)}
+                    {formatSize(row.file.fileSize, sizeRule)}
                   </Typography>
                 )}
               </Stack>
@@ -219,7 +222,7 @@ export function ArchiveFileGrid({
           editable: false,
           search: { hidden: true },
           renderCell: ({ row }) =>
-            row.rowType === 'file' ? formatSize(row.file.fileSize) : '—',
+            row.rowType === 'file' ? formatSize(row.file.fileSize, sizeRule) : '—',
         },
       );
     }
@@ -284,6 +287,7 @@ export function ArchiveFileGrid({
     onDownload,
     onEdit,
     onFolderOpen,
+    sizeRule,
   ]);
 
   return (

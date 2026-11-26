@@ -60,5 +60,11 @@
     "inputQty": { "type": "decimal" },
     "ratio": { "type": "decimal" },
     "perPlateG": { "type": "decimal" }
+    },
+  "groupware.archivePost": {
+    "attachmentCount": { "type": "number" }
+    },
+  "groupware.file": {
+    "fileSize": { "type": "decimal" }
   }
 }

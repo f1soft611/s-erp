@@ -25,6 +25,8 @@ const GUARD_SCOPE: Record<string, string[]> = {
   'co.classification': ['src/pages/co/master/classification'],
   'co.commonCode': ['src/pages/co/master/common-code'],
   'co.workStandard': ['src/pages/co/work-standard'],
+  'groupware.archivePost': ['src/pages/groupware/community/archive'],
+  'groupware.file': ['src/pages/groupware/shared', 'src/pages/groupware/documents/write', 'src/pages/groupware/community/archive'],
 };
 
 /**
