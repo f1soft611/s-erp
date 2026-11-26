@@ -55,5 +55,10 @@
   },
   "co.commonCode": {
     "sortOrder": { "type": "number" }
+    },
+  "co.workStandard": {
+    "inputQty": { "type": "decimal" },
+    "ratio": { "type": "decimal" },
+    "perPlateG": { "type": "decimal" }
   }
 }

@@ -24,6 +24,7 @@ const GUARD_SCOPE: Record<string, string[]> = {
   'co.material': ['src/pages/co/master/materials'],
   'co.classification': ['src/pages/co/master/classification'],
   'co.commonCode': ['src/pages/co/master/common-code'],
+  'co.workStandard': ['src/pages/co/work-standard'],
 };
 
 /**

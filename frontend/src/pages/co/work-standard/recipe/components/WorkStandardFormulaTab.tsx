@@ -15,7 +15,9 @@ import {
   type F1GridRef,
   type F1GridRowId,
 } from '../../../../../shared/components/f1-grid';
+import { usePolicyDecimalRule } from '../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
 import { MaterialPickerDialog } from '../../../../../shared/components/master-picker/MasterPickers';
+import type { GridDecimalRule } from '../../../../../shared/services/gridDecimalPolicy.service';
 import type { MasterPickerOption } from '../../../../../shared/components/master-picker/masterPicker.types';
 import {
   calculateFormulaTotals,
@@ -23,6 +25,7 @@ import {
   createFormulaRow,
   duplicateFormulaRow,
   resolveActiveFormulaRows,
+  resolveFormulaDecimalRules,
   toFormulaMaterialPatch,
 } from '../data/workStandardFormula';
 import { searchWorkStandardMaterials } from '../services/workStandard.service';
@@ -61,7 +64,9 @@ export function WorkStandardFormulaTab({
   const [pickerTarget, setPickerTarget] = useState<FormulaPickerTarget | null>(null);
 
   const activeRows = useMemo(() => resolveActiveFormulaRows(rows, changes), [changes, rows]);
-  const totals = useMemo(() => calculateFormulaTotals(activeRows, baseQty), [activeRows, baseQty]);
+  const policy = usePolicyDecimalRule();
+  const rules = useMemo(() => (policy ? resolveFormulaDecimalRules(policy) : undefined), [policy]);
+  const totals = useMemo(() => calculateFormulaTotals(activeRows, baseQty, rules), [activeRows, baseQty, rules]);
 
   const openMaterialPicker = useCallback(
     (applyPatch: (changes: Partial<WorkStandardFormulaRow>) => void) => {
@@ -101,8 +106,9 @@ export function WorkStandardFormulaTab({
         basis,
         disabled,
         onOpenMaterialPicker: openMaterialPicker,
+        rules,
       }),
-    [basis, baseQty, disabled, openMaterialPicker, totals.inputQty],
+    [basis, baseQty, disabled, openMaterialPicker, rules, totals.inputQty],
   );
 
   const handleChangesChange = useCallback(
@@ -202,10 +208,10 @@ export function WorkStandardFormulaTab({
         <FormulaSummary
           label={basis === 'batch' ? '투입량 합계(kg)' : '1판 투입량 합계(kg)'}
           value={basis === 'batch' || baseQty <= 0 ? totals.inputQty : totals.inputQty / baseQty}
-          digits={3}
+          rule={rules?.inputQty}
         />
-        <FormulaSummary label="배합비 합계(%)" value={totals.ratio} digits={2} />
-        <FormulaSummary label="1판당 합계(g)" value={totals.perPlateG} digits={1} />
+        <FormulaSummary label="배합비 합계(%)" value={totals.ratio} rule={rules?.ratio} />
+        <FormulaSummary label="1판당 합계(g)" value={totals.perPlateG} rule={rules?.perPlateG} />
       </Box>
       <MaterialPickerDialog
         open={pickerTarget !== null && !disabled}
@@ -217,7 +223,7 @@ export function WorkStandardFormulaTab({
   );
 }
 
-function FormulaSummary({ label, value, digits }: { label: string; value: number; digits: number }) {
+function FormulaSummary({ label, value, rule }: { label: string; value: number; rule?: GridDecimalRule }) {
   return (
     <Box
       sx={{
@@ -236,7 +242,12 @@ function FormulaSummary({ label, value, digits }: { label: string; value: number
         {label}
       </Typography>
       <Typography variant="body1" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-        {value.toLocaleString('ko-KR', { minimumFractionDigits: digits, maximumFractionDigits: digits })}
+        {rule
+          ? value.toLocaleString('ko-KR', {
+              minimumFractionDigits: rule.trailingZeros === 'AUTO' ? 0 : rule.places,
+              maximumFractionDigits: rule.places,
+            })
+          : '-'}
       </Typography>
     </Box>
   );

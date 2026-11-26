@@ -39,7 +39,7 @@ class DecimalColumnContractGuardTest {
      */
     private static final Set<String> FRONTEND_ONLY_DOCUMENTS = new HashSet<String>(java.util.Arrays.asList(
             "settings.module", "settings.menu", "settings.role",
-            "co.itemPartnerPriceSummary", "co.classification", "co.commonCode"));
+            "co.itemPartnerPriceSummary", "co.classification", "co.commonCode", "co.workStandard"));
     private static final Pattern SERVER_FIELD = Pattern.compile(
             "\\.(?:input|amount|places)\\(\"(\\w+)\"|policyAmount\\(\\s*\\w+,\\s*\"(\\w+)\"|validAmount\\([^\"]*\"(\\w+)\",\\s*decimalPolicy");
 
