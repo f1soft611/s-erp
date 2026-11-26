@@ -1,6 +1,7 @@
 import { Link } from '@mui/material';
 import { F1GridHighlightText, type F1GridColumn } from '../../../../../../shared/components/f1-grid';
 import type { StatementStatusRow } from '../../types/salesStatement.types';
+import { getDecimalColumnContract } from '../../../../../../shared/services/decimalColumnContract';
 
 export function createStatementStatusColumns(
   onOpenStatement: (row: StatementStatusRow) => void,
@@ -20,9 +21,10 @@ export function createStatementStatusColumns(
     { field: 'materialName', headerName: '품목명', width: 180, align: 'center', highlightSearch: true },
     { field: 'materialSpec', headerName: '규격', width: 140, align: 'center' },
     { field: 'unit', headerName: '단위', width: 80, align: 'center' },
-    ...(['deliveryQty', 'unitPrice', 'supplyAmt', 'vatAmt', 'lineTotalAmt'] as const).map((field, index) => ({
-      field, headerName: ['수량', '단가', '공급가', 'VAT', '합계'][index],
-      type: 'decimal' as const, width: 130, align: 'right' as const,
-    })),
+    ...(['deliveryQty', 'unitPrice', 'supplyAmt', 'vatAmt', 'lineTotalAmt'] as const).map((field, index) => {
+      const { type, ...decimal } = getDecimalColumnContract('sales.delivery')[field === 'lineTotalAmt' ? 'totalAmt' : field];
+      return { field, headerName: ['수량', '단가', '공급가', 'VAT', '합계'][index],
+        type, decimal, exactDecimal: true, width: 130, align: 'right' as const };
+    }),
   ];
 }

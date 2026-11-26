@@ -73,6 +73,8 @@ class ProcessManagementPostgresIntegrationTest {
             jdbc.execute("CREATE TABLE tb_tenant (tenant_id BIGINT PRIMARY KEY)");
             new ResourceDatabasePopulator(new FileSystemResource(
                     "../docs/database/20261112/20261112_003_create_process_management.sql")).execute(source);
+            new ResourceDatabasePopulator(new FileSystemResource(
+                    "../docs/database/20261124/20261124_005_split_process_master.sql")).execute(source);
             return source;
         }
 
@@ -110,18 +112,21 @@ class ProcessManagementPostgresIntegrationTest {
     @BeforeEach
     void reset() {
         JdbcTemplate jdbc = new JdbcTemplate(source);
-        jdbc.execute("TRUNCATE tb_process, tb_process_group, tb_tenant RESTART IDENTITY CASCADE");
+        jdbc.execute("TRUNCATE tb_process_group_process, tb_process, tb_process_group, tb_tenant RESTART IDENTITY CASCADE");
         jdbc.update("INSERT INTO tb_tenant (tenant_id) VALUES (1), (2)");
     }
 
     @Test
-    void createsGroupAndChildAndEnforcesTenantIsolation() {
+    void createsWorkplaceLinksAMasterAndEnforcesTenantIsolation() {
+        ProcessNodeVO master = service.saveMasters(1L, inserted(master("p:new-1", "가공"))).get(0);
         ProcessChangesVO changes = new ProcessChangesVO();
-        changes.setInsertedRows(Arrays.asList(process("p:new-2", "g:new-1"), group("g:new-1")));
+        changes.setInsertedRows(Arrays.asList(link("m:new-2", "g:new-1", master.getProcessId()), group("g:new-1")));
         List<ProcessNodeVO> saved = service.save(1L, changes);
         assertEquals(2, saved.size());
         assertEquals(0, service.list(2L).size());
-        ProcessNodeVO existing = saved.stream().filter(row -> row.getId().startsWith("p:")).findFirst().get();
+        assertEquals(0, service.listMasters(2L).size());
+        ProcessNodeVO existing = saved.stream().filter(row -> row.getId().startsWith("m:")).findFirst().get();
+        assertEquals("가공", existing.getName());
         changes = new ProcessChangesVO();
         changes.setDeletedRows(Collections.singletonList(existing));
         ProcessChangesVO foreignDelete = changes;
@@ -130,23 +135,60 @@ class ProcessManagementPostgresIntegrationTest {
     }
 
     @Test
-    void rollsBackGroupIfChildRefersToMissingGroup() {
+    void sharesOneMasterAcrossWorkplacesAndRejectsDuplicateLinks() {
+        ProcessNodeVO master = service.saveMasters(1L, inserted(master("p:new-1", "가공"))).get(0);
         ProcessChangesVO changes = new ProcessChangesVO();
-        changes.setInsertedRows(Arrays.asList(group("g:new-1"), process("p:new-2", "g:999")));
-        assertThrows(IllegalStateException.class, () -> service.save(1L, changes));
+        changes.setInsertedRows(Arrays.asList(group("g:new-1"), group("g:new-2"),
+                link("m:new-3", "g:new-1", master.getProcessId()), link("m:new-4", "g:new-2", master.getProcessId())));
+        List<ProcessNodeVO> saved = service.save(1L, changes);
+        assertEquals(4, saved.size());
+        assertEquals(1, service.listMasters(1L).size());
+        ProcessNodeVO firstGroup = saved.stream().filter(row -> row.getId().startsWith("g:")).findFirst().get();
+        ProcessChangesVO duplicate = new ProcessChangesVO();
+        duplicate.setInsertedRows(Collections.singletonList(
+                link("m:new-5", firstGroup.getId(), master.getProcessId())));
+        assertThrows(IllegalArgumentException.class, () -> service.save(1L, duplicate));
+        assertEquals(4, service.list(1L).size());
+    }
+
+    @Test
+    void rejectsLinkingAMasterOfAnotherTenant() {
+        ProcessNodeVO foreign = service.saveMasters(2L, inserted(master("p:new-1", "타사"))).get(0);
+        ProcessChangesVO changes = new ProcessChangesVO();
+        changes.setInsertedRows(Arrays.asList(group("g:new-1"), link("m:new-2", "g:new-1", foreign.getProcessId())));
+        assertThrows(IllegalArgumentException.class, () -> service.save(1L, changes));
         assertEquals(0, service.list(1L).size());
     }
 
     @Test
-    void rejectsDeletingGroupWithChild() {
+    void rejectsDeletingAWorkplaceOrMasterWhileLinked() {
+        ProcessNodeVO master = service.saveMasters(1L, inserted(master("p:new-1", "가공"))).get(0);
         ProcessChangesVO changes = new ProcessChangesVO();
-        changes.setInsertedRows(Arrays.asList(group("g:new-1"), process("p:new-2", "g:new-1")));
+        changes.setInsertedRows(Arrays.asList(group("g:new-1"), link("m:new-2", "g:new-1", master.getProcessId())));
         ProcessNodeVO existingGroup = service.save(1L, changes).stream()
                 .filter(row -> row.getId().startsWith("g:")).findFirst().get();
-        ProcessChangesVO deletion = new ProcessChangesVO();
-        deletion.setDeletedRows(Collections.singletonList(existingGroup));
-        assertThrows(IllegalArgumentException.class, () -> service.save(1L, deletion));
+        ProcessChangesVO deleteGroup = new ProcessChangesVO();
+        deleteGroup.setDeletedRows(Collections.singletonList(existingGroup));
+        assertThrows(IllegalArgumentException.class, () -> service.save(1L, deleteGroup));
+        ProcessChangesVO deleteMaster = new ProcessChangesVO();
+        deleteMaster.setDeletedRows(Collections.singletonList(master));
+        assertThrows(IllegalArgumentException.class, () -> service.saveMasters(1L, deleteMaster));
         assertEquals(2, service.list(1L).size());
+        assertEquals(1, service.listMasters(1L).size());
+    }
+
+    @Test
+    void deletesLinkAndWorkplaceTogetherThenTheMaster() {
+        ProcessNodeVO master = service.saveMasters(1L, inserted(master("p:new-1", "가공"))).get(0);
+        ProcessChangesVO changes = new ProcessChangesVO();
+        changes.setInsertedRows(Arrays.asList(group("g:new-1"), link("m:new-2", "g:new-1", master.getProcessId())));
+        List<ProcessNodeVO> saved = service.save(1L, changes);
+        ProcessChangesVO deletion = new ProcessChangesVO();
+        deletion.setDeletedRows(saved);
+        assertEquals(0, service.save(1L, deletion).size());
+        ProcessChangesVO deleteMaster = new ProcessChangesVO();
+        deleteMaster.setDeletedRows(Collections.singletonList(master));
+        assertEquals(0, service.saveMasters(1L, deleteMaster).size());
     }
 
     @Test
@@ -167,19 +209,35 @@ class ProcessManagementPostgresIntegrationTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(user, null, Collections.emptyList()));
         try {
+            mvc.perform(post("/api/v1/pr/processes/masters/save-batch")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"insertedRows\":[{\"id\":\"p:new-1\",\"name\":\"Process\"}],"
+                            + "\"updatedRows\":[],\"deletedRows\":[]}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.result.resultList.length()").value(1))
+                    .andExpect(jsonPath("$.result.resultList[0].id").value("p:1"));
             mvc.perform(post("/api/v1/pr/processes/save-batch")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"insertedRows\":[{\"id\":\"g:new-1\",\"name\":\"Group\"},"
-                            + "{\"id\":\"p:new-2\",\"parentId\":\"g:new-1\",\"name\":\"Process\"}],"
+                            + "{\"id\":\"m:new-2\",\"parentId\":\"g:new-1\",\"processId\":1}],"
                             + "\"updatedRows\":[],\"deletedRows\":[]}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.result.resultList.length()").value(2));
             mvc.perform(get("/api/v1/pr/processes"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.result.resultList.length()").value(2));
+            mvc.perform(get("/api/v1/pr/processes/masters"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.result.resultList.length()").value(1));
         } finally {
             SecurityContextHolder.clearContext();
         }
+    }
+
+    private ProcessChangesVO inserted(ProcessNodeVO row) {
+        ProcessChangesVO changes = new ProcessChangesVO();
+        changes.setInsertedRows(Collections.singletonList(row));
+        return changes;
     }
 
     private ProcessNodeVO group(String id) {
@@ -189,11 +247,18 @@ class ProcessManagementPostgresIntegrationTest {
         return row;
     }
 
-    private ProcessNodeVO process(String id, String parentId) {
+    private ProcessNodeVO master(String id, String name) {
+        ProcessNodeVO row = new ProcessNodeVO();
+        row.setId(id);
+        row.setName(name);
+        return row;
+    }
+
+    private ProcessNodeVO link(String id, String parentId, Long processId) {
         ProcessNodeVO row = new ProcessNodeVO();
         row.setId(id);
         row.setParentId(parentId);
-        row.setName("Process");
+        row.setProcessId(processId);
         return row;
     }
 }

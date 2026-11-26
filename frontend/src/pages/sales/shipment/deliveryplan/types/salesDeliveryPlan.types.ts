@@ -1,14 +1,18 @@
 import type { MenuPermission, ModuleItem, PageContent } from '../../../../dashboard/types/dashboard';
+import type { GridDecimalModuleRule } from '../../../../../shared/services/gridDecimalPolicy.service';
+import type { DecimalColumn } from '../../../../../shared/services/decimalColumnContract';
 
 export type DeliveryPlanDetailRequest = {
   salesDeliveryPlanDetailId: number | null;
   salesOrderId: number;
   salesOrderDetailId: number;
   planDt: string | null;
-  plannedQty: number;
+  plannedQty: number | string;
 };
 
 export type DeliveryPlanRequest = {
+  decimalPolicy?: GridDecimalModuleRule;
+  decimalColumns?: Readonly<Record<string, DecimalColumn>>;
   details: DeliveryPlanDetailRequest[];
 };
 
@@ -25,9 +29,9 @@ export type DeliveryPlanDetail = DeliveryPlanDetailRequest & {
   materialName: string;
   unit: string | null;
   lineNo: number;
-  deliveredQty: number;
-  remainingQty: number;
-  orderQty: number;
+  deliveredQty: number | string;
+  remainingQty: number | string;
+  orderQty: number | string;
 };
 
 export type PlanRow = DeliveryPlanDetailRequest & {
@@ -38,9 +42,9 @@ export type PlanRow = DeliveryPlanDetailRequest & {
   unit: string | null;
   orderNo: string;
   customerName: string;
-  orderQty: number;
-  remainingPlanQty?: number;
-  deliveredQty?: number;
+  orderQty: number | string;
+  remainingPlanQty?: number | string;
+  deliveredQty?: number | string;
 };
 
 export type DeliveryPlanItem = {
@@ -71,10 +75,10 @@ export type DeliveryPlanStatusRow = {
   unit: string | null;
   lineNo: number;
   planDt: string;
-  orderQty: number;
-  plannedQty: number;
-  deliveredQty: number;
-  remainingQty: number;
+  orderQty: number | string;
+  plannedQty: number | string;
+  deliveredQty: number | string;
+  remainingQty: number | string;
   createdBy?: string | null;
   createdByName?: string | null;
   createdByProfileImage?: string | null;
@@ -112,9 +116,9 @@ export type PlanSourceOrderRow = {
   materialCode: string;
   materialName: string;
   unit: string | null;
-  orderQty: number;
-  shippedQty: number;
-  unitPrice: number;
+  orderQty: number | string;
+  shippedQty: number | string;
+  unitPrice: number | string;
   planDt: string | null;
-  remainingPlanQty: number;
+  remainingPlanQty: number | string;
 };

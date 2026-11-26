@@ -1,7 +1,6 @@
 package egovframework.let.sales.shipment.deliveryplan.service.impl;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -33,6 +32,9 @@ import egovframework.let.sales.shipment.deliveryplan.domain.model.SalesDeliveryP
 import egovframework.let.sales.shipment.deliveryplan.domain.model.SalesDeliveryPlanVO;
 import egovframework.let.sales.shipment.deliveryplan.domain.repository.SalesDeliveryPlanDAO;
 import egovframework.let.sales.shipment.deliveryplan.service.SalesDeliveryPlanService;
+import egovframework.let.system.policies.service.SystemPolicyService;
+import egovframework.let.sales.common.SalesDecimalPolicy;
+import egovframework.com.cmm.DecimalColumnContract;
 
 @Service("salesDeliveryPlanService")
 public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implements SalesDeliveryPlanService {
@@ -42,15 +44,15 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
     private static final String EDITABLE_ORDER_STATUS = "수주등록";
     private static final int PLAN_NO_MAX_LENGTH = 30;
     private static final BigDecimal ZERO = new BigDecimal("0.00");
-    private static final int QTY_SCALE = 2;
-    private static final int MAX_NUMERIC_PRECISION = 15;
 
     private final SalesDeliveryPlanDAO dao;
     private final IdSequenceService sequenceService;
+    private final SystemPolicyService policy;
 
-    public SalesDeliveryPlanServiceImpl(SalesDeliveryPlanDAO dao, IdSequenceService sequenceService) {
+    public SalesDeliveryPlanServiceImpl(SalesDeliveryPlanDAO dao, IdSequenceService sequenceService, SystemPolicyService policy) {
         this.dao = dao;
         this.sequenceService = sequenceService;
+        this.policy = policy;
     }
 
     @Override
@@ -227,7 +229,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
                 lockSourceOrders(tenantId, requestOrderIds(request.getDetails()));
         Map<SourceKey, SalesDeliveryPlanDetailVO> linesBySource =
                 loadSourceLines(tenantId, ordersById.keySet());
-        Map<SourceKey, BigDecimal> quantities = validateAndSumDetails(request, linesBySource, null);
+        Map<SourceKey, BigDecimal> quantities = validateAndSumDetails(tenantId, request, linesBySource, null);
         for (SourceKey key : quantities.keySet()) {
             SalesDeliveryPlanDetailVO line = linesBySource.get(key);
             if (isPositive(line.getShippedQty())) {
@@ -324,7 +326,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         }
         Map<SourceKey, SalesDeliveryPlanDetailVO> linesBySource =
                 loadSourceLines(tenantId, ordersById.keySet());
-        Map<SourceKey, BigDecimal> quantities = validateAndSumDetails(request, linesBySource, currentById);
+        Map<SourceKey, BigDecimal> quantities = validateAndSumDetails(tenantId, request, linesBySource, currentById);
         validateTotals(tenantId, quantities, linesBySource, currentById, planId, allowExcess);
         for (SalesDeliveryPlanDetailRequestVO detail : request.getDetails()) {
             if (detail.getSalesDeliveryPlanDetailId() != null) {
@@ -418,9 +420,13 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         }
     }
 
-    private Map<SourceKey, BigDecimal> validateAndSumDetails(SalesDeliveryPlanRequestVO request,
+    private Map<SourceKey, BigDecimal> validateAndSumDetails(Long tenantId, SalesDeliveryPlanRequestVO request,
             Map<SourceKey, SalesDeliveryPlanDetailVO> linesBySource,
-            Map<Long, SalesDeliveryPlanDetailVO> currentById) {
+            Map<Long, SalesDeliveryPlanDetailVO> currentById) throws Exception {
+        SalesDecimalPolicy decimalPolicy = SalesDecimalPolicy.from(policy.getGridDecimals(tenantId),
+                DecimalColumnContract.forDocument("sales.deliveryPlan"));
+        decimalPolicy.verifySnapshot(request.getDecimalPolicy());
+        decimalPolicy.verifyColumnContract(request.getDecimalColumns());
         Map<SourceKey, BigDecimal> totals = new LinkedHashMap<SourceKey, BigDecimal>();
         Set<Long> detailIds = new HashSet<Long>();
         for (SalesDeliveryPlanDetailRequestVO detail : request.getDetails()) {
@@ -433,7 +439,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
             if (!linesBySource.containsKey(key)) {
                 throw badRequest("수주에 포함되지 않은 상세 항목입니다.");
             }
-            validateQuantity(detail.getPlannedQty());
+            detail.setPlannedQty(validateQuantity(detail.getPlannedQty(), decimalPolicy));
             if (detail.getSalesDeliveryPlanDetailId() != null) {
                 if (currentById == null || !detailIds.add(detail.getSalesDeliveryPlanDetailId())) {
                     throw badRequest("출하계획 상세 항목이 중복되었거나 올바르지 않습니다.");
@@ -557,7 +563,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         params.put("materialId", orderLine.getMaterialId());
         params.put("lineNo", lineNo);
         params.put("planDt", detail.getPlanDt());
-        params.put("plannedQty", detail.getPlannedQty().setScale(QTY_SCALE, RoundingMode.UNNECESSARY));
+        params.put("plannedQty", detail.getPlannedQty());
         params.put("createdBy", userId);
         params.put("updatedBy", userId);
         return params;
@@ -595,11 +601,9 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         }
     }
 
-    private void validateQuantity(BigDecimal quantity) {
-        if (quantity == null || quantity.signum() <= 0 || quantity.scale() > QTY_SCALE
-                || quantity.precision() > MAX_NUMERIC_PRECISION) {
-            throw badRequest("계획수량은 소수 둘째 자리까지의 양수로 입력해 주세요.");
-        }
+    private BigDecimal validateQuantity(BigDecimal quantity, SalesDecimalPolicy decimalPolicy) {
+        if (quantity == null || quantity.signum() <= 0) throw badRequest("계획수량은 양수로 입력해 주세요.");
+        return decimalPolicy.input("plannedQty", quantity, "계획수량");
     }
 
     private void requireManualMode(Long tenantId) throws Exception {

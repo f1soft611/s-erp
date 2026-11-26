@@ -1,6 +1,7 @@
 import type { F1GridColumn, F1GridRowId } from '../types/grid.types';
 import { isF1GridInputDigitCountValid } from '../editing/inputFormat';
 import { getGridRowId } from '../utils/grid.utils';
+import { compareGridExactDecimals } from '../utils/gridExactDecimal';
 
 export type F1GridValidationContext<T extends object> = {
   isDuplicate: (row: T, field: keyof T) => boolean;
@@ -95,11 +96,26 @@ export function validateGridRow<T extends object>(
       }
     }
 
+    if (!isEmpty && column.exactDecimal &&
+      (column.type === 'number' || column.type === 'decimal' || column.type === 'currency')) {
+      const text = String(value);
+      const match = text.match(/^[+-]?(?:\d+(?:\.(\d*))?|\.(\d+))$/);
+      const fraction = match?.[1] ?? match?.[2] ?? '';
+      if (!match || (column.decimalPlaces !== undefined &&
+        fraction.replace(/0+$/, '').length > column.decimalPlaces)) {
+        errors[key] = `${column.headerName}의 숫자 또는 소수 자릿수를 확인해 주세요.`;
+        return;
+      }
+    }
+
     const numericValue = Number(value);
+    const minComparison = column.exactDecimal && column.min !== undefined && !isEmpty
+      ? compareGridExactDecimals(value, column.min) : undefined;
+    const maxComparison = column.exactDecimal && column.max !== undefined && !isEmpty
+      ? compareGridExactDecimals(value, column.max) : undefined;
     if (
       column.min !== undefined &&
-      Number.isFinite(numericValue) &&
-      numericValue < column.min
+      (minComparison !== undefined ? minComparison < 0 : Number.isFinite(numericValue) && numericValue < column.min)
     ) {
       errors[key] =
         `${column.headerName}은(는) ${column.min} 이상이어야 합니다.`;
@@ -108,8 +124,7 @@ export function validateGridRow<T extends object>(
 
     if (
       column.max !== undefined &&
-      Number.isFinite(numericValue) &&
-      numericValue > column.max
+      (maxComparison !== undefined ? maxComparison > 0 : Number.isFinite(numericValue) && numericValue > column.max)
     ) {
       errors[key] = `${column.headerName}은(는) ${column.max} 이하여야 합니다.`;
       return;

@@ -8,7 +8,10 @@ import {
 } from '../src/pages/sales/quotation/status/services/quotationStatus.service';
 import type { QuotationStatusRow } from '../src/pages/sales/quotation/status/types/quotationStatus.types';
 
-vi.mock('../src/shared/services/apiClient', () => ({ apiGet: vi.fn() }));
+vi.mock('../src/shared/services/apiClient', () => {
+  const apiGet = vi.fn();
+  return { apiGet, apiGetWithExactDecimals: (path: string) => apiGet(path) };
+});
 const apiGetMock = vi.mocked(apiGet);
 
 describe('quotation status service', () => {

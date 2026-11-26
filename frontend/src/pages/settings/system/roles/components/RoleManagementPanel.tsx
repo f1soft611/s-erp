@@ -29,6 +29,7 @@ import {
 import Splitter from '../../../../../shared/components/Splitter';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
+import { decimalColumnOptions, getDecimalColumnContract } from '../../../../../shared/services/decimalColumnContract';
 import type { RoleManagementRow } from '../types/roleManagement.types';
 import {
   assignUserToRole,
@@ -372,7 +373,7 @@ export const RoleManagementPanel = forwardRef<
         field: 'menuCount',
         headerName: '사용자 수',
         flex: 1,
-        type: 'number',
+        ...decimalColumnOptions(getDecimalColumnContract('settings.role'), 'menuCount'),
         editable: false,
         align: 'center',
         headerAlign: 'center',

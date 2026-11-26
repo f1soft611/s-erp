@@ -4,6 +4,10 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { pageContentMap } from '../src/pages/dashboard/services/dashboardData';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
+import { preloadDashboardPages } from '../src/pages/dashboard/components/dashboardPages';
+
+// 대시보드 업무 화면은 지연 로딩된다. 기존 동기 렌더링 단언을 유지하도록 화면 모듈을 미리 불러온다.
+beforeAll(() => preloadDashboardPages(), 60_000);
 
 it('provides revenue closing page metadata', () => {
   expect(pageContentMap['revenue-closing']).toMatchObject({

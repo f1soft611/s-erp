@@ -20,8 +20,8 @@ class ProcessManagementMapperTest {
         try (InputStream input = Resources.getResourceAsStream(mapper)) {
             new XMLMapperBuilder(input, configuration, mapper, configuration.getSqlFragments()).parse();
         }
-        for (String statement : new String[] {"list", "insertGroup", "insertProcess",
-                "updateGroup", "updateProcess", "deleteGroup", "deleteProcess"}) {
+        for (String statement : new String[] {"list", "listMasters", "insertGroup", "insertMapping", "insertProcess",
+                "updateGroup", "updateProcess", "deleteGroup", "deleteMapping", "deleteProcess"}) {
             assertNotNull(configuration.getMappedStatement("ProcessManagementDAO." + statement));
         }
     }

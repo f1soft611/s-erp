@@ -61,7 +61,7 @@ export function GridSummary<T extends object>({
             }}
           >
             {(!renderedColumnIndexes || renderedColumnIndexes.has(index)) && value !== undefined
-              ? getCellDisplayValue(column, value)
+              ? getCellDisplayValue(column, value, false)
               : (index === labelIndex ? '합계' : '')}
           </Box>
         );

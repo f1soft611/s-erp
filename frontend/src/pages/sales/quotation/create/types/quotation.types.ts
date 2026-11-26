@@ -1,5 +1,8 @@
 import type { MasterPickerOption } from '../../../../../shared/components/master-picker/masterPicker.types';
+import type { GridDecimalModuleRule } from '../../../../../shared/services/gridDecimalPolicy.service';
+import type { DecimalColumn } from '../../../../../shared/services/decimalColumnContract';
 import type { QuotationDetailRow } from '../data/quotationDetail';
+import type { SalesOrderDecimalValue } from '../../../order/create/data/salesOrderDetail';
 
 export type QuotationDetailPayload = {
   materialId: number | null;
@@ -7,12 +10,14 @@ export type QuotationDetailPayload = {
   materialName: string;
   materialSpec: string | null;
   unit: string | null;
-  quotationQty: number;
-  unitPrice: number;
+  quotationQty: SalesOrderDecimalValue;
+  unitPrice: SalesOrderDecimalValue;
   remark: string | null;
 };
 
 export type QuotationCreatePayload = {
+  decimalPolicy?: GridDecimalModuleRule;
+  decimalColumns?: Readonly<Record<string, DecimalColumn>>;
   quotationDt: string;
   submitDt: string | null;
   customerId: number;
@@ -49,9 +54,9 @@ export type QuotationDetailItem = {
   materialName: string;
   materialSpec: string | null;
   unit: string | null;
-  quotationQty: number;
-  unitPrice: number;
-  lineAmt: number;
+  quotationQty: SalesOrderDecimalValue;
+  unitPrice: SalesOrderDecimalValue;
+  lineAmt: SalesOrderDecimalValue;
   remark: string | null;
 };
 
@@ -69,9 +74,9 @@ export type QuotationItem = {
   validTerm: string | null;
   currencyCode: string | null;
   remark: string | null;
-  supplyAmt: number | null;
-  vatAmt: number | null;
-  totalAmt: number | null;
+  supplyAmt: SalesOrderDecimalValue | null;
+  vatAmt: SalesOrderDecimalValue | null;
+  totalAmt: SalesOrderDecimalValue | null;
   createdBy?: string | null;
   createdByName?: string | null;
   createdByProfileImage?: string | null;

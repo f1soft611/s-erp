@@ -1,7 +1,6 @@
 package egovframework.let.sales.order.create.service.impl;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,6 +25,9 @@ import egovframework.let.common.idsequence.service.IdSequenceService;
 import egovframework.let.sales.shipment.deliveryplan.domain.model.SalesDeliveryPlanDetailRequestVO;
 import egovframework.let.sales.shipment.deliveryplan.domain.model.SalesDeliveryPlanRequestVO;
 import egovframework.let.sales.shipment.deliveryplan.service.SalesDeliveryPlanService;
+import egovframework.let.system.policies.service.SystemPolicyService;
+import egovframework.let.sales.common.SalesDecimalPolicy;
+import egovframework.com.cmm.DecimalColumnContract;
 
 /**
  * 수주 등록 검증, 계산, 채번 및 저장을 처리하는 서비스 구현 클래스.
@@ -40,19 +42,19 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
     private static final String EDITABLE_STATUS = "수주등록";
     private static final BigDecimal VAT_RATE = new BigDecimal("0.10");
     private static final BigDecimal ZERO = new BigDecimal("0.00");
-    private static final int MAX_NUMERIC_PRECISION = 15;
-    private static final int MONEY_SCALE = 2;
     private static final int ORDER_NO_MAX_LENGTH = 30;
 
     private final SalesOrderDAO salesOrderDAO;
     private final IdSequenceService idSequenceService;
     private final SalesDeliveryPlanService salesDeliveryPlanService;
+    private final SystemPolicyService systemPolicyService;
 
     public SalesOrderServiceImpl(SalesOrderDAO salesOrderDAO, IdSequenceService idSequenceService,
-            SalesDeliveryPlanService salesDeliveryPlanService) {
+            SalesDeliveryPlanService salesDeliveryPlanService, SystemPolicyService systemPolicyService) {
         this.salesOrderDAO = salesOrderDAO;
         this.idSequenceService = idSequenceService;
         this.salesDeliveryPlanService = salesDeliveryPlanService;
+        this.systemPolicyService = systemPolicyService;
     }
 
     /**
@@ -74,8 +76,12 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         validateDestinationAndBilling(tenantId, payload);
         String deliveryPlanMode = salesDeliveryPlanService.lockModeForPlanCreation(tenantId);
 
-        List<PreparedDetail> preparedDetails = prepareDetails(tenantId, payload);
-        BigDecimal headerTotal = sumTotals(preparedDetails);
+        SalesDecimalPolicy decimalPolicy = SalesDecimalPolicy.from(systemPolicyService.getGridDecimals(tenantId),
+                DecimalColumnContract.forDocument("sales.order"));
+        decimalPolicy.verifySnapshot(payload.getDecimalPolicy());
+        decimalPolicy.verifyColumnContract(payload.getDecimalColumns());
+        List<PreparedDetail> preparedDetails = prepareDetails(tenantId, payload, decimalPolicy);
+        BigDecimal headerTotal = sumTotals(preparedDetails, decimalPolicy);
 
         String orderNo = generateOrderNo(tenantId, payload.getOrderDt());
         Map<String, Object> headerParams = new HashMap<>();
@@ -120,6 +126,7 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
                 planDetails.add(planDetail);
             }
             planRequest.setDetails(planDetails);
+            planRequest.setDecimalColumns(DecimalColumnContract.forDocument("sales.deliveryPlan"));
             salesDeliveryPlanService.createAutomaticPlan(tenantId, userId, planRequest);
         }
 
@@ -180,7 +187,11 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         validateCustomer(tenantId, payload.getCustomerId());
         validateDestinationAndBilling(tenantId, payload);
 
-        List<PreparedDetail> preparedDetails = prepareDetails(tenantId, payload);
+        SalesDecimalPolicy decimalPolicy = SalesDecimalPolicy.from(systemPolicyService.getGridDecimals(tenantId),
+                DecimalColumnContract.forDocument("sales.order"));
+        decimalPolicy.verifySnapshot(payload.getDecimalPolicy());
+        decimalPolicy.verifyColumnContract(payload.getDecimalColumns());
+        List<PreparedDetail> preparedDetails = prepareDetails(tenantId, payload, decimalPolicy);
         List<SalesOrderDetailVO> existingDetails =
                 salesOrderDAO.selectOrderDetails(orderParams(tenantId, salesOrderId));
         String planMode = salesDeliveryPlanService.getMode(tenantId);
@@ -240,7 +251,7 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
                 removedDetails.add(detail);
             }
         }
-        BigDecimal headerTotal = sumTotals(preparedDetails);
+        BigDecimal headerTotal = sumTotals(preparedDetails, decimalPolicy);
 
         Map<String, Object> headerParams = orderParams(tenantId, salesOrderId);
         headerParams.put("orderDt", payload.getOrderDt());
@@ -376,23 +387,21 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         }
     }
 
-    private List<PreparedDetail> prepareDetails(Long tenantId, SalesOrderCreateRequestVO payload)
+    private List<PreparedDetail> prepareDetails(Long tenantId, SalesOrderCreateRequestVO payload, SalesDecimalPolicy decimalPolicy)
             throws Exception {
         List<PreparedDetail> preparedDetails = new ArrayList<>();
         for (SalesOrderDetailCreateRequestVO detail : payload.getDetails()) {
-            preparedDetails.add(prepareDetail(tenantId, detail));
+            preparedDetails.add(prepareDetail(tenantId, detail, decimalPolicy));
         }
         return preparedDetails;
     }
 
-    private BigDecimal sumTotals(List<PreparedDetail> preparedDetails) {
+    private BigDecimal sumTotals(List<PreparedDetail> preparedDetails, SalesDecimalPolicy decimalPolicy) {
         BigDecimal total = ZERO;
         for (PreparedDetail prepared : preparedDetails) {
             total = total.add(prepared.totalAmt);
         }
-        total = money(total);
-        validateNumeric(total, "수주 총액");
-        return total;
+        return decimalPolicy.amount("orderTotal", total, "수주 총액");
     }
 
     private Map<String, Object> orderParams(Long tenantId, Long salesOrderId) {
@@ -441,7 +450,7 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         }
     }
 
-    private PreparedDetail prepareDetail(Long tenantId, SalesOrderDetailCreateRequestVO detail)
+    private PreparedDetail prepareDetail(Long tenantId, SalesOrderDetailCreateRequestVO detail, SalesDecimalPolicy decimalPolicy)
             throws Exception {
         if (detail == null || detail.getMaterialId() == null || detail.getMaterialId() < 1L) {
             throw badRequest("상세 품목을 선택해 주세요.");
@@ -459,17 +468,14 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "품목을 찾을 수 없습니다.");
         }
 
-        BigDecimal quantity = inputNumeric(detail.getOrderQty(), "주문수량");
-        BigDecimal unitPrice = inputNumeric(detail.getUnitPrice(), "단가");
-        BigDecimal supplyAmt = money(quantity.multiply(unitPrice));
-        validateNumeric(supplyAmt, "공급가액");
+        BigDecimal quantity = decimalPolicy.input("orderQty", detail.getOrderQty(), "주문수량");
+        BigDecimal unitPrice = decimalPolicy.input("unitPrice", detail.getUnitPrice(), "단가");
+        BigDecimal supplyAmt = decimalPolicy.amount("supplyAmount", quantity.multiply(unitPrice), "공급가액");
 
         BigDecimal vatAmt = detail.getVatAmt() == null
-                ? money(supplyAmt.multiply(VAT_RATE))
-                : inputNumeric(detail.getVatAmt(), "부가세");
-        BigDecimal totalAmt = money(supplyAmt.add(vatAmt));
-        validateNumeric(vatAmt, "부가세");
-        validateNumeric(totalAmt, "라인 합계");
+                ? decimalPolicy.amount("vatAmount", supplyAmt.multiply(VAT_RATE), "부가세")
+                : decimalPolicy.input("vatAmount", detail.getVatAmt(), "부가세");
+        BigDecimal totalAmt = decimalPolicy.amount("totalAmount", supplyAmt.add(vatAmt), "라인 합계");
 
         return new PreparedDetail(
                 detail.getMaterialId(),
@@ -540,27 +546,6 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         params.put("tenantId", tenantId);
         params.put("id", id);
         return params;
-    }
-
-    private BigDecimal inputNumeric(BigDecimal value, String label) {
-        BigDecimal normalized;
-        try {
-            normalized = value.setScale(MONEY_SCALE, RoundingMode.UNNECESSARY);
-        } catch (ArithmeticException exception) {
-            throw badRequest(label + "은 소수 둘째 자리까지 입력할 수 있습니다.");
-        }
-        validateNumeric(normalized, label);
-        return normalized;
-    }
-
-    private void validateNumeric(BigDecimal value, String label) {
-        if (value.precision() > MAX_NUMERIC_PRECISION) {
-            throw badRequest(label + "이 허용 범위를 초과했습니다.");
-        }
-    }
-
-    private BigDecimal money(BigDecimal value) {
-        return value.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
     }
 
     private void validateText(String value, int maxLength, String label) {

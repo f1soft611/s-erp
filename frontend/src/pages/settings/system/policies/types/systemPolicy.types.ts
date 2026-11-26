@@ -4,7 +4,8 @@ export type GridDecimalPolicyValue = {
   trailingZeros: 'FIXED' | 'AUTO';
   rounding: 'HALF_UP' | 'UP' | 'DOWN';
 };
-export type PolicyValue = boolean | number | string | number[] | GridDecimalPolicyValue;
+export type GridDecimalTypeValues = Record<'number' | 'decimal' | 'currency', GridDecimalPolicyValue>;
+export type PolicyValue = boolean | number | string | number[] | GridDecimalPolicyValue | GridDecimalTypeValues;
 export type PolicyOption = { value: string; label: string };
 export type PolicyPayload = {
   policyCode: string;
@@ -56,7 +57,7 @@ export function isGridDecimalPolicy(policy: Pick<PolicyPayload, 'policyCode' | '
   return policy.valueType === 'NUMBER' && policy.policyCode.startsWith('GRID_DECIMAL_');
 }
 export function toGridDecimalValue(value: PolicyValue): GridDecimalPolicyValue {
-  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+  if (value !== null && typeof value === 'object' && !Array.isArray(value) && 'places' in value) {
     return {
       places: Number(value.places),
       trailingZeros: value.trailingZeros === 'AUTO' ? 'AUTO' : 'FIXED',
@@ -65,8 +66,24 @@ export function toGridDecimalValue(value: PolicyValue): GridDecimalPolicyValue {
   }
   return { places: value === '' ? Number.NaN : Number(value), trailingZeros: 'FIXED', rounding: 'HALF_UP' };
 }
+export function isGridDecimalTypeValues(value: PolicyValue): value is GridDecimalTypeValues {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) && 'number' in value && 'decimal' in value && 'currency' in value;
+}
+export function defaultGridDecimalTypeValues(): GridDecimalTypeValues {
+  const rule = (places: number): GridDecimalPolicyValue => ({ places, trailingZeros: 'FIXED', rounding: 'HALF_UP' });
+  return { number: rule(0), decimal: rule(3), currency: rule(3) };
+}
+export function toGridDecimalTypeValues(value: PolicyValue): GridDecimalTypeValues {
+  if (isGridDecimalTypeValues(value)) return value;
+  const rule = toGridDecimalValue(value);
+  return { number: { ...rule }, decimal: { ...rule }, currency: { ...rule } };
+}
 export function policyValueLabel(policy: SystemPolicy): string {
   if (isGridDecimalPolicy(policy)) {
+    if (isGridDecimalTypeValues(policy.value)) {
+      const value = policy.value;
+      return (['number', 'decimal', 'currency'] as const).map((type) => `${type}: ${value[type].places}${policy.unit || '자리'}`).join(' · ');
+    }
     const rule = toGridDecimalValue(policy.value);
     return `${rule.places}${policy.unit || '자리'} · ${rule.trailingZeros === 'AUTO' ? '0 있을 때만' : '0 항상'} · ${ROUNDING_LABELS[rule.rounding]}`;
   }
@@ -81,6 +98,13 @@ export function validatePolicy(draft: PolicyPayload): string {
   if (!draft.category.trim() || draft.category.length > 80) return '분류는 1~80자로 입력하세요.';
   if (draft.description.length > 1000) return '설명은 1000자 이내로 입력하세요.';
   if (draft.valueType === 'NUMBER') {
+    if (isGridDecimalPolicy(draft) && isGridDecimalTypeValues(draft.value)) {
+      const rules = Object.values(draft.value);
+      if (rules.some((rule) => !Number.isInteger(rule.places) || rule.places < 0 || rule.places > 6)) return '소수점 자릿수는 0~6의 정수로 입력하세요.';
+      if (draft.minValue !== null && draft.maxValue !== null && draft.minValue > draft.maxValue) return '최솟값은 최댓값 이하여야 합니다.';
+      if (rules.some((rule) => (draft.minValue !== null && rule.places < draft.minValue) || (draft.maxValue !== null && rule.places > draft.maxValue))) return '정책값이 허용 범위를 벗어났습니다.';
+      return '';
+    }
     const places = isGridDecimalPolicy(draft) ? toGridDecimalValue(draft.value).places : draft.value;
     if (places === '' || !Number.isFinite(Number(places))) return '정책값에 유효한 숫자를 입력하세요.';
     if (isGridDecimalPolicy(draft) && !Number.isInteger(Number(places))) return '소수점 자릿수는 정수로 입력하세요.';

@@ -1,19 +1,26 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { apiGet, apiPost } from '../src/shared/services/apiClient';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { apiGet, apiPost, apiPut } from '../src/shared/services/apiClient';
 import { QuotationCreatePage } from '../src/pages/sales/quotation/create/QuotationCreatePage';
 import {
   calculateQuotationLineAmount,
 } from '../src/pages/sales/quotation/create/data/quotationDetail';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
+import { GridDecimalModuleProvider } from '../src/shared/components/f1-grid/core/GridDecimalPolicy';
+import * as decimalPolicyService from '../src/shared/services/gridDecimalPolicy.service';
 
-vi.mock('../src/shared/services/apiClient', () => ({
-  apiGet: vi.fn(),
-  apiPost: vi.fn(),
-  apiPut: vi.fn(),
-  apiDelete: vi.fn(),
-}));
+vi.mock('../src/shared/services/apiClient', () => {
+  const apiGet = vi.fn();
+  const apiPost = vi.fn();
+  const apiPut = vi.fn();
+  return {
+    apiGet, apiPost, apiPut, apiDelete: vi.fn(),
+    apiGetWithExactDecimals: (path: string) => apiGet(path),
+    apiPostWithExactDecimals: (path: string, payload: unknown) => apiPost(path, payload),
+    apiPutWithExactDecimals: (path: string, payload: unknown) => apiPut(path, payload),
+  };
+});
 
 const apiGetMock = vi.mocked(apiGet);
 const apiPostMock = vi.mocked(apiPost);
@@ -39,6 +46,143 @@ describe('quotation create page', () => {
       return Promise.resolve({ resultList: [{
         itemCode: 'API_CODE', itemNm: 'API 표시명', sortOrder: 1, useAt: 'Y',
       }] });
+    });
+  });
+
+  it('disables quotation editing and saving when the decimal policy cannot be loaded', async () => {
+    const policy = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockRejectedValue(new Error('offline'));
+    try {
+      const router = createMemoryRouter([{ path: '/', element: <GridDecimalModuleProvider moduleCode="SALES">
+        <QuotationCreatePage selectedModule={moduleItem} currentMenuName="견적서작성"
+          content={{ title: '견적서작성', description: '', cards: [], items: [] }}
+          breadcrumbItems={[]} selectedMenuPermissions={{ read: true, create: true }} />
+      </GridDecimalModuleProvider> }]);
+      render(<RouterProvider router={router} />);
+      expect(await screen.findByText('소수점 정책을 불러오지 못했습니다. 다시 조회해 주세요.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '저장', exact: true })).toBeDisabled();
+    } finally { policy.mockRestore(); }
+  });
+
+  it('updates loaded quotation totals when the currency policy arrives later', async () => {
+    const rules = { SALES: {
+      number: { places: 0, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      decimal: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+      currency: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const },
+    } };
+    let resolvePolicy!: (value: typeof rules) => void;
+    const strict = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict')
+      .mockImplementation(() => new Promise((resolve) => { resolvePolicy = resolve; }));
+    const standard = vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+    const lookup = apiGetMock.getMockImplementation()!;
+    apiGetMock.mockImplementation((path: string) => path === '/api/v1/sales/quotations/21'
+      ? Promise.resolve({ item: {
+        quotationId: 21, quotationNo: 'QT-OLD', quotationDt: '2026-11-16',
+        customerId: 10, customerCode: 'C-10', customerName: '고객 10', writer: true,
+        details: [{ quotationDetailId: 1, materialId: null, materialName: '품목',
+          quotationQty: '1', unitPrice: '1.234567', lineAmt: '1.234567' }],
+      } }) : lookup(path));
+    try {
+      const router = createMemoryRouter([{ path: '/', element: <GridDecimalModuleProvider moduleCode="SALES">
+        <QuotationCreatePage selectedModule={moduleItem} currentMenuName="견적서작성"
+          content={{ title: '견적서작성', description: '', cards: [], items: [] }}
+          breadcrumbItems={[]} selectedMenuPermissions={{ read: true, update: true }}
+          quotationId={21} mode="edit" />
+      </GridDecimalModuleProvider> }]);
+      render(<RouterProvider router={router} />);
+      await screen.findByDisplayValue('QT-OLD');
+      await act(async () => { resolvePolicy(rules); });
+      await waitFor(() => expect(screen.getByLabelText('견적 금액 합계')).toHaveTextContent(
+        /공급가액\s*1\.234567\s*부가세 \(10%\)\s*0\.123457\s*총액\s*1\.358024/,
+      ));
+    } finally { strict.mockRestore(); standard.mockRestore(); }
+  });
+
+  describe('saving a loaded quotation', () => {
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    const loaded = (remark: string) => ({ item: {
+      quotationId: 21, quotationNo: 'QT-OLD', quotationDt: '2026-11-16',
+      customerId: 10, customerCode: 'C-10', customerName: '고객 10', writer: true, remark,
+      details: [{ quotationDetailId: 1, materialId: null, materialName: '품목',
+        quotationQty: '2', unitPrice: '1.234567', lineAmt: '2.469134' }],
+    } });
+
+    function renderEdit(getRemark: () => string) {
+      const rules = { SALES: {
+        number: { places: 0, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+        decimal: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+        currency: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const },
+      } };
+      vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue(rules);
+      vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+      const lookup = apiGetMock.getMockImplementation()!;
+      apiGetMock.mockImplementation((path: string) => path === '/api/v1/sales/quotations/21'
+        ? Promise.resolve(loaded(getRemark())) : lookup(path));
+      const router = createMemoryRouter([{ path: '/', element: <GridDecimalModuleProvider moduleCode="SALES">
+        <QuotationCreatePage selectedModule={moduleItem} currentMenuName="견적서작성"
+          content={{ title: '견적서작성', description: '', cards: [], items: [] }}
+          breadcrumbItems={[]} selectedMenuPermissions={{ read: true, update: true }}
+          quotationId={21} mode="edit" />
+      </GridDecimalModuleProvider> }]);
+      render(<RouterProvider router={router} />);
+    }
+
+    async function editRemark(text: string) {
+      await screen.findByDisplayValue('QT-OLD');
+      fireEvent.change(screen.getByRole('textbox', { name: '비고' }), { target: { value: text } });
+      await waitFor(() => expect(screen.getByRole('button', { name: '저장', exact: true })).toBeEnabled());
+    }
+
+    it('shows progress, blocks duplicate submits, confirms success and clears the dirty state', async () => {
+      let savedRemark = '';
+      let finishSave!: (value: unknown) => void;
+      vi.mocked(apiPut).mockReset();
+      vi.mocked(apiPut).mockImplementation(() => new Promise((resolve) => { finishSave = resolve; }));
+      renderEdit(() => savedRemark);
+      await editRemark('새 비고');
+
+      fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+      await waitFor(() => expect(screen.getByRole('region', { name: '견적 입력 내용' })).toHaveAttribute('aria-busy', 'true'));
+      expect(screen.getByRole('button', { name: '저장', exact: true })).toBeDisabled();
+      fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+      expect(vi.mocked(apiPut)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(apiPut).mock.calls[0][0]).toBe('/api/v1/sales/quotations/21');
+      expect(screen.getByRole('textbox', { name: '비고' })).toHaveValue('새 비고');
+
+      savedRemark = '새 비고';
+      await act(async () => { finishSave({ item: { quotationId: 21, quotationNo: 'QT-OLD' } }); });
+      expect(await screen.findByText('견적이 수정되었습니다. 견적번호: QT-OLD')).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByRole('region', { name: '견적 입력 내용' })).toHaveAttribute('aria-busy', 'false'));
+      expect(screen.getByRole('textbox', { name: '비고' })).toHaveValue('새 비고');
+      expect(screen.getByRole('button', { name: '저장', exact: true })).toBeDisabled();
+      const unload = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(unload);
+      expect(unload.defaultPrevented).toBe(false);
+    });
+
+    it('shows a save failure, keeps the entered values and allows a retry that succeeds', async () => {
+      let savedRemark = '';
+      vi.mocked(apiPut).mockReset();
+      vi.mocked(apiPut).mockRejectedValueOnce(new Error('서버가 저장하지 못했습니다.'))
+        .mockResolvedValueOnce({ item: { quotationId: 21, quotationNo: 'QT-OLD' } });
+      renderEdit(() => savedRemark);
+      await editRemark('재시도 비고');
+
+      fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+      expect(await screen.findByText('서버가 저장하지 못했습니다.')).toBeInTheDocument();
+      expect(screen.queryByText(/견적이 수정되었습니다/)).not.toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: '비고' })).toHaveValue('재시도 비고');
+      expect(screen.getByRole('button', { name: '저장', exact: true })).toBeEnabled();
+      const unload = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(unload);
+      expect(unload.defaultPrevented).toBe(true);
+
+      savedRemark = '재시도 비고';
+      fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+      expect(await screen.findByText('견적이 수정되었습니다. 견적번호: QT-OLD')).toBeInTheDocument();
+      expect(screen.queryByText('서버가 저장하지 못했습니다.')).not.toBeInTheDocument();
+      expect(vi.mocked(apiPut)).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole('button', { name: '저장', exact: true })).toBeDisabled();
     });
   });
 
@@ -193,7 +337,9 @@ describe('quotation create page', () => {
     }
   });
 
-  it('supports direct snapshots and master snapshots while calculating rounded line amounts', () => {
-    expect(calculateQuotationLineAmount(1, 1.005)).toBe(1.01);
+  it('calculates line amounts only with an explicit policy rule instead of a fixed two places', () => {
+    expect(calculateQuotationLineAmount(1, 1.005, { places: 2, rounding: 'HALF_UP' })).toBe(1.01);
+    expect(calculateQuotationLineAmount(1, 1.005, { places: 3, rounding: 'DOWN' })).toBe(1.005);
+    expect(() => calculateQuotationLineAmount(1, 1.005)).toThrow('소수점 정책을 불러오지 못했습니다.');
   });
 });

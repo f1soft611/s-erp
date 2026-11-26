@@ -9,6 +9,10 @@ import { ItemPartnerPriceGrid } from '../src/pages/co/master/item-partner-prices
 import type { ItemPartnerPriceRow } from '../src/pages/co/master/item-partner-prices/types/itemPartnerPrice.types';
 import type { F1GridRef } from '../src/shared/components/f1-grid';
 import type { MasterPickerOption } from '../src/shared/components/master-picker/masterPicker.types';
+import { preloadDashboardPages } from '../src/pages/dashboard/components/dashboardPages';
+
+// 대시보드 업무 화면은 지연 로딩된다. 기존 동기 렌더링 단언을 유지하도록 화면 모듈을 미리 불러온다.
+beforeAll(() => preloadDashboardPages(), 60_000);
 
 const api = vi.hoisted(() => ({ apiGet: vi.fn(), apiPost: vi.fn() }));
 vi.mock('../src/shared/services/apiClient', () => api);

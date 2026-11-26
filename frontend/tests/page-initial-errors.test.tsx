@@ -4,11 +4,21 @@ import { DashboardContent } from '../src/pages/dashboard/components/DashboardCon
 import { WarehouseManagementPage } from '../src/pages/co/master/warehouse/WarehouseManagementPage';
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
 import { ApiNetworkError } from '../src/shared/services/apiErrors';
+import { preloadDashboardPages } from '../src/pages/dashboard/components/dashboardPages';
+
+// 대시보드 업무 화면은 지연 로딩된다. 기존 동기 렌더링 단언을 유지하도록 화면 모듈을 미리 불러온다.
+beforeAll(() => preloadDashboardPages(), 60_000);
 
 const api = vi.hoisted(() => ({
   apiGet: vi.fn(), apiPost: vi.fn(), apiPut: vi.fn(), apiDelete: vi.fn(),
 }));
-vi.mock('../src/shared/services/apiClient', () => api);
+vi.mock('../src/shared/services/apiClient', () => ({
+  ...api,
+  // 영업 서비스는 정밀 소수 응답용 함수를 사용하므로 같은 mock으로 위임한다.
+  apiGetWithExactDecimals: (path: string) => api.apiGet(path),
+  apiPostWithExactDecimals: (path: string, data: unknown) => api.apiPost(path, data),
+  apiPutWithExactDecimals: (path: string, data: unknown) => api.apiPut(path, data),
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();

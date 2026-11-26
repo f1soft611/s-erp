@@ -1,8 +1,9 @@
-import { apiDelete, apiGet, apiPost, apiPut } from '../../../../../shared/services/apiClient';
+import { apiDelete, apiGetWithExactDecimals, apiPostWithExactDecimals, apiPutWithExactDecimals } from '../../../../../shared/services/apiClient';
 import { MAX_STATEMENT_DETAIL_COUNT } from '../../../shared/statementDetailLimit';
 import type { StatementItem, StatementPayload, StatementSource, StatementStatusRow } from '../types/salesStatement.types';
 
 const PATH = '/api/v1/sales/statements';
+const DECIMAL_FIELDS = ['deliveryQty', 'unitPrice', 'supplyAmt', 'vatAmt', 'totalAmt', 'lineTotalAmt'] as const;
 
 function item(response: { item?: StatementItem | null }): StatementItem {
   if (!response.item) throw new Error('거래명세서 응답을 확인해 주세요.');
@@ -10,15 +11,16 @@ function item(response: { item?: StatementItem | null }): StatementItem {
 }
 
 export async function searchStatementSources(keyword: string): Promise<StatementSource[]> {
-  const response = await apiGet<{ items?: StatementSource[] }>(
+  const response = await apiGetWithExactDecimals<{ items?: StatementSource[] }>(
     `${PATH}/source-deliveries?${new URLSearchParams({ keyword })}`,
+    ['totalAmt'],
   );
   if (!Array.isArray(response.items)) throw new Error('출하 목록 응답을 확인해 주세요.');
   return response.items;
 }
 
 export async function getStatement(id: number): Promise<StatementItem> {
-  return item(await apiGet<{ item?: StatementItem }>(`${PATH}/${id}`));
+  return item(await apiGetWithExactDecimals<{ item?: StatementItem }>(`${PATH}/${id}`, DECIMAL_FIELDS));
 }
 
 export async function createStatement(payload: StatementPayload): Promise<StatementItem> {
@@ -30,14 +32,14 @@ export async function createStatement(payload: StatementPayload): Promise<Statem
     || salesDeliveryDetailIds.some((id) => !Number.isSafeInteger(id) || id < 1)) {
     throw new Error('거래명세서 상세를 선택해 주세요.');
   }
-  return item(await apiPost<{ item?: StatementItem }>(PATH, {
+  return item(await apiPostWithExactDecimals<{ item?: StatementItem }>(PATH, {
     ...payload,
     salesDeliveryDetailIds,
-  }));
+  }, DECIMAL_FIELDS));
 }
 
 export async function updateStatement(id: number, payload: Pick<StatementPayload, 'statementDt' | 'remark'>): Promise<StatementItem> {
-  return item(await apiPut<{ item?: StatementItem }>(`${PATH}/${id}`, payload));
+  return item(await apiPutWithExactDecimals<{ item?: StatementItem }>(`${PATH}/${id}`, payload, DECIMAL_FIELDS));
 }
 
 export async function deleteStatement(id: number): Promise<void> {
@@ -46,7 +48,7 @@ export async function deleteStatement(id: number): Promise<void> {
 
 export async function getStatementStatus(from: string, to: string, keyword: string): Promise<StatementStatusRow[]> {
   const params = new URLSearchParams({ statementDtFrom: from, statementDtTo: to, keyword });
-  const response = await apiGet<{ items?: StatementStatusRow[] }>(`${PATH}/status?${params}`);
+  const response = await apiGetWithExactDecimals<{ items?: StatementStatusRow[] }>(`${PATH}/status?${params}`, DECIMAL_FIELDS);
   if (!Array.isArray(response.items)) throw new Error('거래명세서 현황 응답을 확인해 주세요.');
   return response.items;
 }

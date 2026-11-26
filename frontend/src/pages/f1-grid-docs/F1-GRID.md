@@ -282,7 +282,7 @@ const currentRows = grid.acceptSavedRows(savedRows);
 - 인라인 셀 편집은 commit 시 모든 편집기 타입에서 `column.onValueChange`가 있으면 반환 patch를 적용하고, 없으면 편집한 `column.field` 값만 갱신한다. select 편집은 draft 문자열을 `options[].value`의 원래 타입으로 복원한 뒤 callback을 호출한다. 같은 값을 commit하면 dirty가 생기지 않는다.
 - 기본 텍스트 편집기에서 원본 값이 `null` 또는 `undefined`인 빈 셀을 그대로 확정하면 해당 nullable 원본 값을 유지하고 dirty로 표시하지 않는다. 화면에 보이는 빈 값과 원본의 nullish 값은 편집 없이 확정했을 때 같은 값으로 취급한다.
 - 납품처 관리 사업자번호와 이동전화·전화·팩스번호에는 거래처 관리와 같은 `inputFormat`을 적용한다. 사업자번호는 선택 입력이지만 값이 있으면 10자리, 전화번호는 02 지역번호 9~10자리 또는 그 외 10~11자리여야 하며 셀과 행 폼에서 자동 하이픈이 적용된다.
-- 출하계획등록과 현황 상세 수정은 같은 `DeliveryPlanForm`을 사용하며 계획일은 `date`, 계획수량은 `decimal` 기본 셀 편집기로 수정한다. 출하 상세와 동일한 기본 행 높이(32px, 표시 배율 적용)를 사용한다. 확정된 활성 행은 합계·분할·삭제와 저장 요청에 반영하며, 편집 중 저장 버튼을 클릭해도 먼저 셀이 확정된다. 상세보기와 저장 중에는 편집하지 않는다.
+- 출하계획등록과 현황 상세 수정은 같은 `DeliveryPlanForm`을 사용하며 계획일은 `date`, 계획수량은 `number` 기본 셀 편집기로 수정한다. 출하 상세와 동일한 기본 행 높이(32px, 표시 배율 적용)를 사용한다. 확정된 활성 행은 합계·분할·삭제와 저장 요청에 반영하며, 편집 중 저장 버튼을 클릭해도 먼저 셀이 확정된다. 상세보기와 저장 중에는 편집하지 않는다.
 - 출하계획 상세의 분할·삭제 버튼은 분할 셀 가운데에 모아 배치한다. 분할 행은 선택한 행 바로 뒤에 삽입하고 계획수량 셀 편집을 시작한다. 수량은 자동 배분하지 않으며 재조회 시 같은 수주 상세의 행을 그룹으로 표시한다.
 - `number`/`decimal`/`currency` 셀에서 빈 입력을 commit하면 값은 `null`로 유지하고, 원본도 `null`이면 dirty 변경을 만들지 않는다. 명시적으로 입력한 숫자 `0`은 빈 값과 구분해 숫자 0으로 저장한다.
 - F1-Grid는 dirty 변경 집합을 제공하지만 조회/필터 적용으로 부모가 `rows`를 교체할 때 확인창을 자동 표시하지 않는다. 페이지는 `getChanges()` 또는 `onChangesChange`로 변경 유무를 확인하고, 변경 폐기 확인을 취소하면 Grid 상태를 유지하며 계속하면 Grid 상태를 초기화한 뒤 보류한 조회를 실행해야 한다.
@@ -686,7 +686,13 @@ const columns: F1GridColumn<Item>[] = [
 
 `decimalPlaces`를 지정하면 기존처럼 표시 소수점 자릿수를 고정한다. 예를 들어 `decimalPlaces: 2`는 `1.2`를 `1.20`으로 표시한다. 이 옵션은 편집 입력 정규화에도 사용되며, 옵션을 생략해도 편집 입력을 5자리로 제한하지 않는다.
 
-편집 입력에서 `decimalPlaces: 0`은 소수점 이하를 버린다. 예를 들어 `12.34`는 `12`, `-12.34`는 `-12`가 된다. 셀 편집과 행 폼에서 입력 중에는 원문을 임시 표시하고 저장값은 정규화하며, 포커스를 잃거나 셀 편집을 확정하면 정수를 표시한다.
+편집 입력에서 `decimalPlaces: 0`(컬럼 옵션 또는 정책의 0자리)은 소수점 이하를 버린다. 예를 들어 `12.34`는 `12`, `-12.34`는 `-12`가 된다. 셀 직접 편집은 `exactDecimal` 여부와 관계없이 0자리이면 `.`·`,` 키 입력을 막는다. 행 폼 입력과 붙여넣기 등 키 입력을 거치지 않은 소수 원문은 입력 중에는 임시 표시하고 저장값은 정규화하며, 포커스를 잃거나 확정하면 정수를 표시한다. 자릿수가 1 이상이면 소수점 입력을 막지 않는다.
+
+정확한 십진 문자열을 사용하는 컬럼은 `exactDecimal: true`를 지정한다. 셀 직접 편집은 정책 또는 컬럼의 소수 자릿수를 넘는 입력을 거부하며, 0자리이면 소수점 입력을 막는다. 유효한 값은 숫자로 변환하지 않는다. 기존 초과 자릿수 값은 자동으로 잘리지 않고 사용자가 삭제하여 수정할 수 있다. 행 폼과 그리드 셀 붙여넣기는 초과 원문을 유지하며 `validate()`가 실패하므로 저장 화면은 반드시 검증 결과를 확인해야 한다. `min`·`max` 검증도 입력 문자열과 숫자 경계값을 십진수로 비교한다. 경계값은 JavaScript 숫자로 선언되므로 선언 시 이미 손실된 정밀도는 복구할 수 없다. 합계·평균·최소·최대와 정렬·필터는 문자열의 십진값을 기준으로 계산하며 Excel에는 정밀도 손실을 막기 위해 텍스트로 내보낸다. 정렬·필터 시 쿼리 워커는 사용하지 않는다. API 응답의 정밀도 보존, 업무 계산 및 저장 전송은 각 업무에서 별도로 구현해야 한다.
+
+읽기 전용 정밀 숫자 셀은 정책 자릿수를 넘는 조회값을 설정된 방식으로 반올림해 표시하되 원본은 바꾸지 않는다. `editable` 함수가 행별로 편집 가능 여부를 정하면 해당 행의 결과를 적용한다. 편집 가능한 셀은 초과 입력을 숨기지 않도록 원문을 표시하고, 읽기 전용 집계값은 설정된 방식으로 표시한다.
+
+모듈 컨텍스트가 바뀌면 이전 모듈의 소수점 규칙은 즉시 해제하고 새 모듈 정책을 조회한다. 정책 응답이 늦게 도착해도 현재 모듈이 아닌 이전 응답은 적용하지 않는다.
 
 ```typescript
 { field: 'amount', headerName: '금액', type: 'number' } // 최대 5자리, 끝의 0 생략
@@ -700,9 +706,58 @@ const columns: F1GridColumn<Item>[] = [
 
 모듈 컨텍스트를 공백으로 해제한 commit에는 이전 정책을 노출하지 않고 기본값을 사용한다. 해제 시 local rule도 비워 재진입의 조회 대기 상태에 이전 값이 재노출되지 않으며, 해제 전에 시작한 조회의 늦은 응답은 무시한다. 기존 조회 cache와 컬럼 우선순위·반올림·저장 계약은 유지한다.
 
-정책 관리에 `GRID_DECIMAL_{모듈코드}`(예: `GRID_DECIMAL_SALES`) NUMBER 정책을 등록하면 F1Grid가 자동으로 적용한다. 화면 코드 수정은 필요 없다. 대시보드가 `GridDecimalModuleProvider`로 현재 모듈 코드를 제공하고, F1Grid가 `type`이 `number`/`decimal`/`currency`이면서 `decimalPlaces`가 없는 컬럼에 정책값을 채운다. 우선순위: 컬럼 `decimalPlaces` > 모듈 정책 > F1-Grid 기본값(최대 5자리, 끝자리 0 제거). 특정 컬럼만 고정하려면 `decimal: { places, trailingZeros, rounding }` 객체 하나로 지정한다(예: `decimal: { places: 0 }`, `decimal: { places: 3, trailingZeros: 'AUTO', rounding: 'DOWN' }`). 객체에서 지정한 항목만 정책보다 우선하고 생략한 항목은 정책을 따른다. 기존 개별 옵션(`decimalPlaces`, `trailingZeros`, `rounding`)도 호환되지만, 둘 다 있으면 `decimal` 객체가 우선한다. 조회 API는 `GET /api/v1/system/policies/grid-decimals`이며 세션당 1회 캐시한다(변경 반영은 재로그인/새로고침). 모듈 컨텍스트 밖의 F1Grid는 정책을 조회하지 않는다.
+정책 관리에 `GRID_DECIMAL_{모듈코드}`(예: `GRID_DECIMAL_SALES`) NUMBER 정책을 등록하면 F1Grid가 자동으로 적용한다. 화면 코드 수정은 필요 없다. 대시보드가 `GridDecimalModuleProvider`로 현재 모듈 코드를 제공하고, F1Grid가 `type`이 `number`/`decimal`/`currency`인 컬럼에 해당 타입 정책을 채운다. 특정 컬럼만 고정하려면 `decimal: { places, trailingZeros, rounding }` 객체 하나로 지정한다(예: `decimal: { places: 0 }`, `decimal: { places: 3, trailingZeros: 'AUTO', rounding: 'DOWN' }`). 객체에서 지정한 항목만 정책보다 우선하고 생략한 항목은 정책을 따른다. 기존 개별 옵션(`decimalPlaces`, `trailingZeros`, `rounding`)도 호환되지만, 둘 다 있으면 `decimal` 객체가 우선한다. 조회 API는 `GET /api/v1/system/policies/grid-decimals`이며 조회 결과를 캐시한다. 정책관리에서 해당 정책 저장 또는 삭제 시 캐시를 무효화하여 열린 그리드도 다시 조회한다. 모듈 컨텍스트 밖의 F1Grid는 정책을 조회하지 않는다.
 
-정책 값은 `{ "places": 2, "trailingZeros": "FIXED|AUTO", "rounding": "HALF_UP|UP|DOWN" }` 객체이며(기존 숫자 값은 FIXED/HALF_UP으로 호환), 정책 관리의 소수점 편집기에서 한 번에 설정한다. 컬럼 옵션 `trailingZeros`(FIXED=항상 `.00` 표시, AUTO=있을 때만 표시)와 `rounding`(HALF_UP 반올림, UP 올림, DOWN 내림)도 `decimalPlaces`와 동일하게 컬럼 값이 정책보다 우선한다. 반올림은 표시와 Excel 내보내기 값에만 적용되며 저장 데이터와 입력 편집기는 바뀌지 않는다. Excel은 AUTO일 때 `#` 서식을 사용한다.
+타입별 정책 값은 `number`, `decimal`, `currency` 키마다 `{ "places": 2, "trailingZeros": "FIXED|AUTO", "rounding": "HALF_UP|UP|DOWN" }` 규칙을 가진다. 기존 단일 규칙 객체나 숫자 값도 호환된다. 컬럼 옵션 `trailingZeros`(FIXED=항상 `.00` 표시, AUTO=있을 때만 표시)와 `rounding`(HALF_UP 반올림, UP 올림, DOWN 내림)도 `decimalPlaces`와 동일하게 컬럼 값이 정책보다 우선한다. F1-Grid의 반올림은 표시와 Excel 내보내기에 적용되며, 자릿수는 편집 입력의 정규화에도 적용된다. 계산·저장 처리는 각 업무에서 별도로 구현한다. Excel은 AUTO일 때 `#` 서식을 사용한다.
+
+영업 모듈은 조회된 정책이 없으면 `number` 0자리, `decimal`과 `currency` 3자리, `FIXED`·`HALF_UP` 기본값을 사용한다. 빈 정책 객체는 미등록이며 응답의 `item`이 없거나 규칙이 불완전하면 조회 실패다. 일반 그리드는 조회 실패 시 기본 표시를 유지하지만, 모듈 컨텍스트의 영업 등록·수정은 정책 조회 실패와 미등록을 구분해 실패·조회 중 편집과 저장을 차단한다. 입력·저장 정밀도 보존은 아직 완성되지 않았다.
+
+영업 화면에서는 수량에 `number`, 단가에 `decimal`, 금액에 `currency`를 지정한다. 타입만 지정하면 해당 정책의 자릿수와 반올림 변경이 표시와 입력에 적용되며, 영업 계산·서버 검증은 같은 유형의 현재 정책을 별도로 참조한다. `currency` 타입만으로 통화 기호를 붙이지 않으며 기호는 `format: 'currency'`를 명시한 경우에만 표시한다.
+
+### 저장에 영향을 주는 컬럼의 공통 계약
+
+수주·견적·출하·출하계획의 저장 대상 컬럼은 `frontend/src/shared/config/decimal-column-contract.json`에서 업무와 필드별로 정의한다. `type`은 필수이며 `places`(0~6), `rounding`(`HALF_UP`/`UP`/`DOWN`), `trailingZeros`(`FIXED`/`AUTO`)는 선택 사항이다. 지정한 항목만 타입 정책보다 우선한다. 정책관리의 타입 정책만 바꾸는 경우 계약 파일을 수정할 필요가 없다.
+
+```json
+{
+  "sales.order": {
+    "orderQty": { "type": "number" },
+    "unitPrice": { "type": "decimal" },
+    "supplyAmount": { "type": "currency", "places": 2, "rounding": "HALF_UP" }
+  }
+}
+```
+
+위는 형식 설명용 일부 예시이며 기존 업무 계약의 나머지 필드를 삭제하면 안 된다.
+
+1. 저장 필드와 계산 결과·헤더 합계의 의미를 구분해 계약에 등록한다. 그리드는 `getDecimalColumnContract`의 필드에서 `type`과 나머지 `decimal` 옵션을 가져오고, 정확한 입력이 필요하면 `exactDecimal`을 지정한다.
+2. 업무 계산과 저장 전 검증은 `resolveDecimalColumn(필드, 모듈정책)`으로 각 입력·결과 필드의 실효 규칙을 사용한다. 결과별 반올림과 합계 순서는 해당 업무의 서버와 일치시킨다. 단순히 그리드 컬럼만 설정하면 계산이나 서버 검증이 자동 변경되지는 않는다.
+3. 저장 요청에 실제 조회한 `decimalPolicy`와 해당 업무의 전체 `decimalColumns`를 전송한다. 영업 서버는 `DecimalColumnContract.forDocument`로 배포된 계약을 읽고 `SalesDecimalPolicy`의 `verifySnapshot`, `verifyColumnContract`, 필드별 `input`/`amount`를 사용한다. 클라이언트가 보낸 설정을 서버의 기준으로 사용하지 않는다.
+4. 계약 변경은 프론트와 서버를 함께 빌드·배포한다. 불일치 시 저장은 HTTP 409로 거부되며 사용자는 화면을 새로고침해 값을 확인해야 한다. 계약 스냅샷을 보내지 않는 구버전 API 호출은 컬럼별 예외가 없는 경우에만 허용되므로, 타입 자체를 바꾸는 배포에서도 구버전 호출자의 호환성을 별도로 확인해야 한다.
+5. 백엔드 Maven 빌드는 프론트 소스의 위 JSON을 서버 classpath로 복사한다. 백엔드만 별도로 빌드하는 환경은 동일 버전의 프론트 계약 파일을 지정된 상대 경로에 포함해야 한다. 깨끗한 빌드 산출물에 `decimal-column-contract.json`이 들어 있는지 확인한다. 파일이 없으면 해당 서버 기능의 계약 로딩이 실패하며, Maven 자체가 반드시 누락을 감지하는 것은 아니다.
+
+정밀 소수(`exactDecimal`) 셀 표시·편집 동작:
+
+- 읽기 전용 셀은 `decimalPlaces`·`rounding`에 맞춰 표시한다. 반올림 결과가 0이면 음수 부호를 붙이지 않는다(`-0.004` → `0.00`).
+- 편집을 시작하면 편집기에 셀 표시와 같은 자릿수(천 단위 쉼표·통화 기호 제외)를 보여 준다. 서버 값이 `3.220000`이고 정책이 2자리면 편집기도 `3.22`이다. 정책 자릿수를 넘는 유효 숫자가 있으면 값을 잃지 않도록 원문을 그대로 보여 준다.
+- 편집 시작 값에서 바꾸지 않고 확정하면 원래 문자열(`3.220000`)을 유지하고 변경(dirty)으로 처리하지 않는다. 구현: `getExactEditValue`(`grid.utils.ts`), `F1Grid.tsx`의 `startEdit`·`commitEdit`.
+- 폼 모달의 입력 필드(`GridFormField`)는 이 변경 범위에 포함하지 않았다.
+
+서버에서 다른 모듈도 공통 `DecimalColumnContract`와 `DecimalColumnRule`을 사용할 수 있다. 업무에서 조회한 타입별 정책을 `DecimalColumnRule` 맵으로 만들고 배포된 계약의 필드를 해석한다.
+
+```java
+Map<String, DecimalColumnRule> types = new HashMap<String, DecimalColumnRule>();
+types.put("currency", new DecimalColumnRule(3, RoundingMode.HALF_UP)); // 실제 사용 시 모듈 정책을 조회
+Map<String, Object> columns = DecimalColumnContract.forDocument("sales.order");
+DecimalColumnRule rule = DecimalColumnRule.resolve(columns.get("supplyAmount"), types, "supplyAmount");
+BigDecimal result = rawAmount.setScale(rule.getPlaces(), rule.getRounding());
+```
+
+`DecimalColumnRule`은 자릿수와 반올림만 해석하며 `trailingZeros`는 유효성만 확인한다. 없는 필드나 잘못된 정의는 예외로 거부한다. 정책 조회, 입력 정밀도·범위 검증, 업무별 계산 순서, 정책·계약 스냅샷 비교와 요청 연결은 자동으로 구현되지 않는다. 다른 모듈은 해당 업무의 필드와 이 처리들을 별도로 연결하고 검증해야 한다. 화면 코드에만 설정한 `decimal` 옵션은 서버와 동기화되지 않는다.
+
+TSV 붙여넣기에서도 숫자 타입 컬럼의 `onValueChange` 패치를 적용한다. 한 행에 여러 숫자 셀을 붙이면 왼쪽에서 오른쪽 순서로 앞서 적용한 값을 사용하므로 수량·단가에 따른 금액도 갱신된다.
+
+표시 반올림은 12자리 유효숫자로 값을 먼저 자르지 않는다. 다만 JavaScript `number`가 표현할 수 없는 원본 소수는 그리드에 전달되기 전에 이미 정밀도를 잃을 수 있으므로, 이 변경만으로 입력·저장 정밀도가 보장되지는 않는다.
 ## PageSearchArea 상세 검색 연결
 
 문서현황과 수주현황의 통합검색 입력은 outlined 입력 루트에 현재 테마의 `background.paper`를 적용해 공통 표면색을 유지한다.

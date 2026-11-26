@@ -24,6 +24,7 @@ import {
   saveRoleMenuPermissions,
   type MenuSaveCheckpoint,
 } from '../services/menuManagement.service';
+import { decimalColumnOptions, getDecimalColumnContract } from '../../../../../shared/services/decimalColumnContract';
 import type { MenuManagementRow } from '../types/menuManagement.types';
 import type {
   MenuModuleOption,
@@ -203,8 +204,7 @@ export const MenuManagementPanel = forwardRef<
       width: 80,
       editable: true,
       required: true,
-      decimalPlaces: 0,
-      type: 'number',
+      ...decimalColumnOptions(getDecimalColumnContract('settings.menu'), 'order'),
       align: 'center',
       headerAlign: 'center',
     },

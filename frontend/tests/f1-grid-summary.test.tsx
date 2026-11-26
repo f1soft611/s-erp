@@ -20,6 +20,44 @@ const rows: Row[] = [
 ];
 
 describe('F1Grid summary', () => {
+  it('rounds conditionally read-only exact cells and summaries while retaining editable input', () => {
+    type ExactRow = { id: string; amount: string; locked: boolean };
+    const exactRows: ExactRow[] = [
+      { id: 'locked', amount: '1.23456', locked: true },
+      { id: 'editable', amount: '2.23456', locked: false },
+    ];
+    const exactColumns: F1GridColumn<ExactRow>[] = [
+      { field: 'id', headerName: 'ID' },
+      { field: 'amount', headerName: 'Amount', type: 'decimal', exactDecimal: true,
+        decimalPlaces: 3, rounding: 'HALF_UP', editable: (row) => !row.locked, summaryType: 'sum' },
+    ];
+    render(<F1Grid rows={exactRows} columns={exactColumns} rowKey="id"
+      features={[{ ftype: 'summary', dock: 'bottom' }]} />);
+    expect(screen.getByText('1.235')).toBeInTheDocument();
+    expect(screen.getByText('2.23456')).toBeInTheDocument();
+    expect(within(screen.getByTestId('f1-grid-summary-bottom'))
+      .getByRole('gridcell', { name: 'Amount 집계' })).toHaveTextContent('3.469');
+    expect(exactRows[0].amount).toBe('1.23456');
+  });
+
+  it('aggregates exact decimal string columns without number precision loss', () => {
+    type ExactRow = { id: string; amount: string; average: string };
+    const exactRows: ExactRow[] = [
+      { id: 'a', amount: '1234567890123.100001', average: '1.000001' },
+      { id: 'b', amount: '0.000002', average: '1.000002' },
+    ];
+    const exactColumns: F1GridColumn<ExactRow>[] = [
+      { field: 'id', headerName: 'ID' },
+      { field: 'amount', headerName: 'Amount', type: 'decimal', exactDecimal: true, decimalPlaces: 6, summaryType: 'sum' },
+      { field: 'average', headerName: 'Average', type: 'decimal', exactDecimal: true, decimalPlaces: 6, rounding: 'HALF_UP', summaryType: 'average' },
+    ];
+    render(<F1Grid rows={exactRows} columns={exactColumns} rowKey="id"
+      features={[{ ftype: 'summary', dock: 'bottom' }]} />);
+    const summary = screen.getByTestId('f1-grid-summary-bottom');
+    expect(within(summary).getByRole('gridcell', { name: 'Amount 집계' })).toHaveTextContent('1,234,567,890,123.100003');
+    expect(within(summary).getByRole('gridcell', { name: 'Average 집계' })).toHaveTextContent('1.000002');
+  });
+
   it('aggregates all filtered rows, keeps its position, and updates on edit and delete', () => {
     const ref = createRef<F1GridRef<Row>>();
     render(<F1Grid ref={ref} rows={rows} columns={columns} rowKey="id"

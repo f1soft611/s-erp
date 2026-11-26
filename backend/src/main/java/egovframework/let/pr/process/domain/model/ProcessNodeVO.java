@@ -7,6 +7,7 @@ public class ProcessNodeVO {
     private String id;
     private String parentId;
     private String code;
+    private Long processId;
     private String name;
     private String description;
     private String image;

@@ -1,8 +1,30 @@
 import { describe, expect, it } from 'vitest';
 import {
   calculateSalesOrderAmounts,
+  formatSalesOrderAmount,
   sumSalesOrderAmounts,
 } from '../src/pages/sales/order/create/data/salesOrderAmounts';
+
+it('calculates from unrounded inputs with the configured decimal rounding rule', () => {
+  expect(calculateSalesOrderAmounts(1.234, 1.235, { places: 3, rounding: 'DOWN' }))
+    .toEqual({ supplyAmount: 1.523, vatAmount: 0.152, totalAmount: 1.675 });
+  expect(calculateSalesOrderAmounts(1.234, 1.235, { places: 3, rounding: 'UP' }))
+    .toEqual({ supplyAmount: 1.524, vatAmount: 0.153, totalAmount: 1.677 });
+  expect(calculateSalesOrderAmounts(1, 1.234567, { places: 6, rounding: 'HALF_UP' }))
+    .toEqual({ supplyAmount: 1.234567, vatAmount: 0.123457, totalAmount: 1.358024 });
+  expect(calculateSalesOrderAmounts(1, 1234567890123.123, { places: 6, rounding: 'DOWN' }))
+    .toEqual({ supplyAmount: 1234567890123.123, vatAmount: 123456789012.3123, totalAmount: 1358024679135.4353 });
+});
+
+it('formats order totals with the policy precision instead of always using two places', () => {
+  expect(formatSalesOrderAmount(1.234, { places: 3, rounding: 'DOWN', trailingZeros: 'FIXED' })).toBe('1.234');
+  expect(formatSalesOrderAmount(1.2, { places: 3, rounding: 'DOWN', trailingZeros: 'AUTO' })).toBe('1.2');
+});
+
+it('does not format with a hard-coded two places when no policy rule is available', () => {
+  expect(formatSalesOrderAmount('1.2345', undefined)).toBe('-');
+  expect(formatSalesOrderAmount(1.2345, undefined)).toBe('-');
+});
 
 describe('sales order amount calculations', () => {
   it('rounds supply and 10 percent VAT to two decimal places', () => {

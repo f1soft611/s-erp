@@ -1,4 +1,5 @@
-import type { F1GridSort, F1GridSortDirection } from '../types/grid.types';
+import type { F1GridColumn, F1GridSort, F1GridSortDirection } from '../types/grid.types';
+import { compareGridExactDecimals } from '../utils/gridExactDecimal';
 
 export function toggleGridSort<T extends object>(
   sorts: F1GridSort<T>[],
@@ -37,12 +38,15 @@ function compareValues(a: unknown, b: unknown): number {
 export function sortGridRows<T extends object>(
   rows: T[],
   sorts: F1GridSort<T>[],
+  columns?: F1GridColumn<T>[],
 ): T[] {
   if (sorts.length === 0) return rows;
 
   return [...rows].sort((rowA, rowB) => {
     for (const sort of sorts) {
-      const result = compareValues(rowA[sort.field], rowB[sort.field]);
+      const exact = columns?.find((column) => column.field === sort.field)?.exactDecimal;
+      const result = (exact ? compareGridExactDecimals(rowA[sort.field], rowB[sort.field]) : undefined)
+        ?? compareValues(rowA[sort.field], rowB[sort.field]);
       if (result !== 0) {
         return sort.direction === 'asc' ? result : -result;
       }

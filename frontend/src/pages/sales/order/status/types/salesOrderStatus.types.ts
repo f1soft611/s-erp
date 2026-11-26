@@ -17,13 +17,13 @@ export type SalesOrderStatusRow = {
   materialCode: string;
   materialName: string;
   unit: string | null;
-  orderQty: number;
-  unitPrice: number;
-  supplyAmt: number;
-  vatAmt: number;
-  totalAmt: number;
+  orderQty: number | string;
+  unitPrice: number | string;
+  supplyAmt: number | string;
+  vatAmt: number | string;
+  totalAmt: number | string;
   deliveryDt: string | null;
-  shippedQty: number;
+  shippedQty: number | string;
   lineStatus: string;
 };
 

@@ -5,13 +5,22 @@ import { Alert, Box, Chip, Divider, IconButton, Menu, MenuItem, Stack, Table, Ta
 import { PostDetailPanel } from '../../../../../../shared/components/feed/PostDetailPanel';
 import { ProfileAvatar } from '../../../../../../shared/components/ProfileAvatar';
 import { PageAreaOverlay } from '../../../../../../shared/components/view-mode/PageAreaOverlay';
+import { usePolicyDecimalRule } from '../../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
+import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../../shared/services/decimalColumnContract';
+import { formatSalesOrderAmount, type SalesAmountRule } from '../../../../order/create/data/salesOrderAmounts';
 import type { StatementItem } from '../../types/salesStatement.types';
 
-const amount = (value: number) => Number(value).toLocaleString('ko-KR', { maximumFractionDigits: 2 });
+const amount = (value: number | string, rule?: SalesAmountRule) => formatSalesOrderAmount(value, rule);
 export function StatementDetailPanel({ item, loading, error, canEdit, onClose, onView, onEdit, onPrint }: {
   item: StatementItem | null; loading: boolean; error: string; canEdit: boolean;
   onClose: () => void; onView: () => void; onEdit: () => void; onPrint: () => void;
 }) {
+  const policy = usePolicyDecimalRule();
+  const contract = getDecimalColumnContract('sales.delivery');
+  const quantityRule = policy && resolveDecimalColumn(contract.deliveryQty, policy);
+  const priceRule = policy && resolveDecimalColumn(contract.unitPrice, policy);
+  const lineRule = policy && resolveDecimalColumn(contract.totalAmt, policy);
+  const amountRule = policy && resolveDecimalColumn(contract.deliveryTotal, policy);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const writer = item?.createdByName || item?.createdBy || '-';
   return <PageAreaOverlay onClose={onClose}>
@@ -38,13 +47,13 @@ export function StatementDetailPanel({ item, loading, error, canEdit, onClose, o
             </Menu>
           </Stack>
         </Stack>
-        <Box aria-label="거래명세서 요약" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr auto' },
+        <Box aria-label="거래명세서 요약" sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'minmax(0, 1fr) auto' },
           gap: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, p: { xs: 2, sm: 2.5 }, bgcolor: 'action.hover' }}>
           <Box><Typography variant="caption" color="text.secondary">거래처</Typography>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>{item.customerName || '-'}</Typography>
             <Typography variant="body2">명세일: {item.statementDt}　출하번호: {item.deliveryNo}</Typography></Box>
-          <Box sx={{ textAlign: { sm: 'right' } }}><Typography variant="caption" color="text.secondary">총 합계</Typography>
-            <Typography variant="h5" sx={{ fontWeight: 800 }}>{amount(item.totalAmt)}</Typography></Box>
+          <Box sx={{ minWidth: 0, textAlign: { sm: 'right' } }}><Typography variant="caption" color="text.secondary">총 합계</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 800, overflowWrap: 'anywhere' }}>{amount(item.totalAmt, amountRule)}</Typography></Box>
         </Box>
         <Box role="group" aria-label="거래명세서 기본정보"
           sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: { xs: 1.5, sm: 2 } }}>
@@ -59,13 +68,13 @@ export function StatementDetailPanel({ item, loading, error, canEdit, onClose, o
         <Box sx={{ minWidth: 0 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>거래명세서 품목 ({item.details.length}건)</Typography>
           <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflowX: 'auto' }}>
-            <Table size="small" aria-label="거래명세서 품목 목록" sx={{ minWidth: 560 }}>
+            <Table size="small" aria-label="거래명세서 품목 목록" sx={{ minWidth: 560, '& th, & td': { whiteSpace: 'nowrap' } }}>
               <TableHead><TableRow><TableCell>행</TableCell><TableCell>품목코드</TableCell><TableCell>품목명</TableCell>
                 <TableCell align="right">수량</TableCell><TableCell align="right">단가</TableCell><TableCell align="right">합계</TableCell></TableRow></TableHead>
               <TableBody>{item.details.map((row) => <TableRow key={row.salesStatementDetailId}>
                 <TableCell>{row.lineNo}</TableCell><TableCell>{row.materialCode || '-'}</TableCell>
-                <TableCell>{row.materialName || '-'}</TableCell><TableCell align="right">{amount(row.deliveryQty)}</TableCell>
-                <TableCell align="right">{amount(row.unitPrice)}</TableCell><TableCell align="right">{amount(row.totalAmt)}</TableCell>
+                <TableCell>{row.materialName || '-'}</TableCell><TableCell align="right">{amount(row.deliveryQty, quantityRule)}</TableCell>
+                <TableCell align="right">{amount(row.unitPrice, priceRule)}</TableCell><TableCell align="right">{amount(row.totalAmt, lineRule)}</TableCell>
               </TableRow>)}</TableBody>
             </Table>
           </TableContainer>

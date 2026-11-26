@@ -17,6 +17,7 @@
                h.delivery_type AS "deliveryType",
                d.line_no AS "sourceLineNo",
                d.revenue_closed_at AS "revenueClosedAt",
+               d.total_amt AS "totalAmt",
                EXISTS (
                    SELECT 1
                    FROM tb_sales_statement_dt sd
@@ -126,13 +127,7 @@
                t.business_type, t.business_category, t.post_code, t.address, t.telephone_no, t.facsimile_no, t.stamp_image,
                c.customer_code, c.customer_name, c.business_no, c.president_name,
                c.business_item_1, c.business_status_1, c.post_code, c.address, c.telephone_no, c.facsimile_no,
-               (SELECT COALESCE(SUM(d.total_amt), 0)
-                  FROM tb_sales_delivery_dt d
-                 WHERE d.tenant_id = #{tenantId, jdbcType=BIGINT}
-                   AND d.sales_delivery_detail_id IN
-                   <foreach collection="salesDeliveryDetailIds" item="detailId" open="(" separator="," close=")">
-                       #{detailId, jdbcType=BIGINT}
-                   </foreach>) AS total_amt,
+               #{totalAmt, jdbcType=NUMERIC},
                #{remark, jdbcType=VARCHAR}, #{userId, jdbcType=VARCHAR}
         FROM tb_sales_delivery_hd h
         JOIN tb_tenant t ON t.tenant_id = h.tenant_id
@@ -169,7 +164,7 @@
         SELECT h.sales_statement_id AS "salesStatementId", h.sales_delivery_id AS "salesDeliveryId",
                h.statement_no AS "statementNo", to_char(h.statement_dt, 'YYYY-MM-DD') AS "statementDt",
                h.delivery_no AS "deliveryNo", to_char(h.delivery_dt, 'YYYY-MM-DD') AS "deliveryDt", h.delivery_type AS "deliveryType",
-               h.order_no AS "orderNo", h.customer_id AS "customerId",
+               h.order_no AS "orderNo", delivery.customer_id AS "customerId",
                h.supplier_name AS "supplierName",
                h.supplier_business_no AS "supplierBusinessNo", h.supplier_president_name AS "supplierPresidentName",
                h.supplier_business_type AS "supplierBusinessType", h.supplier_business_category AS "supplierBusinessCategory",
@@ -185,6 +180,8 @@
                to_char(h.created_at, 'YYYY-MM-DD HH24:MI') AS "createdAt",
                u.user_nm AS "createdByName", la.profile_image AS "createdByProfileImage"
         FROM tb_sales_statement_hd h
+        JOIN tb_sales_delivery_hd delivery ON delivery.sales_delivery_id = h.sales_delivery_id
+            AND delivery.tenant_id = h.tenant_id
         LEFT JOIN tb_tenant t ON t.tenant_id = h.tenant_id
         LEFT JOIN tb_login_account la ON la.login_code = h.created_by AND la.tenant_id = h.tenant_id
         LEFT JOIN tb_user u ON u.login_id = la.login_id AND u.tenant_id = la.tenant_id

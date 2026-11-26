@@ -18,6 +18,10 @@ import { getSystemDate } from '../../../../../shared/services/systemDateService'
 import { CustomerPicker, MaterialPickerDialog } from '../../../../../shared/components/master-picker/MasterPickers';
 import type { F1GridChanges, F1GridRef } from '../../../../../shared/components/f1-grid';
 import { searchOrderCustomers, searchOrderMaterials } from '../../../order/create/services/salesOrderMaster.service';
+import { formatSalesOrderAmount, sumExactSalesAmounts } from '../../../order/create/data/salesOrderAmounts';
+import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
+import { usePolicyDecimalStatus } from '../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
+import { SalesDecimalPolicyError } from '../../../shared/SalesDecimalPolicyError';
 import { DeliveryDetailGrid } from './components/DeliveryDetailGrid';
 import { activeDeliveryRows } from './data/deliveryDetailRows';
 import { SourceOrderPicker } from './components/SourceOrderPicker';
@@ -45,6 +49,9 @@ export function SalesDeliveryCreatePage({
   currentMenuName, content, breadcrumbItems, selectedMenuPermissions: permissions, salesDeliveryId,
   embedded = false, mode = 'edit', onSaved, onDeleted, onDirtyChange, onPendingChange, onEmbeddedActionsChange,
 }: Props) {
+  const policyState = usePolicyDecimalStatus();
+  const policy = policyState.rule;
+  const amountRule = policy && ('places' in policy ? policy : policy.currency);
   const [form, setForm] = useState<DeliveryForm>(emptyDelivery);
   const [baseline, setBaseline] = useState(() => JSON.stringify(form));
   const [rows, setRows] = useState<DeliveryRow[]>([]);
@@ -71,7 +78,8 @@ export function SalesDeliveryCreatePage({
   const canRead = Boolean(permissions?.read);
   const canSave = canRead && mode !== 'view' && Boolean(savedId ? permissions?.update : permissions?.create);
   const canDelete = canRead && mode !== 'view' && Boolean(savedId && permissions?.delete);
-  const editable = canSave && !pending && !loading && !locked && !overDelivery;
+  const policyReady = policyState.status === 'ready' || policyState.status === 'unmanaged';
+  const editable = canSave && !pending && !loading && !locked && !overDelivery && policyReady;
   const dirty = JSON.stringify(form) !== baseline;
   useUnsavedChangesBeforeUnload(dirty);
   const blocker = useBlocker(!embedded && (dirty || pending));
@@ -143,7 +151,7 @@ export function SalesDeliveryCreatePage({
     }
   };
   const savePayload = useCallback(async (payload: DeliveryPayload) => {
-    if (busy.current || !canSave) return;
+    if (busy.current || !canSave || !policyReady) return;
     busy.current = true; setPending(true); setError(''); setNotice('');
     try {
       const saved = savedId
@@ -166,7 +174,7 @@ export function SalesDeliveryCreatePage({
       }
     }
     finally { busy.current = false; setPending(false); }
-  }, [canSave, savedId, applyItem, onSaved]);
+  }, [canSave, policyReady, savedId, applyItem, onSaved]);
   const save = useCallback(async () => {
     if (!editable || busy.current) return;
     const deliveryDt = normalizeDateInput(form.deliveryDt);
@@ -174,11 +182,11 @@ export function SalesDeliveryCreatePage({
       ? '올바른 출하일자를 입력해 주세요.' : '출하일자를 입력해 주세요.');
     if (!deliveryDt) return;
     const current = { ...form, deliveryDt, details: grid.current?.getActiveRows() ?? form.details };
-    const message = validateDelivery(current);
-    grid.current?.validate();
-    if (message) { setError(message); return; }
-    await savePayload(buildDeliveryPayload(current));
-  }, [editable, form, savePayload]);
+    const message = validateDelivery(current, policy);
+    const gridValid = grid.current?.validate() ?? true;
+    if (message || !gridValid) { if (message) setError(message); return; }
+    await savePayload(buildDeliveryPayload(current, policy));
+  }, [editable, form, savePayload, policy]);
   const requestDelete = useCallback(() => setConfirm('delete'), []);
   const deleteDisabled = pending || loading || locked || Boolean(overDelivery);
   useEffect(() => {
@@ -197,10 +205,15 @@ export function SalesDeliveryCreatePage({
     finally { busy.current = false; setPending(false); }
   };
   const selectSource = useCallback((source: SourceOrderRow[]) => {
-    const next = sourceOrderForm(source, form.deliveryDt);
-    setForm(next); setRows(next.details); setGridKey((value) => value + 1);
-    setSelectedIds([]); setSourceOpen(false); setError('');
-  }, [form.deliveryDt]);
+    try {
+      const next = sourceOrderForm(source, form.deliveryDt, amountRule, policy);
+      setForm(next); setRows(next.details); setGridKey((value) => value + 1);
+      setSelectedIds([]); setSourceOpen(false); setError('');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '출하 금액을 계산할 수 없습니다.');
+    }
+  }, [amountRule, policy, form.deliveryDt]);
+  const handleCalculationError = useCallback((cause: Error) => setError(cause.message), []);
   const actions: PermissionActionGroupDefinition[] = [
     { key: 'write', actions: [
       { label: '신규', icon: NoteAddOutlinedIcon, visible: Boolean(permissions?.create) && mode !== 'view',
@@ -211,9 +224,21 @@ export function SalesDeliveryCreatePage({
       { label: '삭제', icon: DeleteForeverOutlinedIcon, visible: Boolean(permissions?.delete) && mode !== 'view', disabled: !canDelete || deleteDisabled, onClick: requestDelete },
     ] },
   ];
-  const totals = form.details.reduce((total, row) => ({
-    supply: total.supply + Number(row.supplyAmt), vat: total.vat + Number(row.vatAmt), total: total.total + Number(row.totalAmt),
-  }), { supply: 0, vat: 0, total: 0 });
+  let totals: ReturnType<typeof sumExactSalesAmounts> | null;
+  const contract = getDecimalColumnContract('sales.delivery');
+  const summaryRules = policy && {
+    supplyAmount: resolveDecimalColumn(contract.supplyAmt, policy),
+    vatAmount: resolveDecimalColumn(contract.vatAmt, policy),
+    totalAmount: resolveDecimalColumn(contract.deliveryTotal, policy),
+  };
+  try {
+    const lines = form.details.map((row) => ({
+      supplyAmount: row.supplyAmt, vatAmount: row.vatAmt, totalAmount: row.totalAmt,
+    }));
+    totals = amountRule ? sumExactSalesAmounts(lines, amountRule, summaryRules) : null;
+  } catch {
+    totals = null;
+  }
   if (!canRead) return <Alert severity="warning">출하등록 조회 권한이 없습니다.</Alert>;
   return <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
     {!embedded ? <PageHeader breadcrumbItems={breadcrumbItems.length ? breadcrumbItems : [currentMenuName]} description={content.description} actionGroups={actions} /> : null}
@@ -221,6 +246,7 @@ export function SalesDeliveryCreatePage({
       sx={{ px: embedded ? 0 : 2, pt: embedded ? 0 : 2, pb: embedded ? 0 : 2,
         display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
       {notice ? <Alert severity="success">{notice}</Alert> : null}
+      <SalesDecimalPolicyError status={policyState.status} />
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
       {locked && savedId ? <Button startIcon={<SearchIcon />} disabled={pending || loading} onClick={() => void load(savedId)}>재조회</Button> : null}
       {loading ? <Typography role="status">출하를 불러오는 중입니다.</Typography> : null}
@@ -296,13 +322,13 @@ export function SalesDeliveryCreatePage({
         </Box>
         <Box sx={{ flex: '1 0 260px', minHeight: 260, minWidth: 0, overflow: 'hidden', px: 2 }}>
           <DeliveryDetailGrid key={gridKey} gridRef={grid} rows={rows} disabled={!editable} source={form.deliveryType === 'ORDER'}
-            onChanges={handleChanges} onSelection={setSelectedIds} onMaterial={openMaterial} />
+            onChanges={handleChanges} onSelection={setSelectedIds} onMaterial={openMaterial} onCalculationError={handleCalculationError} />
         </Box>
         <Box aria-label="출하 금액 합계" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 1, p: 2 }}>
-          {([['공급가 합계', totals.supply], ['부가세 합계', totals.vat], ['총 합계', totals.total]] as const).map(([label, amount]) => (
+          {([['공급가 합계', totals?.supplyAmount, summaryRules?.supplyAmount], ['부가세 합계', totals?.vatAmount, summaryRules?.vatAmount], ['총 합계', totals?.totalAmount, summaryRules?.totalAmount]] as const).map(([label, amount, displayRule]) => (
             <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1, px: 1.5, py: 1 }}>
               <Typography variant="body2" color="text.secondary">{label}</Typography>
-              <Typography variant="body1" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{amount.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Typography>
+              <Typography variant="body1" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{amount === undefined ? (amountRule ? '계산 범위 초과' : '-') : formatSalesOrderAmount(amount, displayRule ?? amountRule)}</Typography>
             </Box>
           ))}
         </Box>

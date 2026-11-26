@@ -3,25 +3,36 @@ import type {
   F1GridColumn,
 } from '../../../../../shared/components/f1-grid';
 import type { MasterPickerOption } from '../../../../../shared/components/master-picker/masterPicker.types';
+import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
+import type { GridDecimalModuleRule } from '../../../../../shared/services/gridDecimalPolicy.service';
 import {
   calculateSalesOrderAmounts,
+  calculateExactSalesAmounts,
+  addExactSalesDecimals,
+  addSalesOrderAmounts,
   roundSalesOrderAmount,
   type SalesOrderAmounts,
+  type SalesAmountRule,
 } from './salesOrderAmounts';
 import {
   getSalesOrderCodeLabel,
   type SalesOrderCodeOption,
 } from '../../services/salesOrderCommonCode.service';
 
-export type SalesOrderDetailRow = SalesOrderAmounts & {
+export type SalesOrderDecimalValue = number | string;
+
+export type SalesOrderDetailRow = Omit<SalesOrderAmounts, 'supplyAmount' | 'vatAmount' | 'totalAmount'> & {
   rowId: string;
   materialId: number | null;
   materialCode: string;
   materialName: string;
-  orderQty: number;
-  unitPrice: number;
+  orderQty: SalesOrderDecimalValue;
+  unitPrice: SalesOrderDecimalValue;
+  supplyAmount: SalesOrderDecimalValue;
+  vatAmount: SalesOrderDecimalValue;
+  totalAmount: SalesOrderDecimalValue;
   deliveryDt: string;
-  shippedQty: number;
+  shippedQty: SalesOrderDecimalValue;
   lineStatus: string;
 };
 
@@ -83,18 +94,33 @@ export function createSalesOrderDetailColumns(
   disabled = false,
   progressStatusOptions: SalesOrderCodeOption[] = [],
   onCalculationError?: (error: Error) => void,
+  amountRule?: SalesAmountRule,
+  policy?: GridDecimalModuleRule,
 ): F1GridColumn<SalesOrderDetailRow>[] {
-  const recalculateAmounts = (quantity: number, unitPrice: number) => {
+  const contract = getDecimalColumnContract('sales.order');
+  const rules = amountRule && {
+    supplyAmount: resolveDecimalColumn(contract.supplyAmount, policy ?? { ...amountRule, trailingZeros: amountRule.trailingZeros ?? 'FIXED' }),
+    vatAmount: resolveDecimalColumn(contract.vatAmount, policy ?? { ...amountRule, trailingZeros: amountRule.trailingZeros ?? 'FIXED' }),
+    totalAmount: resolveDecimalColumn(contract.totalAmount, policy ?? { ...amountRule, trailingZeros: amountRule.trailingZeros ?? 'FIXED' }),
+  };
+  const columnOptions = (field: string) => {
+    const { type, ...decimal } = contract[field];
+    return { type, decimal };
+  };
+  const recalculateAmounts = (quantity: SalesOrderDecimalValue, unitPrice: SalesOrderDecimalValue) => {
     try {
       return {
         orderQty: quantity,
         unitPrice,
-        ...calculateSalesOrderAmounts(quantity, unitPrice),
+        ...(amountRule && (typeof quantity === 'string' || typeof unitPrice === 'string')
+          ? calculateExactSalesAmounts(String(quantity), String(unitPrice), amountRule, rules)
+          : calculateSalesOrderAmounts(Number(quantity), Number(unitPrice), amountRule, rules)),
       };
     } catch (cause) {
       if (!(cause instanceof Error)) throw cause;
       onCalculationError?.(cause);
-      return {};
+      return amountRule && (typeof quantity === 'string' || typeof unitPrice === 'string')
+        ? { orderQty: quantity, unitPrice } : {};
     }
   };
 
@@ -148,7 +174,8 @@ export function createSalesOrderDetailColumns(
       field: 'orderQty',
       headerName: '주문수량',
       summaryType: 'sum',
-      type: 'decimal',
+      ...columnOptions('orderQty'),
+      exactDecimal: Boolean(amountRule),
       width: 120,
       align: 'right',
       editable: !disabled,
@@ -157,25 +184,27 @@ export function createSalesOrderDetailColumns(
       validate: (value) =>
         Number(value) > 0 ? true : '주문수량은 0보다 커야 합니다.',
       onValueChange: (row, value) =>
-        recalculateAmounts(numericValue(value), row.unitPrice),
+        recalculateAmounts(amountRule && (typeof value === 'string' || value == null) ? String(value ?? '') : numericValue(value), row.unitPrice),
     },
     {
       field: 'unitPrice',
       headerName: '단가',
-      type: 'currency',
+      ...columnOptions('unitPrice'),
+      exactDecimal: Boolean(amountRule),
       width: 130,
       align: 'right',
       editable: !disabled,
       required: true,
       min: 0,
       onValueChange: (row, value) =>
-        recalculateAmounts(row.orderQty, numericValue(value)),
+        recalculateAmounts(row.orderQty, amountRule && (typeof value === 'string' || value == null) ? String(value ?? '') : numericValue(value)),
     },
     {
       field: 'supplyAmount',
       headerName: '공급가',
       summaryType: 'sum',
-      type: 'currency',
+      ...columnOptions('supplyAmount'),
+      exactDecimal: Boolean(amountRule),
       width: 130,
       align: 'right',
       editable: false,
@@ -184,25 +213,30 @@ export function createSalesOrderDetailColumns(
       field: 'vatAmount',
       headerName: '부가세',
       summaryType: 'sum',
-      type: 'currency',
+      ...columnOptions('vatAmount'),
+      exactDecimal: Boolean(amountRule),
       width: 130,
       align: 'right',
       editable: !disabled,
       min: 0,
       onValueChange: (row, value) => {
         try {
-          const vatAmount = roundSalesOrderAmount(numericValue(value), '부가세');
+          if (amountRule && (typeof value === 'string' || value == null)) {
+            const text = String(value ?? '');
+            return { vatAmount: text, totalAmount: addExactSalesDecimals(String(row.supplyAmount), text, rules?.totalAmount ?? amountRule) };
+          }
+          const vatAmount = roundSalesOrderAmount(numericValue(value), '부가세', rules?.vatAmount ?? amountRule);
           return {
             vatAmount,
-            totalAmount: roundSalesOrderAmount(
-              row.supplyAmount + vatAmount,
+            totalAmount: amountRule ? addSalesOrderAmounts(Number(row.supplyAmount), vatAmount, rules?.totalAmount ?? amountRule, '계산된 라인 합계') : roundSalesOrderAmount(
+              Number(row.supplyAmount) + vatAmount,
               '계산된 라인 합계',
             ),
           };
         } catch (cause) {
           if (!(cause instanceof Error)) throw cause;
           onCalculationError?.(cause);
-          return {};
+          return amountRule && (typeof value === 'string' || value == null) ? { vatAmount: String(value ?? '') } : {};
         }
       },
     },
@@ -210,7 +244,8 @@ export function createSalesOrderDetailColumns(
       field: 'totalAmount',
       headerName: '라인합계',
       summaryType: 'sum',
-      type: 'currency',
+      ...columnOptions('totalAmount'),
+      exactDecimal: Boolean(amountRule),
       width: 140,
       align: 'right',
       editable: false,
@@ -226,7 +261,8 @@ export function createSalesOrderDetailColumns(
     {
       field: 'shippedQty',
       headerName: '출하수량',
-      type: 'decimal',
+      type: 'number',
+      exactDecimal: Boolean(amountRule),
       width: 120,
       align: 'right',
       editable: false,

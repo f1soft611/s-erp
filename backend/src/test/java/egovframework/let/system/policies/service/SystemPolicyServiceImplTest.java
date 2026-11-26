@@ -104,6 +104,27 @@ class SystemPolicyServiceImplTest {
     }
 
     @Test
+    void gridDecimalPoliciesStoreAndReturnSeparateRulesForEachNumericType() throws Exception {
+        String rules = "{\"number\":{\"places\":0,\"trailingZeros\":\"FIXED\",\"rounding\":\"HALF_UP\"},"
+                + "\"decimal\":{\"places\":3,\"trailingZeros\":\"AUTO\",\"rounding\":\"DOWN\"},"
+                + "\"currency\":{\"places\":3,\"trailingZeros\":\"FIXED\",\"rounding\":\"UP\"}}";
+        when(dao.insertPolicy(anyMap())).thenReturn(20L);
+        service.createPolicy(TENANT, ACTOR, request("{\"policyCode\":\"GRID_DECIMAL_SALES\","
+                + "\"policyName\":\"sales\",\"category\":\"c\",\"valueType\":\"NUMBER\","
+                + "\"minValue\":0,\"maxValue\":6,\"value\":" + rules + "}"));
+        verify(dao).insertPolicy(argThat(params -> rules.equals(String.valueOf(params.get("valueJson")))));
+
+        SystemPolicyVO sales = new SystemPolicyVO();
+        sales.setPolicyCode("GRID_DECIMAL_SALES");
+        sales.setValueJson(rules);
+        when(dao.selectGridDecimalPolicies(TENANT)).thenReturn(listOf(sales));
+        Map<String, Map<String, Object>> result = service.getGridDecimals(TENANT);
+        assertThat(((Map<?, ?>) result.get("SALES").get("number")).get("places")).isEqualTo(0);
+        assertThat(((Map<?, ?>) result.get("SALES").get("decimal")).get("rounding")).isEqualTo("DOWN");
+        assertThat(((Map<?, ?>) result.get("SALES").get("currency")).get("places")).isEqualTo(3);
+    }
+
+    @Test
     void listConvertsStoredJsonIntoRawValuesAndOptions() throws Exception {
         SystemPolicyVO stored = stored(4L, "DELIVERY_PLAN_MODE", "SELECT", "\"MANUAL\"", MODE_OPTIONS, true, 2);
         SystemPolicyVO flag = stored(5L, "FLAG", "BOOLEAN", "false", "[]", false, 1);

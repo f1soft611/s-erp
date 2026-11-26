@@ -15,6 +15,9 @@ import type { ReactNode } from 'react';
 import { PostDetailPanel } from '../../../../../shared/components/feed/PostDetailPanel';
 import { ProfileAvatar } from '../../../../../shared/components/ProfileAvatar';
 import { PageAreaOverlay } from '../../../../../shared/components/view-mode/PageAreaOverlay';
+import { usePolicyDecimalRule } from '../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
+import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
+import { formatSalesOrderAmount, type SalesAmountRule } from '../../../order/create/data/salesOrderAmounts';
 import type { QuotationItem } from '../../create/types/quotation.types';
 import { QuotationActionsMenu } from './QuotationActionsMenu';
 
@@ -28,12 +31,9 @@ type Props = {
   onEdit: () => void;
 };
 
-function formatAmount(value: number | null | undefined) {
+function formatAmount(value: number | string | null | undefined, rule?: SalesAmountRule) {
   if (value == null) return '-';
-  return Number(value).toLocaleString('ko-KR', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
+  return formatSalesOrderAmount(value, rule);
 }
 
 function InfoItem({ label, children, wide = false }: { label: string; children: ReactNode; wide?: boolean }) {
@@ -70,6 +70,14 @@ export function QuotationStatusDetailPanel({
   onView,
   onEdit,
 }: Props) {
+  const policy = usePolicyDecimalRule();
+  const contract = getDecimalColumnContract('sales.quotation');
+  const quantityRule = policy && resolveDecimalColumn(contract.quotationQty, policy);
+  const priceRule = policy && resolveDecimalColumn(contract.unitPrice, policy);
+  const lineRule = policy && resolveDecimalColumn(contract.lineAmt, policy);
+  const supplyRule = policy && resolveDecimalColumn(contract.supplyAmt, policy);
+  const vatRule = policy && resolveDecimalColumn(contract.vatAmt, policy);
+  const amountRule = policy && resolveDecimalColumn(contract.totalAmt, policy);
   const writerName = quotation?.createdByName || quotation?.createdBy || '-';
   return (
     <PageAreaOverlay onClose={onClose}>
@@ -121,7 +129,7 @@ export function QuotationStatusDetailPanel({
               <Box sx={{ minWidth: { sm: 150 }, textAlign: { sm: 'right' } }}>
                 <Typography variant="caption" color="text.secondary" component="div">총액</Typography>
                 <Typography variant="h5" component="div" sx={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
-                  {formatAmount(quotation.totalAmt)}
+                  {formatAmount(quotation.totalAmt, amountRule)}
                 </Typography>
               </Box>
             </Box>
@@ -138,8 +146,8 @@ export function QuotationStatusDetailPanel({
                 <InfoItem label="화폐단위">{quotation.currencyCode || '-'}</InfoItem>
               </InfoGroup>
               <InfoGroup title="금액 및 비고">
-                <InfoItem label="공급가액">{formatAmount(quotation.supplyAmt)}</InfoItem>
-                <InfoItem label="부가세">{formatAmount(quotation.vatAmt)}</InfoItem>
+                <InfoItem label="공급가액">{formatAmount(quotation.supplyAmt, supplyRule)}</InfoItem>
+                <InfoItem label="부가세">{formatAmount(quotation.vatAmt, vatRule)}</InfoItem>
                 <InfoItem label="비고" wide>{quotation.remark || '-'}</InfoItem>
               </InfoGroup>
             </Box>
@@ -170,9 +178,9 @@ export function QuotationStatusDetailPanel({
                         <TableCell>{detail.materialCode || '-'}</TableCell>
                         <TableCell sx={{ minWidth: 140, overflowWrap: 'anywhere' }}>{detail.materialName}</TableCell>
                         <TableCell>{detail.materialSpec || '-'}</TableCell>
-                        <TableCell align="right">{formatAmount(detail.quotationQty)}</TableCell>
-                        <TableCell align="right">{formatAmount(detail.unitPrice)}</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700 }}>{formatAmount(detail.lineAmt)}</TableCell>
+                        <TableCell align="right">{formatAmount(detail.quotationQty, quantityRule)}</TableCell>
+                        <TableCell align="right">{formatAmount(detail.unitPrice, priceRule)}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700 }}>{formatAmount(detail.lineAmt, lineRule)}</TableCell>
                         <TableCell>{detail.unit || '-'}</TableCell>
                       </TableRow>
                     )) : (

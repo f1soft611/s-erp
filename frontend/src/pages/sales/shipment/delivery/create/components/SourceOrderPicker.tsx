@@ -7,6 +7,7 @@ import { PageSearchArea } from '../../../../../../shared/components/PageSearchAr
 import { toPageSearchFields, type PageSearchFieldValue } from '../../../../../../shared/components/page-search/searchFields';
 import { usePageSearchDefaults } from '../../../../../../shared/hooks/usePageSearchDefaults';
 import { F1Grid, type F1GridColumn, type F1GridRef } from '../../../../../../shared/components/f1-grid';
+import { decimalColumnOptions, getDecimalColumnContract } from '../../../../../../shared/services/decimalColumnContract';
 import { searchSourceOrders } from '../services/salesDelivery.service';
 import type { SourceOrderRow, SourceOrderSearchFilters } from '../types/salesDelivery.types';
 
@@ -50,11 +51,10 @@ export function SourceOrderPicker({ open, onClose, onSelect }: {
     { field: 'materialCode', headerName: '품목코드', width: 100, align: 'center', search: { hidden: true } },
     { field: 'materialName', headerName: '품목명', width: 135, align: 'center',
       search: { label: '품목', order: 4, span: 1, group: '수주 조건' } },
-    { field: 'plannedQty', headerName: '계획수량', type: 'decimal', width: 90, align: 'right', search: { hidden: true } },
-    { field: 'deliveredQty', headerName: '기출하', type: 'decimal', width: 90, align: 'right', search: { hidden: true } },
-    { field: 'remainingQty', headerName: '미납수량', type: 'decimal', width: 90, align: 'right',
-      renderCell: ({ row }) => Math.max(Number(row.remainingQty), 0).toLocaleString('ko-KR'), search: { hidden: true } },
-    { field: 'excessQty', headerName: '초과출하', type: 'decimal', width: 90, align: 'right', search: { hidden: true } },
+    { field: 'plannedQty', headerName: '계획수량', ...decimalColumnOptions(getDecimalColumnContract('sales.deliveryPlan'), 'plannedQty'), exactDecimal: true, width: 90, align: 'right', search: { hidden: true } },
+    { field: 'deliveredQty', headerName: '기출하', ...decimalColumnOptions(getDecimalColumnContract('sales.delivery'), 'deliveryQty'), exactDecimal: true, width: 90, align: 'right', search: { hidden: true } },
+    { field: 'remainingQty', headerName: '미납수량', ...decimalColumnOptions(getDecimalColumnContract('sales.delivery'), 'deliveryQty'), exactDecimal: true, width: 90, align: 'right', search: { hidden: true } },
+    { field: 'excessQty', headerName: '초과출하', type: 'number', width: 90, align: 'right', search: { hidden: true } },
   ], []);
   const detailFields = useMemo(() => toPageSearchFields(columns), [columns]);
   const { values: defaultValues, loading: defaultsLoading, error: defaultsError, retry: retryDefaults } =

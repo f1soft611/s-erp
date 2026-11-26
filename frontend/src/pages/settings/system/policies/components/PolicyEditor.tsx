@@ -5,13 +5,13 @@ import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/Un
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import { createPolicy, updatePolicy } from '../services/systemPolicy.service';
-import { initialPolicyValue, newPolicy, POLICY_TYPES, validatePolicy, type PolicyPayload, type PolicyValueType, type SystemPolicy } from '../types/systemPolicy.types';
+import { defaultGridDecimalTypeValues, initialPolicyValue, isGridDecimalPolicy, newPolicy, POLICY_TYPES, toGridDecimalTypeValues, validatePolicy, type PolicyPayload, type PolicyValueType, type SystemPolicy } from '../types/systemPolicy.types';
 import { PolicyValueInput } from './PolicyValueInput';
 
 export function PolicyEditor({ policy, onClose, onSaved }: { policy: SystemPolicy | null; onClose: () => void; onSaved: (item: SystemPolicy) => void }) {
   const [draft, setDraft] = useState<PolicyPayload>(() => policy ? {
     policyCode: policy.policyCode, policyName: policy.policyName, category: policy.category,
-    description: policy.description, valueType: policy.valueType, value: policy.value,
+    description: policy.description, valueType: policy.valueType, value: isGridDecimalPolicy(policy) ? toGridDecimalTypeValues(policy.value) : policy.value,
     options: policy.options ?? [], minValue: policy.minValue, maxValue: policy.maxValue, unit: policy.unit,
   } : newPolicy());
   const [initial] = useState(() => JSON.stringify(draft));
@@ -65,12 +65,15 @@ export function PolicyEditor({ policy, onClose, onSaved }: { policy: SystemPolic
               <Typography variant="body2" color="text.secondary">{draft.description}</Typography>
               <TextField fullWidth label="정책 코드" value={draft.policyCode} disabled />
             </Stack> : <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
-              <TextField fullWidth label="정책 코드" value={draft.policyCode} disabled={saving || Boolean(policy)} onChange={(event) => set('policyCode', event.target.value.toUpperCase())} helperText="예: SALES_OVER_DELIVERY · 생성 후 변경 불가" slotProps={{ htmlInput: { maxLength: 80 } }} />
+              <TextField fullWidth label="정책 코드" value={draft.policyCode} disabled={saving || Boolean(policy)} onChange={(event) => {
+                const policyCode = event.target.value.toUpperCase();
+                setDraft((current) => ({ ...current, policyCode, value: policyCode.startsWith('GRID_DECIMAL_') && !current.policyCode.startsWith('GRID_DECIMAL_') && current.valueType === 'NUMBER' ? defaultGridDecimalTypeValues() : current.value }));
+              }} helperText="예: SALES_OVER_DELIVERY · 생성 후 변경 불가" slotProps={{ htmlInput: { maxLength: 80 } }} />
               <TextField fullWidth label="정책 이름" value={draft.policyName} disabled={saving || definitionLocked} onChange={(event) => set('policyName', event.target.value)} slotProps={{ htmlInput: { maxLength: 100 } }} />
               <TextField fullWidth label="업무 분류" value={draft.category} disabled={saving || definitionLocked} onChange={(event) => set('category', event.target.value)} helperText="예: 영업관리, 구매관리, 공통" slotProps={{ htmlInput: { maxLength: 80 } }} />
               <TextField select fullWidth label="값 타입" value={draft.valueType} disabled={saving || Boolean(policy)} helperText="생성 후 변경 불가" onChange={(event) => {
                 const type = event.target.value as PolicyValueType;
-                setDraft((current) => ({ ...current, valueType: type, value: initialPolicyValue(type), options: type === 'SELECT' ? [{ value: '', label: '' }] : [], minValue: null, maxValue: null, unit: '' }));
+                setDraft((current) => ({ ...current, valueType: type, value: type === 'NUMBER' && current.policyCode.startsWith('GRID_DECIMAL_') ? defaultGridDecimalTypeValues() : initialPolicyValue(type), options: type === 'SELECT' ? [{ value: '', label: '' }] : [], minValue: null, maxValue: null, unit: '' }));
               }}>{Object.entries(POLICY_TYPES).map(([type, label]) => <MenuItem key={type} value={type}>{label}</MenuItem>)}</TextField>
             </Box>}
             {!definitionLocked && <TextField fullWidth multiline minRows={2} label="정책 설명" value={draft.description} disabled={saving} onChange={(event) => set('description', event.target.value)} helperText="적용되는 업무와 변경 시 주의사항을 적어주세요." slotProps={{ htmlInput: { maxLength: 1000 } }} />}

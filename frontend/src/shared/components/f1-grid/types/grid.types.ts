@@ -199,6 +199,8 @@ export type F1GridColumn<T extends object> = {
   type?: F1GridEditorType;
   format?: string;
   decimalPlaces?: number;
+  /** 숫자 원문을 십진 문자열로 보존한다. 기본값은 기존 숫자 변환이다. */
+  exactDecimal?: boolean;
   /** 소수점 설정을 한 번에 지정한다(예: `decimal: { places: 2, trailingZeros: 'AUTO', rounding: 'DOWN' }`). 지정한 항목만 정책보다 우선하며, 개별 옵션(decimalPlaces 등)보다 우선한다. */
   decimal?: F1GridDecimalOptions;
   /** 소수점 0 표시: FIXED(항상 자리수만큼, 기본) / AUTO(값이 있을 때만). 미지정 시 정책 관리 값. */

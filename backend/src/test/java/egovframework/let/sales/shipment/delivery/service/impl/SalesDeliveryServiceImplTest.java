@@ -21,6 +21,7 @@ import java.util.stream.LongStream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -31,6 +32,9 @@ import org.springframework.transaction.annotation.AnnotationTransactionAttribute
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.web.server.ResponseStatusException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import egovframework.let.common.idsequence.service.IdSequenceService;
 import egovframework.let.sales.shipment.delivery.domain.model.SalesDeliveryDetailRequestVO;
@@ -47,6 +51,7 @@ import egovframework.let.sales.shipment.statement.service.impl.SalesStatementSer
 import egovframework.let.sales.shipment.statement.domain.repository.SalesStatementDAO;
 import egovframework.let.sales.shipment.delivery.service.SalesDeliveryService;
 import egovframework.let.system.policies.service.SystemPolicyService;
+import egovframework.com.cmm.DecimalColumnContract;
 
 class SalesDeliveryServiceImplTest {
     @Mock
@@ -66,6 +71,9 @@ class SalesDeliveryServiceImplTest {
         MockitoAnnotations.openMocks(this);
         service = new SalesDeliveryServiceImpl(dao, sequenceService, planService, systemPolicyService,
                 statementService);
+        Map<String, Object> legacy = new java.util.HashMap<>();
+        legacy.put("places", 2);
+        when(systemPolicyService.getGridDecimals(71L)).thenReturn(Collections.singletonMap("SALES", legacy));
         when(planService.getOverDeliveryPolicy(71L)).thenReturn("BLOCK");
         when(dao.existsActiveCustomer(anyMap())).thenReturn(true);
         when(dao.existsActiveMaterial(anyMap())).thenReturn(true);
@@ -75,6 +83,90 @@ class SalesDeliveryServiceImplTest {
         when(dao.adjustPlanDeliveredQty(anyMap())).thenReturn(1);
         when(sequenceService.nextValue("SALES_DELIVERY_NO", "71", "20261104"))
                 .thenReturn(1L);
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "SALES_DECIMAL_COLUMN_FIXTURE", matches = "true")
+    void calculatesDeliveryWithSharedColumnFixture() throws Exception {
+        Map<String, Object> rule = new java.util.HashMap<>();
+        rule.put("places", 3);
+        rule.put("rounding", "DOWN");
+        when(systemPolicyService.getGridDecimals(71L)).thenReturn(Collections.singletonMap("SALES", rule));
+        SalesDeliveryRequestVO payload = directPayload();
+        payload.setDecimalColumns(DecimalColumnContract.forDocument("sales.delivery"));
+        payload.getDetails().get(0).setDeliveryQty(new BigDecimal("1"));
+        payload.getDetails().get(0).setUnitPrice(new BigDecimal("1.235"));
+        payload.getDetails().get(0).setVatAmt(new BigDecimal("0.1"));
+        SalesDeliveryVO reloaded = new SalesDeliveryVO();
+        reloaded.setCreatedBy("user01");
+        when(dao.selectDelivery(anyMap())).thenReturn(reloaded);
+        when(dao.selectDeliveryDetails(anyMap())).thenReturn(Collections.emptyList());
+        service.createDelivery(71L, "user01", payload);
+        verify(dao).insertDeliveryHeader(argThat(params ->
+                new BigDecimal("1.3").compareTo((BigDecimal) params.get("totalAmt")) == 0));
+        verify(dao).insertDeliveryDetail(argThat(params ->
+                new BigDecimal("1.24").compareTo((BigDecimal) params.get("supplyAmt")) == 0
+                && new BigDecimal("0.1").compareTo((BigDecimal) params.get("vatAmt")) == 0
+                && new BigDecimal("1.340").compareTo((BigDecimal) params.get("totalAmt")) == 0));
+    }
+
+    @Test
+    void rejectsStaleDecimalPolicyBeforePersisting() throws Exception {
+        when(dao.selectDelivery(anyMap())).thenReturn(new SalesDeliveryVO());
+        when(dao.selectDeliveryDetails(anyMap())).thenReturn(Collections.emptyList());
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        ObjectNode json = mapper.valueToTree(directPayload());
+        json.set("decimalPolicy", mapper.readTree("{\"places\":3,\"rounding\":\"DOWN\"}"));
+        SalesDeliveryRequestVO payload = mapper.treeToValue(json, SalesDeliveryRequestVO.class);
+        assertThatThrownBy(() -> service.createDelivery(71L, "user01", payload))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        verify(dao, never()).insertDeliveryHeader(anyMap());
+    }
+
+    @Test
+    void rejectsMismatchedColumnContract() throws Exception {
+        when(dao.selectDelivery(anyMap())).thenReturn(new SalesDeliveryVO());
+        when(dao.selectDeliveryDetails(anyMap())).thenReturn(Collections.emptyList());
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        ObjectNode json = mapper.valueToTree(directPayload());
+        json.set("decimalColumns", mapper.readTree("{\"unitPrice\":{\"type\":\"decimal\",\"places\":6}}"));
+        SalesDeliveryRequestVO payload = mapper.treeToValue(json, SalesDeliveryRequestVO.class);
+        assertThatThrownBy(() -> service.createDelivery(71L, "user01", payload))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        verify(dao, never()).insertDeliveryHeader(anyMap());
+    }
+
+    @Test
+    void savesDeliveryUsingTypedDecimalPolicy() throws Exception {
+        Map<String, Object> qty = new java.util.HashMap<>();
+        qty.put("places", 3);
+        Map<String, Object> amount = new java.util.HashMap<>();
+        amount.put("places", 3);
+        amount.put("rounding", "DOWN");
+        Map<String, Object> typed = new java.util.HashMap<>();
+        typed.put("number", qty);
+        typed.put("decimal", amount);
+        typed.put("currency", amount);
+        when(systemPolicyService.getGridDecimals(71L)).thenReturn(Collections.singletonMap("SALES", typed));
+        SalesDeliveryRequestVO payload = directPayload();
+        payload.getDetails().get(0).setDeliveryQty(new BigDecimal("1.234"));
+        payload.getDetails().get(0).setUnitPrice(new BigDecimal("1.235"));
+        payload.getDetails().get(0).setVatAmt(null);
+        SalesDeliveryVO reloaded = new SalesDeliveryVO();
+        reloaded.setCreatedBy("user01");
+        when(dao.selectDelivery(anyMap())).thenReturn(reloaded);
+        when(dao.selectDeliveryDetails(anyMap())).thenReturn(Collections.emptyList());
+
+        service.createDelivery(71L, "user01", payload);
+
+        verify(dao).insertDeliveryDetail(argThat(params ->
+                new BigDecimal("1.523").compareTo((BigDecimal) params.get("supplyAmt")) == 0
+                && new BigDecimal("0.152").compareTo((BigDecimal) params.get("vatAmt")) == 0
+                && new BigDecimal("1.675").compareTo((BigDecimal) params.get("totalAmt")) == 0));
     }
 
     @Test
@@ -112,7 +204,7 @@ class SalesDeliveryServiceImplTest {
         when(statementDao.lockDelivery(anyMap())).thenReturn(501L);
         when(statementDao.selectAvailableDetailIdsByDelivery(anyMap())).thenReturn(ids);
         when(systemPolicyService.getStatementIssueMode(71L)).thenReturn("AUTO");
-        SalesStatementServiceImpl realStatements = new SalesStatementServiceImpl(statementDao, sequenceService);
+        SalesStatementServiceImpl realStatements = new SalesStatementServiceImpl(statementDao, sequenceService, systemPolicyService);
         SalesDeliveryServiceImpl target = new SalesDeliveryServiceImpl(dao, sequenceService, planService,
                 systemPolicyService, realStatements);
         PlatformTransactionManager transactions = org.mockito.Mockito.mock(PlatformTransactionManager.class);

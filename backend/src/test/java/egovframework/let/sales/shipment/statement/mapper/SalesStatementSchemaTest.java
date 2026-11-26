@@ -57,6 +57,18 @@ class SalesStatementSchemaTest {
         identical("20261120", "20261120_002_change_sales_statement_detail_source_and_revenue_closing.md");
     }
 
+    @Test
+    void salesDecimalMigrationCopiesMatchAndRollbackChecksPrecisionBeforeAltering() throws Exception {
+        String migration = identical("20261124", "20261124_004_expand_sales_decimals.sql");
+        String rollback = identical("20261124", "20261124_004_rollback_sales_decimals.sql");
+        identical("20261124", "20261124_004_change_sales_decimals.md");
+        assertThat(migration).contains("IN ACCESS EXCLUSIVE MODE", "numeric(19,6)",
+                "actual_precision IS DISTINCT FROM 15", "actual_scale IS DISTINCT FROM 2");
+        assertThat(rollback).contains("IN ACCESS EXCLUSIVE MODE", "trunc(%I, 2)",
+                "10000000000000", "'NaN'", "Rollback stopped", "numeric(15,2)");
+        assertThat(rollback.indexOf("IF unsafe_value")).isLessThan(rollback.indexOf("ALTER TABLE public.%I"));
+    }
+
     private String identical(String name) throws Exception {
         return identical("20261109", name);
     }

@@ -2,6 +2,7 @@ package egovframework.let.sales.quotation.create.domain.model;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -16,5 +17,7 @@ public class SalesQuotationCreateRequestVO {
     private String validTerm;
     private String currencyCode;
     private String remark;
+    private Map<String, Object> decimalPolicy;
+    private Map<String, Object> decimalColumns;
     private List<SalesQuotationDetailCreateRequestVO> details;
 }

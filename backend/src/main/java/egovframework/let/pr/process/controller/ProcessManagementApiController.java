@@ -23,32 +23,51 @@ import egovframework.let.system.menus.domain.model.MenuPermissionVO;
 import egovframework.let.system.menus.domain.model.MenuTreeNodeVO;
 import egovframework.let.system.menus.domain.model.MyMenuResponseVO;
 import egovframework.let.system.menus.service.SystemMenuService;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/pr/processes")
+@Tag(name = "ProcessManagementApiController", description = "공정관리(작업장·공정)")
 public class ProcessManagementApiController {
     private final ProcessManagementService service;
     private final SystemMenuService menuService;
     private final ResultVoHelper results;
 
     @GetMapping
-    public ResultVO list(@AuthenticationPrincipal LoginVO user) throws Exception {
+    public ResultVO list(@Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         MenuPermissionVO permissions = requirePermissions(user);
         if (!permissions.isRead()) throw forbidden();
         return result(service.list(user.getTenantId()));
     }
 
     @PostMapping("/save-batch")
-    public ResultVO save(@AuthenticationPrincipal LoginVO user, @RequestBody ProcessChangesVO changes) throws Exception {
+    public ResultVO save(@Parameter(hidden = true) @AuthenticationPrincipal LoginVO user, @RequestBody ProcessChangesVO changes) throws Exception {
+        requireWritePermissions(requirePermissions(user), changes);
+        return result(service.save(user.getTenantId(), changes));
+    }
+
+    @GetMapping("/masters")
+    public ResultVO listMasters(@Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         MenuPermissionVO permissions = requirePermissions(user);
+        if (!permissions.isRead()) throw forbidden();
+        return result(service.listMasters(user.getTenantId()));
+    }
+
+    @PostMapping("/masters/save-batch")
+    public ResultVO saveMasters(@Parameter(hidden = true) @AuthenticationPrincipal LoginVO user, @RequestBody ProcessChangesVO changes) throws Exception {
+        requireWritePermissions(requirePermissions(user), changes);
+        return result(service.saveMasters(user.getTenantId(), changes));
+    }
+
+    private void requireWritePermissions(MenuPermissionVO permissions, ProcessChangesVO changes) {
         if (changes == null || changes.getInsertedRows() == null || changes.getUpdatedRows() == null
                 || changes.getDeletedRows() == null) throw new IllegalArgumentException("변경 행을 확인해 주세요.");
         if ((!changes.getInsertedRows().isEmpty() && !permissions.isCreate())
                 || (!changes.getUpdatedRows().isEmpty() && !permissions.isUpdate())
                 || (!changes.getDeletedRows().isEmpty() && !permissions.isDelete())) throw forbidden();
-        return result(service.save(user.getTenantId(), changes));
     }
 
     private MenuPermissionVO requirePermissions(LoginVO user) throws Exception {

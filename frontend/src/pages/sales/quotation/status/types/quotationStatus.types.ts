@@ -15,9 +15,9 @@ export type QuotationStatusRow = {
   validTerm: string | null;
   currencyCode: string | null;
   remark: string | null;
-  supplyAmt: number;
-  vatAmt: number;
-  totalAmt: number;
+  supplyAmt: number | string;
+  vatAmt: number | string;
+  totalAmt: number | string;
   createdBy: string | null;
   lineNo: number;
   materialId: number | null;
@@ -25,9 +25,9 @@ export type QuotationStatusRow = {
   materialName: string;
   materialSpec: string | null;
   unit: string | null;
-  quotationQty: number;
-  unitPrice: number;
-  lineAmt: number;
+  quotationQty: number | string;
+  unitPrice: number | string;
+  lineAmt: number | string;
   detailRemark: string | null;
 };
 

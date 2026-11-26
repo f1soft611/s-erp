@@ -202,17 +202,27 @@ export function roundGridNumber(
   places: number,
   mode: F1GridRoundingMode = 'HALF_UP',
 ): number {
-  // 부동소수점 오차(예: 3.3000000000000003)가 올림/내림에 영향을 주지 않도록 먼저 정리한다.
-  const clean = Number(value.toPrecision(12));
-  const factor = 10 ** places;
-  const shifted = Number((Math.abs(clean) * factor).toPrecision(12));
-  const rounded =
-    mode === 'UP'
-      ? Math.ceil(shifted)
-      : mode === 'DOWN'
-        ? Math.floor(shifted)
-        : Math.round(shifted);
-  const result = (clean < 0 ? -rounded : rounded) / factor;
+  if (!Number.isFinite(value)) return value;
+  const [originalCoefficient, originalExponent] = Math.abs(value).toString().split('e');
+  const originalFractionLength = (originalCoefficient.split('.')[1] ?? '').length - Number(originalExponent ?? 0);
+  const approximate = Number(value.toPrecision(15));
+  const clean = originalFractionLength > 12 && Math.abs(value - approximate) <= Math.abs(value) * Number.EPSILON
+    ? approximate
+    : value;
+  const [coefficient, exponentText] = Math.abs(clean).toString().split('e');
+  const [integer, fraction = ''] = coefficient.split('.');
+  const digits = BigInt(integer + fraction);
+  const shift = (exponentText ? Number(exponentText) : 0) - fraction.length + places;
+  let rounded: bigint;
+  if (shift >= 0) {
+    rounded = digits * 10n ** BigInt(shift);
+  } else {
+    const divisor = 10n ** BigInt(-shift);
+    const remainder = digits % divisor;
+    rounded = digits / divisor;
+    if ((mode === 'UP' && remainder > 0n) || (mode === 'HALF_UP' && remainder * 2n >= divisor)) rounded += 1n;
+  }
+  const result = Number(`${clean < 0 ? '-' : ''}${rounded}e${-places}`);
   return result === 0 ? 0 : result;
 }
 
@@ -263,6 +273,38 @@ function formatNumericValue(
   }).format(numericValue);
 }
 
+function formatExactNumericValue<T extends object>(column: F1GridColumn<T>, value: unknown, editable: boolean): string {
+  const text = String(value ?? '');
+  const match = text.match(/^([+-]?)(?:(\d+)(?:\.(\d*))?|\.(\d+))$/);
+  if (!match || text.length > 256) return text;
+  const integer = match[2] ?? '0';
+  const fraction = match[3] ?? match[4] ?? '';
+  const places = Number.isInteger(column.decimalPlaces)
+    ? Math.max(0, Math.min(column.decimalPlaces!, 100))
+    : 5;
+  if (editable && fraction.replace(/0+$/, '').length > places) return text;
+  const units = BigInt(integer + fraction) * 10n ** BigInt(Math.max(0, places - fraction.length));
+  const divisor = fraction.length > places ? 10n ** BigInt(fraction.length - places) : 1n;
+  let adjusted = units / divisor;
+  const remainder = units % divisor;
+  if ((column.rounding === 'UP' && remainder > 0n) ||
+      ((column.rounding ?? 'HALF_UP') === 'HALF_UP' && remainder * 2n >= divisor)) adjusted += 1n;
+  const sign = match[1] === '-' && adjusted !== 0n ? '-' : '';
+  const digits = adjusted.toString().padStart(places + 1, '0');
+  const whole = (places ? digits.slice(0, -places) : digits).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  let tail = places ? digits.slice(-places) : '';
+  if (column.trailingZeros === 'AUTO' || column.decimalPlaces === undefined) tail = tail.replace(/0+$/, '');
+  const currency = column.format === 'currency' ? '₩' : '';
+  return `${sign}${currency}${whole}${tail ? `.${tail}` : ''}`;
+}
+
+/** 정밀 소수 셀의 편집 시작 문자열. 값이 바뀌지 않는 범위에서 셀 표시와 같은 자릿수로 맞춘다. */
+export function getExactEditValue<T extends object>(column: F1GridColumn<T>, value: unknown): string {
+  const text = String(value ?? '');
+  if (!column.exactDecimal || !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) return text;
+  return formatExactNumericValue(column, text, true).replace(/[,₩]/g, '');
+}
+
 export function getGridDateValue(value: unknown): Date | undefined {
   if (value instanceof Date) {
     if (!dayjs(value).isValid()) return undefined;
@@ -306,6 +348,7 @@ function formatDateValue(value: unknown, format = 'yyyy-mm-dd'): string {
 export function getCellDisplayValue<T extends object>(
   column: F1GridColumn<T>,
   value: unknown,
+  editable = Boolean(column.editable),
 ): string {
   if (column.type === 'date') {
     return formatDateValue(value, column.format);
@@ -339,6 +382,9 @@ export function getCellDisplayValue<T extends object>(
     column.type === 'decimal' ||
     column.type === 'currency'
   ) {
+    if (column.exactDecimal && value !== null && value !== undefined && value !== '') {
+      return formatExactNumericValue(column, value, editable);
+    }
     return formatNumericValue(value, {
       type: column.type,
       format: column.format,
@@ -380,7 +426,7 @@ export function getAutoFitColumnWidth<T extends object>(
   const headerWidth = measureTextWidth(column.headerName);
   const contentWidth = rows.reduce((widest, row) => {
     const rawValue = column.getValue?.(row) ?? row[column.field];
-    const displayValue = getCellDisplayValue(column, rawValue as T[keyof T]);
+    const displayValue = getCellDisplayValue(column, rawValue as T[keyof T], isCellEditable(column, row));
     return Math.max(widest, measureTextWidth(displayValue));
   }, 0);
 

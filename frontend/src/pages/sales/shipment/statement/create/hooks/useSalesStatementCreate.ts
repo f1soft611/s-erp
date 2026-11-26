@@ -5,6 +5,7 @@ import { useUnsavedChangesBeforeUnload } from '../../../../../../shared/hooks/us
 import { normalizeDateInput } from '../../../../../../shared/components/f1-grid/editing/dateInput';
 import { getSystemDate } from '../../../../../../shared/services/systemDateService';
 import type { F1GridRowId } from '../../../../../../shared/components/f1-grid';
+import { calculateGridSummary } from '../../../../../../shared/components/f1-grid/utils/gridSummary';
 import { getDelivery } from '../../../delivery/create/services/salesDelivery.service';
 import { MAX_STATEMENT_DETAIL_COUNT } from '../../../../shared/statementDetailLimit';
 import { createStatement, deleteStatement, getStatement, updateStatement } from '../../services/salesStatement.service';
@@ -43,7 +44,7 @@ export function useSalesStatementCreate({
       ...sources[0],
       deliveryNo: sources.map((value) => value.deliveryNo).join(', '),
       deliveryDt: sources.map((value) => value.deliveryDt).join(', '),
-      totalAmt: sources.reduce((total, value) => total + Number(value.totalAmt), 0),
+      totalAmt: calculateGridSummary(sources, { field: 'totalAmt', headerName: '합계', type: 'currency', exactDecimal: true, summaryType: 'sum' }) ?? 0,
     };
   }, [sources]);
   const selectedIds = useMemo(() => rows

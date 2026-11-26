@@ -40,14 +40,18 @@ class SalesStatementMapperTest {
         String header = configuration.getMappedStatement("SalesStatementDAO.insertHeader")
                 .getBoundSql(params).getSql();
         assertThat(header).contains("t.president_name", "t.address", "c.business_no",
-                "supplier_stamp_image", "t.stamp_image", "SUM(d.total_amt)");
+                "supplier_stamp_image", "t.stamp_image");
+        // 헤더 합계는 SQL 합산이 아니라 서비스가 deliveryTotal 규칙으로 계산해 넘긴 값을 저장한다.
+        assertThat(header).doesNotContain("SUM(d.total_amt)");
+        assertThat(configuration.getMappedStatement("SalesStatementDAO.insertHeader").getBoundSql(params)
+                .getParameterMappings()).extracting(mapping -> mapping.getProperty()).contains("totalAmt");
         String detail = configuration.getMappedStatement("SalesStatementDAO.insertDetails")
                 .getBoundSql(params).getSql();
         assertThat(detail).contains("sales_delivery_detail_id", "d.delivery_qty", "d.unit_price",
                 "d.supply_amt", "d.vat_amt", "d.total_amt", "m.material_spec");
         String lockLines = configuration.getMappedStatement("SalesStatementDAO.lockDeliveryDetails")
                 .getBoundSql(params).getSql();
-        assertThat(lockLines).contains("d.sales_delivery_detail_id", "h.tenant_id = ?", "FOR UPDATE OF h, d");
+        assertThat(lockLines).contains("d.sales_delivery_detail_id", "d.total_amt", "h.tenant_id = ?", "FOR UPDATE OF h, d");
         String activeLine = configuration.getMappedStatement("SalesStatementDAO.existsActiveLine")
                 .getBoundSql(params).getSql();
         assertThat(activeLine).contains("sales_delivery_detail_id = ?", "use_at = 'Y'");
@@ -58,7 +62,11 @@ class SalesStatementMapperTest {
         String read = configuration.getMappedStatement("SalesStatementDAO.selectHeader")
                 .getBoundSql(params).getSql();
         assertThat(read).contains("h.supplier_name", "h.customer_name", "COALESCE(h.supplier_stamp_image, t.stamp_image)",
-                "t.tenant_id = h.tenant_id", "h.use_at = 'Y'");
+                "t.tenant_id = h.tenant_id", "h.use_at = 'Y'",
+                "delivery.customer_id AS \"customerId\"",
+                "delivery.sales_delivery_id = h.sales_delivery_id",
+                "delivery.tenant_id = h.tenant_id")
+                .doesNotContain("h.customer_id AS \"customerId\"");
         String readDetails = configuration.getMappedStatement("SalesStatementDAO.selectDetails")
                 .getBoundSql(params).getSql();
         assertThat(readDetails).contains("salesDeliveryDetailId", "sourceDeliveryNo", "sourceDeliveryDt");

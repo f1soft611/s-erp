@@ -3,6 +3,7 @@ package egovframework.let.sales.order.create.domain.model;
 import java.io.Serializable;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
@@ -51,4 +52,10 @@ public class SalesOrderCreateRequestVO implements Serializable {
 
     @Schema(description = "수주 상세 품목 목록", required = true)
     private List<SalesOrderDetailCreateRequestVO> details;
+
+    @Schema(description = "화면에서 사용한 소수점 정책 스냅샷")
+    private Map<String, Object> decimalPolicy;
+
+    @Schema(description = "화면에서 사용한 컬럼별 소수점 계약")
+    private Map<String, Object> decimalColumns;
 }

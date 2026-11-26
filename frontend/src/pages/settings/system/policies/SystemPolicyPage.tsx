@@ -6,8 +6,10 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { CommonDialog } from '../../../../shared/components/CommonDialog';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { getStoredAuth } from '../../../../shared/services/authService';
+import { resetGridDecimalPolicyCache } from '../../../../shared/services/gridDecimalPolicy.service';
 import type { MenuPermission } from '../../../dashboard/types/dashboard';
 import { PolicyEditor } from './components/PolicyEditor';
+import { PolicyHistoryChange } from './components/PolicyHistoryChange';
 import { deletePolicy, getPolicies, getPolicyHistory } from './services/systemPolicy.service';
 import { POLICY_TYPES, policyValueLabel, type PolicyHistory, type SystemPolicy } from './types/systemPolicy.types';
 
@@ -65,6 +67,7 @@ export function SystemPolicyPage({ isPlatformAdmin, selectedMenuPermissions, bre
     setError('');
     try {
       await deletePolicy(deleting.policyId, deleting.version);
+      if (deleting.policyCode.startsWith('GRID_DECIMAL_')) resetGridDecimalPolicyCache();
       setPolicies((current) => current.filter((policy) => policy.policyId !== deleting.policyId));
       setDeleting(null);
       setNotice('정책이 삭제되었습니다.');
@@ -138,6 +141,7 @@ export function SystemPolicyPage({ isPlatformAdmin, selectedMenuPermissions, bre
         <Alert severity="info">새 정책을 추가해도 업무 동작이 자동 생성되지는 않습니다. 해당 업무에서 정책을 읽도록 연동해야 적용됩니다.</Alert>
       </Stack>
       {editor && <PolicyEditor policy={editor.policy} onClose={() => setEditor(null)} onSaved={(saved) => {
+        if (saved.policyCode.startsWith('GRID_DECIMAL_')) resetGridDecimalPolicyCache();
         setPolicies((current) => current.some((policy) => policy.policyId === saved.policyId) ? current.map((policy) => policy.policyId === saved.policyId ? saved : policy) : [...current, saved]);
         setNotice('정책이 저장되었습니다.');
         setEditor(null);
@@ -167,9 +171,8 @@ export function SystemPolicyPage({ isPlatformAdmin, selectedMenuPermissions, bre
             {history?.error && <Alert severity="error">{history.error}</Alert>}
             {!history?.loading && !history?.error && !history?.entries.length && <Typography>변경 이력이 없습니다.</Typography>}
             {history?.entries.map((entry, index) => <Paper key={index} variant="outlined" sx={{ p: 2, overflowWrap: 'anywhere' }}>
-              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}><Chip size="small" label={({ CREATE: '추가', UPDATE: '수정', DELETE: '삭제' } as Record<string, string>)[entry.action] ?? entry.action} /><Typography variant="body2">{entry.changedBy}</Typography><Typography variant="body2" color="text.secondary">{entry.changedAt}</Typography></Stack>
-              <Typography variant="caption">변경 전 → 변경 후</Typography>
-              <Typography component="pre" variant="body2" sx={{ whiteSpace: 'pre-wrap', m: 0, overflowWrap: 'anywhere' }}>{JSON.stringify(entry.beforeValue)} → {JSON.stringify(entry.afterValue)}</Typography>
+              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}><Chip size="small" label={({ CREATE: '추가', UPDATE: '수정', DELETE: '삭제' } as Record<string, string>)[entry.action] ?? entry.action} /><Typography variant="body2">{entry.changedBy}</Typography><Typography variant="body2" color="text.secondary">{entry.changedAt.replace('T', ' ')}</Typography></Stack>
+              <PolicyHistoryChange policy={history.policy} beforeValue={entry.beforeValue} afterValue={entry.afterValue} />
             </Paper>)}
           </Stack>
       </CommonDialog>

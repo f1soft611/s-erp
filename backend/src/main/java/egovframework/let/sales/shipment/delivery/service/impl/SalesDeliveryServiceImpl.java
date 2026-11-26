@@ -1,7 +1,6 @@
 package egovframework.let.sales.shipment.delivery.service.impl;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -36,6 +35,8 @@ import egovframework.let.sales.shipment.delivery.service.SalesDeliveryService;
 import egovframework.let.sales.shipment.deliveryplan.service.SalesDeliveryPlanService;
 import egovframework.let.sales.shipment.statement.service.impl.SalesStatementServiceImpl;
 import egovframework.let.system.policies.service.SystemPolicyService;
+import egovframework.let.sales.common.SalesDecimalPolicy;
+import egovframework.com.cmm.DecimalColumnContract;
 
 @Service("salesDeliveryService")
 public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements SalesDeliveryService {
@@ -44,8 +45,6 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
     private static final String ORDER = "ORDER";
     private static final BigDecimal VAT_RATE = new BigDecimal("0.10");
     private static final BigDecimal ZERO = new BigDecimal("0.00");
-    private static final int MAX_NUMERIC_PRECISION = 15;
-    private static final int MONEY_SCALE = 2;
 
     private final SalesDeliveryDAO salesDeliveryDAO;
     private final IdSequenceService idSequenceService;
@@ -73,8 +72,12 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         Map<Long, SalesDeliverySourceOrderHeaderVO> sourceOrders =
                 lockAndValidateOrders(tenantId, payload, Collections.<SalesDeliveryDetailVO>emptyList());
         validateCustomer(tenantId, payload.getCustomerId());
-        List<PreparedDetail> details = prepareDetails(tenantId, payload, sourceOrders, null, null);
-        BigDecimal total = sumTotals(details);
+        SalesDecimalPolicy decimalPolicy = SalesDecimalPolicy.from(systemPolicyService.getGridDecimals(tenantId),
+                DecimalColumnContract.forDocument("sales.delivery"));
+        decimalPolicy.verifySnapshot(payload.getDecimalPolicy());
+        decimalPolicy.verifyColumnContract(payload.getDecimalColumns());
+        List<PreparedDetail> details = prepareDetails(tenantId, payload, sourceOrders, null, null, decimalPolicy);
+        BigDecimal total = sumTotals(details, decimalPolicy);
         String deliveryNo = generateDeliveryNo(tenantId, payload.getDeliveryDt());
 
         Map<String, Object> header = new HashMap<String, Object>();
@@ -148,9 +151,13 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         if (oldDetails == null) {
             oldDetails = new ArrayList<SalesDeliveryDetailVO>();
         }
+        SalesDecimalPolicy decimalPolicy = SalesDecimalPolicy.from(systemPolicyService.getGridDecimals(tenantId),
+                DecimalColumnContract.forDocument("sales.delivery"));
+        decimalPolicy.verifySnapshot(payload.getDecimalPolicy());
+        decimalPolicy.verifyColumnContract(payload.getDecimalColumns());
         List<PreparedDetail> details = prepareDetails(
-                tenantId, payload, sourceOrders, linkedPlanQuantities(oldDetails), linkedOrderQuantities(oldDetails));
-        BigDecimal total = sumTotals(details);
+                tenantId, payload, sourceOrders, linkedPlanQuantities(oldDetails), linkedOrderQuantities(oldDetails), decimalPolicy);
+        BigDecimal total = sumTotals(details, decimalPolicy);
 
         Map<String, Object> header = deliveryParams(tenantId, salesDeliveryId);
         header.put("deliveryDt", payload.getDeliveryDt());
@@ -346,7 +353,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
 
     private List<PreparedDetail> prepareDetails(Long tenantId, SalesDeliveryRequestVO payload,
             Map<Long, SalesDeliverySourceOrderHeaderVO> sourceOrderHeaders, Map<Long, BigDecimal> oldPlanQuantities,
-            Map<Long, BigDecimal> oldOrderQuantities)
+            Map<Long, BigDecimal> oldOrderQuantities, SalesDecimalPolicy decimalPolicy)
             throws Exception {
         List<PreparedDetail> prepared = new ArrayList<PreparedDetail>();
         Map<Long, SalesDeliverySourceOrderVO> sourcePlans = new LinkedHashMap<Long, SalesDeliverySourceOrderVO>();
@@ -359,7 +366,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
             if (!salesDeliveryDAO.existsActiveMaterial(referenceParams(tenantId, request.getMaterialId()))) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사용 가능한 품목을 찾을 수 없습니다.");
             }
-            PreparedDetail detail = prepareDetail(request, payload);
+            PreparedDetail detail = prepareDetail(request, payload, decimalPolicy);
             if (ORDER.equals(payload.getDeliveryType())) {
                 SalesDeliverySourceOrderVO sourceLine =
                         validateSourceDetail(tenantId, payload, sourceOrderHeaders, request);
@@ -377,7 +384,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
                 BigDecimal after = valueOrZero(line.getDeliveredQty())
                         .subtract(previousQuantity(oldPlanQuantities, detail.salesDeliveryPlanDetailId))
                         .add(detail.deliveryQty);
-                validateCumulativeQuantity(after, "계획 누적출하수량");
+                validateCumulativeQuantity(after, "계획 누적출하수량", decimalPolicy);
                 addExcess(excesses, "계획 상세 " + detail.salesDeliveryPlanDetailId,
                         line.getPlannedQty(), after);
             }
@@ -385,7 +392,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
                 SalesDeliverySourceOrderVO line = sourceOrderLines.get(entry.getKey());
                 BigDecimal after = valueOrZero(line.getShippedQty())
                         .subtract(previousQuantity(oldOrderQuantities, entry.getKey())).add(entry.getValue());
-                validateCumulativeQuantity(after, "수주 누적출하수량");
+                validateCumulativeQuantity(after, "수주 누적출하수량", decimalPolicy);
                 addExcess(excesses, "수주 상세 " + entry.getKey(), line.getOrderQty(), after);
             }
             if (!excesses.isEmpty()) {
@@ -405,11 +412,11 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         return quantities == null ? ZERO : valueOrZero(quantities.get(detailId));
     }
 
-    private void validateCumulativeQuantity(BigDecimal quantity, String label) {
+    private void validateCumulativeQuantity(BigDecimal quantity, String label, SalesDecimalPolicy decimalPolicy) {
         if (quantity.signum() < 0) {
             throw conflict(label + "이 유효하지 않습니다. 다시 조회해 주세요.");
         }
-        inputNumeric(quantity, label);
+        decimalPolicy.storedQuantity(quantity, label);
     }
 
     private void addExcess(List<String> excesses, String label, BigDecimal baseline, BigDecimal after) {
@@ -448,7 +455,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         return line;
     }
 
-    private PreparedDetail prepareDetail(SalesDeliveryDetailRequestVO request, SalesDeliveryRequestVO payload) {
+    private PreparedDetail prepareDetail(SalesDeliveryDetailRequestVO request, SalesDeliveryRequestVO payload, SalesDecimalPolicy decimalPolicy) {
         if (request.getDeliveryQty() == null || request.getDeliveryQty().signum() <= 0) {
             throw badRequest("출하수량은 0보다 커야 합니다.");
         }
@@ -458,16 +465,13 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         if (request.getVatAmt() != null && request.getVatAmt().signum() < 0) {
             throw badRequest("부가세는 0 이상이어야 합니다.");
         }
-        BigDecimal quantity = inputNumeric(request.getDeliveryQty(), "출하수량");
-        BigDecimal unitPrice = inputNumeric(request.getUnitPrice(), "단가");
-        BigDecimal supplyAmt = money(quantity.multiply(unitPrice));
-        validateNumeric(supplyAmt, "공급가액");
+        BigDecimal quantity = decimalPolicy.input("deliveryQty", request.getDeliveryQty(), "출하수량");
+        BigDecimal unitPrice = decimalPolicy.input("unitPrice", request.getUnitPrice(), "단가");
+        BigDecimal supplyAmt = decimalPolicy.amount("supplyAmt", quantity.multiply(unitPrice), "공급가액");
         BigDecimal vatAmt = request.getVatAmt() == null
-                ? money(supplyAmt.multiply(VAT_RATE))
-                : inputNumeric(request.getVatAmt(), "부가세");
-        BigDecimal totalAmt = money(supplyAmt.add(vatAmt));
-        validateNumeric(vatAmt, "부가세");
-        validateNumeric(totalAmt, "라인 합계");
+                ? decimalPolicy.amount("vatAmt", supplyAmt.multiply(VAT_RATE), "부가세")
+                : decimalPolicy.input("vatAmt", request.getVatAmt(), "부가세");
+        BigDecimal totalAmt = decimalPolicy.amount("totalAmt", supplyAmt.add(vatAmt), "라인 합계");
         return new PreparedDetail(request.getMaterialId(), ORDER.equals(payload.getDeliveryType())
                 ? sourceOrderId(request, payload) : null, request.getSalesOrderDetailId(),
                 request.getSalesDeliveryPlanDetailId(), quantity, unitPrice, supplyAmt, vatAmt, totalAmt);
@@ -612,14 +616,12 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         quantities.put(key, valueOrZero(quantities.get(key)).add(valueOrZero(value)));
     }
 
-    private BigDecimal sumTotals(List<PreparedDetail> details) {
+    private BigDecimal sumTotals(List<PreparedDetail> details, SalesDecimalPolicy decimalPolicy) {
         BigDecimal total = ZERO;
         for (PreparedDetail detail : details) {
             total = total.add(detail.totalAmt);
         }
-        total = money(total);
-        validateNumeric(total, "출하 총액");
-        return total;
+        return decimalPolicy.amount("deliveryTotal", total, "출하 총액");
     }
 
     private void validatePayload(SalesDeliveryRequestVO payload) {
@@ -706,27 +708,6 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         if (tenantId == null || tenantId.longValue() < 1L) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증 정보가 없습니다.");
         }
-    }
-
-    private void validateNumeric(BigDecimal value, String label) {
-        if (value.precision() > MAX_NUMERIC_PRECISION) {
-            throw badRequest(label + "이 허용 범위를 초과했습니다.");
-        }
-    }
-
-    private BigDecimal inputNumeric(BigDecimal value, String label) {
-        BigDecimal normalized;
-        try {
-            normalized = value.setScale(MONEY_SCALE, RoundingMode.UNNECESSARY);
-        } catch (ArithmeticException exception) {
-            throw badRequest(label + "은 소수 둘째 자리까지 입력할 수 있습니다.");
-        }
-        validateNumeric(normalized, label);
-        return normalized;
-    }
-
-    private BigDecimal money(BigDecimal value) {
-        return value.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
     }
 
     private void validateText(String value, int maxLength, String label) {

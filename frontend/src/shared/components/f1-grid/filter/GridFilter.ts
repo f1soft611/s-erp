@@ -4,6 +4,7 @@ import type {
   F1GridFilter,
   F1GridFilterOperator,
 } from '../types/grid.types';
+import { compareGridExactDecimals } from '../utils/gridExactDecimal';
 
 const TEXT_OPERATORS: F1GridFilterOperator[] = [
   'contains',
@@ -84,6 +85,25 @@ export function matchesGridFilter<T extends object>(
     if (filter.operator === 'contains') return text.includes(needle);
     if (filter.operator === 'startsWith') return text.startsWith(needle);
     return text.endsWith(needle);
+  }
+
+  if (column.exactDecimal &&
+    (column.type === 'number' || column.type === 'decimal' || column.type === 'currency')) {
+    const comparison = compareGridExactDecimals(rawValue, filter.value);
+    if (comparison === undefined) return filter.operator === 'notEquals';
+    switch (filter.operator) {
+      case 'equals': return comparison === 0;
+      case 'notEquals': return comparison !== 0;
+      case 'greaterThan': return comparison > 0;
+      case 'lessThan': return comparison < 0;
+      case 'greaterThanOrEqual': return comparison >= 0;
+      case 'lessThanOrEqual': return comparison <= 0;
+      case 'between': {
+        const upper = compareGridExactDecimals(rawValue, filter.value2);
+        return comparison >= 0 && upper !== undefined && upper <= 0;
+      }
+      default: return true;
+    }
   }
 
   const value = toComparable(rawValue, column.type);

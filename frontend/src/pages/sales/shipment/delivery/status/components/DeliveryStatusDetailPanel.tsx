@@ -7,6 +7,9 @@ import {
 import { PostDetailPanel } from '../../../../../../shared/components/feed/PostDetailPanel';
 import { ProfileAvatar } from '../../../../../../shared/components/ProfileAvatar';
 import { PageAreaOverlay } from '../../../../../../shared/components/view-mode/PageAreaOverlay';
+import { usePolicyDecimalRule } from '../../../../../../shared/components/f1-grid/core/gridDecimalPolicyContext';
+import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../../shared/services/decimalColumnContract';
+import { formatSalesOrderAmount, type SalesAmountRule } from '../../../../order/create/data/salesOrderAmounts';
 import type { DeliveryItem } from '../../create/types/salesDelivery.types';
 
 function InfoItem({ label, children }: { label: string; children: ReactNode }) {
@@ -21,12 +24,18 @@ function InfoGroup({ title, children }: { title: string; children: ReactNode }) 
     <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1.5 }}>{children}</Box>
   </Box>;
 }
-const amount = (value: number) => value.toLocaleString('ko-KR', { maximumFractionDigits: 2 });
+const amount = (value: number | string, rule?: SalesAmountRule) => formatSalesOrderAmount(value, rule);
 
 export function DeliveryStatusDetailPanel({ item, loading, error, canEdit, onClose, onView, onEdit }: {
   item: DeliveryItem | null; loading: boolean; error: string; canEdit: boolean;
   onClose: () => void; onView: () => void; onEdit: () => void;
 }) {
+  const policy = usePolicyDecimalRule();
+  const contract = getDecimalColumnContract('sales.delivery');
+  const quantityRule = policy && resolveDecimalColumn(contract.deliveryQty, policy);
+  const priceRule = policy && resolveDecimalColumn(contract.unitPrice, policy);
+  const amountRule = policy && resolveDecimalColumn(contract.totalAmt, policy);
+  const totalRule = policy && resolveDecimalColumn(contract.deliveryTotal, policy);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const writer = item?.createdByName || item?.createdBy || '-';
   return <PageAreaOverlay onClose={onClose}>
@@ -66,7 +75,7 @@ export function DeliveryStatusDetailPanel({ item, loading, error, canEdit, onClo
           </Box>
           <Box sx={{ minWidth: { sm: 150 }, textAlign: { sm: 'right' } }}>
             <Typography variant="caption" color="text.secondary" component="div">총 합계</Typography>
-            <Typography variant="h5" component="div" sx={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{amount(item.totalAmt)}</Typography>
+            <Typography variant="h5" component="div" sx={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{amount(item.totalAmt, totalRule)}</Typography>
           </Box>
         </Box>
         <Box aria-label="출하 기본정보" sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))' }, gap: 1.5 }}>
@@ -91,8 +100,8 @@ export function DeliveryStatusDetailPanel({ item, loading, error, canEdit, onClo
                   <TableCell align="center">{detail.lineNo}</TableCell>
                   <TableCell><Typography variant="caption" color="text.secondary">{detail.materialCode || '-'}</Typography></TableCell>
                   <TableCell sx={{ minWidth: 120 }}><Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{detail.materialName || '-'}</Typography></TableCell>
-                  <TableCell align="right">{amount(detail.deliveryQty)}</TableCell><TableCell align="right">{amount(detail.unitPrice)}</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>{amount(detail.totalAmt)}</TableCell>
+                  <TableCell align="right">{amount(detail.deliveryQty, quantityRule)}</TableCell><TableCell align="right">{amount(detail.unitPrice, priceRule)}</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>{amount(detail.totalAmt, amountRule)}</TableCell>
                 </TableRow>
               )) : <TableRow><TableCell colSpan={6} align="center" sx={{ py: 3, color: 'text.secondary' }}>등록된 출하 품목이 없습니다.</TableCell></TableRow>}</TableBody>
             </Table>

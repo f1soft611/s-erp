@@ -15,6 +15,7 @@ import { defaultDeliveryFilters, getDelivery, getDeliveryStatus, restoreDelivery
 import type { DeliveryFilters, DeliveryItem, DeliveryPageProps, DeliveryStatusRow } from '../create/types/salesDelivery.types';
 import { DeliveryEditorDialog } from './components/DeliveryEditorDialog';
 import { DeliveryStatusDetailPanel } from './components/DeliveryStatusDetailPanel';
+import { getDecimalColumnContract } from '../../../../../shared/services/decimalColumnContract';
 
 const SESSION_KEY = 's-erp:page:sales-delivery-status';
 const fields: PageSearchField[] = [
@@ -132,14 +133,15 @@ export function SalesDeliveryStatusPage(props: DeliveryPageProps) {
     { field: 'deliveryType', headerName: '출하구분', width: 80, align: 'center', mergeRows: true, renderCell: ({ row }) => row.deliveryType === 'ORDER' ? '수주출하' : '직출하' },
     { field: 'deliveryPlace', headerName: '출하장소', width: 150, align: 'left', mergeRows: true },
     { field: 'deliveryMethod', headerName: '배송방법', width: 110, align: 'left', mergeRows: true },
-    { field: 'lineNo', headerName: '행', width: 56, align: 'center' },
+    { field: 'lineNo', headerName: '행', type: 'number', width: 56, align: 'center' },
     { field: 'materialCode', headerName: '품목코드', width: 120, align: 'center', highlightSearch: true },
     { field: 'materialName', headerName: '품목명', width: 180, align: 'center', highlightSearch: true },
     { field: 'unit', headerName: '단위', width: 80, align: 'center' },
-    ...(['deliveryQty', 'unitPrice', 'supplyAmt', 'vatAmt', 'totalAmt'] as const).map((field, index) => ({
-      field, headerName: ['출하수량', '단가', '공급가', 'VAT', '합계'][index],
-      type: 'decimal' as const, width: 130, align: 'right' as const,
-    })),
+    ...(['deliveryQty', 'unitPrice', 'supplyAmt', 'vatAmt', 'totalAmt'] as const).map((field, index) => {
+      const { type, ...decimal } = getDecimalColumnContract('sales.delivery')[field];
+      return { field, headerName: ['출하수량', '단가', '공급가', 'VAT', '합계'][index],
+        type, decimal, exactDecimal: true, width: 130, align: 'right' as const };
+    }),
     { field: 'remark', headerName: '비고', width: 200, align: 'left', mergeRows: true },
   ], [canRead]);
   if (!canRead) return <Alert severity="warning">출하현황 조회 권한이 없습니다.</Alert>;

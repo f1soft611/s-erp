@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPost, apiPut } from '../../../../../shared/services/apiClient';
+import { apiDelete, apiGetWithExactDecimals, apiPostWithExactDecimals, apiPutWithExactDecimals } from '../../../../../shared/services/apiClient';
 import type {
   QuotationCreateInput,
   QuotationCreatePayload,
@@ -8,12 +8,26 @@ import type {
   QuotationResponse,
   QuotationValidationErrors,
 } from '../types/quotation.types';
+import { isExactSalesPolicyNumber, multiplyExactSalesDecimals } from '../../../order/create/data/salesOrderAmounts';
+import { compareGridExactDecimals } from '../../../../../shared/components/f1-grid/utils/gridExactDecimal';
+import type { SalesOrderDecimalValue } from '../../../order/create/data/salesOrderDetail';
+import type { GridDecimalModuleRule } from '../../../../../shared/services/gridDecimalPolicy.service';
+import { getDecimalColumnContract, resolveDecimalColumn } from '../../../../../shared/services/decimalColumnContract';
+import { calculateQuotationTotals } from '../data/quotationDetail';
 
 const QUOTATION_PATH = '/api/v1/sales/quotations';
+const QUOTATION_DECIMAL_FIELDS = ['quotationQty', 'unitPrice', 'lineAmt', 'supplyAmt', 'vatAmt', 'totalAmt'] as const;
 const MAX_NUMERIC_15_2 = 9_999_999_999_999.99;
 
-export function validateQuotationInput(input: QuotationCreateInput): QuotationValidationErrors {
+export function validateQuotationInput(input: QuotationCreateInput, policy?: GridDecimalModuleRule): QuotationValidationErrors {
   const errors: QuotationValidationErrors = { detailRows: {}, detailMessages: [] };
+  const contract = getDecimalColumnContract('sales.quotation');
+  const quantityRule = policy && resolveDecimalColumn(contract.quotationQty, policy);
+  const priceRule = policy && resolveDecimalColumn(contract.unitPrice, policy);
+  const amountRule = policy && resolveDecimalColumn(contract.lineAmt, policy);
+  const quantityValid = (value: SalesOrderDecimalValue) => quantityRule ? isExactSalesPolicyNumber(String(value), quantityRule.places) : isNumeric15_2(Number(value));
+  const amountValid = (value: SalesOrderDecimalValue) => amountRule ? isExactSalesPolicyNumber(String(value), amountRule.places) : isNumeric15_2(Number(value));
+  const priceValid = (value: SalesOrderDecimalValue) => priceRule ? isExactSalesPolicyNumber(String(value), priceRule.places) : isNumeric15_2(Number(value));
   if (!input.quotationDt.trim()) errors.quotationDt = '견적작성일을 입력해 주세요.';
   if (input.customerId == null || !Number.isSafeInteger(input.customerId) || input.customerId < 1) {
     errors.customerId = '거래처를 선택해 주세요.';
@@ -23,14 +37,22 @@ export function validateQuotationInput(input: QuotationCreateInput): QuotationVa
   input.details.forEach((row) => {
     const messages: string[] = [];
     if (!row.materialName.trim()) messages.push('품목명을 입력해 주세요.');
-    if (!isNumeric15_2(row.quotationQty) || row.quotationQty <= 0) {
+    if (!quantityValid(row.quotationQty) || Number(row.quotationQty) <= 0) {
       messages.push('견적수량은 0보다 큰 유효한 값이어야 합니다.');
     }
-    if (!isNumeric15_2(row.unitPrice) || row.unitPrice < 0) {
+    if (!priceValid(row.unitPrice) || Number(row.unitPrice) < 0) {
       messages.push('견적단가는 0 이상의 유효한 값이어야 합니다.');
     }
-    if (!isNumeric15_2(row.lineAmt) || row.lineAmt < 0) {
+    if (!amountValid(row.lineAmt) || Number(row.lineAmt) < 0) {
       messages.push('계산된 견적금액이 허용 범위를 초과했습니다.');
+    }
+    if (amountRule && quantityValid(row.quotationQty) && priceValid(row.unitPrice)) {
+      try {
+        const amount = multiplyExactSalesDecimals(String(row.quotationQty), String(row.unitPrice), amountRule);
+        if (compareGridExactDecimals(row.lineAmt, amount) !== 0) messages.push('현재 정책에 맞게 금액을 재계산해 주세요.');
+      } catch {
+        messages.push('계산된 견적금액이 허용 범위 또는 정밀도를 초과했습니다.');
+      }
     }
     if (messages.length) {
       errors.detailRows[row.rowId] = messages.join(' ');
@@ -39,12 +61,21 @@ export function validateQuotationInput(input: QuotationCreateInput): QuotationVa
       });
     }
   });
+  if (amountRule && policy && errors.detailMessages.length === 0) {
+    try {
+      calculateQuotationTotals(input.details.map((row) => ({ lineAmt: String(row.lineAmt) })),
+        'places' in policy ? policy : policy.currency, policy);
+    } catch {
+      errors.detailMessages.push('견적 합계가 허용 범위를 초과했습니다.');
+    }
+  }
   return errors;
 }
 
-export function buildQuotationPayload(input: QuotationCreateInput): QuotationCreatePayload {
+export function buildQuotationPayload(input: QuotationCreateInput, decimalPolicy?: GridDecimalModuleRule): QuotationCreatePayload {
   if (input.customerId == null) throw new Error('거래처를 선택해 주세요.');
   return {
+    ...(decimalPolicy ? { decimalPolicy, decimalColumns: getDecimalColumnContract('sales.quotation') } : {}),
     quotationDt: input.quotationDt,
     submitDt: input.submitDt || null,
     customerId: input.customerId,
@@ -68,13 +99,13 @@ export function buildQuotationPayload(input: QuotationCreateInput): QuotationCre
 }
 
 export async function createQuotation(payload: QuotationCreatePayload): Promise<QuotationItem> {
-  const response = await apiPost<QuotationCreateResponse>(QUOTATION_PATH, payload);
+  const response = await apiPostWithExactDecimals<QuotationCreateResponse>(QUOTATION_PATH, payload, QUOTATION_DECIMAL_FIELDS);
   if (!response.item) throw new Error('견적 저장 응답에 생성된 견적이 없습니다.');
   return response.item;
 }
 
 export async function getQuotation(quotationId: number): Promise<QuotationItem> {
-  const response = await apiGet<QuotationResponse>(`${QUOTATION_PATH}/${quotationId}`);
+  const response = await apiGetWithExactDecimals<QuotationResponse>(`${QUOTATION_PATH}/${quotationId}`, QUOTATION_DECIMAL_FIELDS);
   if (!response.item) throw new Error('견적 조회 응답에 견적 정보가 없습니다.');
   return response.item;
 }
@@ -83,7 +114,7 @@ export async function updateQuotation(
   quotationId: number,
   payload: QuotationCreatePayload,
 ): Promise<QuotationItem> {
-  const response = await apiPut<QuotationResponse>(`${QUOTATION_PATH}/${quotationId}`, payload);
+  const response = await apiPutWithExactDecimals<QuotationResponse>(`${QUOTATION_PATH}/${quotationId}`, payload, QUOTATION_DECIMAL_FIELDS);
   if (!response.item) throw new Error('견적 수정 응답에 견적 정보가 없습니다.');
   return response.item;
 }
@@ -116,9 +147,9 @@ export function toQuotationForm(quotation: QuotationItem): QuotationForm {
       materialName: detail.materialName ?? '',
       materialSpec: detail.materialSpec ?? '',
       unit: detail.unit ?? '',
-      quotationQty: Number(detail.quotationQty),
-      unitPrice: Number(detail.unitPrice),
-      lineAmt: Number(detail.lineAmt),
+      quotationQty: detail.quotationQty,
+      unitPrice: detail.unitPrice,
+      lineAmt: detail.lineAmt,
       remark: detail.remark ?? '',
     })),
   };

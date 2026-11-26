@@ -1,0 +1,39 @@
+{
+  "sales.order": {
+    "orderQty": { "type": "number" },
+    "unitPrice": { "type": "decimal" },
+    "supplyAmount": { "type": "currency" },
+    "vatAmount": { "type": "currency" },
+    "totalAmount": { "type": "currency" },
+    "orderTotal": { "type": "currency" }
+  },
+  "sales.quotation": {
+    "quotationQty": { "type": "number" },
+    "unitPrice": { "type": "decimal" },
+    "lineAmt": { "type": "currency" },
+    "supplyAmt": { "type": "currency" },
+    "vatAmt": { "type": "currency" },
+    "totalAmt": { "type": "currency" }
+  },
+  "sales.delivery": {
+    "deliveryQty": { "type": "number" },
+    "unitPrice": { "type": "decimal" },
+    "supplyAmt": { "type": "currency" },
+    "vatAmt": { "type": "currency" },
+    "totalAmt": { "type": "currency" },
+    "deliveryTotal": { "type": "currency" }
+  },
+  "sales.deliveryPlan": {
+    "plannedQty": { "type": "number" }
+  },
+  "settings.module": {
+    "sortOrder": { "type": "number" },
+    "menuCount": { "type": "number" }
+  },
+  "settings.menu": {
+    "order": { "type": "number" }
+  },
+  "settings.role": {
+    "menuCount": { "type": "number" }
+  }
+}

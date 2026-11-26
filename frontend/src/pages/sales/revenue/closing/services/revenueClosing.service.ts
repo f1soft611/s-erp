@@ -1,4 +1,5 @@
-import { apiGet, apiPost } from '../../../../../shared/services/apiClient';
+import { apiGetWithExactDecimals, apiPost } from '../../../../../shared/services/apiClient';
+import { compareGridExactDecimals } from '../../../../../shared/components/f1-grid/utils/gridExactDecimal';
 import { MAX_STATEMENT_DETAIL_COUNT } from '../../../shared/statementDetailLimit';
 import type {
   RevenueClosingCustomerSummaryRow,
@@ -35,7 +36,8 @@ export async function searchRevenueClosings(
   });
   search.customerIds.forEach((customerId) => params.append('customerIds', String(customerId)));
 
-  const response = await apiGet<unknown>(`${PATH}?${params.toString()}`);
+  const response = await apiGetWithExactDecimals<unknown>(`${PATH}?${params.toString()}`,
+    ['quantity', 'salesAmount', 'vatAmount', 'totalAmount']);
   if (!isSearchResult(response)) {
     throw new Error('매출마감 조회 응답을 확인해 주세요.');
   }
@@ -89,10 +91,10 @@ function isDetailRow(value: unknown): value is RevenueClosingDetailRow {
     && typeof row.materialName === 'string'
     && (row.orderNo === null || typeof row.orderNo === 'string')
     && (row.closingStatus === 'CLOSED' || row.closingStatus === 'OPEN')
-    && isFiniteNumber(row.quantity)
-    && isFiniteNumber(row.salesAmount)
-    && isFiniteNumber(row.vatAmount)
-    && isFiniteNumber(row.totalAmount);
+    && isDecimal(row.quantity)
+    && isDecimal(row.salesAmount)
+    && isDecimal(row.vatAmount)
+    && isDecimal(row.totalAmount);
 }
 
 function isCustomerSummaryRow(value: unknown): value is RevenueClosingCustomerSummaryRow {
@@ -131,4 +133,8 @@ function isIsoDate(value: string) {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isDecimal(value: unknown): value is number | string {
+  return isFiniteNumber(value) || (typeof value === 'string' && compareGridExactDecimals(value, value) === 0);
 }

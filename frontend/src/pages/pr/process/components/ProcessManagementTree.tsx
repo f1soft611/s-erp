@@ -1,8 +1,7 @@
 import { useCallback, useMemo, type RefObject } from 'react';
-import {
-  F1Tree, type F1GridChanges, type F1GridColumn, type F1TreeRef,
-} from '../../../../shared/components/f1-grid';
-import { createProcessRow } from '../data/processManagement.data';
+import { F1Tree, type F1GridChanges, type F1TreeRef } from '../../../../shared/components/f1-grid';
+import { createProcessColumns } from '../data/processManagement.columns';
+import { createWorkplaceRow } from '../data/processManagement.data';
 import type { ProcessRow } from '../types/processManagement.types';
 
 type Props = {
@@ -18,55 +17,40 @@ type Props = {
   onSelection: (ids: (string | number)[]) => void;
   onChanges: (changes: F1GridChanges<ProcessRow>) => void;
   onError: (message: string) => void;
-  onAddGroup: () => void;
-  onAddProcess: (groupId: string) => void;
+  onAddWorkplace: () => void;
+  onAddProcess: (workplaceId: string) => void;
 };
-
-function createProcessColumns(canEdit: (row: ProcessRow) => boolean): F1GridColumn<ProcessRow>[] {
-  return [
-    { field: 'name', headerName: '공정그룹 / 공정명', width: 220, editable: canEdit, required: true,
-      validate: (value) => typeof value === 'string' && value.trim().length > 0 && value.trim().length <= 100 ? true : '이름은 1~100자로 입력해 주세요.' },
-    { field: 'description', headerName: '설명', width: 180, editable: canEdit },
-    { field: 'image', headerName: '공정 이미지', type: 'image', width: 90, align: 'center',
-      editable: (row) => row.id.startsWith('p:') && canEdit(row),
-      renderCell: ({ row }) => row.id.startsWith('g:') ? null : undefined },
-    ...([
-      ['productionOutsource', '생산외주'], ['purchaseOutsource', '구매외주'], ['inspection', '공정검사'],
-      ['packing', '포장공정'], ['stockManagement', '공정재고'], ['previousStockOut', '이전공정 재고출고'],
-      ['finalProcess', '최종공정'], ['plannedEquipment', '계획설비'], ['actualEquipmentRequired', '실적설비 필수'],
-    ] as const).map(([field, headerName]): F1GridColumn<ProcessRow> => ({
-      field, headerName, type: 'checkbox', width: 100, align: 'center', editable: (row) => row.id.startsWith('p:') && canEdit(row), syncWithTreeCheckbox: false,
-    })),
-    { field: 'inactive', headerName: '미사용', type: 'checkbox', width: 80, align: 'center', editable: canEdit, syncWithTreeCheckbox: false },
-  ];
-}
 
 export function ProcessManagementTree({
   treeRef, rows, version, loading, saving, filtered, canCreate, canUpdate, canDelete,
-  onSelection, onChanges, onError, onAddGroup, onAddProcess,
+  onSelection, onChanges, onError, onAddWorkplace, onAddProcess,
 }: Props) {
-  const canEdit = useCallback((row: ProcessRow) => !saving && (row.id.includes(':new-') ? canCreate : canUpdate), [canCreate, canUpdate, saving]);
-  const columns = useMemo(() => createProcessColumns(canEdit), [canEdit]);
+  // 작업장 이름·설명·미사용만 편집한다. 연결된 공정의 내용은 공정 설정에서 수정한다.
+  const canEditWorkplace = useCallback((row: ProcessRow) => !saving && row.id.startsWith('g:')
+    && (row.id.includes(':new-') ? canCreate : canUpdate), [canCreate, canUpdate, saving]);
+  const columns = useMemo(() => createProcessColumns({
+    nameHeader: '작업장 / 공정명', canEditText: canEditWorkplace, canEditProcess: () => false,
+  }), [canEditWorkplace]);
 
   return (
-    <F1Tree key={version} ref={treeRef} storageKey="process-management-tree-v1" ariaLabel="공정관리" rows={rows} rowKey="id" parentKey="parentId"
+    <F1Tree key={version} ref={treeRef} storageKey="process-management-tree-v2" ariaLabel="공정관리" rows={rows} rowKey="id" parentKey="parentId"
       treeColumn="name" columns={columns} height="100%" rowHeight={80} defaultExpandAll showCheckbox selectionMode="row"
       multiSelect={false} loading={loading} onSelectionChange={onSelection}
-      createRow={() => createProcessRow(true)} onChangesChange={onChanges}
+      createRow={createWorkplaceRow} onChangesChange={onChanges}
       treeContextMenu={{
-        addRootLabel: '공정그룹 추가',
+        addRootLabel: '작업장 추가',
         addChildLabel: '공정 추가',
         addRootDisabled: !canCreate || loading || saving || filtered,
         isAddChildDisabled: (id) => !canCreate || loading || saving || filtered || id === undefined,
-        onAddRoot: onAddGroup,
+        onAddRoot: onAddWorkplace,
         onAddChild: (id) => {
           const row = treeRef.current?.getActiveRows().find((item) => item.id === id);
-          const groupId = row?.id.startsWith('g:') ? row.id : row?.parentId;
-          if (groupId) onAddProcess(groupId);
+          const workplaceId = row?.id.startsWith('g:') ? row.id : row?.parentId;
+          if (workplaceId) onAddProcess(workplaceId);
         },
       }}
       allowDuplicateRowInContextMenu={false}
-      allowDeleteRowInContextMenu={canDelete} onDeleteBlocked={() => onError('공정이 있는 그룹은 삭제할 수 없습니다.')}
+      allowDeleteRowInContextMenu={canDelete} onDeleteBlocked={() => onError('공정이 연결된 작업장은 삭제할 수 없습니다. 연결된 공정을 먼저 삭제해 주세요.')}
       onValidationErrors={(errors) => onError(errors.map((item) => item.message).join('\n'))} />
   );
 }

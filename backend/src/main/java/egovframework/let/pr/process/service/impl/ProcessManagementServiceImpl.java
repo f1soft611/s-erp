@@ -2,6 +2,7 @@ package egovframework.let.pr.process.service.impl;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,39 +37,34 @@ public class ProcessManagementServiceImpl extends EgovAbstractServiceImpl implem
     }
 
     @Override
+    public List<ProcessNodeVO> listMasters(Long tenantId) {
+        requireTenant(tenantId);
+        return dao.listMasters(tenantId);
+    }
+
+    /** 작업장(g:)과 작업장-공정 연결(m:)을 저장한다. 공정 내용은 공정 마스터에서만 수정한다. */
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public List<ProcessNodeVO> save(Long tenantId, ProcessChangesVO changes) {
         requireTenant(tenantId);
-        if (changes == null || changes.getInsertedRows() == null
-                || changes.getUpdatedRows() == null || changes.getDeletedRows() == null) {
-            throw new IllegalArgumentException("변경 행을 확인해 주세요.");
-        }
-        Set<String> ids = new HashSet<>();
-        List<List<ProcessNodeVO>> batches = java.util.Arrays.asList(
-                changes.getInsertedRows(), changes.getUpdatedRows(), changes.getDeletedRows());
-        for (int batch = 0; batch < batches.size(); batch++) {
-            for (ProcessNodeVO row : batches.get(batch)) {
-                if (row == null || !StringUtils.hasText(row.getId()) || !ids.add(row.getId())) {
-                    throw new IllegalArgumentException("변경 행 ID가 올바르지 않습니다.");
-                }
-                if (!row.getId().startsWith("g:") && !row.getId().startsWith("p:")) {
-                    throw new IllegalArgumentException("공정 구분이 올바르지 않습니다.");
-                }
-                if (batch == 0) {
-                    if (!row.getId().matches("[gp]:new-[A-Za-z0-9-]+")) {
-                        throw new IllegalArgumentException("신규 행 ID를 확인해 주세요.");
-                    }
-                } else {
-                    parseId(row.getId());
-                }
+        validateBatch(changes, "gm");
+        for (ProcessNodeVO row : changes.getUpdatedRows()) {
+            if (!row.getId().startsWith("g:")) {
+                throw new IllegalArgumentException("연결된 공정은 공정 설정에서 수정해 주세요.");
             }
         }
-        for (ProcessNodeVO row : changes.getInsertedRows()) validate(row);
-        for (ProcessNodeVO row : changes.getUpdatedRows()) validate(row);
+        Set<String> links = new HashSet<>();
+        for (ProcessNodeVO row : changes.getInsertedRows()) {
+            validateNode(row);
+            if (row.getId().startsWith("m:") && !links.add(row.getParentId() + "/" + row.getProcessId())) {
+                throw new IllegalArgumentException("이미 연결된 공정입니다.");
+            }
+        }
+        for (ProcessNodeVO row : changes.getUpdatedRows()) validateNode(row);
 
         Map<String, Long> newGroups = new HashMap<>();
         for (ProcessNodeVO row : changes.getDeletedRows()) {
-            if (row.getId().startsWith("p:")) requireAffected(dao.deleteProcess(params(tenantId, row, null)));
+            if (row.getId().startsWith("m:")) requireAffected(dao.deleteMapping(params(tenantId, row, null)));
         }
         for (ProcessNodeVO row : changes.getDeletedRows()) {
             if (row.getId().startsWith("g:")) requireAffected(dao.deleteGroup(params(tenantId, row, null)));
@@ -76,41 +72,91 @@ public class ProcessManagementServiceImpl extends EgovAbstractServiceImpl implem
         for (ProcessNodeVO row : changes.getInsertedRows()) {
             if (row.getId().startsWith("g:")) {
                 Long id = dao.insertGroup(params(tenantId, row, null));
-                if (id == null) throw new IllegalStateException("공정그룹 저장 결과가 없습니다.");
+                if (id == null) throw new IllegalStateException("작업장 저장 결과가 없습니다.");
                 newGroups.put(row.getId(), id);
             }
         }
         for (ProcessNodeVO row : changes.getUpdatedRows()) {
-            if (row.getId().startsWith("g:")) requireAffected(dao.updateGroup(params(tenantId, row, null)));
+            requireAffected(dao.updateGroup(params(tenantId, row, null)));
         }
         for (ProcessNodeVO row : changes.getInsertedRows()) {
-            if (row.getId().startsWith("p:")) {
-                Long id = dao.insertProcess(params(tenantId, row, newGroups));
-                if (id == null) throw new IllegalStateException("공정 저장 결과가 없습니다.");
+            if (row.getId().startsWith("m:") && dao.insertMapping(params(tenantId, row, newGroups)) == null) {
+                throw new IllegalArgumentException("이미 연결되었거나 사용할 수 없는 공정입니다.");
+            }
+        }
+        return dao.list(tenantId);
+    }
+
+    /** 테넌트 단위 공정 마스터(p:)를 저장한다. 작업장에 연결된 공정은 삭제하지 않는다. */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public List<ProcessNodeVO> saveMasters(Long tenantId, ProcessChangesVO changes) {
+        requireTenant(tenantId);
+        validateBatch(changes, "p");
+        for (ProcessNodeVO row : changes.getInsertedRows()) validateNode(row);
+        for (ProcessNodeVO row : changes.getUpdatedRows()) validateNode(row);
+        for (ProcessNodeVO row : changes.getDeletedRows()) {
+            if (dao.deleteProcess(params(tenantId, row, null)) != 1) {
+                throw new IllegalArgumentException("연결된 작업장이 있는 공정은 삭제할 수 없습니다.");
+            }
+        }
+        for (ProcessNodeVO row : changes.getInsertedRows()) {
+            if (dao.insertProcess(params(tenantId, row, null)) == null) {
+                throw new IllegalStateException("공정 저장 결과가 없습니다.");
             }
         }
         for (ProcessNodeVO row : changes.getUpdatedRows()) {
-            if (row.getId().startsWith("p:")) requireAffected(dao.updateProcess(params(tenantId, row, newGroups)));
+            requireAffected(dao.updateProcess(params(tenantId, row, null)));
         }
-        return dao.list(tenantId);
+        return dao.listMasters(tenantId);
+    }
+
+    private void validateBatch(ProcessChangesVO changes, String prefixes) {
+        if (changes == null || changes.getInsertedRows() == null
+                || changes.getUpdatedRows() == null || changes.getDeletedRows() == null) {
+            throw new IllegalArgumentException("변경 행을 확인해 주세요.");
+        }
+        Set<String> ids = new HashSet<>();
+        List<List<ProcessNodeVO>> batches = Arrays.asList(
+                changes.getInsertedRows(), changes.getUpdatedRows(), changes.getDeletedRows());
+        for (int batch = 0; batch < batches.size(); batch++) {
+            for (ProcessNodeVO row : batches.get(batch)) {
+                if (row == null || !StringUtils.hasText(row.getId()) || !ids.add(row.getId())) {
+                    throw new IllegalArgumentException("변경 행 ID가 올바르지 않습니다.");
+                }
+                if (row.getId().length() < 3 || row.getId().charAt(1) != ':'
+                        || prefixes.indexOf(row.getId().charAt(0)) < 0) {
+                    throw new IllegalArgumentException("행 구분이 올바르지 않습니다.");
+                }
+                if (batch == 0) {
+                    if (!row.getId().matches("[gmp]:new-[A-Za-z0-9-]+")) {
+                        throw new IllegalArgumentException("신규 행 ID를 확인해 주세요.");
+                    }
+                } else {
+                    parseId(row.getId());
+                }
+            }
+        }
     }
 
     private Map<String, Object> params(Long tenantId, ProcessNodeVO row, Map<String, Long> newGroups) {
         Map<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
         params.put("row", row);
-        if (!row.getId().startsWith("g:new-") && !row.getId().startsWith("p:new-")) {
+        if (!row.getId().startsWith("g:new-") && !row.getId().startsWith("m:new-")
+                && !row.getId().startsWith("p:new-")) {
             params.put("id", parseId(row.getId()));
         }
-        if (row.getId().startsWith("p:") && newGroups != null) {
-            Long groupId = newGroups.get(row.getParentId());
+        if (row.getId().startsWith("m:")) {
+            Long groupId = newGroups == null ? null : newGroups.get(row.getParentId());
             params.put("groupId", groupId != null ? groupId : parseId(row.getParentId()));
+            params.put("processId", row.getProcessId());
         }
         return params;
     }
 
     private Long parseId(String id) {
-        if (id == null || !id.matches("[gp]:[1-9][0-9]*")) {
+        if (id == null || !id.matches("[gmp]:[1-9][0-9]*")) {
             throw new IllegalArgumentException("저장된 행 ID를 확인해 주세요.");
         }
         try {
@@ -120,21 +166,27 @@ public class ProcessManagementServiceImpl extends EgovAbstractServiceImpl implem
         }
     }
 
-    private void validate(ProcessNodeVO row) {
+    private void validateNode(ProcessNodeVO row) {
+        if (row.getId().startsWith("m:")) {
+            if (!StringUtils.hasText(row.getParentId()) || !row.getParentId().startsWith("g:")) {
+                throw new IllegalArgumentException("작업장을 선택해 주세요.");
+            }
+            if (row.getProcessId() == null || row.getProcessId() <= 0) {
+                throw new IllegalArgumentException("연결할 공정을 선택해 주세요.");
+            }
+            return;
+        }
         if (!StringUtils.hasText(row.getName()) || row.getName().trim().length() > 100) {
             throw new IllegalArgumentException("이름은 1~100자로 입력해 주세요.");
         }
         if (row.getDescription() != null && row.getDescription().length() > 255) {
             throw new IllegalArgumentException("설명은 255자 이하여야 합니다.");
         }
-        if (row.getId().startsWith("p:")) {
-            if (!StringUtils.hasText(row.getParentId()) || !row.getParentId().startsWith("g:")) {
-                throw new IllegalArgumentException("공정그룹을 선택해 주세요.");
-            }
-            validateImage(row.getImage());
-        } else if (row.getParentId() != null) {
-            throw new IllegalArgumentException("공정그룹은 최상위여야 합니다.");
+        if (row.getParentId() != null) {
+            throw new IllegalArgumentException(row.getId().startsWith("g:")
+                    ? "작업장은 최상위여야 합니다." : "공정은 최상위여야 합니다.");
         }
+        if (row.getId().startsWith("p:")) validateImage(row.getImage());
     }
 
     private void validateImage(String image) {

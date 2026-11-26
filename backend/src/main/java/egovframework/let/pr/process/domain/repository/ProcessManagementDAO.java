@@ -12,8 +12,16 @@ public class ProcessManagementDAO extends EgovAbstractMapper {
         return selectList("ProcessManagementDAO.list", tenantId);
     }
 
+    public List<ProcessNodeVO> listMasters(Long tenantId) {
+        return selectList("ProcessManagementDAO.listMasters", tenantId);
+    }
+
     public Long insertGroup(Map<String, Object> params) {
         return selectOne("ProcessManagementDAO.insertGroup", params);
+    }
+
+    public Long insertMapping(Map<String, Object> params) {
+        return selectOne("ProcessManagementDAO.insertMapping", params);
     }
 
     public Long insertProcess(Map<String, Object> params) {
@@ -30,6 +38,10 @@ public class ProcessManagementDAO extends EgovAbstractMapper {
 
     public int deleteGroup(Map<String, Object> params) {
         return delete("ProcessManagementDAO.deleteGroup", params);
+    }
+
+    public int deleteMapping(Map<String, Object> params) {
+        return delete("ProcessManagementDAO.deleteMapping", params);
     }
 
     public int deleteProcess(Map<String, Object> params) {
