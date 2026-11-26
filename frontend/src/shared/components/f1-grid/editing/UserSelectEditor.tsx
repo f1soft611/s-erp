@@ -18,6 +18,9 @@ export type UserSelectEditorProps = {
   disableCloseOnSelect?: boolean;
   hideSelectedOptions?: boolean;
   preserveSelectionOrder?: boolean;
+  /** 다중 선택에서 이 수를 넘는 칩은 `+N명`으로 접고 한 줄로 유지한다. */
+  maxVisibleChips?: number;
+  onOverflowClick?: () => void;
   autoFocus?: boolean;
   compact?: boolean;
   anchorEl?: HTMLElement | null;
@@ -49,6 +52,8 @@ export function UserSelectEditor({
   disableCloseOnSelect = multiple,
   hideSelectedOptions = false,
   preserveSelectionOrder = false,
+  maxVisibleChips,
+  onOverflowClick,
   autoFocus = false,
   compact = false,
   anchorEl,
@@ -198,9 +203,22 @@ export function UserSelectEditor({
       }}
       renderValue={(selected) => {
         const selectedItems = Array.isArray(selected) ? selected : [selected];
+        const collapse = multiple && maxVisibleChips !== undefined;
+        const shownItems = collapse
+          ? selectedItems.slice(0, maxVisibleChips)
+          : selectedItems;
+        const hiddenCount = selectedItems.length - shownItems.length;
         return (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-            {selectedItems.map((option) => (
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: collapse ? 'nowrap' : 'wrap',
+              gap: 0.5,
+              minWidth: 0,
+              ...(collapse ? { overflow: 'hidden' } : {}),
+            }}
+          >
+            {shownItems.map((option) => (
               <Chip
                 key={String(option.value)}
                 avatar={
@@ -210,6 +228,8 @@ export function UserSelectEditor({
                 }
                 label={option.label}
                 size="small"
+                title={collapse ? [option.label, option.positionName, option.departmentName].filter(Boolean).join(' ') : undefined}
+                sx={collapse ? { flexShrink: 0, maxWidth: 140 } : undefined}
                 onDelete={() => {
                   if (disabled) return;
                   const remaining = selectedItems.filter(
@@ -221,6 +241,16 @@ export function UserSelectEditor({
                 }}
               />
             ))}
+            {hiddenCount > 0 && (
+              <Chip
+                size="small"
+                variant="outlined"
+                data-testid="user-select-overflow-chip"
+                label={`+${hiddenCount}명`}
+                onClick={onOverflowClick}
+                sx={{ flexShrink: 0 }}
+              />
+            )}
           </Box>
         );
       }}

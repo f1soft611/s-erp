@@ -693,6 +693,8 @@ class DocumentApprovalMapperTest {
         assertThat(linesSql)
                 .contains("line.tenant_id = ?")
                 .contains("line.electronic_approval_id IN")
+                .contains("LEFT JOIN public.tb_department dept")
+                .contains("dept.department_nm")
                 .contains("ORDER BY line.electronic_approval_id, line.stage_order, line.participant_order");
         assertThat(commentPageSql)
                 .contains("tenant_id = ?")
@@ -950,6 +952,8 @@ class DocumentApprovalMapperTest {
                 .contains("la.tenant_id = u.tenant_id")
                 .contains("la.login_id = u.login_id")
                 .contains("la.profile_image")
+                .contains("LEFT JOIN public.tb_department dept")
+                .contains("dept.department_nm")
                 .contains("line.action_status IN ('APPROVED', 'REJECTED', 'RETURNED')")
                 .contains("ORDER BY line.stage_order, line.participant_order");
 
