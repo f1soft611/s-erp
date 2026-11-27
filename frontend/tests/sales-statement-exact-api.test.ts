@@ -29,7 +29,8 @@ it('preserves source delivery totals in the statement picker', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
     '{"resultCode":"200","result":{"items":[{"salesDeliveryId":1,"totalAmt":1234567890123.100001}]}}',
   )));
-  const rows = await searchStatementSources('');
+  const rows = await searchStatementSources({ keyword: '', deliveryDtFrom: '2026-11-01', deliveryDtTo: '2026-11-30',
+    deliveryType: '', customerKeyword: '', materialKeyword: '', deliveryNo: '' });
   expect(rows[0].totalAmt).toBe('1234567890123.100001');
   expect(createStatementSourceColumns().find((column) => column.field === 'totalAmt')?.exactDecimal).toBe(true);
 });

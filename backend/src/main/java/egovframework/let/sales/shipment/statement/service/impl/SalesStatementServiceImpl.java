@@ -99,9 +99,32 @@ public class SalesStatementServiceImpl {
     }
 
     public List<Map<String, Object>> sources(Long tenantId, String userId, String keyword) throws Exception {
+        return sources(tenantId, userId, keyword, null, null, null, null, null, null);
+    }
+
+    public List<Map<String, Object>> sources(Long tenantId, String userId, String keyword, String deliveryDtFrom,
+            String deliveryDtTo, String deliveryType, String customerKeyword, String materialKeyword,
+            String deliveryNo) throws Exception {
         validatePrincipal(tenantId, userId);
         Map<String, Object> params = params(tenantId, userId);
         params.put("keyword", keyword == null ? "" : keyword.trim());
+        if (StringUtils.hasText(deliveryDtFrom) || StringUtils.hasText(deliveryDtTo)) {
+            LocalDate start = parseDeliveryDate(deliveryDtFrom);
+            LocalDate end = parseDeliveryDate(deliveryDtTo);
+            if (start.isAfter(end)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "출하일 기간을 확인해 주세요.");
+            }
+            params.put("deliveryDtFrom", start);
+            params.put("deliveryDtTo", end);
+        }
+        String type = deliveryType == null ? "" : deliveryType.trim();
+        if (!type.isEmpty() && !"DIRECT".equals(type) && !"ORDER".equals(type)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "출하구분을 확인해 주세요.");
+        }
+        params.put("deliveryType", type);
+        params.put("customerKeyword", customerKeyword == null ? "" : customerKeyword.trim());
+        params.put("materialKeyword", materialKeyword == null ? "" : materialKeyword.trim());
+        params.put("deliveryNo", deliveryNo == null ? "" : deliveryNo.trim());
         List<Map<String, Object>> sources = dao.selectSources(params);
         for (Map<String, Object> source : sources) {
             Object value = source.get("salesDeliveryDetailIds");
@@ -282,6 +305,15 @@ public class SalesStatementServiceImpl {
             return LocalDate.parse(value);
         } catch (DateTimeParseException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명세일을 확인해 주세요.");
+        }
+    }
+
+    private LocalDate parseDeliveryDate(String value) {
+        try {
+            if (value == null || !value.matches("\\d{4}-\\d{2}-\\d{2}")) throw new DateTimeParseException("date", "", 0);
+            return LocalDate.parse(value);
+        } catch (DateTimeParseException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "출하일을 확인해 주세요.");
         }
     }
 

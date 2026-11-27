@@ -59,6 +59,18 @@ class SalesStatementMapperTest {
                 .getBoundSql(params).getSql();
         assertThat(sources).contains("salesDeliveryDetailIds", "revenue_closed_at IS NULL",
                 "NOT EXISTS", "tb_sales_statement_dt", "tb_sales_statement_hd");
+        Map<String, Object> filtered = new HashMap<String, Object>(params);
+        filtered.put("deliveryDtFrom", java.time.LocalDate.of(2026, 11, 1));
+        filtered.put("deliveryDtTo", java.time.LocalDate.of(2026, 11, 30));
+        filtered.put("deliveryType", "ORDER");
+        filtered.put("deliveryNo", "SD");
+        filtered.put("customerKeyword", "C1");
+        filtered.put("materialKeyword", "M1");
+        String filteredSources = configuration.getMappedStatement("SalesStatementDAO.selectSources")
+                .getBoundSql(filtered).getSql();
+        assertThat(filteredSources).contains("h.delivery_dt BETWEEN", "h.delivery_type = ?",
+                "h.delivery_no ILIKE", "c.customer_code ILIKE", "EXISTS", "tb_material_info");
+        assertThat(sources).doesNotContain("h.delivery_dt BETWEEN", "tb_material_info");
         String read = configuration.getMappedStatement("SalesStatementDAO.selectHeader")
                 .getBoundSql(params).getSql();
         assertThat(read).contains("h.supplier_name", "h.customer_name", "COALESCE(h.supplier_stamp_image, t.stamp_image)",

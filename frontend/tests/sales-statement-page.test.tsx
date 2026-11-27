@@ -10,7 +10,8 @@ import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
 import { getSystemDate } from '../src/shared/services/systemDateService';
 import type { StatementItem, StatementStatusRow } from '../src/pages/sales/shipment/statement/types/salesStatement.types';
 
-vi.mock('../src/shared/services/systemDateService', () => ({
+vi.mock('../src/shared/services/systemDateService', async (original) => ({
+  ...await original<object>(),
   getSystemDate: vi.fn(),
 }));
 vi.mock('../src/pages/sales/shipment/statement/services/salesStatement.service', () => ({
@@ -39,6 +40,11 @@ const props = {
 };
 function mount(node: React.ReactNode) {
   render(<RouterProvider router={createMemoryRouter([{ path: '/', element: node }])} />);
+}
+async function searchPicker(picker: HTMLElement) {
+  const input = within(picker).getByRole('textbox', { name: '출하번호·거래처 검색' });
+  await waitFor(() => expect(input).toBeEnabled());
+  fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
 }
 beforeEach(() => {
   vi.clearAllMocks();
@@ -209,11 +215,11 @@ it('groups selected detail lines from multiple same-customer deliveries into one
   });
   fireEvent.click(screen.getByRole('button', { name: '출하 선택' }));
   const picker = screen.getByRole('dialog', { name: '출하 선택' });
-  fireEvent.keyDown(within(picker).getByRole('textbox', { name: '출하번호·거래처 검색' }), { key: 'Enter', code: 'Enter' });
+  await searchPicker(picker);
   await within(picker).findByText('SD-1');
   fireEvent.click(within(picker).getByLabelText('1 행 선택'));
   fireEvent.click(within(picker).getByLabelText('4 행 선택'));
-  fireEvent.click(within(picker).getByRole('button', { name: '선택 완료' }));
+  fireEvent.click(within(picker).getByRole('button', { name: '선택', exact: true }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: '출하 선택' })).not.toBeInTheDocument());
   await screen.findByDisplayValue(/SD-1.*SD-2/);
   const grid = screen.getByRole('grid', { name: '거래명세서 상세 목록' });
@@ -234,7 +240,7 @@ it('prevents grouping deliveries from different customers', async () => {
   mount(<SalesStatementCreatePage {...props} />);
   fireEvent.click(screen.getByRole('button', { name: '출하 선택' }));
   const picker = screen.getByRole('dialog', { name: '출하 선택' });
-  fireEvent.keyDown(within(picker).getByRole('textbox', { name: '출하번호·거래처 검색' }), { key: 'Enter', code: 'Enter' });
+  await searchPicker(picker);
   await within(picker).findByText('SD-1');
   fireEvent.click(within(picker).getByLabelText('1 행 선택'));
 
@@ -250,10 +256,10 @@ it('requires at least one selected detail before creating a statement', async ()
   mount(<SalesStatementCreatePage {...props} />);
   fireEvent.click(screen.getByRole('button', { name: '출하 선택' }));
   const picker = screen.getByRole('dialog', { name: '출하 선택' });
-  fireEvent.keyDown(within(picker).getByRole('textbox', { name: '출하번호·거래처 검색' }), { key: 'Enter', code: 'Enter' });
+  await searchPicker(picker);
   await within(picker).findByText('SD-1');
   fireEvent.click(within(picker).getByLabelText('1 행 선택'));
-  fireEvent.click(within(picker).getByRole('button', { name: '선택 완료' }));
+  fireEvent.click(within(picker).getByRole('button', { name: '선택', exact: true }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: '출하 선택' })).not.toBeInTheDocument());
   await screen.findByDisplayValue('SD-1');
   fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
@@ -272,10 +278,10 @@ it('shows the 100-detail limit before submitting a statement', async () => {
   mount(<SalesStatementCreatePage {...props} />);
   fireEvent.click(screen.getByRole('button', { name: '출하 선택' }));
   const picker = screen.getByRole('dialog', { name: '출하 선택' });
-  fireEvent.keyDown(within(picker).getByRole('textbox', { name: '출하번호·거래처 검색' }), { key: 'Enter', code: 'Enter' });
+  await searchPicker(picker);
   await within(picker).findByText('SD-1');
   fireEvent.click(within(picker).getByLabelText('1 행 선택'));
-  fireEvent.click(within(picker).getByRole('button', { name: '선택 완료' }));
+  fireEvent.click(within(picker).getByRole('button', { name: '선택', exact: true }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: '출하 선택' })).not.toBeInTheDocument());
   await screen.findByDisplayValue('SD-1');
   const grid = screen.getByRole('grid', { name: '거래명세서 상세 목록' });

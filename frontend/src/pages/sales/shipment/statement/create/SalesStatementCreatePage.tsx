@@ -110,7 +110,7 @@ export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
       </Paper>
     </Box>
     </PageLoadBoundary>
-    <StatementSourcePicker open={picker} onClose={() => setPicker(false)} onSelect={(value) => void choose(value)} />
+    {picker ? <StatementSourcePicker open onClose={() => setPicker(false)} onSelect={(value) => void choose(value)} /> : null}
     {printing && item ? <StatementPrint item={item} onClose={() => setPrinting(false)} /> : null}
     <UnsavedChangesConfirmDialog open={blocker.state === 'blocked'} disableContinue={pending}
       onCancel={() => blocker.state === 'blocked' && blocker.reset()}
