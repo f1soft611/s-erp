@@ -1,3 +1,4 @@
+import { useNotification } from '../../../../../../shared/context/notification';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isApiNetworkError } from '../../../../../../shared/services/apiErrors';
 import { useBlocker } from 'react-router-dom';
@@ -32,7 +33,7 @@ export function useSalesStatementCreate({
   const [printing, setPrinting] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const { showSuccess } = useNotification();
   const busy = useRef(false);
   const dateTouchedRef = useRef(false);
   const canRead = Boolean(permissions?.read);
@@ -150,7 +151,7 @@ export function useSalesStatementCreate({
     finally { setPending(false); }
   }, []);
   const reset = useCallback(async () => {
-    setPending(true); setError(''); setNotice('');
+    setPending(true); setError('');
     dateTouchedRef.current = false;
     setId(undefined); setItem(null); setSources([]); setSelectedRowIds([]); setRows([]); setDate(''); setRemark('');
     setDateError('');
@@ -189,7 +190,7 @@ export function useSalesStatementCreate({
       setError('거래명세서는 출하 상세를 최대 100건까지 발행할 수 있습니다.');
       return;
     }
-    busy.current = true; setPending(true); setError(''); setNotice('');
+    busy.current = true; setPending(true); setError('');
     try {
       const value = id ? await updateStatement(id, { statementDt, remark })
         : await createStatement({
@@ -198,10 +199,10 @@ export function useSalesStatementCreate({
           statementDt,
           remark,
         });
-      apply(value); setNotice(`거래명세서가 저장되었습니다. 명세번호: ${value.statementNo}`); onSaved?.();
+      apply(value); showSuccess(`거래명세서가 저장되었습니다. 명세번호: ${value.statementNo}`); onSaved?.();
     } catch (cause) { setError(cause instanceof Error ? cause.message : '거래명세서 저장에 실패했습니다.'); }
     finally { busy.current = false; setPending(false); }
-  }, [editable, source, commitDate, remark, id, apply, onSaved, selectedIds]);
+  }, [showSuccess, editable, source, commitDate, remark, id, apply, onSaved, selectedIds]);
   const remove = useCallback(async () => {
     if (!canDelete || !id || busy.current) return;
     if (!(await confirm({ title: '거래명세서 삭제', description: '거래명세서를 삭제하시겠습니까?' }))) return;
@@ -225,7 +226,7 @@ export function useSalesStatementCreate({
 
   return {
     id, item, source, rows, selectedRowIds, setSelectedRowIds, date, changeDate, commitDate, dateError, remark, setRemark, picker, setPicker, printing, setPrinting,
-    pending, error, setError, notice, canRead, canSave, canDelete, editable, dirty, blocker, dialog,
+    pending, error, setError, canRead, canSave, canDelete, editable, dirty, blocker, dialog,
     choose, save, remove, handleNew, print, initialLoad, retryLoad,
   };
 }

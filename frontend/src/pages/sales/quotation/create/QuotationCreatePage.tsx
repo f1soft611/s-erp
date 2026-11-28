@@ -1,3 +1,4 @@
+import { useNotification } from '../../../../shared/context/notification';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isApiNetworkError } from '../../../../shared/services/apiErrors';
 import { useBlocker } from 'react-router-dom';
@@ -213,7 +214,7 @@ export function QuotationCreatePage({
   const [isLocked, setIsLocked] = useState(false);
   const [hasDetailChanges, setHasDetailChanges] = useState(false);
   const [validationErrors, setValidationErrors] = useState<QuotationValidationErrors | null>(null);
-  const [notice, setNotice] = useState('');
+  const { showSuccess } = useNotification();
   const [error, setError] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const gridValidationActiveRef = useRef(false);
@@ -337,7 +338,6 @@ export function QuotationCreatePage({
     setHasDetailChanges(false);
     setSelectedRowIds([]);
     setValidationErrors(null);
-    setNotice('');
     setError('');
   }, [businessDate]);
 
@@ -454,7 +454,6 @@ export function QuotationCreatePage({
     if (validationMessages.length || !isGridValid) return;
     savingRef.current = true;
     setIsSaving(true);
-    setNotice('');
     try {
       const payload = buildQuotationPayload(input, policy);
       const saved = loadedQuotation
@@ -463,7 +462,7 @@ export function QuotationCreatePage({
       try {
         const reloaded = await getQuotation(saved.quotationId);
         applyLoadedQuotation(reloaded);
-        setNotice(`견적이 ${loadedQuotation ? '수정' : '저장'}되었습니다. 견적번호: ${reloaded.quotationNo}`);
+        showSuccess(`견적이 ${loadedQuotation ? '수정' : '저장'}되었습니다. 견적번호: ${reloaded.quotationNo}`);
         onSaved?.(reloaded);
       } catch {
         setIsLocked(true);
@@ -475,7 +474,7 @@ export function QuotationCreatePage({
       savingRef.current = false;
       setIsSaving(false);
     }
-  }, [
+  }, [showSuccess, 
     applyLoadedQuotation, currencyCode, customer, customerReference, hasUnsavedChanges,
     incoterms, isEditable, loadedQuotation, onSaved, paymentTerm, policy, quotationDt, remark,
     submitDt, validTerm,
@@ -492,10 +491,9 @@ export function QuotationCreatePage({
     savingRef.current = true;
     setIsSaving(true);
     setError('');
-    setNotice('');
     try {
       await deleteQuotation(loadedQuotation.quotationId);
-      setNotice(`견적이 삭제되었습니다. 견적번호: ${loadedQuotation.quotationNo}`);
+      showSuccess(`견적이 삭제되었습니다. 견적번호: ${loadedQuotation.quotationNo}`);
       onDeleted?.();
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : '견적 삭제 중 오류가 발생했습니다.');
@@ -503,7 +501,7 @@ export function QuotationCreatePage({
       savingRef.current = false;
       setIsSaving(false);
     }
-  }, [isDeletable, loadedQuotation, onDeleted]);
+  }, [showSuccess, isDeletable, loadedQuotation, onDeleted]);
 
   const handleNew = useCallback(async () => {
     if (savingRef.current) return;
@@ -621,7 +619,6 @@ export function QuotationCreatePage({
             <Box component="ul" sx={{ my: 0, pl: 2 }}>{validationMessages.map((message) => <li key={message}>{message}</li>)}</Box>
           </Alert>
         ) : null}
-        {notice ? <Alert severity="success">{notice}</Alert> : null}
         <SalesDecimalPolicyError status={policyState.status} network={policyState.network} />
         {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
         <Paper variant="outlined" sx={{ p: 2, minWidth: 0, borderRadius: 1 }}>

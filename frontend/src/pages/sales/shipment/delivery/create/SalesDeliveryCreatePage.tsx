@@ -1,3 +1,4 @@
+import { useNotification } from '../../../../../shared/context/notification';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBlocker } from 'react-router-dom';
 import { Alert, Box, Button, IconButton, InputAdornment, MenuItem, Paper, TextField, Tooltip, Typography } from '@mui/material';
@@ -70,7 +71,7 @@ export function SalesDeliveryCreatePage({
   const [locked, setLocked] = useState(false);
   const [error, setError] = useState('');
   const [dateError, setDateError] = useState('');
-  const [notice, setNotice] = useState('');
+  const { showSuccess } = useNotification();
   const [sourceOpen, setSourceOpen] = useState(false);
   const [materialOpen, setMaterialOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
@@ -134,7 +135,7 @@ export function SalesDeliveryCreatePage({
   }, [salesDeliveryId, canRead, load]);
   const change = <K extends keyof DeliveryForm>(key: K, value: DeliveryForm[K]) => {
     if (key === 'deliveryDt') deliveryDateTouchedRef.current = true;
-    setForm((current) => ({ ...current, [key]: value })); setError(''); setNotice('');
+    setForm((current) => ({ ...current, [key]: value })); setError('');
   };
   const handleChanges = useCallback((changes: F1GridChanges<DeliveryRow>) => {
     const active = activeDeliveryRows(rows, changes);
@@ -145,7 +146,7 @@ export function SalesDeliveryCreatePage({
   }, []);
   const reset = async () => {
     setItem(null); setSavedId(undefined); setLocked(false); setLoadError(null);
-    setError(''); setNotice(''); setConfirm(null); setOverDelivery(null);
+    setError(''); setConfirm(null); setOverDelivery(null);
     setPending(true);
     deliveryDateTouchedRef.current = false;
     try {
@@ -161,7 +162,7 @@ export function SalesDeliveryCreatePage({
   };
   const savePayload = useCallback(async (payload: DeliveryPayload) => {
     if (busy.current || !canSave || !policyReady) return;
-    busy.current = true; setPending(true); setError(''); setNotice('');
+    busy.current = true; setPending(true); setError('');
     try {
       const saved = savedId
         ? await updateDelivery(savedId, payload)
@@ -171,7 +172,7 @@ export function SalesDeliveryCreatePage({
       setLocked(true);
       try {
         const detail = await getDelivery(saved.salesDeliveryId);
-        applyItem(detail); setNotice(`출하가 저장되었습니다. 출하번호: ${detail.deliveryNo}`); onSaved?.(detail);
+        applyItem(detail); showSuccess(`출하가 저장되었습니다. 출하번호: ${detail.deliveryNo}`); onSaved?.(detail);
       } catch {
         setError(`출하는 저장되었지만 다시 불러오지 못했습니다. 출하번호: ${saved.deliveryNo}. 재조회를 눌러 주세요.`);
       }
@@ -183,7 +184,7 @@ export function SalesDeliveryCreatePage({
       }
     }
     finally { busy.current = false; setPending(false); }
-  }, [canSave, policyReady, savedId, applyItem, onSaved]);
+  }, [showSuccess, canSave, policyReady, savedId, applyItem, onSaved]);
   const save = useCallback(async () => {
     if (!editable || busy.current) return;
     const deliveryDt = normalizeDateInput(form.deliveryDt);
@@ -209,7 +210,7 @@ export function SalesDeliveryCreatePage({
     setConfirm(null);
     if (!canDelete || !savedId || busy.current) return;
     busy.current = true; setPending(true); setError('');
-    try { await deleteDelivery(savedId); await reset(); setNotice('출하가 삭제되었습니다.'); onDeleted?.(); }
+    try { await deleteDelivery(savedId); await reset(); showSuccess('출하가 삭제되었습니다.'); onDeleted?.(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : '출하 삭제에 실패했습니다.'); }
     finally { busy.current = false; setPending(false); }
   };
@@ -256,7 +257,6 @@ export function SalesDeliveryCreatePage({
         display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
       <PageLoadBoundary loading={loading} error={loadError ?? (policyState.network ? 'network' : null)} label="출하등록"
         onRetry={() => { if (policyState.network) resetGridDecimalPolicyCache(); if (savedId) void load(savedId); else setDateRetry((value) => value + 1); }}>
-      {notice ? <Alert severity="success">{notice}</Alert> : null}
       <SalesDecimalPolicyError status={policyState.status} network={policyState.network} />
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
       {locked && savedId ? <Button startIcon={<SearchIcon />} disabled={pending || loading} onClick={() => void load(savedId)}>재조회</Button> : null}

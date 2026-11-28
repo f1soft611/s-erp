@@ -1,8 +1,11 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { useState } from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { apiGet, apiPost, apiPut } from '../src/shared/services/apiClient';
+import { apiDelete, apiGet, apiPost, apiPut } from '../src/shared/services/apiClient';
 import { QuotationCreatePage } from '../src/pages/sales/quotation/create/QuotationCreatePage';
+import { QuotationEditorDialog } from '../src/pages/sales/quotation/status/components/QuotationEditorDialog';
+import { NotificationProvider } from '../src/shared/context/NotificationContext';
 import {
   calculateQuotationLineAmount,
 } from '../src/pages/sales/quotation/create/data/quotationDetail';
@@ -124,7 +127,7 @@ describe('quotation create page', () => {
           breadcrumbItems={[]} selectedMenuPermissions={{ read: true, update: true }}
           quotationId={21} mode="edit" />
       </GridDecimalModuleProvider> }]);
-      render(<RouterProvider router={router} />);
+      render(<NotificationProvider><RouterProvider router={router} /></NotificationProvider>);
     }
 
     async function editRemark(text: string) {
@@ -158,6 +161,68 @@ describe('quotation create page', () => {
       const unload = new Event('beforeunload', { cancelable: true });
       window.dispatchEvent(unload);
       expect(unload.defaultPrevented).toBe(false);
+    });
+
+    // 현황 화면처럼 저장·삭제 성공 시 수정 창을 닫는다. 토스트는 앱 수준 NotificationProvider가 그린다.
+    function renderEditorDialog(getRemark: () => string) {
+      const rules = { SALES: {
+        number: { places: 0, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+        decimal: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'DOWN' as const },
+        currency: { places: 6, trailingZeros: 'FIXED' as const, rounding: 'HALF_UP' as const },
+      } };
+      vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicyStrict').mockResolvedValue(rules);
+      vi.spyOn(decimalPolicyService, 'fetchGridDecimalPolicy').mockResolvedValue(rules);
+      const lookup = apiGetMock.getMockImplementation()!;
+      apiGetMock.mockImplementation((path: string) => path === '/api/v1/sales/quotations/21'
+        ? Promise.resolve(loaded(getRemark())) : lookup(path));
+      function Host() {
+        const [mode, setMode] = useState<'edit' | null>('edit');
+        return <QuotationEditorDialog mode={mode} quotationId={21} selectedModule={moduleItem}
+          permissions={{ read: true, update: true, delete: true }}
+          onClose={() => setMode(null)} onSaved={() => setMode(null)} onDeleted={() => setMode(null)} />;
+      }
+      const router = createMemoryRouter([{ path: '/', element: <NotificationProvider>
+        <GridDecimalModuleProvider moduleCode="SALES"><Host /></GridDecimalModuleProvider>
+      </NotificationProvider> }]);
+      render(<RouterProvider router={router} />);
+    }
+
+    it('shows the save success as a toast that stays after the editor dialog closes', async () => {
+      let savedRemark = '';
+      vi.mocked(apiPut).mockReset();
+      vi.mocked(apiPut).mockResolvedValue({ item: { quotationId: 21, quotationNo: 'QT-OLD' } });
+      renderEditorDialog(() => savedRemark);
+      await editRemark('새 비고');
+      savedRemark = '새 비고';
+      fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: '견적 수정' })).not.toBeInTheDocument());
+      expect(await screen.findByRole('alert')).toHaveTextContent('견적이 수정되었습니다. 견적번호: QT-OLD');
+    });
+
+    it('keeps a save failure inside the editor dialog without a success toast', async () => {
+      vi.mocked(apiPut).mockReset();
+      vi.mocked(apiPut).mockRejectedValue(new Error('서버가 저장하지 못했습니다.'));
+      renderEditorDialog(() => '');
+      await editRemark('실패 비고');
+      fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+
+      expect(await screen.findByText('서버가 저장하지 못했습니다.')).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: '견적 수정' })).toBeInTheDocument();
+      expect(screen.queryByText(/견적이 수정되었습니다/)).not.toBeInTheDocument();
+    });
+
+    it('shows the delete success as a toast after the editor dialog closes', async () => {
+      vi.mocked(apiDelete).mockReset();
+      vi.mocked(apiDelete).mockResolvedValue(undefined);
+      renderEditorDialog(() => '');
+      await screen.findByDisplayValue('QT-OLD');
+      fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+      const confirm = await screen.findByRole('dialog', { name: '견적 삭제' });
+      fireEvent.click(within(confirm).getByRole('button', { name: '삭제' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: '견적 수정' })).not.toBeInTheDocument());
+      expect(await screen.findByRole('alert')).toHaveTextContent('견적이 삭제되었습니다. 견적번호: QT-OLD');
     });
 
     it('shows a save failure, keeps the entered values and allows a retry that succeeds', async () => {

@@ -12,6 +12,9 @@ import {
   searchOrderQuotations,
 } from '../src/pages/sales/order/create/services/salesOrderMaster.service';
 import { SalesOrderCreatePage } from '../src/pages/sales/order/create/SalesOrderCreatePage';
+import { SalesOrderEditorDialog } from '../src/pages/sales/order/status/components/SalesOrderEditorDialog';
+import { NotificationProvider } from '../src/shared/context/NotificationContext';
+import { useState } from 'react';
 import type {
   SalesOrderCreated,
   SalesOrderItem,
@@ -952,6 +955,45 @@ describe('sales order entry page', () => {
     expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
   }, 15000);
 
+  // 현황 화면처럼 저장·삭제 성공 시 수정 창을 닫는다. 토스트는 앱 수준 NotificationProvider가 그린다.
+  function renderOrderEditorDialog() {
+    function Host() {
+      const [mode, setMode] = useState<'edit' | null>('edit');
+      return <SalesOrderEditorDialog mode={mode} salesOrderId={300} selectedModule={salesOrderPageProps.selectedModule}
+        permissions={{ read: true, update: true, delete: true }}
+        onClose={() => setMode(null)} onSaved={() => setMode(null)} onDeleted={() => setMode(null)} />;
+    }
+    render(<RouterProvider router={createMemoryRouter([{ path: '/', element: <NotificationProvider><Host /></NotificationProvider> }])} />);
+  }
+
+  it('shows the order save success as a toast after the editor dialog closes', async () => {
+    getSalesOrderMock.mockResolvedValue({ ...loadedOrder(), deliveryDt: '2026-11-30' });
+    updateSalesOrderMock.mockResolvedValue({ ...loadedOrder(), deliveryDt: '2026-11-30', quotNo: 'Q-EDIT' });
+    renderOrderEditorDialog();
+    await screen.findByDisplayValue('SO-20261027-0001');
+    fireEvent.change(screen.getByLabelText('견적번호'), { target: { value: 'Q-EDIT' } });
+    const save = screen.getByRole('button', { name: '저장', exact: true });
+    await waitFor(() => expect(save).toBeEnabled());
+    fireEvent.click(save);
+
+    await waitFor(() => expect(updateSalesOrderMock).toHaveBeenCalledWith(300, expect.anything()));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '수주 수정' })).not.toBeInTheDocument());
+    expect(await screen.findByRole('alert')).toHaveTextContent('수주가 수정되었습니다. 수주번호: SO-20261027-0001');
+  }, 15000);
+
+  it('shows the order delete success as a toast after the editor dialog closes', async () => {
+    deleteSalesOrderMock.mockResolvedValue(undefined);
+    renderOrderEditorDialog();
+    await screen.findByDisplayValue('SO-20261027-0001');
+    fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+    const confirm = await screen.findByRole('dialog', { name: '수주 삭제' });
+    fireEvent.click(within(confirm).getByRole('button', { name: '삭제' }));
+
+    await waitFor(() => expect(deleteSalesOrderMock).toHaveBeenCalledWith(300));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '수주 수정' })).not.toBeInTheDocument());
+    expect(await screen.findByRole('alert')).toHaveTextContent('수주가 삭제되었습니다. 수주번호: SO-20261027-0001');
+  }, 15000);
+
   it('deletes the loaded order after confirmation in the common dialog and resets to a new order', async () => {
     createSalesOrderMock.mockResolvedValue(createdOrder());
     deleteSalesOrderMock.mockResolvedValue(undefined);
@@ -1051,7 +1093,7 @@ function renderSalesOrderPage(
     { initialEntries: ['/'] },
   );
   return {
-    ...render(<RouterProvider router={router} />),
+    ...render(<NotificationProvider><RouterProvider router={router} /></NotificationProvider>),
     router,
   };
 }

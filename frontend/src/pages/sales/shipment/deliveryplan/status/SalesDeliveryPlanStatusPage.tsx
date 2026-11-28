@@ -1,3 +1,4 @@
+import { useNotification } from '../../../../../shared/context/notification';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { isApiNetworkError } from '../../../../../shared/services/apiErrors';
 import { Alert, Box, Button, Chip, Divider, IconButton, Link, Menu, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material';
@@ -78,7 +79,9 @@ export function SalesDeliveryPlanStatusPage({
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailLoaded, setDetailLoaded] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  // 수정 창 안에서만 보여 줄 실패 메시지(현황 화면 메시지 영역과 분리)
+  const [dialogError, setDialogError] = useState('');
+  const { showSuccess } = useNotification();
   const [detailValues, setDetailValues] = useState<SearchValues>(() => ({
     planDt: { from: filters.planDtFrom, to: filters.planDtTo },
   }));
@@ -143,17 +146,17 @@ export function SalesDeliveryPlanStatusPage({
     };
     const message = validateDeliveryPlan(request, details, plannedRule);
     const gridValid = editGridRef.current?.validate() ?? true;
-    if (message || !gridValid) { if (message) setError(message); return; }
+    if (message || !gridValid) { if (message) setDialogError(message); return; }
     setLoading(true);
-    setError('');
+    setDialogError('');
     try {
       const updated = await updateDeliveryPlan(selected.salesDeliveryPlanId, request);
       setDetails(updated.details);
       setEditRows(planRowsFromDetails(updated.details));
       setDialogMode(null);
-      setNotice(`출하계획 ${updated.planNo}이 수정되었습니다.`);
+      showSuccess(`출하계획 ${updated.planNo}이 수정되었습니다.`);
       await runSearch(filters);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '출하계획 수정에 실패했습니다.'); }
+    } catch (cause) { setDialogError(cause instanceof Error ? cause.message : '출하계획 수정에 실패했습니다.'); }
     finally { setLoading(false); }
   };
 
@@ -200,7 +203,7 @@ export function SalesDeliveryPlanStatusPage({
     }
     setDialogMode(null);
     setEditRows(planRowsFromDetails(details));
-    setError('');
+    setDialogError('');
   };
   const orderNumbers = Array.from(new Set(details.map((detail) => detail.orderNo))).join(', ');
   const orderDates = Array.from(new Set(details.map((detail) => detail.orderDt))).join(', ');
@@ -271,7 +274,6 @@ export function SalesDeliveryPlanStatusPage({
         horizontalPadding="none"
         salesSpacing="contained"
       />
-      {notice ? <Alert severity="success">{notice}</Alert> : null}
       <SearchResultMessage
         resultCount={rows.length}
         horizontalPadding="none"
@@ -302,8 +304,8 @@ export function SalesDeliveryPlanStatusPage({
               <IconButton size="small" aria-label="출하계획 더보기" aria-haspopup="menu" aria-expanded={Boolean(anchor)}
                 disabled={detailLoading || !detailLoaded} onClick={(event) => setAnchor(event.currentTarget)}><MoreVertIcon fontSize="small" /></IconButton>
               <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
-                <MenuItem onClick={() => { setAnchor(null); setEditRows(planRowsFromDetails(details)); setDialogMode('view'); }}>자세히보기</MenuItem>
-                {canEdit ? <MenuItem onClick={() => { setAnchor(null); setEditRows(planRowsFromDetails(details)); setDialogMode('edit'); }}>수정</MenuItem> : null}
+                <MenuItem onClick={() => { setAnchor(null); setEditRows(planRowsFromDetails(details)); setDialogError(''); setDialogMode('view'); }}>자세히보기</MenuItem>
+                {canEdit ? <MenuItem onClick={() => { setAnchor(null); setEditRows(planRowsFromDetails(details)); setDialogError(''); setDialogMode('edit'); }}>수정</MenuItem> : null}
               </Menu>
             </Stack>
           </Stack>
@@ -336,7 +338,8 @@ export function SalesDeliveryPlanStatusPage({
         <Button disabled={loading} onClick={closeDialog}>취소</Button></> : <Button onClick={closeDialog}>닫기</Button>}>
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <Box sx={{ p: 0, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
-        <PageMessageArea message={error} onClose={() => setError('')} />
+        {/* 등록 화면(embedded)과 같이 본문 레이아웃(gap)에 바로 놓아 여백·폭을 맞춘다. */}
+        {dialogError ? <Alert severity="error" onClose={() => setDialogError('')}>{dialogError}</Alert> : null}
         <SalesDecimalPolicyError status={policyState.status} network={policyState.network} />
         <DeliveryPlanForm gridRef={editGridRef} storageKey="sales-delivery-plan-status-details-v1" planNo={selected.planNo} orderNo={selectedOrderNumbers} orderDt={selectedOrderDates}
           customerName={selectedCustomerNames} rows={editRows} setRows={setEditRows} editable={dialogMode === 'edit' && !loading && policyReady}

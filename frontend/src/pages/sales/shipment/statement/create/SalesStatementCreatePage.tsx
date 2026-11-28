@@ -22,7 +22,7 @@ export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
   const { currentMenuName, content, breadcrumbItems, selectedMenuPermissions: permissions, embedded = false } = props;
   const {
     id, item, source, rows, selectedRowIds, setSelectedRowIds, date, changeDate, commitDate, dateError, remark, setRemark, picker, setPicker, printing, setPrinting,
-    pending, error, setError, notice, canRead, canSave, canDelete, editable, dirty, blocker, dialog,
+    pending, error, setError, canRead, canSave, canDelete, editable, dirty, blocker, dialog,
     choose, save, remove, handleNew, print, initialLoad, retryLoad,
   } = useSalesStatementCreate(props);
   const policyState = usePolicyDecimalStatus();
@@ -63,7 +63,6 @@ export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
       sx={{ px: embedded ? 0 : 2, pt: embedded ? 0 : 2, pb: embedded ? 0 : 2,
         display: 'flex', flexDirection: 'column',
         minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
-      {notice ? <Alert severity="success">{notice}</Alert> : null}
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
       <Paper variant="outlined" sx={{ p: 2, minWidth: 0, borderRadius: 1 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>거래명세서 기본정보</Typography>
