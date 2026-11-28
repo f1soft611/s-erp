@@ -76,6 +76,8 @@ export function SalesDeliveryPlanStatusPage({
   const [dialogMode, setDialogMode] = useState<'view' | 'edit' | null>(null);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [loading, setLoading] = useState(true);
+  // 수정 창 저장 중(목록 로딩과 분리: 저장 중에도 현황 목록은 그대로 둔다)
+  const [saving, setSaving] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailLoaded, setDetailLoaded] = useState(false);
   const [error, setError] = useState('');
@@ -89,14 +91,15 @@ export function SalesDeliveryPlanStatusPage({
     planDt: { from: filters.planDtFrom, to: filters.planDtTo },
   }), [filters]);
 
-  const runSearch = useCallback(async (next: DeliveryPlanFilters) => {
+  // quiet: 수정 창 저장 후 재조회처럼 목록 로딩 표시 없이 갱신한다.
+  const runSearch = useCallback(async (next: DeliveryPlanFilters, { quiet = false }: { quiet?: boolean } = {}) => {
     if (!validDeliveryPlanPeriod(next)) { setError('계획일 기간의 시작일과 종료일을 확인해 주세요.'); return; }
-    setLoading(true);
+    if (!quiet) setLoading(true);
     setError('');
     startLoad();
     try { setRows(await getDeliveryPlanStatus(next)); setAppliedKeyword(next.keyword.trim()); succeedLoad(); }
     catch (cause) { failLoad(cause); if (!isApiNetworkError(cause)) setError(cause instanceof Error ? cause.message : '출하계획 현황 조회에 실패했습니다.'); }
-    finally { setLoading(false); }
+    finally { if (!quiet) setLoading(false); }
   }, [startLoad, succeedLoad, failLoad]);
 
   const search = () => runSearch(filters);
@@ -147,7 +150,7 @@ export function SalesDeliveryPlanStatusPage({
     const message = validateDeliveryPlan(request, details, plannedRule);
     const gridValid = editGridRef.current?.validate() ?? true;
     if (message || !gridValid) { if (message) setDialogError(message); return; }
-    setLoading(true);
+    setSaving(true);
     setDialogError('');
     try {
       const updated = await updateDeliveryPlan(selected.salesDeliveryPlanId, request);
@@ -155,9 +158,9 @@ export function SalesDeliveryPlanStatusPage({
       setEditRows(planRowsFromDetails(updated.details));
       setDialogMode(null);
       showSuccess(`출하계획 ${updated.planNo}이 수정되었습니다.`);
-      await runSearch(filters);
+      await runSearch(filters, { quiet: true });
     } catch (cause) { setDialogError(cause instanceof Error ? cause.message : '출하계획 수정에 실패했습니다.'); }
-    finally { setLoading(false); }
+    finally { setSaving(false); }
   };
 
   const actions: PermissionActionGroupDefinition[] = [{
@@ -191,7 +194,7 @@ export function SalesDeliveryPlanStatusPage({
 
   const canEdit = Boolean(permissions.update || registrationCanUpdate(selectedModule.tree));
   const closeDialog = async () => {
-    if (loading) return;
+    if (saving) return;
     if (
       dialogMode === 'edit' &&
       JSON.stringify(editGridRef.current?.getActiveRows() ?? editRows) !== JSON.stringify(planRowsFromDetails(details)) &&
@@ -334,15 +337,15 @@ export function SalesDeliveryPlanStatusPage({
       </PostDetailPanel></PageAreaOverlay> : null}
     {selected && dialogMode ? <CommonDialog open title={dialogMode === 'edit' ? '출하계획 수정' : '출하계획 상세보기'}
       onClose={closeDialog} size="lg" bodyMode="fill" paperHeight="min(900px, 92vh)" fullScreenOnMobile
-      actions={dialogMode === 'edit' ? <><Button variant="contained" disabled={loading || !policyReady} onClick={() => void save()}>저장</Button>
-        <Button disabled={loading} onClick={closeDialog}>취소</Button></> : <Button onClick={closeDialog}>닫기</Button>}>
+      actions={dialogMode === 'edit' ? <><Button variant="contained" disabled={saving || !policyReady} onClick={() => void save()}>저장</Button>
+        <Button disabled={saving} onClick={closeDialog}>취소</Button></> : <Button onClick={closeDialog}>닫기</Button>}>
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <Box sx={{ p: 0, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
         {/* 등록 화면(embedded)과 같이 본문 레이아웃(gap)에 바로 놓아 여백·폭을 맞춘다. */}
         {dialogError ? <Alert severity="error" onClose={() => setDialogError('')}>{dialogError}</Alert> : null}
         <SalesDecimalPolicyError status={policyState.status} network={policyState.network} />
         <DeliveryPlanForm gridRef={editGridRef} storageKey="sales-delivery-plan-status-details-v1" planNo={selected.planNo} orderNo={selectedOrderNumbers} orderDt={selectedOrderDates}
-          customerName={selectedCustomerNames} rows={editRows} setRows={setEditRows} editable={dialogMode === 'edit' && !loading && policyReady}
+          customerName={selectedCustomerNames} rows={editRows} setRows={setEditRows} editable={dialogMode === 'edit' && !saving && policyReady}
           canSelectOrder={false} onSelectOrder={() => undefined} />
       </Box>
       </Box>

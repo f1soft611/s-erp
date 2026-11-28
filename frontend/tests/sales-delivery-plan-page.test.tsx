@@ -417,6 +417,37 @@ it('shows a save failure only inside the edit dialog and keeps it off the status
   expect(screen.queryByText('계획 저장 서버 오류')).not.toBeInTheDocument();
 });
 
+it('keeps the status list quiet while saving in the edit dialog and while reloading after the save', async () => {
+  let finishSave!: (value: DeliveryPlanItem) => void;
+  let finishReload!: (value: DeliveryPlanStatusRow[]) => void;
+  vi.mocked(updateDeliveryPlan).mockImplementationOnce(() => new Promise((resolve) => { finishSave = resolve; }));
+  await renderReady(<SalesDeliveryPlanStatusPage {...props} />);
+  const grid = screen.getByRole('grid', { name: '출하계획 현황 목록' });
+  fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
+  await screen.findByRole('group', { name: '출하계획 정보' });
+  fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+  const dialog = screen.getByRole('dialog', { name: '출하계획 수정' });
+  const cell = planCell(within(dialog).getByRole('grid'), 0, 5);
+  fireEvent.doubleClick(cell);
+  fireEvent.change(cell.querySelector('input')!, { target: { value: '7' } });
+  const save = within(dialog).getByRole('button', { name: '저장', exact: true });
+  fireEvent.click(save);
+
+  await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledTimes(1));
+  expect(save).toBeDisabled();
+  expect(grid).not.toHaveAttribute('aria-busy');
+  expect(grid).toHaveTextContent('DP-9');
+
+  vi.mocked(getDeliveryPlanStatus).mockImplementationOnce(() => new Promise((resolve) => { finishReload = resolve; }));
+  await act(async () => finishSave({ ...plan, details: [{ ...plan.details[0], plannedQty: 7 }] }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '출하계획 수정' })).not.toBeInTheDocument());
+  await waitFor(() => expect(getDeliveryPlanStatus).toHaveBeenCalledTimes(2));
+  expect(grid).not.toHaveAttribute('aria-busy');
+  expect(grid).toHaveTextContent('DP-9');
+  await act(async () => finishReload([statusRow]));
+});
+
 it('opens and closes the standard status detail panel', async () => {
   await renderReady(<SalesDeliveryPlanStatusPage {...props} />);
   fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));

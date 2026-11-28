@@ -323,6 +323,33 @@ it('opens the same registration form from status detail and prints its stored sn
   }
   await waitFor(() => expect(getStatement).toHaveBeenCalledWith(3));
 });
+it('refreshes the status list quietly after saving in the edit dialog', async () => {
+  const row = { ...detail, salesStatementId: 3, statementNo: 'TS-1',
+    statementDt: '2026-11-09', deliveryNo: 'SD-1', customerCode: 'C1', customerName: '거래처', lineTotalAmt: 220 };
+  let finishReload!: (rows: StatementStatusRow[]) => void;
+  vi.mocked(getStatementStatus).mockResolvedValueOnce([row])
+    .mockImplementationOnce(() => new Promise((resolve) => { finishReload = resolve; }));
+  vi.mocked(updateStatement).mockResolvedValue({ ...item, remark: '조용한 갱신' });
+  mount(<SalesStatementStatusPage {...props} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'TS-1 상세 보기' }));
+  const panel = await screen.findByRole('region', { name: '거래명세서 상세' });
+  await within(panel).findByRole('table', { name: '거래명세서 품목 목록' });
+  fireEvent.click(within(panel).getByRole('button', { name: '거래명세서 더보기' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+  const dialog = await screen.findByRole('dialog', { name: '거래명세서 수정' });
+  await within(dialog).findByDisplayValue('TS-1');
+  fireEvent.change(within(dialog).getByRole('textbox', { name: '비고' }), { target: { value: '조용한 갱신' } });
+  const save = within(dialog).getByRole('button', { name: '저장', exact: true });
+  await waitFor(() => expect(save).toBeEnabled());
+  fireEvent.click(save);
+
+  await waitFor(() => expect(getStatementStatus).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '거래명세서 수정' })).not.toBeInTheDocument());
+  const grid = screen.getByRole('grid', { name: '거래명세서현황 목록' });
+  expect(grid).not.toHaveAttribute('aria-busy');
+  expect(grid).toHaveTextContent('TS-1');
+  await act(async () => finishReload([row]));
+}, 20000);
 it('opens the source delivery detail panel from the status delivery number', async () => {
   vi.mocked(getStatementStatus).mockResolvedValue([{ ...detail, salesStatementId: 3, statementNo: 'TS-1',
     statementDt: '2026-11-09', deliveryNo: 'SD-1', sourceDeliveryId: 1, sourceDeliveryNo: 'SD-1',

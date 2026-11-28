@@ -47,6 +47,8 @@ export function useSalesStatementStatus(props: StatementPageProps) {
   const [deliveryLoading, setDeliveryLoading] = useState(false);
   const [deliveryEditor, setDeliveryEditor] = useState<'view' | null>(null);
   const [refresh, setRefresh] = useState(0);
+  // 수정 창 저장·삭제 후 재조회처럼 목록 로딩 표시 없이 처리할 refresh 번호
+  const [quietRefresh, setQuietRefresh] = useState<number | null>(null);
   const [detailRefresh, setDetailRefresh] = useState(0);
   const request = useRef(0);
   const { start, succeed, fail, ...initialLoad } = useInitialLoadState({ networkOnly: true });
@@ -73,7 +75,7 @@ export function useSalesStatementStatus(props: StatementPageProps) {
     setPreviousListRequest({ canRead, applied, appliedKeyword, refresh });
     const period = applied.statementDt;
     if (canRead && typeof period === 'object' && period) {
-      setLoading(true);
+      if (quietRefresh !== refresh) setLoading(true);
       setError('');
       start();
     }
@@ -135,11 +137,16 @@ export function useSalesStatementStatus(props: StatementPageProps) {
   const closeDetail = () => {
     if (!editor && !printing) { setSelectedId(null); setDetail(null); }
   };
+  const refreshQuietly = () => {
+    const next = refresh + 1;
+    setQuietRefresh(next);
+    setRefresh(next);
+  };
   const saved = () => {
-    setEditor(null); setDetailRefresh((value) => value + 1); setRefresh((value) => value + 1);
+    setEditor(null); setDetailRefresh((value) => value + 1); refreshQuietly();
   };
   const deleted = () => {
-    setEditor(null); setSelectedId(null); setDetail(null); setRefresh((value) => value + 1);
+    setEditor(null); setSelectedId(null); setDetail(null); refreshQuietly();
   };
 
   const retry = () => setRefresh((value) => value + 1);
