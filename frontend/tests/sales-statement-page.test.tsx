@@ -4,10 +4,11 @@ import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router-d
 import { beforeEach, expect, it, vi } from 'vitest';
 import { SalesStatementCreatePage } from '../src/pages/sales/shipment/statement/create/SalesStatementCreatePage';
 import { SalesStatementStatusPage } from '../src/pages/sales/shipment/statement/status/SalesStatementStatusPage';
-import { createStatement, getStatement, getStatementStatus, searchStatementSources, updateStatement } from '../src/pages/sales/shipment/statement/services/salesStatement.service';
+import { createStatement, deleteStatement, getStatement, getStatementStatus, searchStatementSources, updateStatement } from '../src/pages/sales/shipment/statement/services/salesStatement.service';
 import { getDelivery } from '../src/pages/sales/shipment/delivery/create/services/salesDelivery.service';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
 import { getSystemDate } from '../src/shared/services/systemDateService';
+import { NotificationProvider } from '../src/shared/context/NotificationContext';
 import type { StatementItem, StatementStatusRow } from '../src/pages/sales/shipment/statement/types/salesStatement.types';
 
 vi.mock('../src/shared/services/systemDateService', async (original) => ({
@@ -349,6 +350,37 @@ it('refreshes the status list quietly after saving in the edit dialog', async ()
   expect(grid).not.toHaveAttribute('aria-busy');
   expect(grid).toHaveTextContent('TS-1');
   await act(async () => finishReload([row]));
+}, 20000);
+async function openStatementEditor() {
+  vi.mocked(getStatementStatus).mockResolvedValue([{ ...detail, salesStatementId: 3, statementNo: 'TS-1',
+    statementDt: '2026-11-09', deliveryNo: 'SD-1', customerCode: 'C1', customerName: '거래처', lineTotalAmt: 220 }]);
+  render(<NotificationProvider><RouterProvider router={createMemoryRouter([
+    { path: '/', element: <SalesStatementStatusPage {...props} /> }])} /></NotificationProvider>);
+  fireEvent.click(await screen.findByRole('button', { name: 'TS-1 상세 보기' }));
+  const panel = await screen.findByRole('region', { name: '거래명세서 상세' });
+  await within(panel).findByRole('table', { name: '거래명세서 품목 목록' });
+  fireEvent.click(within(panel).getByRole('button', { name: '거래명세서 더보기' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+  const dialog = await screen.findByRole('dialog', { name: '거래명세서 수정' });
+  await within(dialog).findByDisplayValue('TS-1');
+  fireEvent.click(within(dialog).getByRole('button', { name: '삭제' }));
+  const confirm = await screen.findByRole('dialog', { name: '거래명세서 삭제' });
+  fireEvent.click(within(confirm).getByRole('button', { name: '확인' }));
+  return dialog;
+}
+it('shows the statement delete success as a toast after the edit dialog closes', async () => {
+  vi.mocked(deleteStatement).mockResolvedValue(undefined);
+  await openStatementEditor();
+  await waitFor(() => expect(deleteStatement).toHaveBeenCalledWith(3));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '거래명세서 수정' })).not.toBeInTheDocument());
+  expect(await screen.findByText('거래명세서가 삭제되었습니다. 명세번호: TS-1')).toBeInTheDocument();
+}, 20000);
+it('keeps a statement delete failure inside the edit dialog without a success toast', async () => {
+  vi.mocked(deleteStatement).mockRejectedValue(new Error('서버가 삭제하지 못했습니다.'));
+  const dialog = await openStatementEditor();
+  expect(await within(dialog).findByText('서버가 삭제하지 못했습니다.')).toBeInTheDocument();
+  expect(dialog).toBeInTheDocument();
+  expect(screen.queryByText(/거래명세서가 삭제되었습니다/)).not.toBeInTheDocument();
 }, 20000);
 it('opens the source delivery detail panel from the status delivery number', async () => {
   vi.mocked(getStatementStatus).mockResolvedValue([{ ...detail, salesStatementId: 3, statementNo: 'TS-1',

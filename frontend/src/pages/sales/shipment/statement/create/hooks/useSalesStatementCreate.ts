@@ -207,10 +207,16 @@ export function useSalesStatementCreate({
     if (!canDelete || !id || busy.current) return;
     if (!(await confirm({ title: '거래명세서 삭제', description: '거래명세서를 삭제하시겠습니까?' }))) return;
     busy.current = true; setPending(true); setError('');
-    try { await deleteStatement(id); await reset(); onDeleted?.(); }
+    // reset이 item을 비우므로 삭제 전 명세번호를 보관해 성공 토스트에 쓴다.
+    const statementNo = item?.statementNo;
+    try {
+      await deleteStatement(id); await reset();
+      showSuccess(statementNo ? `거래명세서가 삭제되었습니다. 명세번호: ${statementNo}` : '거래명세서가 삭제되었습니다.');
+      onDeleted?.();
+    }
     catch (cause) { setError(cause instanceof Error ? cause.message : '거래명세서 삭제에 실패했습니다.'); }
     finally { busy.current = false; setPending(false); }
-  }, [canDelete, id, reset, onDeleted, confirm]);
+  }, [canDelete, id, item, reset, onDeleted, confirm, showSuccess]);
   const handleNew = useCallback(async () => {
     if (dirty && !(await confirm({ description: '입력 내용을 초기화하시겠습니까?' }))) return;
     await reset();
