@@ -1,3 +1,4 @@
+import { useNotification } from '../../../../shared/context/notification';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isApiNetworkError } from '../../../../shared/services/apiErrors';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -111,7 +112,7 @@ export function RevenueClosingPage(props: Props) {
   const closeSource = useCallback(() => setSourceTarget(null), []);
   const [selectedRowIds, setSelectedRowIds] = useState<F1GridRowId[]>([]);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const { showSuccess } = useNotification();
   const [loading, setLoading] = useState(true);
   const [closing, setClosing] = useState(false);
   const [details, setDetails] = useState<RevenueClosingDetailRow[]>(emptyDetails);
@@ -250,7 +251,6 @@ export function RevenueClosingPage(props: Props) {
     const detailIds = selectedDetailIds;
     if (!canCreate || closing || closeInFlightRef.current || detailIds.length === 0) return;
     if (new Set(detailIds).size > MAX_STATEMENT_DETAIL_COUNT) {
-      setNotice('');
       setError('매출마감은 출하 상세를 최대 100건까지 처리할 수 있습니다.');
       return;
     }
@@ -267,12 +267,11 @@ export function RevenueClosingPage(props: Props) {
 
     setClosing(true);
     setError('');
-    setNotice('');
     try {
       const statementDt = await getSystemDate();
       const result = await closeRevenueClosings(detailIds, statementDt);
       clearGridSelection();
-      setNotice(`${result.closedCount.toLocaleString('ko-KR')}개 상세의 매출마감이 완료되었습니다.`);
+      showSuccess(`${result.closedCount.toLocaleString('ko-KR')}개 상세의 매출마감이 완료되었습니다.`);
       setLoading(true);
       setAppliedSearch((current) => ({ ...current }));
     } catch (closeError) {
@@ -388,7 +387,6 @@ export function RevenueClosingPage(props: Props) {
         }
       />
       {error ? <Alert severity="error" onClose={() => setError('')}>{error}</Alert> : null}
-      {notice ? <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert> : null}
       <Box
         sx={{
           px: 2,

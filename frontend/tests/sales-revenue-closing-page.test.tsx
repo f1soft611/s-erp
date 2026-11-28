@@ -20,6 +20,10 @@ import { searchOrderCustomers } from '../src/pages/sales/order/create/services/s
 import { getDelivery } from '../src/pages/sales/shipment/delivery/create/services/salesDelivery.service';
 import { getSalesOrder } from '../src/pages/sales/order/create/services/salesOrder.service';
 
+const notification = vi.hoisted(() => ({ showSuccess: vi.fn(), showWarning: vi.fn(), showError: vi.fn() }));
+// 성공 문구는 공통 토스트(showSuccess)로 표시된다.
+vi.mock('../src/shared/context/notification', () => ({ useNotification: () => notification }));
+
 vi.mock('../src/pages/sales/order/create/services/salesOrderMaster.service', () => ({
   searchOrderCustomers: vi.fn(async () => [
     { id: 11, code: 'C11', name: '가나다상사', details: [{ label: '사업자번호', value: '123-45-67890' }] },
@@ -373,7 +377,7 @@ it('prevents duplicate close submissions and reloads after a successful line-lev
   expect(closeRevenueClosings).toHaveBeenCalledWith([10, 11], '2026-11-20');
 
   await act(async () => resolveClose({ closedCount: 2, items: [] }));
-  expect(await screen.findByText('2개 상세의 매출마감이 완료되었습니다.')).toBeInTheDocument();
+  await waitFor(() => expect(notification.showSuccess).toHaveBeenCalledWith('2개 상세의 매출마감이 완료되었습니다.'));
   await waitFor(() => expect(searchRevenueClosings).toHaveBeenCalledTimes(2));
   expect(screen.getByRole('button', { name: '마감 (0건)' })).toBeDisabled();
 });

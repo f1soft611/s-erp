@@ -117,8 +117,8 @@ it('preserves an exact price edited in the delivery grid', async () => {
     mount(<GridDecimalModuleProvider moduleCode="SALES"><SalesDeliveryCreatePage {...props} salesDeliveryId={1} /></GridDecimalModuleProvider>);
     await screen.findByDisplayValue('SD-1');
     const row = screen.getByRole('row', { name: /delivery-2 행 선택/ });
-    const cells = within(row).getAllByRole('gridcell');
-    fireEvent.doubleClick(cells.find((cell) => cell.textContent === '100.000000')!);
+    // 헤더 조회와 소수점 정책 조회는 따로 끝나므로, 정책이 적용된 단가 셀이 나타날 때까지 기다린다.
+    fireEvent.doubleClick(await within(row).findByText('100.000000', { exact: true }));
     const editor = screen.getByRole('spinbutton');
     fireEvent.change(editor, { target: { value: '1234567890123.100001' } });
     fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });

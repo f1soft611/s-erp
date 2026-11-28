@@ -8,6 +8,7 @@ export function createStatementStatusColumns(
   onOpenDelivery: (row: StatementStatusRow) => void,
 ): F1GridColumn<StatementStatusRow>[] {
   return [
+    { field: 'salesStatementDetailId', headerName: 'No', type: 'rownumber', width: 56, align: 'center', pinned: 'left', search: { hidden: true }, form: { hidden: true } },
     { field: 'statementNo', headerName: '명세번호', width: 140, align: 'center', mergeRows: true, highlightSearch: true,
       renderCell: ({ row, highlightKeyword }) => <Link component="button" type="button" underline="hover" aria-label={`${row.statementNo} 상세 보기`}
         onClick={(event) => { event.stopPropagation(); onOpenStatement(row); }}

@@ -1,3 +1,5 @@
+import { COMMON_DIALOG_BODY_PADDING } from '../../../../shared/components/commonDialogLayout';
+import { useNotification } from '../../../../shared/context/notification';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isApiNetworkError } from '../../../../shared/services/apiErrors';
 import { useBlocker } from 'react-router-dom';
@@ -199,7 +201,7 @@ export function SalesOrderCreatePage({
   const [gridRows, setGridRows] = useState<SalesOrderDetailRow[]>([]);
   const [gridKey, setGridKey] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
-  const [notice, setNotice] = useState('');
+  const { showSuccess } = useNotification();
   const [hasDetailChanges, setHasDetailChanges] = useState(false);
   const [validationErrors, setValidationErrors] =
     useState<SalesOrderValidationErrors | null>(null);
@@ -512,7 +514,6 @@ export function SalesOrderCreatePage({
 
     savingRef.current = true;
     setIsSaving(true);
-    setNotice('');
     const payload = buildSalesOrderCreatePayload(input, policy);
     try {
       if (loadedOrder) {
@@ -521,7 +522,7 @@ export function SalesOrderCreatePage({
           payload,
         );
         applyLoadedOrder(updated);
-        setNotice(`수주가 수정되었습니다. 수주번호: ${updated.orderNo}`);
+        showSuccess(`수주가 수정되었습니다. 수주번호: ${updated.orderNo}`);
         onSaved?.(updated);
         return;
       }
@@ -530,7 +531,7 @@ export function SalesOrderCreatePage({
       try {
         const reloaded = await getSalesOrder(saved.salesOrderId);
         applyLoadedOrder(reloaded);
-        setNotice(`수주가 저장되었습니다. 수주번호: ${reloaded.orderNo}`);
+        showSuccess(`수주가 저장되었습니다. 수주번호: ${reloaded.orderNo}`);
         onSaved?.(reloaded);
       } catch {
         setIsLocked(true);
@@ -548,7 +549,7 @@ export function SalesOrderCreatePage({
       savingRef.current = false;
       setIsSaving(false);
     }
-  }, [
+  }, [showSuccess, 
     applyLoadedOrder,
     customer,
     destination,
@@ -583,12 +584,11 @@ export function SalesOrderCreatePage({
 
     savingRef.current = true;
     setIsSaving(true);
-    setNotice('');
     setError('');
     try {
       await deleteSalesOrder(loadedOrder.salesOrderId);
       await resetToNewOrder();
-      setNotice(`수주가 삭제되었습니다. 수주번호: ${loadedOrder.orderNo}`);
+      showSuccess(`수주가 삭제되었습니다. 수주번호: ${loadedOrder.orderNo}`);
       onDeleted?.();
     } catch (deleteError) {
       setError(
@@ -600,7 +600,7 @@ export function SalesOrderCreatePage({
       savingRef.current = false;
       setIsSaving(false);
     }
-  }, [isDeletable, loadedOrder, onDeleted, resetToNewOrder]);
+  }, [showSuccess, isDeletable, loadedOrder, onDeleted, resetToNewOrder]);
 
   const handleNew = useCallback(async () => {
     if (savingRef.current) {
@@ -616,7 +616,6 @@ export function SalesOrderCreatePage({
       return;
     }
     await resetToNewOrder();
-    setNotice('');
   }, [confirm, hasUnsavedChanges, resetToNewOrder]);
 
   const actions = useMemo<PermissionActionGroupDefinition[]>(
@@ -751,9 +750,7 @@ export function SalesOrderCreatePage({
           minWidth: 0,
           overflowX: 'hidden',
           overflowY: 'auto',
-          px: embedded ? 0 : 2,
-          pt: embedded ? 0 : 2,
-          pb: embedded ? 0 : 2,
+          ...(embedded ? COMMON_DIALOG_BODY_PADDING : { px: 2, pt: 2, pb: 2 }),
         }}
       >
         {validationMessages.length > 0 && (
@@ -765,7 +762,6 @@ export function SalesOrderCreatePage({
             </Box>
           </Alert>
         )}
-        {notice && <Alert severity="success">{notice}</Alert>}
         <SalesDecimalPolicyError status={policyState.status} network={policyState.network} />
         {commonCodesError || missingCommonCodes ? (
           <Alert

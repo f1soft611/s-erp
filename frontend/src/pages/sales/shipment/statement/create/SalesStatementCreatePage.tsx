@@ -1,3 +1,4 @@
+import { COMMON_DIALOG_BODY_PADDING } from '../../../../../shared/components/commonDialogLayout';
 import SearchIcon from '@mui/icons-material/Search';
 import SaveIcon from '@mui/icons-material/Save';
 import NoteAddOutlinedIcon from '@mui/icons-material/NoteAddOutlined';
@@ -22,7 +23,7 @@ export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
   const { currentMenuName, content, breadcrumbItems, selectedMenuPermissions: permissions, embedded = false } = props;
   const {
     id, item, source, rows, selectedRowIds, setSelectedRowIds, date, changeDate, commitDate, dateError, remark, setRemark, picker, setPicker, printing, setPrinting,
-    pending, error, setError, notice, canRead, canSave, canDelete, editable, dirty, blocker, dialog,
+    pending, error, setError, canRead, canSave, canDelete, editable, dirty, blocker, dialog,
     choose, save, remove, handleNew, print, initialLoad, retryLoad,
   } = useSalesStatementCreate(props);
   const policyState = usePolicyDecimalStatus();
@@ -60,10 +61,9 @@ export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
     <PageLoadBoundary {...initialLoad} error={initialLoad.error ?? (policyState.network ? 'network' : null)} label="거래명세서등록"
       onRetry={() => { if (policyState.network) resetGridDecimalPolicyCache(); retryLoad(); }}>
     <Box role="region" aria-label="거래명세서 입력 내용" aria-busy={pending}
-      sx={{ px: embedded ? 0 : 2, pt: embedded ? 0 : 2, pb: embedded ? 0 : 2,
+      sx={{ ...(embedded ? COMMON_DIALOG_BODY_PADDING : { px: 2, pt: 2, pb: 2 }),
         display: 'flex', flexDirection: 'column',
         minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
-      {notice ? <Alert severity="success">{notice}</Alert> : null}
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
       <Paper variant="outlined" sx={{ p: 2, minWidth: 0, borderRadius: 1 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>거래명세서 기본정보</Typography>
@@ -110,7 +110,7 @@ export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
       </Paper>
     </Box>
     </PageLoadBoundary>
-    <StatementSourcePicker open={picker} onClose={() => setPicker(false)} onSelect={(value) => void choose(value)} />
+    {picker ? <StatementSourcePicker open onClose={() => setPicker(false)} onSelect={(value) => void choose(value)} /> : null}
     {printing && item ? <StatementPrint item={item} onClose={() => setPrinting(false)} /> : null}
     <UnsavedChangesConfirmDialog open={blocker.state === 'blocked'} disableContinue={pending}
       onCancel={() => blocker.state === 'blocked' && blocker.reset()}

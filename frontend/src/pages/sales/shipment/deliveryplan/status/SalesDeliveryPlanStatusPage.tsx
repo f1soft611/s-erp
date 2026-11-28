@@ -1,9 +1,11 @@
+import { useNotification } from '../../../../../shared/context/notification';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { isApiNetworkError } from '../../../../../shared/services/apiErrors';
 import { Alert, Box, Button, Chip, Divider, IconButton, Link, Menu, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
+import { COMMON_DIALOG_BODY_PADDING } from '../../../../../shared/components/commonDialogLayout';
 import { ProfileAvatar } from '../../../../../shared/components/ProfileAvatar';
 import { resetGridDecimalPolicyCache } from '../../../../../shared/services/gridDecimalPolicy.service';
 import { PageLoadBoundary } from '../../../../../shared/components/PageLoadBoundary';
@@ -75,10 +77,14 @@ export function SalesDeliveryPlanStatusPage({
   const [dialogMode, setDialogMode] = useState<'view' | 'edit' | null>(null);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [loading, setLoading] = useState(true);
+  // 수정 창 저장 중(목록 로딩과 분리: 저장 중에도 현황 목록은 그대로 둔다)
+  const [saving, setSaving] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailLoaded, setDetailLoaded] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  // 수정 창 안에서만 보여 줄 실패 메시지(현황 화면 메시지 영역과 분리)
+  const [dialogError, setDialogError] = useState('');
+  const { showSuccess } = useNotification();
   const [detailValues, setDetailValues] = useState<SearchValues>(() => ({
     planDt: { from: filters.planDtFrom, to: filters.planDtTo },
   }));
@@ -86,14 +92,15 @@ export function SalesDeliveryPlanStatusPage({
     planDt: { from: filters.planDtFrom, to: filters.planDtTo },
   }), [filters]);
 
-  const runSearch = useCallback(async (next: DeliveryPlanFilters) => {
+  // quiet: 수정 창 저장 후 재조회처럼 목록 로딩 표시 없이 갱신한다.
+  const runSearch = useCallback(async (next: DeliveryPlanFilters, { quiet = false }: { quiet?: boolean } = {}) => {
     if (!validDeliveryPlanPeriod(next)) { setError('계획일 기간의 시작일과 종료일을 확인해 주세요.'); return; }
-    setLoading(true);
+    if (!quiet) setLoading(true);
     setError('');
     startLoad();
     try { setRows(await getDeliveryPlanStatus(next)); setAppliedKeyword(next.keyword.trim()); succeedLoad(); }
     catch (cause) { failLoad(cause); if (!isApiNetworkError(cause)) setError(cause instanceof Error ? cause.message : '출하계획 현황 조회에 실패했습니다.'); }
-    finally { setLoading(false); }
+    finally { if (!quiet) setLoading(false); }
   }, [startLoad, succeedLoad, failLoad]);
 
   const search = () => runSearch(filters);
@@ -143,18 +150,18 @@ export function SalesDeliveryPlanStatusPage({
     };
     const message = validateDeliveryPlan(request, details, plannedRule);
     const gridValid = editGridRef.current?.validate() ?? true;
-    if (message || !gridValid) { if (message) setError(message); return; }
-    setLoading(true);
-    setError('');
+    if (message || !gridValid) { if (message) setDialogError(message); return; }
+    setSaving(true);
+    setDialogError('');
     try {
       const updated = await updateDeliveryPlan(selected.salesDeliveryPlanId, request);
       setDetails(updated.details);
       setEditRows(planRowsFromDetails(updated.details));
       setDialogMode(null);
-      setNotice(`출하계획 ${updated.planNo}이 수정되었습니다.`);
-      await runSearch(filters);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '출하계획 수정에 실패했습니다.'); }
-    finally { setLoading(false); }
+      showSuccess(`출하계획 ${updated.planNo}이 수정되었습니다.`);
+      await runSearch(filters, { quiet: true });
+    } catch (cause) { setDialogError(cause instanceof Error ? cause.message : '출하계획 수정에 실패했습니다.'); }
+    finally { setSaving(false); }
   };
 
   const actions: PermissionActionGroupDefinition[] = [{
@@ -188,7 +195,7 @@ export function SalesDeliveryPlanStatusPage({
 
   const canEdit = Boolean(permissions.update || registrationCanUpdate(selectedModule.tree));
   const closeDialog = async () => {
-    if (loading) return;
+    if (saving) return;
     if (
       dialogMode === 'edit' &&
       JSON.stringify(editGridRef.current?.getActiveRows() ?? editRows) !== JSON.stringify(planRowsFromDetails(details)) &&
@@ -200,7 +207,7 @@ export function SalesDeliveryPlanStatusPage({
     }
     setDialogMode(null);
     setEditRows(planRowsFromDetails(details));
-    setError('');
+    setDialogError('');
   };
   const orderNumbers = Array.from(new Set(details.map((detail) => detail.orderNo))).join(', ');
   const orderDates = Array.from(new Set(details.map((detail) => detail.orderDt))).join(', ');
@@ -271,7 +278,6 @@ export function SalesDeliveryPlanStatusPage({
         horizontalPadding="none"
         salesSpacing="contained"
       />
-      {notice ? <Alert severity="success">{notice}</Alert> : null}
       <SearchResultMessage
         resultCount={rows.length}
         horizontalPadding="none"
@@ -302,8 +308,8 @@ export function SalesDeliveryPlanStatusPage({
               <IconButton size="small" aria-label="출하계획 더보기" aria-haspopup="menu" aria-expanded={Boolean(anchor)}
                 disabled={detailLoading || !detailLoaded} onClick={(event) => setAnchor(event.currentTarget)}><MoreVertIcon fontSize="small" /></IconButton>
               <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
-                <MenuItem onClick={() => { setAnchor(null); setEditRows(planRowsFromDetails(details)); setDialogMode('view'); }}>자세히보기</MenuItem>
-                {canEdit ? <MenuItem onClick={() => { setAnchor(null); setEditRows(planRowsFromDetails(details)); setDialogMode('edit'); }}>수정</MenuItem> : null}
+                <MenuItem onClick={() => { setAnchor(null); setEditRows(planRowsFromDetails(details)); setDialogError(''); setDialogMode('view'); }}>자세히보기</MenuItem>
+                {canEdit ? <MenuItem onClick={() => { setAnchor(null); setEditRows(planRowsFromDetails(details)); setDialogError(''); setDialogMode('edit'); }}>수정</MenuItem> : null}
               </Menu>
             </Stack>
           </Stack>
@@ -331,15 +337,16 @@ export function SalesDeliveryPlanStatusPage({
         </Stack>
       </PostDetailPanel></PageAreaOverlay> : null}
     {selected && dialogMode ? <CommonDialog open title={dialogMode === 'edit' ? '출하계획 수정' : '출하계획 상세보기'}
-      onClose={closeDialog} size="lg" bodyMode="fill" paperHeight="min(900px, 92vh)" fullScreenOnMobile
-      actions={dialogMode === 'edit' ? <><Button variant="contained" disabled={loading || !policyReady} onClick={() => void save()}>저장</Button>
-        <Button disabled={loading} onClick={closeDialog}>취소</Button></> : <Button onClick={closeDialog}>닫기</Button>}>
+      onClose={closeDialog} size="lg" bodyMode="fill" disableBodyGutters paperHeight="min(900px, 92vh)" fullScreenOnMobile
+      actions={dialogMode === 'edit' ? <><Button variant="contained" disabled={saving || !policyReady} onClick={() => void save()}>저장</Button>
+        <Button disabled={saving} onClick={closeDialog}>취소</Button></> : <Button onClick={closeDialog}>닫기</Button>}>
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      <Box sx={{ p: 0, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
-        <PageMessageArea message={error} onClose={() => setError('')} />
+      <Box sx={{ ...COMMON_DIALOG_BODY_PADDING, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
+        {/* 등록 화면(embedded)과 같이 본문 레이아웃(gap)에 바로 놓아 여백·폭을 맞춘다. */}
+        {dialogError ? <Alert severity="error" onClose={() => setDialogError('')}>{dialogError}</Alert> : null}
         <SalesDecimalPolicyError status={policyState.status} network={policyState.network} />
         <DeliveryPlanForm gridRef={editGridRef} storageKey="sales-delivery-plan-status-details-v1" planNo={selected.planNo} orderNo={selectedOrderNumbers} orderDt={selectedOrderDates}
-          customerName={selectedCustomerNames} rows={editRows} setRows={setEditRows} editable={dialogMode === 'edit' && !loading && policyReady}
+          customerName={selectedCustomerNames} rows={editRows} setRows={setEditRows} editable={dialogMode === 'edit' && !saving && policyReady}
           canSelectOrder={false} onSelectOrder={() => undefined} />
       </Box>
       </Box>

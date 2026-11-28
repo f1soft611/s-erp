@@ -39,6 +39,7 @@ export function StatementEditorDialog({ id, mode, page, permissions, onClose, on
         onClose={close}
         size="lg"
         bodyMode="fill"
+        disableBodyGutters
         paperHeight="min(900px, 92vh)"
         fullScreenOnMobile
         footerStart={

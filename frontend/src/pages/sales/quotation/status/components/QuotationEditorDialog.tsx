@@ -71,6 +71,7 @@ export function QuotationEditorDialog({
         title={isEditMode ? '견적 수정' : '견적 상세보기'}
         size="lg"
         bodyMode="fill"
+        disableBodyGutters
         paperHeight="min(900px, 92vh)"
         fullScreenOnMobile
         actions={footerActions}

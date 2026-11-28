@@ -56,9 +56,16 @@ public class SalesStatementApiController {
 
     @GetMapping("/source-deliveries")
     public ResultVO sources(@RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String deliveryDtFrom,
+            @RequestParam(required = false) String deliveryDtTo,
+            @RequestParam(required = false) String deliveryType,
+            @RequestParam(required = false) String customerKeyword,
+            @RequestParam(required = false) String materialKeyword,
+            @RequestParam(required = false) String deliveryNo,
             @AuthenticationPrincipal LoginVO user) throws Exception {
         require(user, "statement-create", Action.READ);
-        return result("items", service.sources(user.getTenantId(), user.getId(), keyword));
+        return result("items", service.sources(user.getTenantId(), user.getId(), keyword, deliveryDtFrom,
+                deliveryDtTo, deliveryType, customerKeyword, materialKeyword, deliveryNo));
     }
 
     @GetMapping("/status")

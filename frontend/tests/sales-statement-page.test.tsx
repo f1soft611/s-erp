@@ -4,13 +4,15 @@ import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router-d
 import { beforeEach, expect, it, vi } from 'vitest';
 import { SalesStatementCreatePage } from '../src/pages/sales/shipment/statement/create/SalesStatementCreatePage';
 import { SalesStatementStatusPage } from '../src/pages/sales/shipment/statement/status/SalesStatementStatusPage';
-import { createStatement, getStatement, getStatementStatus, searchStatementSources, updateStatement } from '../src/pages/sales/shipment/statement/services/salesStatement.service';
+import { createStatement, deleteStatement, getStatement, getStatementStatus, searchStatementSources, updateStatement } from '../src/pages/sales/shipment/statement/services/salesStatement.service';
 import { getDelivery } from '../src/pages/sales/shipment/delivery/create/services/salesDelivery.service';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
 import { getSystemDate } from '../src/shared/services/systemDateService';
+import { NotificationProvider } from '../src/shared/context/NotificationContext';
 import type { StatementItem, StatementStatusRow } from '../src/pages/sales/shipment/statement/types/salesStatement.types';
 
-vi.mock('../src/shared/services/systemDateService', () => ({
+vi.mock('../src/shared/services/systemDateService', async (original) => ({
+  ...await original<object>(),
   getSystemDate: vi.fn(),
 }));
 vi.mock('../src/pages/sales/shipment/statement/services/salesStatement.service', () => ({
@@ -39,6 +41,11 @@ const props = {
 };
 function mount(node: React.ReactNode) {
   render(<RouterProvider router={createMemoryRouter([{ path: '/', element: node }])} />);
+}
+async function searchPicker(picker: HTMLElement) {
+  const input = within(picker).getByRole('textbox', { name: '출하번호·거래처 검색' });
+  await waitFor(() => expect(input).toBeEnabled());
+  fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
 }
 beforeEach(() => {
   vi.clearAllMocks();
@@ -209,11 +216,11 @@ it('groups selected detail lines from multiple same-customer deliveries into one
   });
   fireEvent.click(screen.getByRole('button', { name: '출하 선택' }));
   const picker = screen.getByRole('dialog', { name: '출하 선택' });
-  fireEvent.keyDown(within(picker).getByRole('textbox', { name: '출하번호·거래처 검색' }), { key: 'Enter', code: 'Enter' });
+  await searchPicker(picker);
   await within(picker).findByText('SD-1');
   fireEvent.click(within(picker).getByLabelText('1 행 선택'));
   fireEvent.click(within(picker).getByLabelText('4 행 선택'));
-  fireEvent.click(within(picker).getByRole('button', { name: '선택 완료' }));
+  fireEvent.click(within(picker).getByRole('button', { name: '선택', exact: true }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: '출하 선택' })).not.toBeInTheDocument());
   await screen.findByDisplayValue(/SD-1.*SD-2/);
   const grid = screen.getByRole('grid', { name: '거래명세서 상세 목록' });
@@ -234,7 +241,7 @@ it('prevents grouping deliveries from different customers', async () => {
   mount(<SalesStatementCreatePage {...props} />);
   fireEvent.click(screen.getByRole('button', { name: '출하 선택' }));
   const picker = screen.getByRole('dialog', { name: '출하 선택' });
-  fireEvent.keyDown(within(picker).getByRole('textbox', { name: '출하번호·거래처 검색' }), { key: 'Enter', code: 'Enter' });
+  await searchPicker(picker);
   await within(picker).findByText('SD-1');
   fireEvent.click(within(picker).getByLabelText('1 행 선택'));
 
@@ -250,10 +257,10 @@ it('requires at least one selected detail before creating a statement', async ()
   mount(<SalesStatementCreatePage {...props} />);
   fireEvent.click(screen.getByRole('button', { name: '출하 선택' }));
   const picker = screen.getByRole('dialog', { name: '출하 선택' });
-  fireEvent.keyDown(within(picker).getByRole('textbox', { name: '출하번호·거래처 검색' }), { key: 'Enter', code: 'Enter' });
+  await searchPicker(picker);
   await within(picker).findByText('SD-1');
   fireEvent.click(within(picker).getByLabelText('1 행 선택'));
-  fireEvent.click(within(picker).getByRole('button', { name: '선택 완료' }));
+  fireEvent.click(within(picker).getByRole('button', { name: '선택', exact: true }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: '출하 선택' })).not.toBeInTheDocument());
   await screen.findByDisplayValue('SD-1');
   fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
@@ -272,10 +279,10 @@ it('shows the 100-detail limit before submitting a statement', async () => {
   mount(<SalesStatementCreatePage {...props} />);
   fireEvent.click(screen.getByRole('button', { name: '출하 선택' }));
   const picker = screen.getByRole('dialog', { name: '출하 선택' });
-  fireEvent.keyDown(within(picker).getByRole('textbox', { name: '출하번호·거래처 검색' }), { key: 'Enter', code: 'Enter' });
+  await searchPicker(picker);
   await within(picker).findByText('SD-1');
   fireEvent.click(within(picker).getByLabelText('1 행 선택'));
-  fireEvent.click(within(picker).getByRole('button', { name: '선택 완료' }));
+  fireEvent.click(within(picker).getByRole('button', { name: '선택', exact: true }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: '출하 선택' })).not.toBeInTheDocument());
   await screen.findByDisplayValue('SD-1');
   const grid = screen.getByRole('grid', { name: '거래명세서 상세 목록' });
@@ -317,6 +324,64 @@ it('opens the same registration form from status detail and prints its stored sn
   }
   await waitFor(() => expect(getStatement).toHaveBeenCalledWith(3));
 });
+it('refreshes the status list quietly after saving in the edit dialog', async () => {
+  const row = { ...detail, salesStatementId: 3, statementNo: 'TS-1',
+    statementDt: '2026-11-09', deliveryNo: 'SD-1', customerCode: 'C1', customerName: '거래처', lineTotalAmt: 220 };
+  let finishReload!: (rows: StatementStatusRow[]) => void;
+  vi.mocked(getStatementStatus).mockResolvedValueOnce([row])
+    .mockImplementationOnce(() => new Promise((resolve) => { finishReload = resolve; }));
+  vi.mocked(updateStatement).mockResolvedValue({ ...item, remark: '조용한 갱신' });
+  mount(<SalesStatementStatusPage {...props} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'TS-1 상세 보기' }));
+  const panel = await screen.findByRole('region', { name: '거래명세서 상세' });
+  await within(panel).findByRole('table', { name: '거래명세서 품목 목록' });
+  fireEvent.click(within(panel).getByRole('button', { name: '거래명세서 더보기' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+  const dialog = await screen.findByRole('dialog', { name: '거래명세서 수정' });
+  await within(dialog).findByDisplayValue('TS-1');
+  fireEvent.change(within(dialog).getByRole('textbox', { name: '비고' }), { target: { value: '조용한 갱신' } });
+  const save = within(dialog).getByRole('button', { name: '저장', exact: true });
+  await waitFor(() => expect(save).toBeEnabled());
+  fireEvent.click(save);
+
+  await waitFor(() => expect(getStatementStatus).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '거래명세서 수정' })).not.toBeInTheDocument());
+  const grid = screen.getByRole('grid', { name: '거래명세서현황 목록' });
+  expect(grid).not.toHaveAttribute('aria-busy');
+  expect(grid).toHaveTextContent('TS-1');
+  await act(async () => finishReload([row]));
+}, 20000);
+async function openStatementEditor() {
+  vi.mocked(getStatementStatus).mockResolvedValue([{ ...detail, salesStatementId: 3, statementNo: 'TS-1',
+    statementDt: '2026-11-09', deliveryNo: 'SD-1', customerCode: 'C1', customerName: '거래처', lineTotalAmt: 220 }]);
+  render(<NotificationProvider><RouterProvider router={createMemoryRouter([
+    { path: '/', element: <SalesStatementStatusPage {...props} /> }])} /></NotificationProvider>);
+  fireEvent.click(await screen.findByRole('button', { name: 'TS-1 상세 보기' }));
+  const panel = await screen.findByRole('region', { name: '거래명세서 상세' });
+  await within(panel).findByRole('table', { name: '거래명세서 품목 목록' });
+  fireEvent.click(within(panel).getByRole('button', { name: '거래명세서 더보기' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+  const dialog = await screen.findByRole('dialog', { name: '거래명세서 수정' });
+  await within(dialog).findByDisplayValue('TS-1');
+  fireEvent.click(within(dialog).getByRole('button', { name: '삭제' }));
+  const confirm = await screen.findByRole('dialog', { name: '거래명세서 삭제' });
+  fireEvent.click(within(confirm).getByRole('button', { name: '확인' }));
+  return dialog;
+}
+it('shows the statement delete success as a toast after the edit dialog closes', async () => {
+  vi.mocked(deleteStatement).mockResolvedValue(undefined);
+  await openStatementEditor();
+  await waitFor(() => expect(deleteStatement).toHaveBeenCalledWith(3));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '거래명세서 수정' })).not.toBeInTheDocument());
+  expect(await screen.findByText('거래명세서가 삭제되었습니다. 명세번호: TS-1')).toBeInTheDocument();
+}, 20000);
+it('keeps a statement delete failure inside the edit dialog without a success toast', async () => {
+  vi.mocked(deleteStatement).mockRejectedValue(new Error('서버가 삭제하지 못했습니다.'));
+  const dialog = await openStatementEditor();
+  expect(await within(dialog).findByText('서버가 삭제하지 못했습니다.')).toBeInTheDocument();
+  expect(dialog).toBeInTheDocument();
+  expect(screen.queryByText(/거래명세서가 삭제되었습니다/)).not.toBeInTheDocument();
+}, 20000);
 it('opens the source delivery detail panel from the status delivery number', async () => {
   vi.mocked(getStatementStatus).mockResolvedValue([{ ...detail, salesStatementId: 3, statementNo: 'TS-1',
     statementDt: '2026-11-09', deliveryNo: 'SD-1', sourceDeliveryId: 1, sourceDeliveryNo: 'SD-1',

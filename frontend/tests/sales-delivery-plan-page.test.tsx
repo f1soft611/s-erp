@@ -17,6 +17,10 @@ import * as decimalColumns from '../src/shared/services/decimalColumnContract';
 
 vi.setConfig({ testTimeout: 15000 });
 
+const notification = vi.hoisted(() => ({ showSuccess: vi.fn(), showWarning: vi.fn(), showError: vi.fn() }));
+// 성공 문구는 공통 토스트(showSuccess)로 표시된다.
+vi.mock('../src/shared/context/notification', () => ({ useNotification: () => notification }));
+
 vi.mock('../src/pages/sales/shipment/deliveryplan/services/salesDeliveryPlan.service', async (original) => ({
   ...await original<object>(),
   createDeliveryPlan: vi.fn(), getDeliveryPlan: vi.fn(), getDeliveryPlanByOrder: vi.fn(), getDeliveryPlanStatus: vi.fn(),
@@ -386,6 +390,64 @@ it('commits a cell when save is clicked without pressing Enter', async () => {
   })));
 });
 
+it('shows a save failure only inside the edit dialog and keeps it off the status page', async () => {
+  vi.mocked(updateDeliveryPlan).mockRejectedValueOnce(new Error('계획 저장 서버 오류'));
+  await renderReady(<SalesDeliveryPlanStatusPage {...props} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
+  await screen.findByRole('group', { name: '출하계획 정보' });
+  fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+  const dialog = screen.getByRole('dialog', { name: '출하계획 수정' });
+  const cell = planCell(within(dialog).getByRole('grid'), 0, 5);
+  fireEvent.doubleClick(cell);
+  fireEvent.change(cell.querySelector('input')!, { target: { value: '7' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장', exact: true }));
+
+  expect(await within(dialog).findByText('계획 저장 서버 오류')).toBeInTheDocument();
+  expect(screen.getAllByText('계획 저장 서버 오류')).toHaveLength(1);
+  // 등록 화면처럼 오류 영역이 별도 여백 래퍼 없이 기본정보 패널과 같은 본문 레이아웃(gap)에 놓인다.
+  const dialogAlert = within(dialog).getByRole('alert');
+  expect(dialogAlert.parentElement).toContainElement(within(dialog).getByText('출하계획 기본정보'));
+  expect(notification.showSuccess).not.toHaveBeenCalled();
+
+  fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+  const discard = await screen.findByRole('dialog', { name: /확인|닫기/ }).catch(() => null);
+  if (discard) fireEvent.click(within(discard).getAllByRole('button').at(-1)!);
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '출하계획 수정' })).not.toBeInTheDocument());
+  expect(screen.queryByText('계획 저장 서버 오류')).not.toBeInTheDocument();
+});
+
+it('keeps the status list quiet while saving in the edit dialog and while reloading after the save', async () => {
+  let finishSave!: (value: DeliveryPlanItem) => void;
+  let finishReload!: (value: DeliveryPlanStatusRow[]) => void;
+  vi.mocked(updateDeliveryPlan).mockImplementationOnce(() => new Promise((resolve) => { finishSave = resolve; }));
+  await renderReady(<SalesDeliveryPlanStatusPage {...props} />);
+  const grid = screen.getByRole('grid', { name: '출하계획 현황 목록' });
+  fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
+  await screen.findByRole('group', { name: '출하계획 정보' });
+  fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+  const dialog = screen.getByRole('dialog', { name: '출하계획 수정' });
+  const cell = planCell(within(dialog).getByRole('grid'), 0, 5);
+  fireEvent.doubleClick(cell);
+  fireEvent.change(cell.querySelector('input')!, { target: { value: '7' } });
+  const save = within(dialog).getByRole('button', { name: '저장', exact: true });
+  fireEvent.click(save);
+
+  await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledTimes(1));
+  expect(save).toBeDisabled();
+  expect(grid).not.toHaveAttribute('aria-busy');
+  expect(grid).toHaveTextContent('DP-9');
+
+  vi.mocked(getDeliveryPlanStatus).mockImplementationOnce(() => new Promise((resolve) => { finishReload = resolve; }));
+  await act(async () => finishSave({ ...plan, details: [{ ...plan.details[0], plannedQty: 7 }] }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '출하계획 수정' })).not.toBeInTheDocument());
+  await waitFor(() => expect(getDeliveryPlanStatus).toHaveBeenCalledTimes(2));
+  expect(grid).not.toHaveAttribute('aria-busy');
+  expect(grid).toHaveTextContent('DP-9');
+  await act(async () => finishReload([statusRow]));
+});
+
 it('opens and closes the standard status detail panel', async () => {
   await renderReady(<SalesDeliveryPlanStatusPage {...props} />);
   fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
@@ -470,13 +532,12 @@ it('excludes quantities in other plans from an AUTO plan update limit', async ()
   editCell(grid, 0, 5, '7');
   fireEvent.click(screen.getByRole('button', { name: '수정 저장', exact: true }));
   await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledTimes(1));
-  await screen.findByText(/출하계획이 수정되었습니다/);
+  await waitFor(() => expect(notification.showSuccess).toHaveBeenCalledWith(expect.stringMatching(/출하계획이 수정되었습니다/)));
   grid = screen.getByRole('grid', { name: '출하계획 상세 목록' });
   editCell(grid, 0, 5, '8');
   fireEvent.click(screen.getByRole('button', { name: '수정 저장', exact: true }));
   const alert = screen.getByText('계획수량 합계가 수주수량을 초과했습니다.').closest('[role="alert"]') as HTMLElement;
   expect(alert).toHaveTextContent('계획수량 합계가 수주수량을 초과했습니다.');
-  expect(screen.queryByText(/출하계획이 수정되었습니다/)).not.toBeInTheDocument();
   expect(alert.parentElement).toBe(screen.getByRole('region', { name: '출하계획 입력 내용' }));
   expect(alert.parentElement).toHaveStyle({ paddingTop: '16px', paddingBottom: '16px' });
   expect(updateDeliveryPlan).toHaveBeenCalledTimes(1);
@@ -559,7 +620,7 @@ it('registers only selected source item rows from multiple orders with their rem
         planDt: '2026-11-08', plannedQty: 3 },
     ],
   })));
-  expect(await screen.findByText('출하계획이 등록되었습니다. 계획번호: DP-9')).toBeInTheDocument();
+  await waitFor(() => expect(notification.showSuccess).toHaveBeenCalledWith('출하계획이 등록되었습니다. 계획번호: DP-9'));
   fireEvent.click(screen.getByRole('button', { name: '신규', exact: true }));
   expect(screen.getByLabelText('계획번호')).toHaveValue('저장 시 자동 채번');
   expect(within(screen.getByRole('region', { name: '출하계획 입력 내용' }))

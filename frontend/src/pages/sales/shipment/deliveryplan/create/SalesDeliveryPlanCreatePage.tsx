@@ -1,3 +1,4 @@
+import { useNotification } from '../../../../../shared/context/notification';
 import { useMemo, useRef, useState } from 'react';
 import { Alert, Box, Button, TextField } from '@mui/material';
 import NoteAddOutlinedIcon from '@mui/icons-material/NoteAddOutlined';
@@ -53,7 +54,7 @@ export function SalesDeliveryPlanCreatePage({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const { showSuccess } = useNotification();
   const [planNo, setPlanNo] = useState('');
   const [planId, setPlanId] = useState<number | null>(null);
   const canRead = Boolean(permissions?.read);
@@ -93,7 +94,6 @@ export function SalesDeliveryPlanCreatePage({
     })));
     setPlanNo('');
     setPlanId(null);
-    setNotice('');
     setError('');
     setSourceOpen(false);
     if (deliveryPlanMode !== 'AUTO') return;
@@ -129,7 +129,6 @@ export function SalesDeliveryPlanCreatePage({
 
   const save = async () => {
     if (!canWrite) return;
-    setNotice('');
     const currentRequest = createRequest(gridRef.current?.getActiveRows() ?? rows, policy);
     const message = validateDeliveryPlan(currentRequest, selectedSources, quantityRule);
     const gridValid = gridRef.current?.validate() ?? true;
@@ -144,7 +143,7 @@ export function SalesDeliveryPlanCreatePage({
       setPlanNo(saved.planNo);
       setRows(planRowsFromDetails(saved.details));
       setFormVersion((version) => version + 1);
-      setNotice(`${planId === null ? '출하계획이 등록' : '출하계획이 수정'}되었습니다. 계획번호: ${saved.planNo}`);
+      showSuccess(`${planId === null ? '출하계획이 등록' : '출하계획이 수정'}되었습니다. 계획번호: ${saved.planNo}`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '출하계획 저장에 실패했습니다.');
     } finally { setSaving(false); }
@@ -160,7 +159,6 @@ export function SalesDeliveryPlanCreatePage({
     setFormVersion((version) => version + 1);
     setPlanNo('');
     setPlanId(null);
-    setNotice('');
     setError('');
   };
 
@@ -207,7 +205,6 @@ export function SalesDeliveryPlanCreatePage({
     <Box role="region" aria-label="출하계획 입력 내용"
       sx={{ px: 2, pt: 2, pb: 2,
         display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
-      {notice ? <Alert severity="success">{notice}</Alert> : null}
       <SalesDecimalPolicyError status={policyState.status} network={policyState.network} />
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
       <DeliveryPlanForm key={formVersion} gridRef={gridRef} storageKey="sales-delivery-plan-create-details-v1" planNo={planNo} orderNo={selectedOrderNo} orderDt={selectedOrderDates}

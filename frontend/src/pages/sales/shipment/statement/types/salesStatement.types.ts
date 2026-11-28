@@ -58,6 +58,16 @@ export type StatementItem = {
   details: StatementDetail[];
 };
 
+export type StatementSourceFilters = {
+  keyword: string;
+  deliveryDtFrom: string;
+  deliveryDtTo: string;
+  deliveryType: string;
+  customerKeyword: string;
+  materialKeyword: string;
+  deliveryNo: string;
+};
+
 export type StatementSource = {
   salesDeliveryId: number;
   customerId: number;

@@ -98,6 +98,7 @@ export function SalesOrderEditorDialog({
         title={isEditMode ? '수주 수정' : '수주 상세보기'}
         size="lg"
         bodyMode="fill"
+        disableBodyGutters
         paperHeight="min(900px, 92vh)"
         fullScreenOnMobile
         actions={footerActions}

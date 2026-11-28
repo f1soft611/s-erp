@@ -1,6 +1,6 @@
 import { apiDelete, apiGetWithExactDecimals, apiPostWithExactDecimals, apiPutWithExactDecimals } from '../../../../../shared/services/apiClient';
 import { MAX_STATEMENT_DETAIL_COUNT } from '../../../shared/statementDetailLimit';
-import type { StatementItem, StatementPayload, StatementSource, StatementStatusRow } from '../types/salesStatement.types';
+import type { StatementItem, StatementPayload, StatementSource, StatementSourceFilters, StatementStatusRow } from '../types/salesStatement.types';
 
 const PATH = '/api/v1/sales/statements';
 const DECIMAL_FIELDS = ['deliveryQty', 'unitPrice', 'supplyAmt', 'vatAmt', 'totalAmt', 'lineTotalAmt'] as const;
@@ -10,9 +10,13 @@ function item(response: { item?: StatementItem | null }): StatementItem {
   return response.item;
 }
 
-export async function searchStatementSources(keyword: string): Promise<StatementSource[]> {
+export async function searchStatementSources(filters: StatementSourceFilters): Promise<StatementSource[]> {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value.trim()) params.set(key, value.trim());
+  });
   const response = await apiGetWithExactDecimals<{ items?: StatementSource[] }>(
-    `${PATH}/source-deliveries?${new URLSearchParams({ keyword })}`,
+    `${PATH}/source-deliveries?${params}`,
     ['totalAmt'],
   );
   if (!Array.isArray(response.items)) throw new Error('출하 목록 응답을 확인해 주세요.');
