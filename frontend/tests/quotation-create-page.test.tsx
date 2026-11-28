@@ -200,6 +200,28 @@ describe('quotation create page', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent('견적이 수정되었습니다. 견적번호: QT-OLD');
     });
 
+    it('lets the editor scroll area span the dialog so the scrollbar sits at the dialog edge', async () => {
+      renderEditorDialog(() => '');
+      await screen.findByDisplayValue('QT-OLD');
+      const dialog = screen.getByRole('dialog', { name: '견적 수정' });
+      const content = dialog.querySelector('.MuiDialogContent-root') as HTMLElement;
+      expect(getComputedStyle(content)).toMatchObject({ paddingLeft: '0px', paddingRight: '0px', paddingTop: '0px' });
+      const region = within(dialog).getByRole('region', { name: '견적 입력 내용' });
+      // 기존 대화상자 본문 여백은 스크롤 영역 안쪽으로 옮겨 내용 위치를 유지한다.
+      // 좌우 여백(xs 16px·sm 24px)은 반응형 미디어 쿼리라 jsdom에서 계산되지 않아 브라우저 측정으로 확인한다.
+      expect(getComputedStyle(region)).toMatchObject({
+        overflowY: 'auto', paddingTop: '16px', paddingBottom: '16px',
+      });
+    });
+
+    it('keeps the registration page padding when opened from the menu', async () => {
+      renderEdit(() => '');
+      await screen.findByDisplayValue('QT-OLD');
+      expect(getComputedStyle(screen.getByRole('region', { name: '견적 입력 내용' }))).toMatchObject({
+        paddingLeft: '16px', paddingRight: '16px', paddingTop: '16px', paddingBottom: '16px',
+      });
+    });
+
     it('keeps a save failure inside the editor dialog without a success toast', async () => {
       vi.mocked(apiPut).mockReset();
       vi.mocked(apiPut).mockRejectedValue(new Error('서버가 저장하지 못했습니다.'));

@@ -5,6 +5,7 @@ import { Alert, Box, Button, Chip, Divider, IconButton, Link, Menu, MenuItem, St
 import SearchIcon from '@mui/icons-material/Search';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
+import { COMMON_DIALOG_BODY_PADDING } from '../../../../../shared/components/commonDialogLayout';
 import { ProfileAvatar } from '../../../../../shared/components/ProfileAvatar';
 import { resetGridDecimalPolicyCache } from '../../../../../shared/services/gridDecimalPolicy.service';
 import { PageLoadBoundary } from '../../../../../shared/components/PageLoadBoundary';
@@ -336,11 +337,11 @@ export function SalesDeliveryPlanStatusPage({
         </Stack>
       </PostDetailPanel></PageAreaOverlay> : null}
     {selected && dialogMode ? <CommonDialog open title={dialogMode === 'edit' ? '출하계획 수정' : '출하계획 상세보기'}
-      onClose={closeDialog} size="lg" bodyMode="fill" paperHeight="min(900px, 92vh)" fullScreenOnMobile
+      onClose={closeDialog} size="lg" bodyMode="fill" disableBodyGutters paperHeight="min(900px, 92vh)" fullScreenOnMobile
       actions={dialogMode === 'edit' ? <><Button variant="contained" disabled={saving || !policyReady} onClick={() => void save()}>저장</Button>
         <Button disabled={saving} onClick={closeDialog}>취소</Button></> : <Button onClick={closeDialog}>닫기</Button>}>
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      <Box sx={{ p: 0, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
+      <Box sx={{ ...COMMON_DIALOG_BODY_PADDING, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
         {/* 등록 화면(embedded)과 같이 본문 레이아웃(gap)에 바로 놓아 여백·폭을 맞춘다. */}
         {dialogError ? <Alert severity="error" onClose={() => setDialogError('')}>{dialogError}</Alert> : null}
         <SalesDecimalPolicyError status={policyState.status} network={policyState.network} />

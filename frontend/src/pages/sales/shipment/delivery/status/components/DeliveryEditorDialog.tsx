@@ -39,6 +39,7 @@ export function DeliveryEditorDialog({ id, mode, page, permissions, onClose, onS
         onClose={close}
         size="lg"
         bodyMode="fill"
+        disableBodyGutters
         paperHeight="min(900px, 92vh)"
         fullScreenOnMobile
         footerStart={

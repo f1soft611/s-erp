@@ -1,3 +1,4 @@
+import { COMMON_DIALOG_BODY_PADDING } from './commonDialogLayout';
 import CloseIcon from '@mui/icons-material/Close';
 import {
   Box,
@@ -36,6 +37,11 @@ export type CommonDialogProps = {
   paperHeight?: CSSProperties['height'];
   surfaceBackgroundColor?: CSSProperties['backgroundColor'];
   fullScreenOnMobile?: boolean;
+  /**
+   * true면 본문(DialogContent) 여백을 없앤다. 자식이 자체 스크롤 영역을 가질 때 그 영역에
+   * COMMON_DIALOG_BODY_PADDING을 적용하면 내용 위치는 같고 세로 스크롤바가 창 오른쪽 끝에 생긴다.
+   */
+  disableBodyGutters?: boolean;
   dialogProps?: Omit<
     DialogProps,
     'open' | 'onClose' | 'children' | 'fullWidth' | 'maxWidth' | 'fullScreen'
@@ -58,6 +64,7 @@ export function CommonDialog({
   bodyMode = 'content',
   paperHeight,
   surfaceBackgroundColor,
+  disableBodyGutters = false,
   fullScreenOnMobile = false,
   dialogProps,
 }: CommonDialogProps) {
@@ -199,8 +206,7 @@ export function CommonDialog({
         }}
         sx={{
           bgcolor: surfaceBackground,
-          px: { xs: 2, sm: 3 },
-          py: 2,
+          ...(disableBodyGutters ? { px: 0, py: 0 } : COMMON_DIALOG_BODY_PADDING),
         }}
       >
         {children}

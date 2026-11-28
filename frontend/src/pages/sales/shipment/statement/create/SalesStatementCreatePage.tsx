@@ -1,3 +1,4 @@
+import { COMMON_DIALOG_BODY_PADDING } from '../../../../../shared/components/commonDialogLayout';
 import SearchIcon from '@mui/icons-material/Search';
 import SaveIcon from '@mui/icons-material/Save';
 import NoteAddOutlinedIcon from '@mui/icons-material/NoteAddOutlined';
@@ -60,7 +61,7 @@ export function SalesStatementCreatePage(props: SalesStatementCreateProps) {
     <PageLoadBoundary {...initialLoad} error={initialLoad.error ?? (policyState.network ? 'network' : null)} label="거래명세서등록"
       onRetry={() => { if (policyState.network) resetGridDecimalPolicyCache(); retryLoad(); }}>
     <Box role="region" aria-label="거래명세서 입력 내용" aria-busy={pending}
-      sx={{ px: embedded ? 0 : 2, pt: embedded ? 0 : 2, pb: embedded ? 0 : 2,
+      sx={{ ...(embedded ? COMMON_DIALOG_BODY_PADDING : { px: 2, pt: 2, pb: 2 }),
         display: 'flex', flexDirection: 'column',
         minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}

@@ -1,3 +1,4 @@
+import { COMMON_DIALOG_BODY_PADDING } from '../../../../shared/components/commonDialogLayout';
 import { useNotification } from '../../../../shared/context/notification';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isApiNetworkError } from '../../../../shared/services/apiErrors';
@@ -595,7 +596,7 @@ export function QuotationCreatePage({
         sx={{
           display: 'flex', flex: 1, flexDirection: 'column', gap: 2, minHeight: 0,
           minWidth: 0, overflowX: 'hidden', overflowY: 'auto',
-          px: embedded ? 0 : 2, pt: embedded ? 0 : 2, pb: embedded ? 0 : 2,
+          ...(embedded ? COMMON_DIALOG_BODY_PADDING : { px: 2, pt: 2, pb: 2 }),
         }}
       >
         {dateError ? (

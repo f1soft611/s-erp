@@ -1,3 +1,4 @@
+import { COMMON_DIALOG_BODY_PADDING } from '../../../../../shared/components/commonDialogLayout';
 import { useNotification } from '../../../../../shared/context/notification';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBlocker } from 'react-router-dom';
@@ -253,7 +254,7 @@ export function SalesDeliveryCreatePage({
   return <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
     {!embedded ? <PageHeader breadcrumbItems={breadcrumbItems.length ? breadcrumbItems : [currentMenuName]} description={content.description} actionGroups={actions} /> : null}
     <Box role="region" aria-label="출하 입력 내용" aria-busy={pending || loading}
-      sx={{ px: embedded ? 0 : 2, pt: embedded ? 0 : 2, pb: embedded ? 0 : 2,
+      sx={{ ...(embedded ? COMMON_DIALOG_BODY_PADDING : { px: 2, pt: 2, pb: 2 }),
         display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
       <PageLoadBoundary loading={loading} error={loadError ?? (policyState.network ? 'network' : null)} label="출하등록"
         onRetry={() => { if (policyState.network) resetGridDecimalPolicyCache(); if (savedId) void load(savedId); else setDateRetry((value) => value + 1); }}>
