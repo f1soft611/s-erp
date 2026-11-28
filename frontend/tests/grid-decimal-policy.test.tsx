@@ -6,6 +6,7 @@ import { GridDecimalModuleProvider } from '../src/shared/components/f1-grid/core
 import { usePolicyDecimalRule, usePolicyDecimalStatus } from '../src/shared/components/f1-grid/core/gridDecimalPolicyContext';
 import { roundGridNumber } from '../src/shared/components/f1-grid/utils/grid.utils';
 import { resetGridDecimalPolicyCache } from '../src/shared/services/gridDecimalPolicy.service';
+import { ApiNetworkError, ApiResponseError } from '../src/shared/services/apiErrors';
 import type { F1GridColumn } from '../src/shared/components/f1-grid/types/grid.types';
 import { createSalesOrderDetailColumns, createSalesOrderDetailRow } from '../src/pages/sales/order/create/data/salesOrderDetail';
 
@@ -305,6 +306,19 @@ describe('F1Grid module decimal policy', () => {
     expect(await screen.findByText('error:-')).toBeInTheDocument();
     act(() => resetGridDecimalPolicyCache());
     expect(await screen.findByText('ready:3')).toBeInTheDocument();
+  });
+
+  it.each([
+    [new ApiNetworkError(), 'error:network'],
+    [new ApiResponseError('server', 500), 'error:other'],
+  ])('flags a policy lookup that failed because the server was unreachable', async (cause, expected) => {
+    apiGet.mockRejectedValue(cause);
+    function Probe() {
+      const { status, network } = usePolicyDecimalStatus();
+      return <output aria-label="정책 연결 상태">{status}:{network ? 'network' : 'other'}</output>;
+    }
+    render(<GridDecimalModuleProvider moduleCode="SALES"><Probe /></GridDecimalModuleProvider>);
+    expect(await screen.findByText(expected)).toBeInTheDocument();
   });
 
   it('does not request the policy outside a module context', () => {

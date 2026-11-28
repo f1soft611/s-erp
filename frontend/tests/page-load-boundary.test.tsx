@@ -1,8 +1,53 @@
 import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { PageLoadBoundary } from '../src/shared/components/PageLoadBoundary';
-import { useInitialLoadState } from '../src/shared/hooks/useInitialLoadState';
-import { ApiNetworkError, ApiResponseError } from '../src/shared/services/apiErrors';
+import { toPageLoadError, useInitialLoadState } from '../src/shared/hooks/useInitialLoadState';
+import { ApiNetworkError, ApiResponseError, isApiNetworkError } from '../src/shared/services/apiErrors';
+import { SalesDecimalPolicyError } from '../src/pages/sales/shared/SalesDecimalPolicyError';
+
+describe('server connection failure classification', () => {
+  it.each([
+    [new ApiNetworkError(), 'network'],
+    [new ApiResponseError('expired', 401), 'authentication'],
+    [new ApiResponseError('denied', 403), 'forbidden'],
+    [new ApiResponseError('server', 500), 'server'],
+    [new Error('unknown'), 'server'],
+  ])('classifies %s as %s', (cause, expected) => {
+    expect(toPageLoadError(cause)).toBe(expected);
+  });
+
+  it('detects only connection failures as network errors', () => {
+    expect(isApiNetworkError(new ApiNetworkError())).toBe(true);
+    expect(isApiNetworkError(new ApiResponseError('server', 500))).toBe(false);
+    expect(isApiNetworkError(new Error('unknown'))).toBe(false);
+    expect(isApiNetworkError(null)).toBe(false);
+  });
+
+  it.each([
+    [new ApiResponseError('server', 500)],
+    [new ApiResponseError('expired', 401)],
+    [new ApiResponseError('denied', 403)],
+  ])('leaves non-connection failures to the in-page message when networkOnly is set (%s)', (cause) => {
+    const { result } = renderHook(() => useInitialLoadState({ networkOnly: true }));
+    act(() => result.current.start());
+    act(() => result.current.fail(cause));
+    expect(result.current.error).toBeNull();
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('still shows the page failure for a connection failure when networkOnly is set', () => {
+    const { result } = renderHook(() => useInitialLoadState({ networkOnly: true }));
+    act(() => result.current.fail(new ApiNetworkError()));
+    expect(result.current.error).toBe('network');
+  });
+
+  it('hides the decimal policy notice when the page failure already covers a connection failure', () => {
+    const view = render(<SalesDecimalPolicyError status="error" network />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    view.rerender(<SalesDecimalPolicyError status="error" />);
+    expect(screen.getByRole('alert')).toHaveTextContent('소수점 정책을 불러오지 못했습니다');
+  });
+});
 
 describe('initial page load failures', () => {
   it('retains the failure while retrying and releases it after an empty successful load', () => {
